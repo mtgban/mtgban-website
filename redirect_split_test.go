@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // A number can carry a slash - Flesh and Blood numbers a double-faced card
@@ -43,7 +43,7 @@ func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
 		t.Skip("opening the datastore:", err)
 	}
 	defer f.Close()
-	b, err := mtgmatcher.Open("fleshandblood", f)
+	b, err := matcher.Open("fleshandblood", f)
 	if err != nil {
 		t.Skip("loading the datastore:", err)
 	}

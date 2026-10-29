@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/fuzzy"
 )
 
@@ -25,8 +25,8 @@ var sealedTypeKeywords = []string{
 
 // Closest returns the canonical card (or sealed product) name in b closest
 // to query, used to power "did you mean..." suggestions.
-func Closest(b *mtgmatcher.Backend, query string, sealed bool) string {
-	return fuzzy.Closest(query, b.Names(mtgmatcher.NameFormCanonical, sealed))
+func Closest(b *matcher.Backend, query string, sealed bool) string {
+	return fuzzy.Closest(query, b.Names(matcher.NameFormCanonical, sealed))
 }
 
 // AltSearch is a suggested query offered when a search yields no results,
@@ -39,7 +39,7 @@ type AltSearch struct {
 // Params describes the failed search a suggestion is being built for.
 type Params struct {
 	// Backend is the datastore snapshot used to build suggestions.
-	Backend *mtgmatcher.Backend
+	Backend *matcher.Backend
 	// RawQuery is the query as the user typed it.
 	RawQuery string
 	// CleanQuery is the query with all filters stripped.
@@ -97,7 +97,7 @@ func relaxedSearches(rawQuery, cleanQuery string, appliedFilters []string) []Alt
 // (mapped to t: filters) and a set-name fragment (containment-matched
 // against sets that actually carry sealed product), then rebuild a query
 // the sealed engine understands. Returns nil when no set can be identified.
-func sealedQuerySuggestion(b *mtgmatcher.Backend, rawQuery string) *AltSearch {
+func sealedQuerySuggestion(b *matcher.Backend, rawQuery string) *AltSearch {
 	fields := strings.Fields(strings.ToLower(rawQuery))
 	if len(fields) == 0 {
 		return nil

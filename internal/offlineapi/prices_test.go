@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/internal/offline"
 )
 
@@ -32,10 +32,10 @@ func TestServePricesCanonicalSetCode(t *testing.T) {
 	t.Cleanup(func() { s.manifestStore.Set(manifestFile{}) })
 
 	var gotCode string
-	s.deps.CanonicalSetCode = func(b *mtgmatcher.Backend, code string) (string, error) {
+	s.deps.CanonicalSetCode = func(b *matcher.Backend, code string) (string, error) {
 		return "NEO", nil
 	}
-	s.deps.BuildSetPayload = func(b *mtgmatcher.Backend, setCode string, sellers, vendors []string) (*offline.SetPayload, error) {
+	s.deps.BuildSetPayload = func(b *matcher.Backend, setCode string, sellers, vendors []string) (*offline.SetPayload, error) {
 		gotCode = setCode
 		return &offline.SetPayload{SetCode: setCode, Snapshot: time.Now()}, nil
 	}

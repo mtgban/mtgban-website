@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
@@ -245,7 +245,7 @@ func TestUnpackActionShipsNoList(t *testing.T) {
 	}
 }
 
-func mustCard(t *testing.T, uuid string) *mtgmatcher.CardObject {
+func mustCard(t *testing.T, uuid string) *matcher.CardObject {
 	t.Helper()
 	co, err := backend().GetUUID(uuid)
 	if err != nil {

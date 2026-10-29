@@ -43,7 +43,7 @@ Core capabilities:
 - **Discord bot** — price lookups and affiliate-link rewriting in Discord.
 
 Key dependency: `github.com/mtgban/go-mtgban` supplies the card database
-(`mtgmatcher`: UUID canonicalization, fuzzy matching, sets, sealed contents)
+(`matcher`: UUID canonicalization, fuzzy matching, sets, sealed contents)
 and the scraper abstractions (`mtgban`: `Seller`/`Vendor` interfaces,
 `InventoryRecord`/`BuylistRecord` maps of UUID → price entries, `Arbit()`
 /`Mismatch()` comparison helpers) for every game the site deploys, not just
@@ -107,8 +107,8 @@ Boot sequence (`main()`):
    a reload requested before this finishes is queued to run once it ends
    instead of racing it (one waits at most, the latest request), and a panic
    building a snapshot is recovered instead of killing the process. `loadDatastore` opens the site's game via
-   `mtgmatcher.Open(datastoreGame(), reader)` (not the old
-   `mtgmatcher.LoadDatastore()`), builds the numbers/names/editions
+   `matcher.Open(datastoreGame(), reader)` (not the old
+   `matcher.LoadDatastore()`), builds the numbers/names/editions
    snapshots and the palette's sets/promos/finishes lists from it
    (`s.newDatastore()`, site.go), publishes backend and snapshots
    together in one `s.ds.Store()`, then itself spawns
@@ -260,7 +260,7 @@ read, or its workflow state's names.
 
 - **Card datastore**: `Config.DatastorePath` (per-deployment; falls back to
   `AllPrintings.json.xz`) from local disk, B2, or HTTPS via
-  `openBucketPath()`; opened through `mtgmatcher.Open(datastoreGame(), …)`
+  `openBucketPath()`; opened through `matcher.Open(datastoreGame(), …)`
   and indexed per game — this is now a multi-game site (magic, lorcana,
   onepiece, yugioh, riftbound, fleshandblood, pokemon, gundam, palworld).
   Reloadable from the admin panel (`?tool=datastore`).
@@ -619,7 +619,7 @@ override; phone UA detection via `mileusna/useragent`).
   ask instead of assuming every row is a dollar amount.
 - **Suggest** (`SuggestAPI` in `api_suggest.go`, matching in
   `internal/suggest`): no longer a live prefix scan of
-  `mtgmatcher.AllNames()` per request. A `suggest.Names` is built once when
+  `matcher.AllNames()` per request. A `suggest.Names` is built once when
   the datastore (re)loads (`suggest.NewNames(singles, sealed)`, called from
   `s.newDatastore()`), folding every name
   (diacritics/case/punctuation stripped) and also "squashing" spaces out of
@@ -708,7 +708,7 @@ increase/decrease, CK buylist increase/decrease), defined declaratively
 with their SQL (`newspaperPagesInitial`), all query one PostgreSQL
 `NewNewspaperDB` populated by external scripts into `scripts__*_cards`
 tables. Each page's query filters on `game_name`, substituted per
-deployment from `gameMap` (full game names for every game `mtgmatcher`
+deployment from `gameMap` (full game names for every game `matcher`
 registers, gundam/palworld included — without an entry, every refresh
 logs it, pages left empty — each TCGplayer's exact `productLineName`,
 which is what the newspaper stores); the short form for the navbar wordmark

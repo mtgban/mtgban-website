@@ -66,7 +66,7 @@ func WithLongFormWrites(on bool) Option {
 
 // WithProductReport hands each synced game's catalog to fn after it is stored.
 // The server uses it to report how many products resolve to a loaded card
-// identity, which needs the mtgmatcher datastore the standalone binary doesn't
+// identity, which needs the matcher datastore the standalone binary doesn't
 // have — hence a hook rather than a dependency.
 func WithProductReport(fn func(categoryID int, products []timeseries.TCGProduct)) Option {
 	return func(s *Service) { s.report = fn }

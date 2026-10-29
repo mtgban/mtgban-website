@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 
 	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/internal/siteorigin"
@@ -41,7 +41,7 @@ func (s *site) alertPrices(cardID string, side alerts.Side, v url.Values) []aler
 
 // alertVisiblePrices is a card's store prices on one side, less the
 // stores the ACL values block.
-func alertVisiblePrices(b *mtgmatcher.Backend, cardID string, side alerts.Side, v url.Values) []alerts.StorePrice {
+func alertVisiblePrices(b *matcher.Backend, cardID string, side alerts.Side, v url.Values) []alerts.StorePrice {
 	co, err := b.GetUUID(cardID)
 	sealed := err == nil && co.Sealed
 	retail, buylist := blocklistsFromValues(v)

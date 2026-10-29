@@ -1,7 +1,7 @@
 // Package docparse turns uploaded inventory lists (CSV/XLS rows, decklist
 // lines) into matched card entries. It recognizes the column layouts of the
 // mtgban export format and the common deckbuilding/store tools, and resolves
-// each row through mtgmatcher by uuid, TCGplayer SKU, or name.
+// each row through matcher by uuid, TCGplayer SKU, or name.
 package docparse
 
 import (
@@ -11,8 +11,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // ErrDecklist reports that the input has no header row and should be
@@ -26,7 +26,7 @@ var ErrReloadFirstRow = errors.New("firstrow")
 // Entry is a single uploaded row, matched to a card when possible.
 type Entry struct {
 	// A reference to the parsed card
-	Card mtgmatcher.InputCard
+	Card matcher.InputCard
 
 	// The UUID of the card
 	CardID string
@@ -94,7 +94,7 @@ func (e Entry) QuantityOrOne() int {
 type Parser struct {
 	// Backend is the datastore every row is matched against; nil means an
 	// empty one.
-	Backend *mtgmatcher.Backend
+	Backend *matcher.Backend
 	// Logf receives diagnostic lines about header detection. Optional.
 	Logf func(format string, v ...any)
 
@@ -119,11 +119,11 @@ type Parser struct {
 	PreferredPrinting func(uuidA, uuidB string) bool
 }
 
-func (p *Parser) backend() *mtgmatcher.Backend {
+func (p *Parser) backend() *matcher.Backend {
 	if p.Backend != nil {
 		return p.Backend
 	}
-	return &mtgmatcher.Backend{}
+	return &matcher.Backend{}
 }
 
 func (p *Parser) logf(format string, v ...any) {
@@ -452,7 +452,7 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 		}
 
 		// Parse "Rift Bolt (TSP)"
-		vars := mtgmatcher.SplitVariants(line)
+		vars := matcher.SplitVariants(line)
 		if len(vars) > 1 {
 			maybeEdition := vars[1]
 			// Only assign edition if it's a known set code
@@ -573,7 +573,7 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 
 	idx, found = indexMap["price"]
 	if found && idx < len(record) {
-		res.OriginalPrice, _ = mtgmatcher.ParsePrice(record[idx])
+		res.OriginalPrice, _ = matcher.ParsePrice(record[idx])
 	}
 
 	switch {
@@ -621,7 +621,7 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 		}
 	}
 
-	var alias *mtgmatcher.AliasingError
+	var alias *matcher.AliasingError
 	if errors.As(err, &alias) {
 		// Keep the most recent printing available in case of aliasing
 		aliases := alias.Probe()

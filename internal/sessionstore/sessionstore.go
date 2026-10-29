@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/internal/docparse"
 )
@@ -93,9 +93,9 @@ func InfoFromForm(r *http.Request) mtgban.ScraperInfo {
 // the scrapers that come in pairs are split. An unmatched row has nothing to
 // key on, and an opened product is not being traded as itself. A nil backend
 // reads as empty, so nothing resolves as sealed.
-func FromEntries(kind string, info mtgban.ScraperInfo, entries []docparse.Entry, backend *mtgmatcher.Backend) (mtgban.Scraper, Report, error) {
+func FromEntries(kind string, info mtgban.ScraperInfo, entries []docparse.Entry, backend *matcher.Backend) (mtgban.Scraper, Report, error) {
 	if backend == nil {
-		backend = &mtgmatcher.Backend{}
+		backend = &matcher.Backend{}
 	}
 	var report Report
 	if kind != Retail && kind != Buylist {
@@ -229,7 +229,7 @@ func (reg *Registry) Is(kind, shorthand string) bool {
 // one already serving that was not published this way, is refused: a
 // session store may replace an earlier one of its own kind, never a real
 // one. The lookups a host does are case-insensitive, so this is too.
-func (reg *Registry) Publish(b *mtgmatcher.Backend, kind string, info mtgban.ScraperInfo, entries []docparse.Entry) (Report, error) {
+func (reg *Registry) Publish(b *matcher.Backend, kind string, info mtgban.ScraperInfo, entries []docparse.Entry) (Report, error) {
 	var report Report
 	if info.Name == "" || info.Shorthand == "" {
 		return report, errors.New("a store needs a name and a shorthand")

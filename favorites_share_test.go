@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/userstate"
 )
 
@@ -42,7 +42,7 @@ const liveShareID = "AAAAAAAAAAAAAAAAAAAAAA"
 // sharedMatch is the id of a real printing; a shared row must name one.
 func sharedMatch(t *testing.T, name, edition string) string {
 	t.Helper()
-	id, err := backend().Match(&mtgmatcher.InputCard{Name: name, Edition: edition})
+	id, err := backend().Match(&matcher.InputCard{Name: name, Edition: edition})
 	if err != nil {
 		t.Fatalf("%s: %v", name, err)
 	}
@@ -273,11 +273,11 @@ func TestSharedRowsReadsTheSyncShape(t *testing.T) {
 func TestSharedRowsTakeArtFromTheDatastore(t *testing.T) {
 	skipWithoutDatastore(t)
 	b := backend()
-	plain, err := b.Match(&mtgmatcher.InputCard{Name: "Black Lotus", Edition: "Limited Edition Alpha"})
+	plain, err := b.Match(&matcher.InputCard{Name: "Black Lotus", Edition: "Limited Edition Alpha"})
 	if err != nil {
 		t.Fatalf("Black Lotus: %v", err)
 	}
-	warned, err := b.Match(&mtgmatcher.InputCard{Name: "Invoke Prejudice", Edition: "Legends"})
+	warned, err := b.Match(&matcher.InputCard{Name: "Invoke Prejudice", Edition: "Legends"})
 	if err != nil {
 		t.Fatalf("Invoke Prejudice: %v", err)
 	}

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/internal/siteorigin"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
@@ -481,7 +481,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 
 	if Config().Game != DefaultGame {
 		// Append which game this site is for
-		pageVars.Title += " - " + mtgmatcher.Title(string(Config().Game))
+		pageVars.Title += " - " + matcher.Title(string(Config().Game))
 	}
 	// Allocate a new navigation bar
 	pageVars.Nav = make([]NavElem, len(DefaultNav))

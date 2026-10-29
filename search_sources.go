@@ -1,6 +1,6 @@
 package main
 
-import "github.com/mtgban/go-mtgban/mtgmatcher"
+import "github.com/mtgban/go-mtgban/matcher"
 
 // sourcesSnapshot inverts SourceProducts: for each sealed product, every
 // uuid the contents filter would keep for it, read the way the filter reads
@@ -9,7 +9,7 @@ type sourcesSnapshot struct {
 	byProduct map[string][]string
 }
 
-func newSourcesSnapshot(b *mtgmatcher.Backend) *sourcesSnapshot {
+func newSourcesSnapshot(b *matcher.Backend) *sourcesSnapshot {
 	sources := &sourcesSnapshot{byProduct: make(map[string][]string)}
 	// The two lists are disjoint: non-sealed and sealed uuids.
 	for _, list := range [][]string{b.GetUUIDs(), b.GetSealedUUIDs()} {

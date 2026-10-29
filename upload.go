@@ -28,9 +28,9 @@ import (
 	"github.com/xuri/excelize/v2"
 	"gopkg.in/Iwark/spreadsheet.v2"
 
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/mtgban-website/cardconduit"
 	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/internal/docparse"
@@ -129,7 +129,7 @@ type UploadEntry = docparse.Entry
 // the TCGplayer SKU index, and the set-recency ordering for alias
 // candidates. Built once per upload, so every row matches against the same
 // datastore.
-func newUploadParser(b *mtgmatcher.Backend) *docparse.Parser {
+func newUploadParser(b *matcher.Backend) *docparse.Parser {
 	return &docparse.Parser{
 		Backend: b,
 		Logf: func(format string, v ...any) {
@@ -824,7 +824,7 @@ func fillUploadKeys(pageVars *UploadVars, blMode bool, selected uploadStores, id
 
 // fillUploadEntries puts the rows on the page, with the line naming where they
 // came from, and counts the products left to open and those already opened.
-func fillUploadEntries(pageVars *UploadVars, r *http.Request, b *mtgmatcher.Backend, in uploadInput, uploadName string, uploadedData []UploadEntry) {
+func fillUploadEntries(pageVars *UploadVars, r *http.Request, b *matcher.Backend, in uploadInput, uploadName string, uploadedData []UploadEntry) {
 	// Orders implies priority of argument search
 	// Read here rather than passed dereferenced: a paste reaches this line
 	// with no file behind it at all.
@@ -849,7 +849,7 @@ func fillUploadEntries(pageVars *UploadVars, r *http.Request, b *mtgmatcher.Back
 
 // uploadMetadata reads what the page shows of every matched card, and of the
 // other printings the printing picker offers for it.
-func uploadMetadata(b *mtgmatcher.Backend, st uploadSettings, uploadedData []UploadEntry) cardMetadata {
+func uploadMetadata(b *matcher.Backend, st uploadSettings, uploadedData []UploadEntry) cardMetadata {
 	metadata := cardMetadata{}
 
 	// Load up image links
@@ -872,7 +872,7 @@ func uploadMetadata(b *mtgmatcher.Backend, st uploadSettings, uploadedData []Upl
 // fillUploadResults sorts the rows and the optimizer's picks, and lays them
 // out on the page: the tabs, the opened products' sections, the totals row
 // and the optimizer's sections.
-func fillUploadResults(pageVars *UploadVars, b *mtgmatcher.Backend, reprintParents map[string]string, st uploadSettings, ids uploadIDs, prices uploadPrices, rows uploadRows, uploadedData []UploadEntry) {
+func fillUploadResults(pageVars *UploadVars, b *matcher.Backend, reprintParents map[string]string, st uploadSettings, ids uploadIDs, prices uploadPrices, rows uploadRows, uploadedData []UploadEntry) {
 	sortResults(b, reprintParents, uploadedData, rows.optimizedResults, st.sorting)
 
 	// Split sorted entries into singles, sealed, and not-found for the tabbed view
@@ -950,7 +950,7 @@ type uploadRows struct {
 
 // priceUploadRows prices each matched row at the stores and indexes fetched,
 // adds up the totals, and picks the best stores for the optimizer.
-func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, prices uploadPrices, indexes uploadIndexes, uploadedData []UploadEntry) uploadRows {
+func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices uploadPrices, indexes uploadIndexes, uploadedData []UploadEntry) uploadRows {
 	rows := uploadRows{
 		resultPrices:     map[string]map[string]float64{},
 		totalEntries:     map[string]float64{},
@@ -1223,7 +1223,7 @@ type uploadRow struct {
 }
 
 // newUploadRow reads what pricing the entry needs to know about it.
-func newUploadRow(b *mtgmatcher.Backend, st uploadSettings, entry *UploadEntry) uploadRow {
+func newUploadRow(b *matcher.Backend, st uploadSettings, entry *UploadEntry) uploadRow {
 	// The sealed id list was built from this same lookup, so ask the
 	// datastore directly instead of scanning the list per row.
 	co, err := b.GetUUID(entry.CardID)
@@ -1269,7 +1269,7 @@ func (rows *uploadRows) tallyFor(product string) *unpackedTally {
 
 // redirectToSCGMassEntry sends the cards to Star City Games' mass entry and
 // redirects to the deck builder holding them.
-func redirectToSCGMassEntry(w http.ResponseWriter, r *http.Request, b *mtgmatcher.Backend, hashes, hashesQtys, hashesCond []string) error {
+func redirectToSCGMassEntry(w http.ResponseWriter, r *http.Request, b *matcher.Backend, hashes, hashesQtys, hashesCond []string) error {
 	log.Println("Preparing a mass-entry call to SCG")
 	dataID, err := SCGRetailRedirect(r.Context(), b, hashes, hashesQtys, hashesCond)
 	if err != nil {
@@ -1285,7 +1285,7 @@ func redirectToSCGMassEntry(w http.ResponseWriter, r *http.Request, b *mtgmatche
 // writeTagCSV answers with the CSV the store hashTag names (CK, SCG or TCG)
 // imports, listing the cards hashes names. When it fails it drops the
 // download headers, so the caller can answer with a page instead.
-func writeTagCSV(w http.ResponseWriter, b *mtgmatcher.Backend, hashTag string, hashes, hashesQtys, hashesCond []string) error {
+func writeTagCSV(w http.ResponseWriter, b *matcher.Backend, hashTag string, hashes, hashesQtys, hashesCond []string) error {
 	setCSVDownloadHeaders(w, "ban_"+strings.ToLower(hashTag)+".csv")
 	csvWriter := csv.NewWriter(w)
 
@@ -1306,7 +1306,7 @@ func writeTagCSV(w http.ResponseWriter, b *mtgmatcher.Backend, hashTag string, h
 
 // redirectToCardConduit sends the cards that have a Scryfall id to a
 // CardConduit estimate and redirects to it.
-func redirectToCardConduit(w http.ResponseWriter, r *http.Request, b *mtgmatcher.Backend, uploadedData []UploadEntry, multiplier, maxQty int) error {
+func redirectToCardConduit(w http.ResponseWriter, r *http.Request, b *matcher.Backend, uploadedData []UploadEntry, multiplier, maxQty int) error {
 	var items []cardconduit.Item
 	for i := range uploadedData {
 		if uploadedData[i].CardID == "" {
@@ -1354,7 +1354,7 @@ func redirectToCardConduit(w http.ResponseWriter, r *http.Request, b *mtgmatcher
 
 // writeDeckboxCSV answers with the cards as a Deckbox import. When it fails
 // it drops the download headers, so the caller can answer with a page.
-func writeDeckboxCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData []UploadEntry) error {
+func writeDeckboxCSV(w http.ResponseWriter, b *matcher.Backend, uploadedData []UploadEntry) error {
 	setCSVDownloadHeaders(w, "ban_deckbox.csv")
 	csvWriter := csv.NewWriter(w)
 
@@ -1367,7 +1367,7 @@ func writeDeckboxCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData 
 
 // writeTCGplayerCSV answers with the cards as a TCGplayer import. When it
 // fails it drops the download headers, so the caller can answer with a page.
-func writeTCGplayerCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData []UploadEntry, multiplier, maxQty int) error {
+func writeTCGplayerCSV(w http.ResponseWriter, b *matcher.Backend, uploadedData []UploadEntry, multiplier, maxQty int) error {
 	setCSVDownloadHeaders(w, "ban_tcgplayer.csv")
 	csvWriter := csv.NewWriter(w)
 
@@ -1905,7 +1905,7 @@ func readUploadModes(r *http.Request, canBuylist, magicOnlyExports bool) uploadM
 
 // loadUploadEntries reads the rows of the list the request carries, up to
 // maxRows, and the name of the deck or collection a link points at.
-func loadUploadEntries(r *http.Request, b *mtgmatcher.Backend, in uploadInput, maxRows int) ([]UploadEntry, string, error) {
+func loadUploadEntries(r *http.Request, b *matcher.Backend, in uploadInput, maxRows int) ([]UploadEntry, string, error) {
 	parser := newUploadParser(b)
 
 	// Load data
@@ -1945,7 +1945,7 @@ func loadUploadEntries(r *http.Request, b *mtgmatcher.Backend, in uploadInput, m
 
 // publishUploadStore serves the rows as a store, on the side of the book the
 // mode names, and says what it published.
-func publishUploadStore(r *http.Request, b *mtgmatcher.Backend, blMode bool, uploadedData []UploadEntry) (string, error) {
+func publishUploadStore(r *http.Request, b *matcher.Backend, blMode bool, uploadedData []UploadEntry) (string, error) {
 	kind := sessionstore.Retail
 	if blMode {
 		kind = sessionstore.Buylist
@@ -1972,7 +1972,7 @@ type uploadIDs struct {
 // splitUploadIDs splits the rows' cards into singles and sealed products. When
 // the settings skip conditions it also moves each row's condition to
 // IgnoredCondition, in place.
-func splitUploadIDs(b *mtgmatcher.Backend, uploadedData []UploadEntry, st uploadSettings) uploadIDs {
+func splitUploadIDs(b *matcher.Backend, uploadedData []UploadEntry, st uploadSettings) uploadIDs {
 	var shouldCheckForConditions bool
 
 	// Extract card Ids, separating sealed from singles
@@ -2021,7 +2021,7 @@ type uploadPrices struct {
 // fetchUploadPrices looks up the upload's singles and sealed products in the
 // stores selected, and in the custom buylist when the settings allow one and
 // the request asks for it.
-func fetchUploadPrices(r *http.Request, b *mtgmatcher.Backend, blMode bool, st uploadSettings, selected uploadStores, ids uploadIDs) uploadPrices {
+func fetchUploadPrices(r *http.Request, b *matcher.Backend, blMode bool, st uploadSettings, selected uploadStores, ids uploadIDs) uploadPrices {
 	enabledStores := selected.enabledStores
 	enabledSealedStores := selected.enabledSealedStores
 
@@ -2112,7 +2112,7 @@ func fetchUploadPrices(r *http.Request, b *mtgmatcher.Backend, blMode bool, st u
 // writePricesCSV answers with the upload's prices as a CSV, adding to them in
 // place the CSV index prices the reader keeps enabled. When it fails it drops
 // the download headers, so the caller can answer with a page.
-func writePricesCSV(w http.ResponseWriter, r *http.Request, b *mtgmatcher.Backend, st uploadSettings, selected uploadStores, ids uploadIDs, prices uploadPrices, uploadedData []UploadEntry) error {
+func writePricesCSV(w http.ResponseWriter, r *http.Request, b *matcher.Backend, st uploadSettings, selected uploadStores, ids uploadIDs, prices uploadPrices, uploadedData []UploadEntry) error {
 	csvName := "ban_prices"
 	if scope := r.FormValue("csvscope"); scope == "singles" || scope == "sealed" {
 		csvName += "_" + scope
@@ -2161,7 +2161,7 @@ type uploadIndexes struct {
 // fetchUploadIndexes looks up the index prices of the upload's singles, the
 // comparison price included, and of its sealed products, leaving out in
 // retail mode a sealed index that is also a selected store.
-func fetchUploadIndexes(b *mtgmatcher.Backend, blMode bool, st uploadSettings, selected uploadStores, ids uploadIDs, prices uploadPrices) uploadIndexes {
+func fetchUploadIndexes(b *matcher.Backend, blMode bool, st uploadSettings, selected uploadStores, ids uploadIDs, prices uploadPrices) uploadIndexes {
 	var indexKeys []string
 	indexResults := map[string]map[string]*BanPrice{}
 
@@ -2206,7 +2206,7 @@ func mergePrices(dst, src map[string]map[string]*BanPrice) {
 	}
 }
 
-func sortResults(b *mtgmatcher.Backend, reprintParents map[string]string, uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string) {
+func sortResults(b *matcher.Backend, reprintParents map[string]string, uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string) {
 	// The card-data sorts below order both the uploaded rows and every
 	// per-store optimized list, so resolve the ids of both up front.
 	resolveUploadSortingData := func() map[string]*SortingData {
@@ -2356,7 +2356,7 @@ func adjustQty(qty, multiplier, maxQty int) int {
 // unpackableSealed counts the rows that hold a decklist, which is what decides
 // whether the results offer to open them. Counting rather than opening: the
 // answer is wanted on every result page, the contents only when asked for.
-func unpackableSealed(b *mtgmatcher.Backend, entries []UploadEntry) int {
+func unpackableSealed(b *matcher.Backend, entries []UploadEntry) int {
 	var n int
 	for _, entry := range entries {
 		// A product already opened is not one left to open, so the offer goes
@@ -2399,7 +2399,7 @@ func unpackableSealed(b *mtgmatcher.Backend, entries []UploadEntry) int {
 //
 // The rows stop at maxPackedRows, as a posted list does, and cut says when a
 // product was left closed for it.
-func unpackSealed(b *mtgmatcher.Backend, entries []UploadEntry) (out []UploadEntry, cut bool) {
+func unpackSealed(b *matcher.Backend, entries []UploadEntry) (out []UploadEntry, cut bool) {
 	for _, entry := range entries {
 		co, err := b.GetUUID(entry.CardID)
 		if entry.CardID == "" || entry.Unpacked || err != nil || !co.Sealed ||
@@ -2648,7 +2648,7 @@ func isURLID(s string) bool {
 	return true
 }
 
-func loadMoxfield(ctx context.Context, b *mtgmatcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
+func loadMoxfield(ctx context.Context, b *matcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
 	var uploadEntries []UploadEntry
 
 	moxURL, err := moxfieldURL(Infrastructure().Uploader["moxfield"], link)
@@ -2677,7 +2677,7 @@ func loadMoxfield(ctx context.Context, b *mtgmatcher.Backend, link string, maxRo
 	return uploadEntries, deckName, nil
 }
 
-func loadManabox(ctx context.Context, b *mtgmatcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
+func loadManabox(ctx context.Context, b *matcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
 	items, deckName, err := manabox.Load(ctx, link, maxRows)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to fetch ManaBox deck: %w", err)
@@ -2687,7 +2687,7 @@ func loadManabox(ctx context.Context, b *mtgmatcher.Backend, link string, maxRow
 	for _, item := range items {
 		cardID, err := b.MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
 		entry := UploadEntry{
-			Card: mtgmatcher.InputCard{
+			Card: matcher.InputCard{
 				Name: item.Name,
 				Foil: item.IsFoil,
 			},
@@ -2705,7 +2705,7 @@ func loadManabox(ctx context.Context, b *mtgmatcher.Backend, link string, maxRow
 // loadCollectr fetches a public Collectr showcase (through the configured
 // proxy, which carries a browser TLS fingerprint - direct fetches from
 // datacenter IPs get blocked by Cloudflare) and matches its products.
-func loadCollectr(ctx context.Context, b *mtgmatcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
+func loadCollectr(ctx context.Context, b *matcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
 	proxyBase := Infrastructure().Uploader["collectr"]
 	if proxyBase == "" {
 		return nil, "", errors.New("no Collectr proxy is configured")
@@ -2722,7 +2722,7 @@ func loadCollectr(ctx context.Context, b *mtgmatcher.Backend, link string, maxRo
 		var matchErr error
 
 		// Try matching via TCGplayer product ID first
-		uuid := b.ConvertID(mtgmatcher.IDSpaceTCGplayer, item.ProductID)
+		uuid := b.ConvertID(matcher.IDSpaceTCGplayer, item.ProductID)
 		if uuid != "" {
 			cardID, matchErr = b.MatchID(uuid, item.IsFoil)
 		}
@@ -2742,7 +2742,7 @@ func loadCollectr(ctx context.Context, b *mtgmatcher.Backend, link string, maxRo
 					cardID = results[0]
 				}
 			} else {
-				card := mtgmatcher.InputCard{
+				card := matcher.InputCard{
 					Name:      item.Name,
 					Edition:   item.SetName,
 					Variation: item.Number,
@@ -2753,7 +2753,7 @@ func loadCollectr(ctx context.Context, b *mtgmatcher.Backend, link string, maxRo
 		}
 
 		entry := UploadEntry{
-			Card: mtgmatcher.InputCard{
+			Card: matcher.InputCard{
 				Name:    item.Name,
 				Edition: item.SetName,
 				Foil:    item.IsFoil,
@@ -2777,7 +2777,7 @@ func loadCollectr(ctx context.Context, b *mtgmatcher.Backend, link string, maxRo
 // scryfall id; deck per-copy printings carry name plus set and collector
 // number instead, resolved through the set catalog with the finish applied
 // on top.
-func resolveMoxItem(b *mtgmatcher.Backend, item moxfield.Item) (string, error) {
+func resolveMoxItem(b *matcher.Backend, item moxfield.Item) (string, error) {
 	if item.ScryfallID != "" {
 		return b.MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
 	}
@@ -2868,7 +2868,7 @@ func readCollectionPage(parser *docparse.Parser, body io.Reader, maxRows int) ([
 		// the columns of the page's own layout; the override is this row's
 		// alone, so a later row with no known id reads the page's header
 		rowMap := indexMap
-		if len(record) > 5 && parser.Backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, tcgID) != "" {
+		if len(record) > 5 && parser.Backend.ConvertID(matcher.IDSpaceTCGplayer, tcgID) != "" {
 			record[5] = tcgID
 
 			record[2] = "Normal"

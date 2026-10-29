@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/magic"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
 	"github.com/mtgban/mtgban-website/internal/tcgcatalog"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -206,7 +206,7 @@ const secretLairCategory = "Secret Lair"
 // (Drop, Countdown, Ultimate Edition, Promo, Showcase Planes, …). They all
 // share the "Secret Lair" name prefix; SLX (Universes Within) does not and is
 // intentionally excluded.
-func isSecretLairSet(set *mtgmatcher.Set) bool {
+func isSecretLairSet(set *matcher.Set) bool {
 	return strings.HasPrefix(set.Name, "Secret Lair")
 }
 
@@ -258,7 +258,7 @@ var colorValues = map[string]string{
 	"psychic":   "#F85888",
 }
 
-func makeEditionEntry(set *mtgmatcher.Set, names ...string) EditionEntry {
+func makeEditionEntry(set *matcher.Set, names ...string) EditionEntry {
 	date, _ := time.Parse("2006-01-02", set.ReleaseDate)
 
 	name := set.Name
@@ -298,7 +298,7 @@ func makeEditionEntry(set *mtgmatcher.Set, names ...string) EditionEntry {
 	}
 }
 
-func getAllEditions(b *mtgmatcher.Backend) ([]string, map[string]EditionEntry) {
+func getAllEditions(b *matcher.Backend) ([]string, map[string]EditionEntry) {
 	sets := b.GetAllSets()
 
 	sortedEditions := make([]string, 0, len(sets))
@@ -323,7 +323,7 @@ func getAllEditions(b *mtgmatcher.Backend) ([]string, map[string]EditionEntry) {
 
 // getReprintParents finds the editions printing exactly their parent's
 // card names, another border or language of the same set.
-func getReprintParents(b *mtgmatcher.Backend) map[string]string {
+func getReprintParents(b *matcher.Backend) map[string]string {
 	parents := map[string]string{}
 	for _, code := range b.GetAllSets() {
 		set, err := b.GetSet(code)
@@ -341,7 +341,7 @@ func getReprintParents(b *mtgmatcher.Backend) map[string]string {
 	return parents
 }
 
-func cardNames(cards []mtgmatcher.Card) map[string]bool {
+func cardNames(cards []matcher.Card) map[string]bool {
 	names := make(map[string]bool, len(cards))
 	for _, card := range cards {
 		names[card.Name] = true
@@ -349,7 +349,7 @@ func cardNames(cards []mtgmatcher.Card) map[string]bool {
 	return names
 }
 
-func getTreeEditions(b *mtgmatcher.Backend) ([]string, map[string][]EditionEntry) {
+func getTreeEditions(b *matcher.Backend) ([]string, map[string][]EditionEntry) {
 	sets := b.GetAllSets()
 
 	var sortedEditions []string
@@ -476,7 +476,7 @@ func flattenEditions(keys []string, tree map[string][]EditionEntry) []FlatEditio
 	return flat
 }
 
-func getSealedEditions(b *mtgmatcher.Backend) ([]string, map[string][]EditionEntry) {
+func getSealedEditions(b *matcher.Backend) ([]string, map[string][]EditionEntry) {
 	sortedEditions := []string{}
 	listEditions := map[string][]EditionEntry{}
 	for _, code := range b.GetAllSets() {
@@ -532,7 +532,7 @@ func getSealedEditions(b *mtgmatcher.Backend) ([]string, map[string][]EditionEnt
 // getAllEditionsByCategory returns the same edition set as getAllEditions()
 // grouped by category (using the same categoryEdition / categoryOverrides maps
 // that drive SealedEditionsList). Uncategorized set types land in "Other".
-func getAllEditionsByCategory(b *mtgmatcher.Backend) ([]string, map[string][]EditionEntry) {
+func getAllEditionsByCategory(b *matcher.Backend) ([]string, map[string][]EditionEntry) {
 	sortedCategories := []string{}
 	listEditions := map[string][]EditionEntry{}
 
@@ -592,7 +592,7 @@ const (
 )
 
 // Produce a map of card : []ReprintEntry containing array reprints sorted by age
-func getReprintsGlobal(b *mtgmatcher.Backend, tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[string][]ReprintEntry) {
+func getReprintsGlobal(b *matcher.Backend, tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[string][]ReprintEntry) {
 	uuids := b.GetUUIDs()
 
 	var names []string
@@ -722,7 +722,7 @@ const (
 )
 
 // Check if it makes sense to keep two keep foil and nonfoil separate
-func combineFinish(b *mtgmatcher.Backend, setCode string) bool {
+func combineFinish(b *matcher.Backend, setCode string) bool {
 	set, err := b.GetSet(setCode)
 	if err != nil {
 		return false
@@ -747,7 +747,7 @@ func combineFinish(b *mtgmatcher.Backend, setCode string) bool {
 	return false
 }
 
-func bulkBuylist(co *mtgmatcher.CardObject) float64 {
+func bulkBuylist(co *matcher.CardObject) float64 {
 	var price float64
 	switch co.Rarity {
 	case "mythic":
@@ -944,7 +944,7 @@ const ckAtHighTip = "Card Kingdom is paying its highest price of the last 90 day
 // buylistMetrics computes multiple per-card buylist metrics in a single pass:
 // one aggregate query covers the whole 90-day window, then every card runs
 // through every reducer. The result is keyed by the same labels passed in.
-func buylistMetrics(b *mtgmatcher.Backend, store string, reducers map[string]buylistReducer) map[string]mtgban.InventoryRecord {
+func buylistMetrics(b *matcher.Backend, store string, reducers map[string]buylistReducer) map[string]mtgban.InventoryRecord {
 	bl, err := findVendorBuylist(store)
 	if err != nil {
 		return nil
@@ -1047,7 +1047,7 @@ func buylistMetrics(b *mtgmatcher.Backend, store string, reducers map[string]buy
 	return out
 }
 
-func runRawSetValue(b *mtgmatcher.Backend, infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDirect mtgban.InventoryRecord, ckBuylist, directNetBuylist mtgban.BuylistRecord) {
+func runRawSetValue(b *matcher.Backend, infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDirect mtgban.InventoryRecord, ckBuylist, directNetBuylist mtgban.BuylistRecord) {
 	inv := map[string]float64{}
 	invFoil := map[string]float64{}
 	invDirect := map[string]float64{}
@@ -1152,7 +1152,7 @@ func runRawSetValue(b *mtgmatcher.Backend, infos map[string]mtgban.InventoryReco
 // newEditionsSnapshot derives every edition-related view from b. Called by
 // newDatastore, so it runs before that datastore is published - it must
 // read only b, never the (still previous) live datastore.
-func newEditionsSnapshot(b *mtgmatcher.Backend) *editionsSnapshot {
+func newEditionsSnapshot(b *matcher.Backend) *editionsSnapshot {
 	snap := &editionsSnapshot{}
 	snap.SealedEditionsSorted, snap.SealedEditionsList = getSealedEditions(b)
 	snap.AllEditionsKeys, snap.AllEditionsMap = getAllEditions(b)

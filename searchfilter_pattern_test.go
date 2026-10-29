@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // TestPatternKeepsItsBrackets pins the brackets to the pattern. They used to
@@ -49,7 +49,7 @@ func TestPatternKeepsItsBrackets(t *testing.T) {
 // TestPatternWithBracketsMatches walks the whole way through, so the pattern
 // is graded on the card it reaches rather than on how it is spelled.
 func TestPatternWithBracketsMatches(t *testing.T) {
-	co := &mtgmatcher.CardObject{}
+	co := &matcher.CardObject{}
 	co.Number = "635"
 	co.Name = "Toxin Sliver"
 	co.Edition = "Secret Lair Drop"

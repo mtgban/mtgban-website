@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // rekeyFilters reads a filter whose key does not take its value under the
@@ -228,7 +228,7 @@ type rekeyPart struct {
 	keeps, readsValue bool
 }
 
-func (p *rekeyPart) try(b *mtgmatcher.Backend, co *mtgmatcher.CardObject) {
+func (p *rekeyPart) try(b *matcher.Backend, co *matcher.CardObject) {
 	if !p.failed() {
 		return
 	}

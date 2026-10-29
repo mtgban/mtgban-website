@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/internal/suggest"
 )
@@ -21,21 +21,21 @@ import (
 // already be upper case, matching what GetSet looks up. Each cards entry is
 // {name, number}; every card also carries a promo type and a finish named
 // after the set, so the palette lists have something of this load's own.
-func fixtureBackend(setCode, setName, releaseDate string, cards [][2]string) *mtgmatcher.Backend {
-	b := &mtgmatcher.Backend{
-		Sets:  map[string]*mtgmatcher.Set{},
-		UUIDs: map[string]*mtgmatcher.CardObject{},
+func fixtureBackend(setCode, setName, releaseDate string, cards [][2]string) *matcher.Backend {
+	b := &matcher.Backend{
+		Sets:  map[string]*matcher.Set{},
+		UUIDs: map[string]*matcher.CardObject{},
 	}
-	set := &mtgmatcher.Set{
+	set := &matcher.Set{
 		Code:          setCode,
 		Name:          setName,
 		ReleaseDate:   releaseDate,
 		Type:          "expansion",
-		SealedProduct: []mtgmatcher.SealedProduct{{UUID: setCode + "-box"}},
+		SealedProduct: []matcher.SealedProduct{{UUID: setCode + "-box"}},
 	}
 	for _, nameNumber := range cards {
 		name, number := nameNumber[0], nameNumber[1]
-		card := mtgmatcher.Card{
+		card := matcher.Card{
 			UUID:        setCode + "-" + number,
 			Name:        name,
 			Number:      number,
@@ -45,7 +45,7 @@ func fixtureBackend(setCode, setName, releaseDate string, cards [][2]string) *mt
 			PromoTypes:  []string{strings.ToLower(setCode)},
 		}
 		set.Cards = append(set.Cards, card)
-		b.UUIDs[card.UUID] = &mtgmatcher.CardObject{Card: card}
+		b.UUIDs[card.UUID] = &matcher.CardObject{Card: card}
 		b.AllUUIDs = append(b.AllUUIDs, card.UUID)
 		b.AddName(name)
 	}

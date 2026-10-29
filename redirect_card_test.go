@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // A scryfall link reaches the same card here: swap the host, keep the path.
@@ -311,7 +311,7 @@ func TestCardRedirectReadsAFinishOverAName(t *testing.T) {
 
 // cardPath is the /card/<set>/<number>[/<finish>] shape a link to a printing
 // arrives in, escaped the way a browser sends it.
-func cardPath(co *mtgmatcher.CardObject, finish string) string {
+func cardPath(co *matcher.CardObject, finish string) string {
 	path := "/card/" + url.PathEscape(co.SetCode) + "/" + url.PathEscape(co.Number)
 	if finish != "" {
 		path += "/" + url.PathEscape(finish)
@@ -360,17 +360,17 @@ func TestCardPathComesBackWithItsName(t *testing.T) {
 // it: the games that break it are not the game CI loads, so the cases live
 // here as cards rather than as a datastore to find them in.
 func TestOpeningNameLabelsWithoutNarrowing(t *testing.T) {
-	cards := func(names ...string) []mtgmatcher.Card {
-		out := make([]mtgmatcher.Card, len(names))
+	cards := func(names ...string) []matcher.Card {
+		out := make([]matcher.Card, len(names))
 		for i, name := range names {
-			out[i] = mtgmatcher.Card{Name: name, Number: "1", SetCode: "TST"}
+			out[i] = matcher.Card{Name: name, Number: "1", SetCode: "TST"}
 		}
 		return out
 	}
 
 	for _, tc := range []struct {
 		why   string
-		cards []mtgmatcher.Card
+		cards []matcher.Card
 		want  string
 	}{{
 		why:   "the one card at a number is named",

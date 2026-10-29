@@ -14,10 +14,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/magic"
+	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
-	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 )
 
 type SearchConfig struct {
@@ -161,7 +161,7 @@ type FilterPostElem struct {
 // Return a comma-separated string of set codes, from a comma-separated
 // list of codes or edition names. If no match is found, the input code
 // segment is returned as-is.
-func fixupEditionNG(b *mtgmatcher.Backend, code string) []string {
+func fixupEditionNG(b *matcher.Backend, code string) []string {
 	var out []string
 
 	code = strings.TrimSpace(code)
@@ -188,9 +188,9 @@ func fixupEditionNG(b *mtgmatcher.Backend, code string) []string {
 // code or by name. A run with nothing loaded answers yes to everything: no
 // code names a set there, which is not the same as a code naming no set, and
 // a query is not reinterpreted over an empty shelf.
-func namesASet(b *mtgmatcher.Backend, value string) bool {
+func namesASet(b *matcher.Backend, value string) bool {
 	_, err := b.GetSetByName(strings.Trim(strings.TrimSpace(value), `"`))
-	return err == nil || errors.Is(err, mtgmatcher.ErrDatastoreEmpty)
+	return err == nil || errors.Is(err, matcher.ErrDatastoreEmpty)
 }
 
 // setFilterNamesNothing reports whether a field reads as a set filter - s:,
@@ -209,7 +209,7 @@ func namesASet(b *mtgmatcher.Backend, value string) bool {
 // this is the only key that can tell a name from a filter rather than guess.
 // A negated one is left alone - -s:P excludes an edition nothing is in, which
 // is every card, and that is an answer rather than a dead end.
-func setFilterNamesNothing(b *mtgmatcher.Backend, field string) bool {
+func setFilterNamesNothing(b *matcher.Backend, field string) bool {
 	index := strings.IndexAny(field, ":<>")
 	if index == -1 {
 		return false
@@ -452,12 +452,12 @@ func fixupStoreCodeNG(code string) []string {
 }
 
 // fixupRarityNG reads the rarities a search names, separated by commas, as
-// mtgmatcher.RarityName spells them. A single letter names every rarity of
+// matcher.RarityName spells them. A single letter names every rarity of
 // the game it begins, "c" common; one that begins none stays as written.
-func fixupRarityNG(b *mtgmatcher.Backend, code string) []string {
+func fixupRarityNG(b *matcher.Backend, code string) []string {
 	var names []string
 	for _, word := range strings.Split(code, ",") {
-		name := mtgmatcher.RarityName(word)
+		name := matcher.RarityName(word)
 		begun := len(names)
 		if len(name) == 1 {
 			for _, rarity := range b.Rarities {
@@ -478,7 +478,7 @@ func fixupRarityNG(b *mtgmatcher.Backend, code string) []string {
 // commonest and r< by the rarest: Lorcana's "s" is special and super rare,
 // and r>s keeps what is rarer than super rare. Names the game does not rank
 // are left as they are.
-func rarityBound(b *mtgmatcher.Backend, names []string, rarer bool) []string {
+func rarityBound(b *matcher.Backend, names []string, rarer bool) []string {
 	var bound string
 	limit := -1
 	for _, name := range names {
@@ -504,7 +504,7 @@ func rarityBound(b *mtgmatcher.Backend, names []string, rarer bool) []string {
 // or marks names a printing and is kept as typed, so that cn:HNT222 is not
 // every set's card 222. A comparison's bound is always reduced, as it is
 // compared against the plain number.
-func fixupNumberNG(b *mtgmatcher.Backend, code, opt string) []string {
+func fixupNumberNG(b *matcher.Backend, code, opt string) []string {
 	filters := strings.Split(code, ",")
 	for i := range filters {
 		reduce := opt != "number_strict" &&
@@ -523,7 +523,7 @@ func fixupNumberNG(b *mtgmatcher.Backend, code, opt string) []string {
 // total their card prints, "222/236". The number is prepared as cn: prepares
 // it and the total loses its padding; a value with no slash, or with two, is
 // a number alone.
-func fixupNumberTotal(b *mtgmatcher.Backend, code string) []string {
+func fixupNumberTotal(b *matcher.Backend, code string) []string {
 	filters := strings.Split(code, ",")
 	for i := range filters {
 		number, total := filters[i], ""
@@ -576,7 +576,7 @@ func fixupFinishNG(code string) []string {
 		// separators. That is what makes "Rainbow Foil", "rainbow-foil" and
 		// "rainbowfoil" one query, and it leaves the shared names alone -
 		// foil, etched, nonfoil and the short forms are already one word.
-		filters[i] = mtgmatcher.PromoTypeSlug(filters[i])
+		filters[i] = matcher.PromoTypeSlug(filters[i])
 	}
 	return filters
 }
@@ -585,12 +585,12 @@ func fixupTypeNG(code string) []string {
 	filters := strings.Split(code, ",")
 	for i := range filters {
 		filters[i] = strings.Trim(filters[i], "\"")
-		filters[i] = mtgmatcher.Title(filters[i])
+		filters[i] = matcher.Title(filters[i])
 	}
 	return filters
 }
 
-func fixupDateNG(b *mtgmatcher.Backend, code string) string {
+func fixupDateNG(b *matcher.Backend, code string) string {
 	if code == "now" || code == "today" {
 		return time.Now().Format("2006-01-02")
 	}
@@ -697,7 +697,7 @@ func fixupColorName(code string) []string {
 }
 
 // Validate UUIDs, convert them to mtgban format
-func fixupIDs(b *mtgmatcher.Backend, code string) []string {
+func fixupIDs(b *matcher.Backend, code string) []string {
 	fields := strings.Split(code, ",")
 	for i, field := range fields {
 		_, err := b.GetUUID(field)
@@ -709,9 +709,9 @@ func fixupIDs(b *mtgmatcher.Backend, code string) []string {
 		// reaches a space the spaceless walk must skip, like multiverse
 		prefix, id, qualified := strings.Cut(field, ":")
 		if qualified {
-			space := mtgmatcher.IDSpace(prefix)
+			space := matcher.IDSpace(prefix)
 			if prefix == "tcg" {
-				space = mtgmatcher.IDSpaceTCGplayer
+				space = matcher.IDSpaceTCGplayer
 			}
 			uuid := b.ConvertID(space, id)
 			if uuid != "" {
@@ -729,7 +729,7 @@ func fixupIDs(b *mtgmatcher.Backend, code string) []string {
 	return fields
 }
 
-func sealedname2uuid(b *mtgmatcher.Backend, name string) string {
+func sealedname2uuid(b *matcher.Backend, name string) string {
 	name = strings.TrimSpace(strings.Trim(name, "\""))
 	res, err := b.SearchSealedEquals(name)
 	if err != nil {
@@ -738,7 +738,7 @@ func sealedname2uuid(b *mtgmatcher.Backend, name string) string {
 	return res[0]
 }
 
-func cardobject2sources(co *mtgmatcher.CardObject) []string {
+func cardobject2sources(co *matcher.CardObject) []string {
 	var values []string
 	if co.Sealed {
 		values = co.SourceProducts["sealed"]
@@ -757,7 +757,7 @@ func cardobject2sources(co *mtgmatcher.CardObject) []string {
 	return values
 }
 
-func fixupPicks(b *mtgmatcher.Backend, code string) []string {
+func fixupPicks(b *matcher.Backend, code string) []string {
 	co, err := b.GetUUID(code)
 	if err != nil {
 		co, err = b.GetUUID(sealedname2uuid(b, code))
@@ -781,7 +781,7 @@ func fixupPicks(b *mtgmatcher.Backend, code string) []string {
 // it names. A comma-separated list of quoted names (mirroring
 // fixupEditionNG) names more than one product, and every one of them is
 // resolved and merged into the result.
-func fixupContents(b *mtgmatcher.Backend, code string) []string {
+func fixupContents(b *matcher.Backend, code string) []string {
 	var uuids []string
 	seen := map[string]bool{}
 	for _, field := range strings.Split(code, ",") {
@@ -805,7 +805,7 @@ func fixupContents(b *mtgmatcher.Backend, code string) []string {
 // failing that - every product whose name contains it. That fallback is what
 // lets a product-type word like "Scene Box" reach every product of that type
 // across every set, rather than only the one exact listing.
-func resolveSealedProducts(b *mtgmatcher.Backend, name string) []string {
+func resolveSealedProducts(b *matcher.Backend, name string) []string {
 	co, err := b.GetUUID(name)
 	if err != nil {
 		co, err = b.GetUUID(sealedname2uuid(b, name))
@@ -821,7 +821,7 @@ func resolveSealedProducts(b *mtgmatcher.Backend, name string) []string {
 	return uuids
 }
 
-func fixupContainer(b *mtgmatcher.Backend, code string) []string {
+func fixupContainer(b *matcher.Backend, code string) []string {
 	co, err := b.GetUUID(code)
 	if err != nil {
 		results, err := b.SearchEquals(code)
@@ -982,7 +982,7 @@ func isNotDigit(r rune) bool {
 // ExtractNumberAny applied on its own behalf until go-mtgban v0.8.4 made
 // it read its argument and nothing else; it moves here unchanged so the
 // queries that worked keep working.
-func namesASetCode(b *mtgmatcher.Backend, token string) bool {
+func namesASetCode(b *matcher.Backend, token string) bool {
 	if strings.HasSuffix(strings.ToLower(token), "a") {
 		return false
 	}
@@ -994,7 +994,7 @@ func namesASetCode(b *mtgmatcher.Backend, token string) bool {
 // number, set code and ordinal joined by a dash with an optional region code
 // before the ordinal, into its set code and ordinal: "info-067" and
 // "info-en067" both give "info 067". A word of any other shape is not one.
-func splitPrintedNumber(b *mtgmatcher.Backend, token string) ([]string, bool) {
+func splitPrintedNumber(b *matcher.Backend, token string) ([]string, bool) {
 	code, number, found := strings.Cut(token, "-")
 	if !found || number == "" {
 		return nil, false
@@ -1022,8 +1022,8 @@ func splitPrintedNumber(b *mtgmatcher.Backend, token string) ([]string, bool) {
 // the # off, while "#17a" is asked for whole and is no card's number - as
 // against 17a, which is one's. A number given with its set total is asked
 // for with it.
-func numberValue(b *mtgmatcher.Backend, token string) (opt, value string) {
-	number := mtgmatcher.ExtractNumberAny(token)
+func numberValue(b *matcher.Backend, token string) (opt, value string) {
+	number := matcher.ExtractNumberAny(token)
 	if (number == "" && !typesSetTotal(token)) || namesASetCode(b, token) {
 		return "", ""
 	}
@@ -1038,7 +1038,7 @@ func numberValue(b *mtgmatcher.Backend, token string) (opt, value string) {
 
 // numberTerm is the cn: or cns: term numberValue's reading of a word is
 // typed as, or "" when the word is no number.
-func numberTerm(b *mtgmatcher.Backend, token string) string {
+func numberTerm(b *matcher.Backend, token string) string {
 	opt, value := numberValue(b, token)
 	switch opt {
 	case "":
@@ -1055,7 +1055,7 @@ func numberTerm(b *mtgmatcher.Backend, token string) string {
 // no card carries is left to the id and name readings, so a TCGplayer
 // product id reaches its product. Without a numbers snapshot it reads
 // nothing.
-func bareNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, query string) []FilterElem {
+func bareNumberFilters(b *matcher.Backend, numbers *numbersSnapshot, query string) []FilterElem {
 	tokens := strings.Fields(query)
 	if len(tokens) != 1 || typesSetTotal(tokens[0]) {
 		return nil
@@ -1077,7 +1077,7 @@ func bareNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, query st
 // finds no card the way its game searches names and a card carries the
 // number. It returns the name and the number's filter, or the query
 // untouched and nil.
-func trailingNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, query string) (string, []FilterElem) {
+func trailingNumberFilters(b *matcher.Backend, numbers *numbersSnapshot, query string) (string, []FilterElem) {
 	tokens := strings.Fields(query)
 	if len(tokens) < 2 {
 		return query, nil
@@ -1095,7 +1095,7 @@ func trailingNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, quer
 	// "pyromancy 10" (Pyromancy 101) and Yu-Gi-Oh's "skyscraper 2"
 	// (Skyscraper 2 - Hero City) stay names. b.Game is the deployment's
 	// game, the one that picks the "any" mode in parseSearchOptionsNG.
-	if b.Game == mtgmatcher.GameMagic {
+	if b.Game == matcher.GameMagic {
 		_, err = b.SearchHasPrefix(query)
 	} else {
 		_, err = b.SearchContains(query)
@@ -1109,7 +1109,7 @@ func trailingNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, quer
 // carriedNumberFilters is the cn: or cns: filter for a word spelled as a
 // collector number, as numberValue reads it, when a card carries that
 // number. Without a numbers snapshot it reads nothing.
-func carriedNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, token string) []FilterElem {
+func carriedNumberFilters(b *matcher.Backend, numbers *numbersSnapshot, token string) []FilterElem {
 	if numbers == nil || !writtenAsNumber(token) {
 		return nil
 	}
@@ -1144,13 +1144,13 @@ func writtenAsNumber(token string) bool {
 
 // setPrintsNumber reports whether a card of the set carries number exactly,
 // compared the way cns: compares it.
-func setPrintsNumber(b *mtgmatcher.Backend, code, number string) bool {
+func setPrintsNumber(b *matcher.Backend, code, number string) bool {
 	set, err := b.GetSet(code)
 	if err != nil {
 		return false
 	}
 	number = strings.ToLower(number)
-	return slices.ContainsFunc(set.Cards, func(card mtgmatcher.Card) bool {
+	return slices.ContainsFunc(set.Cards, func(card matcher.Card) bool {
 		return strings.ToLower(card.Number) == number
 	})
 }
@@ -1171,7 +1171,7 @@ func parseSearchQuery(ds *datastore, query string, blocklistRetail, blocklistBuy
 // snapshot, so a number searched alone is an id or a name, never a collector
 // number. The outer query is depth zero; parseSearchOptionsDepth counts the
 // in: pools nested in it.
-func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
+func parseSearchOptionsNG(b *matcher.Backend, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
 	budget := maxPools
 	return parseSearchOptionsDepth(b, nil, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
 }
@@ -1188,7 +1188,7 @@ const maxPools = 8
 // reach restoreProtected and the pool loop.
 var stripMarks = strings.NewReplacer(protectedMark, "", poolMark, "")
 
-func parseSearchOptionsDepth(b *mtgmatcher.Backend, numbers *numbersSnapshot, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string, depth int, budget *int) (config SearchConfig) {
+func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string, depth int, budget *int) (config SearchConfig) {
 	query = stripMarks.Replace(query)
 	rawQuery := query
 	var filters []FilterElem
@@ -1565,7 +1565,7 @@ func parseSearchOptionsDepth(b *mtgmatcher.Backend, numbers *numbersSnapshot, qu
 				opt = "color_identity"
 			}
 			fixup := fixupColorNG
-			if b.Game != mtgmatcher.GameMagic {
+			if b.Game != matcher.GameMagic {
 				fixup = fixupColorName
 			}
 			filters = append(filters, FilterElem{
@@ -2128,7 +2128,7 @@ func squeezePromo(s string) string {
 // exact token stands alone - asking for "metal" is not asking for every type
 // with "metal" inside it - and failing that every type carrying the query as a
 // substring comes back, which is how "foil" reaches all sixteen of them.
-func promoTypeMatches(b *mtgmatcher.Backend, query string) []string {
+func promoTypeMatches(b *matcher.Backend, query string) []string {
 	needle := squeezePromo(query)
 	if needle == "" {
 		return nil
@@ -2157,7 +2157,7 @@ func promoTypeMatches(b *mtgmatcher.Backend, query string) []string {
 // a search with no results takes. An exact code or an exact name stands alone;
 // failing that every set whose name carries the query as a substring comes
 // back, so "shadows" reaches both Shadows over Innistrad and its remaster.
-func setCodeMatches(b *mtgmatcher.Backend, query string) []string {
+func setCodeMatches(b *matcher.Backend, query string) []string {
 	needle := squeezePromo(query)
 	if len(needle) < minPromoFallbackLen {
 		return nil
@@ -2180,7 +2180,7 @@ func setCodeMatches(b *mtgmatcher.Backend, query string) []string {
 	return contains
 }
 
-func compareCollectorNumber(filters []string, co *mtgmatcher.CardObject, cmpFunc func(a, b int) bool) bool {
+func compareCollectorNumber(filters []string, co *matcher.CardObject, cmpFunc func(a, b int) bool) bool {
 	if filters == nil {
 		return false
 	}
@@ -2189,7 +2189,7 @@ func compareCollectorNumber(filters []string, co *mtgmatcher.CardObject, cmpFunc
 	for i, num := range []string{filters[0], co.PlainNumber} {
 		ref, err := strconv.Atoi(num)
 		if err != nil {
-			ref, err = strconv.Atoi(mtgmatcher.ExtractNumberValue(num))
+			ref, err = strconv.Atoi(matcher.ExtractNumberValue(num))
 			if err != nil {
 				// Exclude card in case the number is all letters
 				ref = LargestIntValue
@@ -2201,7 +2201,7 @@ func compareCollectorNumber(filters []string, co *mtgmatcher.CardObject, cmpFunc
 	return cmpFunc(values[0], values[1])
 }
 
-func findInDeck(b *mtgmatcher.Backend, sealedUUID, opt string) []string {
+func findInDeck(b *matcher.Backend, sealedUUID, opt string) []string {
 	var output []string
 
 	sealed, err := b.GetUUID(sealedUUID)
@@ -2233,7 +2233,7 @@ func findInDeck(b *mtgmatcher.Backend, sealedUUID, opt string) []string {
 					continue
 				}
 
-				var board []mtgmatcher.DeckCard
+				var board []matcher.DeckCard
 				switch opt {
 				case "commander":
 					board = deck.Commander
@@ -2267,7 +2267,7 @@ func findInDeck(b *mtgmatcher.Backend, sealedUUID, opt string) []string {
 	return output
 }
 
-func compareReleaseDate(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardObject, cmpFunc func(i, j time.Time) bool) bool {
+func compareReleaseDate(b *matcher.Backend, filters []string, co *matcher.CardObject, cmpFunc func(i, j time.Time) bool) bool {
 	if filters == nil {
 		return false
 	}
@@ -2492,7 +2492,7 @@ var specialEditionTags = map[string]string{
 // func value forced the freshly copied CardObject to escape to the heap on
 // every card examined (the dominant allocation of pool-scanning searches).
 // Unknown names panic, preserving the old registry behavior.
-func applyCardFilter(b *mtgmatcher.Backend, name string, filters []string, co *mtgmatcher.CardObject) bool {
+func applyCardFilter(b *matcher.Backend, name string, filters []string, co *matcher.CardObject) bool {
 	switch name {
 	case "name":
 		return cardFilterName(filters, co)
@@ -2544,15 +2544,15 @@ func applyCardFilter(b *mtgmatcher.Backend, name string, filters []string, co *m
 	panic(name + " option not found")
 }
 
-func cardFilterName(filters []string, co *mtgmatcher.CardObject) bool {
-	return !mtgmatcher.Equals(filters[0], co.Name) && !mtgmatcher.Equals(filters[0], co.FlavorName)
+func cardFilterName(filters []string, co *matcher.CardObject) bool {
+	return !matcher.Equals(filters[0], co.Name) && !matcher.Equals(filters[0], co.FlavorName)
 }
 
 // cardFilterRegexp is where every pattern filter compares. The pattern was
 // compiled when the query was parsed, and a pattern that would not compile
 // arrives nil and matches nothing - which is what the error discarded by the
 // MatchString these filters used to call already said.
-func cardFilterRegexp(name string, re *regexp.Regexp, co *mtgmatcher.CardObject) bool {
+func cardFilterRegexp(name string, re *regexp.Regexp, co *matcher.CardObject) bool {
 	if re == nil {
 		return true
 	}
@@ -2567,14 +2567,14 @@ func cardFilterRegexp(name string, re *regexp.Regexp, co *mtgmatcher.CardObject)
 	return true
 }
 
-func cardFilterEdition(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterEdition(filters []string, co *matcher.CardObject) bool {
 	return !slices.Contains(filters, co.SetCode)
 }
 
 // cardFilterRarity keeps the cards at a rarity the query names: spelled as
 // the card spells it, or at its place in the game's order, which is how
 // "superrare" finds "Super Rare".
-func cardFilterRarity(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterRarity(b *matcher.Backend, filters []string, co *matcher.CardObject) bool {
 	rank, ranked := b.RarityRank(co.Rarity)
 	for _, name := range filters {
 		if name == co.Rarity {
@@ -2588,7 +2588,7 @@ func cardFilterRarity(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.Ca
 	return true
 }
 
-func cardFilterFormat(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterFormat(filters []string, co *matcher.CardObject) bool {
 	// Keep the card if it's legal (or restricted) in any requested format.
 	for _, value := range filters {
 		switch co.Legalities[value] {
@@ -2602,7 +2602,7 @@ func cardFilterFormat(filters []string, co *mtgmatcher.CardObject) bool {
 // cardFilterRarityGreaterThan keeps the cards rarer than the rarity named,
 // by the game's own order; a rarity the game does not rank is rarer than
 // none.
-func cardFilterRarityGreaterThan(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterRarityGreaterThan(b *matcher.Backend, filters []string, co *matcher.CardObject) bool {
 	limit, found := b.RarityRank(filters[0])
 	if !found {
 		return true
@@ -2613,7 +2613,7 @@ func cardFilterRarityGreaterThan(b *mtgmatcher.Backend, filters []string, co *mt
 
 // cardFilterRarityLessThan keeps the cards commoner than the rarity named;
 // a rarity the game does not rank is commoner than all.
-func cardFilterRarityLessThan(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterRarityLessThan(b *matcher.Backend, filters []string, co *matcher.CardObject) bool {
 	limit, found := b.RarityRank(filters[0])
 	if !found {
 		return true
@@ -2622,7 +2622,7 @@ func cardFilterRarityLessThan(b *mtgmatcher.Backend, filters []string, co *mtgma
 	return ranked && rank <= limit
 }
 
-func cardFilterType(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterType(filters []string, co *matcher.CardObject) bool {
 	if co.Sealed {
 		for _, value := range filters {
 			value = strings.ToLower(strings.Replace(value, " ", "_", -1))
@@ -2645,7 +2645,7 @@ func cardFilterType(filters []string, co *mtgmatcher.CardObject) bool {
 	return true
 }
 
-func cardFilterColor(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterColor(filters []string, co *matcher.CardObject) bool {
 	if len(filters) == 0 {
 		// Pokemon, Palworld and Riftbound print colorless as a colour of its
 		// own, beside the cards with none.
@@ -2662,7 +2662,7 @@ func cardFilterColor(filters []string, co *mtgmatcher.CardObject) bool {
 	return false
 }
 
-func cardFilterColorIdentity(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterColorIdentity(filters []string, co *matcher.CardObject) bool {
 	if len(filters) == 0 {
 		return len(co.ColorIdentity) != 0
 	}
@@ -2679,15 +2679,15 @@ func cardFilterColorIdentity(filters []string, co *mtgmatcher.CardObject) bool {
 
 // cardFilterPool skips a card the pool does not hold. An unresolved pool
 // holds nothing.
-func cardFilterPool(members map[string]bool, co *mtgmatcher.CardObject) bool {
+func cardFilterPool(members map[string]bool, co *matcher.CardObject) bool {
 	return !members[co.UUID]
 }
 
-func cardFilterIdlookup(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterIdlookup(filters []string, co *matcher.CardObject) bool {
 	return !slices.Contains(filters, co.UUID)
 }
 
-func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterContents(filters []string, co *matcher.CardObject) bool {
 	// A name that names no product leaves nothing to be the contents of: the
 	// loop below has nothing to match on, and an answer of "everything" is
 	// the whole datastore handed back for a typo.
@@ -2706,7 +2706,7 @@ func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
 	return true
 }
 
-func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterNumber(filters []string, co *matcher.CardObject) bool {
 	return !slices.Contains(filters, strings.ToLower(co.PlainNumber)) &&
 		!slices.Contains(filters, strings.ToLower(co.Number))
 }
@@ -2714,7 +2714,7 @@ func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
 // cardFilterNumberTotal keeps a card whose number is in the list, as
 // cardFilterNumber reads it, or whose number and set total are, "222/236".
 // A value is compared whole first, for the numbers written with a slash.
-func cardFilterNumberTotal(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterNumberTotal(filters []string, co *matcher.CardObject) bool {
 	plain := strings.ToLower(co.PlainNumber)
 	printed := strings.ToLower(co.Number)
 	for _, value := range filters {
@@ -2732,23 +2732,23 @@ func cardFilterNumberTotal(filters []string, co *mtgmatcher.CardObject) bool {
 	return true
 }
 
-func cardFilterNumberStrict(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterNumberStrict(filters []string, co *matcher.CardObject) bool {
 	return !slices.Contains(filters, strings.ToLower(co.Number))
 }
 
-func cardFilterNumberGreaterThan(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterNumberGreaterThan(filters []string, co *matcher.CardObject) bool {
 	return compareCollectorNumber(filters, co, func(a, b int) bool {
 		return a > b
 	})
 }
 
-func cardFilterNumberLessThan(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterNumberLessThan(filters []string, co *matcher.CardObject) bool {
 	return compareCollectorNumber(filters, co, func(a, b int) bool {
 		return a < b
 	})
 }
 
-func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterFinish(filters []string, co *matcher.CardObject) bool {
 	for _, value := range filters {
 		switch value {
 		case "etched", "e":
@@ -2783,15 +2783,15 @@ func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
 //   - a Magic foil treatment, which Magic files as a promo type, or its short
 //     form: f:galaxy is f:galaxyfoil. altFoilTags names the promo types that
 //     are foilings.
-func finishReaches(co *mtgmatcher.CardObject, name string) bool {
+func finishReaches(co *matcher.CardObject, name string) bool {
 	if co.Finish != "" && name == co.Finish {
 		return true
 	}
-	finish, found := mtgmatcher.FinishOf(co.Finish)
+	finish, found := matcher.FinishOf(co.Finish)
 	if found && finish.Treatment == name {
 		return true
 	}
-	if found && finish.Run != "" && mtgmatcher.PromoTypeSlug(finish.Run) == name {
+	if found && finish.Run != "" && matcher.PromoTypeSlug(finish.Run) == name {
 		return true
 	}
 	expanded, known := isKnownPromo[name]
@@ -2806,9 +2806,9 @@ func finishReaches(co *mtgmatcher.CardObject, name string) bool {
 // finish list and the offline catalog, which list them rather than ask about
 // one. Each is one of the printing's own words or a short form of one, so
 // these are all of them.
-func finishNames(co *mtgmatcher.CardObject) []string {
-	finish, _ := mtgmatcher.FinishOf(co.Finish)
-	candidates := []string{co.Finish, finish.Treatment, mtgmatcher.PromoTypeSlug(finish.Run)}
+func finishNames(co *matcher.CardObject) []string {
+	finish, _ := matcher.FinishOf(co.Finish)
+	candidates := []string{co.Finish, finish.Treatment, matcher.PromoTypeSlug(finish.Run)}
 	for _, promoType := range co.PromoTypes {
 		candidates = append(candidates, promoType)
 		candidates = append(candidates, promoShortForms[promoType]...)
@@ -2835,30 +2835,30 @@ var promoShortForms = func() map[string][]string {
 	return out
 }()
 
-func cardFilterDate(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterDate(b *matcher.Backend, filters []string, co *matcher.CardObject) bool {
 	return compareReleaseDate(b, filters, co, func(i, j time.Time) bool {
 		return !i.Equal(j)
 	})
 }
 
-func cardFilterDateGreaterThan(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterDateGreaterThan(b *matcher.Backend, filters []string, co *matcher.CardObject) bool {
 	return compareReleaseDate(b, filters, co, func(i, j time.Time) bool {
 		return i.Before(j)
 	})
 }
 
-func cardFilterDateLessThan(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterDateLessThan(b *matcher.Backend, filters []string, co *matcher.CardObject) bool {
 	return compareReleaseDate(b, filters, co, func(i, j time.Time) bool {
 		return i.After(j)
 	})
 }
 
-func cardFilterAltname(filters []string, co *mtgmatcher.CardObject) bool {
-	return (co.FlavorName != "" && mtgmatcher.Normalize(co.FlavorName) != filters[0]) ||
-		(co.FaceFlavorName != "" && mtgmatcher.Normalize(co.FaceFlavorName) != filters[0])
+func cardFilterAltname(filters []string, co *matcher.CardObject) bool {
+	return (co.FlavorName != "" && matcher.Normalize(co.FlavorName) != filters[0]) ||
+		(co.FaceFlavorName != "" && matcher.Normalize(co.FaceFlavorName) != filters[0])
 }
 
-func cardFilterOn(filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterOn(filters []string, co *matcher.CardObject) bool {
 	for _, value := range filters {
 		switch value {
 		case "mtgstocks":
@@ -2908,7 +2908,7 @@ func cardFilterOn(filters []string, co *mtgmatcher.CardObject) bool {
 // PTC is intentionally included with the World Championship Deck family.
 var wcSets = []string{"PTC", "WC97", "WC98", "WC99", "WC00", "WC01", "WC02", "WC03", "WC04"}
 
-func cardFilterIs(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardObject) bool {
+func cardFilterIs(b *matcher.Backend, filters []string, co *matcher.CardObject) bool {
 	for _, value := range filters {
 		switch value {
 		case "foil":
@@ -3051,7 +3051,7 @@ func cardFilterIs(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardOb
 	return true
 }
 
-func shouldSkipCardNG(b *mtgmatcher.Backend, cardID string, filters []FilterElem) bool {
+func shouldSkipCardNG(b *matcher.Backend, cardID string, filters []FilterElem) bool {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return true
@@ -3060,7 +3060,7 @@ func shouldSkipCardNG(b *mtgmatcher.Backend, cardID string, filters []FilterElem
 }
 
 // shouldSkipCard is shouldSkipCardNG for a card already looked up.
-func shouldSkipCard(b *mtgmatcher.Backend, co *mtgmatcher.CardObject, filters []FilterElem) bool {
+func shouldSkipCard(b *matcher.Backend, co *matcher.CardObject, filters []FilterElem) bool {
 	for i := range filters {
 		skip := shouldSkipCard(b, co, filters[i].Subfilters)
 		if skip {

@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/internal/palette"
 )
 
@@ -43,7 +43,7 @@ func TestPromosEndpoint(t *testing.T) {
 		}
 		// The value is what an is: query carries, so it has to survive
 		// being typed: one word, no capitals.
-		if mtgmatcher.PromoTypeSlug(promo.Value) != promo.Value {
+		if matcher.PromoTypeSlug(promo.Value) != promo.Value {
 			t.Errorf("value %q is not a token a query can carry", promo.Value)
 		}
 	}

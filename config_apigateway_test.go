@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 func TestAPIGatewayConfigDecodes(t *testing.T) {
@@ -17,7 +17,7 @@ func TestAPIGatewayConfigDecodes(t *testing.T) {
 	if c.APIGateway.URL != "https://api.example" {
 		t.Errorf("url %q, want the trailing slash trimmed", c.APIGateway.URL)
 	}
-	want := []mtgmatcher.Game{"magic", "pokemon"}
+	want := []matcher.Game{"magic", "pokemon"}
 	if !slices.Equal(c.APIGateway.Games, want) {
 		t.Errorf("games %v want %v", c.APIGateway.Games, want)
 	}
@@ -26,13 +26,13 @@ func TestAPIGatewayConfigDecodes(t *testing.T) {
 func TestAPIGatewayConfigDefaults(t *testing.T) {
 	var c APIGatewayConfig
 	applyAPIGatewayDefaults(&c, "pokemon")
-	if c.URL != DefaultAPIGatewayURL || !slices.Equal(c.Games, []mtgmatcher.Game{"magic", "pokemon"}) {
+	if c.URL != DefaultAPIGatewayURL || !slices.Equal(c.Games, []matcher.Game{"magic", "pokemon"}) {
 		t.Errorf("defaults %+v", c)
 	}
 
 	var empty APIGatewayConfig
 	applyAPIGatewayDefaults(&empty, "")
-	if !slices.Equal(empty.Games, []mtgmatcher.Game{DefaultGame}) {
+	if !slices.Equal(empty.Games, []matcher.Game{DefaultGame}) {
 		t.Errorf("empty game: %+v", empty)
 	}
 

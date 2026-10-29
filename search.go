@@ -22,9 +22,9 @@ import (
 
 	"github.com/BlueMonday/go-scryfall"
 
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/siteorigin"
@@ -336,15 +336,15 @@ func searchFallback(ds *datastore, config SearchConfig) []string {
 }
 
 // isValidChartID reports whether a chart= piece is a plausibly chartable id: a
-// mtgmatcher id, a ban:/tcg:/scryfall:/mtgjson: prefixed id, a bare number (a
+// matcher id, a ban:/tcg:/scryfall:/mtgjson: prefixed id, a bare number (a
 // TCGplayer id), or something shaped like an mtgjson uuid. Full resolution
 // happens at render time.
 //
-// The uuid shape has to pass even when mtgmatcher does not carry it, because
+// The uuid shape has to pass even when matcher does not carry it, because
 // resolution has a fallback for exactly that case: a printing the datastore
 // retired but the archive still holds prices for charts from our own history.
 // Refusing it here is what decides it never gets asked about.
-func isValidChartID(b *mtgmatcher.Backend, part string) bool {
+func isValidChartID(b *matcher.Backend, part string) bool {
 	if _, err := b.GetUUID(part); err == nil {
 		return true
 	}
@@ -361,10 +361,10 @@ func isValidChartID(b *mtgmatcher.Backend, part string) bool {
 
 // magicFinishSearchID re-tags an mtgjson uuid with the finish of the variant it
 // came from. The variants table stores the finish beside the base uuid, while
-// mtgmatcher gives each finish its own id ("_f", "_e"), so handing the bare uuid
+// matcher gives each finish its own id ("_f", "_e"), so handing the bare uuid
 // back to the search always lands on the nonfoil printing. Falls back to the
 // uuid when the finish has no id of its own.
-func magicFinishSearchID(b *mtgmatcher.Backend, uuid string, foil, etched bool) string {
+func magicFinishSearchID(b *matcher.Backend, uuid string, foil, etched bool) string {
 	if matched, err := b.MatchID(uuid, foil, etched); err == nil {
 		return matched
 	}
@@ -390,7 +390,7 @@ func chartIDsDroppedNotice(dropped, total int, why string) string {
 // handed back as it came: the results table will find no row for it, so the
 // card drops out of the page it was asked for. The caller says so rather than
 // letting it vanish.
-func chartSearchID(b *mtgmatcher.Backend, id string, target *chartTarget) (string, bool) {
+func chartSearchID(b *matcher.Backend, id string, target *chartTarget) (string, bool) {
 	if target != nil {
 		if target.SearchID != "" {
 			return target.SearchID, true
@@ -416,7 +416,7 @@ func chartSearchID(b *mtgmatcher.Backend, id string, target *chartTarget) (strin
 		return id, false
 	}
 
-	// tcg:, scryfall:, mtgjson:, or a bare id mtgmatcher maps through its external
+	// tcg:, scryfall:, mtgjson:, or a bare id matcher maps through its external
 	// id table (a TCGplayer product id, a Scryfall id, or an mtgjson uuid).
 	if matched, merr := b.MatchID(val); merr == nil {
 		return matched, true
@@ -425,7 +425,7 @@ func chartSearchID(b *mtgmatcher.Backend, id string, target *chartTarget) (strin
 }
 
 // parseChartIDs splits a chart=... param (comma-separated UUIDs) into a
-// validated, de-duplicated list. Pieces that don't resolve via mtgmatcher are
+// validated, de-duplicated list. Pieces that don't resolve via matcher are
 // dropped silently, mirroring how single-UUID chart= used to be handled.
 //
 // The roster is capped at the palette size: the multi-card chart can only
@@ -434,7 +434,7 @@ func chartSearchID(b *mtgmatcher.Backend, id string, target *chartTarget) (strin
 // handler by a crafted many-UUID chart= URL. truncated reports whether at
 // least one otherwise-valid, distinct card was dropped for exceeding the cap,
 // so the caller can tell the user instead of silently swallowing it.
-func parseChartIDs(b *mtgmatcher.Backend, chartParam string) (ids []string, truncated bool) {
+func parseChartIDs(b *matcher.Backend, chartParam string) (ids []string, truncated bool) {
 	if chartParam == "" {
 		return nil, false
 	}
@@ -757,7 +757,7 @@ func searchTitle(title string, charting, sealed, editions bool) string {
 // searchMetadata reads what the page shows of each card on it: its details,
 // and its printings row for the sidebar. It does not use cardMetadata.add,
 // because ChartID is set before the card is stored.
-func searchMetadata(b *mtgmatcher.Backend, keys []string, preferFlavor bool) (cardMetadata, map[string]string) {
+func searchMetadata(b *matcher.Backend, keys []string, preferFlavor bool) (cardMetadata, map[string]string) {
 	metadata := cardMetadata{}
 	printings := map[string]string{}
 
@@ -848,7 +848,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 
 // searchPreview is the preview of a search's first cards, with their
 // cheapest offers.
-func searchPreview(r *http.Request, b *mtgmatcher.Backend, allKeys []string, result searchResults) *embed.OEmbed {
+func searchPreview(r *http.Request, b *matcher.Backend, allKeys []string, result searchResults) *embed.OEmbed {
 	// Every card is quoted with its own index prices: one shared list would
 	// print the first card's numbers under every other card's heading.
 	return embed.Generate(b, externalURL(r), allKeys, func(cardID string) string {
@@ -920,7 +920,7 @@ func readSearchSort(r *http.Request, config SearchConfig) string {
 // the add-to-chart affordance, and when chart= comes alone, it returns the
 // roster to chart and turns the query into its cards' search ids. A reader
 // the charts are locked to gets no roster.
-func fillChartRoster(pageVars *SearchVars, r *http.Request, b *mtgmatcher.Backend, query string, locked bool) (chartRoster, string) {
+func fillChartRoster(pageVars *SearchVars, r *http.Request, b *matcher.Backend, query string, locked bool) (chartRoster, string) {
 	chartParam := r.FormValue("chart")
 
 	// The front-end enforces the same cap when batching cards, so let the JS
@@ -1147,7 +1147,7 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 }
 
 // withoutSealed returns keys without the sealed products, in a new slice.
-func withoutSealed(b *mtgmatcher.Backend, keys []string) []string {
+func withoutSealed(b *matcher.Backend, keys []string) []string {
 	var out []string
 	for _, key := range keys {
 		co, err := b.GetUUID(key)
@@ -1162,7 +1162,7 @@ func withoutSealed(b *mtgmatcher.Backend, keys []string) []string {
 // fillSearchResults puts the cards found on the page: the page of them with
 // their offers, how many there are, and the contents switch for a sealed
 // product that has one.
-func fillSearchResults(pageVars *SearchVars, b *mtgmatcher.Backend, query string, config SearchConfig, result searchResults, keys []string) {
+func fillSearchResults(pageVars *SearchVars, b *matcher.Backend, query string, config SearchConfig, result searchResults, keys []string) {
 	// Offered once the search has found cards to switch between. A product
 	// that holds nothing but other products answers with those products: rows
 	// on the page, but not cards, and reading them another way finds nothing.
@@ -1395,7 +1395,7 @@ func sortOfferRows(r *http.Request, allKeys []string, result searchResults) {
 // fillEmbed fills the page's link preview: the title the oEmbed answer
 // carries, and the first card's image, description and a retail and a
 // buylist reference price.
-func fillEmbed(pageVars *SearchVars, metadata cardMetadata, b *mtgmatcher.Backend, preview *embed.OEmbed, allKeys []string) {
+func fillEmbed(pageVars *SearchVars, metadata cardMetadata, b *matcher.Backend, preview *embed.OEmbed, allKeys []string) {
 	pageVars.Embed.Title = preview.Title
 	if len(allKeys) > 0 {
 		pageVars.Embed.ImageURL = metadata[allKeys[0]].FullImageURL
@@ -1430,7 +1430,7 @@ func fillEmbed(pageVars *SearchVars, metadata cardMetadata, b *mtgmatcher.Backen
 // reference rows and the fallback marketplace links, adds the average-count
 // row to its buylist, and where the listing is locked, locks the offers a
 // logged-out reader may not see.
-func rebuildIndexRows(pageVars *SearchVars, metadata cardMetadata, b *mtgmatcher.Backend, config SearchConfig, allKeys []string, result searchResults) {
+func rebuildIndexRows(pageVars *SearchVars, metadata cardMetadata, b *matcher.Backend, config SearchConfig, allKeys []string, result searchResults) {
 	cautioned := false
 
 	// When the user asked to drop index data (skip:index), don't synthesize the
@@ -1668,7 +1668,7 @@ func fillChartPage(pageVars *SearchVars, metadata cardMetadata, r *http.Request,
 	pageVars.EditionList = chartEditions.SealedEditionsList
 
 	// Rebuild a display query from the (first) chart card. Use the resolved
-	// mtgmatcher id (a ban:<id> doesn't parse as a query), so SearchQuery is
+	// matcher id (a ban:<id> doesn't parse as a query), so SearchQuery is
 	// non-empty and the template renders the results+chart layout rather than
 	// the empty-query editions browse.
 	cfg := parseSearchOptionsNG(b, roster.searchIDs[roster.id], nil, nil, nil)
@@ -1679,7 +1679,7 @@ func fillChartPage(pageVars *SearchVars, metadata cardMetadata, r *http.Request,
 	pageVars.IsMultiChart = isMultiChart
 
 	// The template keys card metadata off ChartID and the roster ids, but the
-	// results Metadata map is keyed by the resolved mtgmatcher id. Alias each
+	// results Metadata map is keyed by the resolved matcher id. Alias each
 	// ban:<id> roster entry to its resolved card so those lookups resolve.
 	for _, id := range roster.ids {
 		sid := roster.searchIDs[id]
@@ -1701,7 +1701,7 @@ func fillChartPage(pageVars *SearchVars, metadata cardMetadata, r *http.Request,
 	// Sidebar foil/etched switch and Stocks link are inherently per-card,
 	// and sealed products have no foil/etched variants, so leave them empty
 	// and let the sidebar's self-checks hide them. The switches key off the
-	// resolved mtgmatcher id, since a ban:<id> roster entry means nothing to
+	// resolved matcher id, since a ban:<id> roster entry means nothing to
 	// the matcher.
 	if !isMultiChart {
 		fillChartSidebar(pageVars, metadata, b, roster)
@@ -1725,7 +1725,7 @@ func fillLongFormChart(pageVars *SearchVars, r *http.Request, ds *datastore, ros
 
 	// Generic path: resolve every roster id to a target and chart it by
 	// whatever providers have data — one path for every game, keyed on the
-	// cached ban_id. The ?chart= url keeps the mtgmatcher id (the search
+	// cached ban_id. The ?chart= url keeps the matcher id (the search
 	// UI's identity for favorites/roster/legend); the ban_id is internal.
 	//
 	// Resolution stays here, on the request's own goroutine, because
@@ -1768,11 +1768,11 @@ func fillLongFormChart(pageVars *SearchVars, r *http.Request, ds *datastore, ros
 
 // fillChartSidebar sets the single card's foil and etched switches and its
 // Stocks link, all of which a sealed product goes without.
-func fillChartSidebar(pageVars *SearchVars, metadata cardMetadata, b *mtgmatcher.Backend, roster chartRoster) {
+func fillChartSidebar(pageVars *SearchVars, metadata cardMetadata, b *matcher.Backend, roster chartRoster) {
 	searchID := roster.searchIDs[roster.id]
 	co, gerr := b.GetUUID(searchID)
 	if gerr == nil && !co.Sealed {
-		altID, err := b.Match(&mtgmatcher.InputCard{
+		altID, err := b.Match(&matcher.InputCard{
 			ID:   searchID,
 			Foil: !co.Foil,
 		})
@@ -1780,7 +1780,7 @@ func fillChartSidebar(pageVars *SearchVars, metadata cardMetadata, b *mtgmatcher
 			pageVars.Alternative = altID
 		}
 
-		altID, err = b.Match(&mtgmatcher.InputCard{
+		altID, err = b.Match(&matcher.InputCard{
 			ID:        searchID,
 			Variation: "Etched",
 		})
@@ -1813,7 +1813,7 @@ type chartRoster struct {
 type chartTargetCache map[string]*chartTarget
 
 // target returns the chart target of a roster id, resolving it on first ask.
-func (cache chartTargetCache) target(ctx context.Context, b *mtgmatcher.Backend, id string) *chartTarget {
+func (cache chartTargetCache) target(ctx context.Context, b *matcher.Backend, id string) *chartTarget {
 	if target, asked := cache[id]; asked {
 		return target
 	}
@@ -1827,7 +1827,7 @@ func (cache chartTargetCache) target(ctx context.Context, b *mtgmatcher.Backend,
 
 // series is the roster ids that resolve, in order, each as the series the
 // chart reads it into, named and labelled by its target.
-func (cache chartTargetCache) series(ctx context.Context, b *mtgmatcher.Backend, ids []string) []chartSeries {
+func (cache chartTargetCache) series(ctx context.Context, b *matcher.Backend, ids []string) []chartSeries {
 	resolved := make([]chartSeries, 0, len(ids))
 	for _, id := range ids {
 		target := cache.target(ctx, b, id)
@@ -2117,7 +2117,7 @@ var customBuylistSkipSets = append([]string{"CED", "CEI", "30A"}, wcSets...)
 
 // Append a virtual buylist to search results, priced off the reference
 // seller inventories according to the custom buylist rule settings
-func searchCustomBuylist(b *mtgmatcher.Backend, r *http.Request, cardIDs []string, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+func searchCustomBuylist(b *matcher.Backend, r *http.Request, cardIDs []string, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
 	customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
 	if !slices.Contains(customOpts, "enabled") {
 		return
@@ -2252,7 +2252,7 @@ const (
 
 // containsSingles answers whether a result set holds a card, as opposed to
 // holding only the products that cards come in.
-func containsSingles(b *mtgmatcher.Backend, cardIDs []string) bool {
+func containsSingles(b *matcher.Backend, cardIDs []string) bool {
 	for _, cardID := range cardIDs {
 		co, err := b.GetUUID(cardID)
 		if err == nil && !co.Sealed {
@@ -2297,7 +2297,7 @@ type ContentsViews struct {
 // every product in the datastore it answers in half a second, the slowest
 // single product in 4ms and the slowest with a variable part in 1.4ms,
 // against a search that then prices every card found.
-func dropOdds(b *mtgmatcher.Backend, config SearchConfig) map[string]float64 {
+func dropOdds(b *matcher.Backend, config SearchConfig) map[string]float64 {
 	if config.ContentsMode != ContentsVariable || config.ContentsProduct == "" {
 		return nil
 	}
@@ -2339,7 +2339,7 @@ func indexOutsidePools(query, substr string) int {
 	return -1
 }
 
-func contentsViews(b *mtgmatcher.Backend, query string, config SearchConfig) *ContentsViews {
+func contentsViews(b *matcher.Backend, query string, config SearchConfig) *ContentsViews {
 	if config.ContentsProduct == "" || config.ContentsMode == "" {
 		return nil
 	}
@@ -2438,7 +2438,7 @@ func numberSeedUUIDs(numbers *numbersSnapshot, filters []FilterElem) ([]string, 
 // names what a card must not have among possibly many others it does, which
 // is not a set this can name by enumerating one store's keys - and a
 // negated store filter carries no Values to enumerate regardless.
-func storeSeedUUIDs(b *mtgmatcher.Backend, config SearchConfig) ([]string, bool) {
+func storeSeedUUIDs(b *matcher.Backend, config SearchConfig) ([]string, bool) {
 	var f *FilterPostElem
 	for i := range config.PostFilters {
 		if config.PostFilters[i].Name == "any" && len(config.PostFilters[i].Values) > 0 {
@@ -2693,7 +2693,7 @@ func searchAndFilter(ds *datastore, config SearchConfig) ([]string, error) {
 }
 
 // filterUUIDs returns the uuids that pass every card filter.
-func filterUUIDs(b *mtgmatcher.Backend, uuids []string, filters []FilterElem) []string {
+func filterUUIDs(b *matcher.Backend, uuids []string, filters []FilterElem) []string {
 	var selected []string
 	for _, uuid := range uuids {
 		if shouldSkipCardNG(b, uuid, filters) {
@@ -2740,7 +2740,7 @@ func editionsForSearch(ds *datastore, allKeys []string) []EditionEntry {
 
 // addFinishVariants appends id's foil and etched finishes to uuids, skipping
 // any that don't exist, equal id, or are already present.
-func addFinishVariants(b *mtgmatcher.Backend, uuids []string, id string) []string {
+func addFinishVariants(b *matcher.Backend, uuids []string, id string) []string {
 	foilID, _ := b.MatchID(id, true)
 	etchedID, _ := b.MatchID(id, false, true)
 	for _, otherFinishID := range []string{foilID, etchedID} {
@@ -2751,7 +2751,7 @@ func addFinishVariants(b *mtgmatcher.Backend, uuids []string, id string) []strin
 	return uuids
 }
 
-func searchScryfall(b *mtgmatcher.Backend, query string) ([]string, error) {
+func searchScryfall(b *matcher.Backend, query string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*30))
 	defer cancel()
 
@@ -2776,7 +2776,7 @@ func searchScryfall(b *mtgmatcher.Backend, query string) ([]string, error) {
 
 		// Sort through the results, add the possible foil and etched variants
 		for _, card := range result.Cards {
-			id := b.ConvertID(mtgmatcher.IDSpaceScryfall, card.ID)
+			id := b.ConvertID(matcher.IDSpaceScryfall, card.ID)
 			if id == "" {
 				continue
 			}
@@ -2798,13 +2798,13 @@ func searchScryfall(b *mtgmatcher.Backend, query string) ([]string, error) {
 }
 
 // Try searching for cards usign the Match algorithm
-func attemptMatch(b *mtgmatcher.Backend, query string) ([]string, error) {
+func attemptMatch(b *matcher.Backend, query string) ([]string, error) {
 	var uuids []string
-	uuid, err := b.Match(&mtgmatcher.InputCard{
+	uuid, err := b.Match(&matcher.InputCard{
 		Name: query,
 	})
 	if err != nil {
-		var alias *mtgmatcher.AliasingError
+		var alias *matcher.AliasingError
 		if errors.As(err, &alias) {
 			uuids = alias.Probe()
 		} else {
@@ -2853,7 +2853,7 @@ func searchParallelNG(cardIDs []string, config SearchConfig) (foundSellers map[s
 }
 
 type SortingData struct {
-	co          *mtgmatcher.CardObject
+	co          *matcher.CardObject
 	releaseDate time.Time
 	parentCode  string
 
@@ -2879,7 +2879,7 @@ type SortingData struct {
 	finishRank int
 }
 
-func getSortingData(b *mtgmatcher.Backend, uuid string) (*SortingData, error) {
+func getSortingData(b *matcher.Backend, uuid string) (*SortingData, error) {
 	co, err := b.GetUUID(uuid)
 	if err != nil {
 		return nil, err
@@ -2949,7 +2949,7 @@ func fileReprintsUnderParent(sortData map[string]*SortingData, parents map[strin
 // elements, so nothing is saved by resolving lazily. Unknown ids get a
 // nil entry, which the cmp* comparators order like the lookup error it
 // stands for.
-func resolveSortingData(b *mtgmatcher.Backend, cardIDs []string) map[string]*SortingData {
+func resolveSortingData(b *matcher.Backend, cardIDs []string) map[string]*SortingData {
 	data := make(map[string]*SortingData, len(cardIDs))
 	for _, cardID := range cardIDs {
 		_, found := data[cardID]
@@ -3045,7 +3045,7 @@ func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
 
 // finishOrder ranks a printing's finish for the number sort: nonfoil,
 // foil, then etched.
-func finishOrder(co *mtgmatcher.CardObject) int {
+func finishOrder(co *matcher.CardObject) int {
 	switch {
 	case co.Etched:
 		return 2
@@ -3113,7 +3113,7 @@ func isDigit(c byte) bool {
 }
 
 // Sort cards grouping them by edition, and then by their collector number
-func sortSets(b *mtgmatcher.Backend, uuidI, uuidJ string) bool {
+func sortSets(b *matcher.Backend, uuidI, uuidJ string) bool {
 	sortingI, _ := getSortingData(b, uuidI)
 	sortingJ, _ := getSortingData(b, uuidJ)
 	return cmpSets(sortingI, sortingJ)

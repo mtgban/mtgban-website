@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/apihandoff"
 	"github.com/mtgban/mtgban-website/internal/pledge"
 	"github.com/mtgban/mtgban-website/patreon"
@@ -46,7 +46,7 @@ func handoffSetup(t *testing.T) *strings.Builder {
 	LogPages["Admin"] = log.New(&logged, "", 0)
 	savedGateway, savedPatreon := Config().APIGateway, Config().Patreon
 	t.Cleanup(func() { Config().APIGateway, Config().Patreon = savedGateway, savedPatreon })
-	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
+	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []matcher.Game{"magic"}}
 	Config().Patreon.Source = "main"
 	Config().Patreon.Client = map[string]string{"main": "client-id"}
 	return &logged

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // TestAlphabeticalSortUsesEnglishNames is the SOA case from the site: a
@@ -112,7 +112,7 @@ func wrathOfGodKeys(t *testing.T) []string {
 // with its nonfoil first, either way round, instead of tying and scattering
 // both cards' finishes.
 func TestAlphabeticalSortReadsOneNameInTwoSpellings(t *testing.T) {
-	b := &mtgmatcher.Backend{Sets: map[string]*mtgmatcher.Set{"S": {Code: "S", Name: "Set"}}, UUIDs: map[string]*mtgmatcher.CardObject{}}
+	b := &matcher.Backend{Sets: map[string]*matcher.Set{"S": {Code: "S", Name: "Set"}}, UUIDs: map[string]*matcher.CardObject{}}
 	var keys []string
 	for _, printing := range [][3]string{
 		{"Ho-Oh", "1", "holofoil"},
@@ -122,7 +122,7 @@ func TestAlphabeticalSortReadsOneNameInTwoSpellings(t *testing.T) {
 	} {
 		name, number, finish := printing[0], printing[1], printing[2]
 		uuid := number + "_" + finish
-		b.AddPrinting(&mtgmatcher.Card{Name: name, Number: number, SetCode: "S"}, uuid, finish)
+		b.AddPrinting(&matcher.Card{Name: name, Number: number, SetCode: "S"}, uuid, finish)
 		keys = append(keys, uuid)
 	}
 	b.IndexSets()
@@ -243,7 +243,7 @@ func TestNumberOrderIsOneOrder(t *testing.T) {
 // as a reader goes through it.
 func TestCmpNumberAndFinishReadsEachShape(t *testing.T) {
 	numbered := func(number string) *SortingData {
-		return &SortingData{co: &mtgmatcher.CardObject{Card: mtgmatcher.Card{Number: number}}}
+		return &SortingData{co: &matcher.CardObject{Card: matcher.Card{Number: number}}}
 	}
 	for _, tc := range []struct {
 		first, second string
@@ -311,7 +311,7 @@ func TestPrefixedNumbersSortByPrefixFirst(t *testing.T) {
 // finish the flags read alike, form a strict order, never a loop or a tie.
 func TestNumberOrderIsTotalWithinANumber(t *testing.T) {
 	printing := func(uuid, finish string, foil, etched bool, promos ...string) *SortingData {
-		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid, Number: "1", PromoTypes: promos}, Foil: foil, Etched: etched}
+		co := &matcher.CardObject{Card: matcher.Card{UUID: uuid, Number: "1", PromoTypes: promos}, Foil: foil, Etched: etched}
 		co.Finish = finish
 		return &SortingData{co: co, finish: finishOrder(co), finishName: finish}
 	}

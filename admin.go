@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/diskusage"
@@ -54,7 +54,7 @@ type bantoolWorkflow struct {
 	RunName   string
 }
 
-func newBantoolWorkflow(game mtgmatcher.Game, store string) bantoolWorkflow {
+func newBantoolWorkflow(game matcher.Game, store string) bantoolWorkflow {
 	slug := string(game)
 	return bantoolWorkflow{
 		EventType: slug + "-" + store,
@@ -688,7 +688,7 @@ func adminInfrastructureEditor(r *http.Request, pageVars *PageVars) {
 // reloads the scrapers they touch, then fills the editor, the override
 // builder's store list, and the builder itself when a search "Fix" link
 // pre-filled it.
-func (s *site) adminKeyOverrides(r *http.Request, b *mtgmatcher.Backend, pageVars *PageVars) {
+func (s *site) adminKeyOverrides(r *http.Request, b *matcher.Backend, pageVars *PageVars) {
 	// -- Key overrides: handle POST if submitted --
 	newOverrides := r.PostFormValue("keyOverridesTextArea")
 	if newOverrides != "" {
@@ -1128,7 +1128,7 @@ func queryGithubAction(ctx context.Context, file, state string) (int, error) {
 	return payload.TotalCount, nil
 }
 
-func sendGithubAction(ctx context.Context, game mtgmatcher.Game, store string) error {
+func sendGithubAction(ctx context.Context, game matcher.Game, store string) error {
 	wf := newBantoolWorkflow(game, store)
 
 	busy, err := isBusyGithubAction(ctx, wf)

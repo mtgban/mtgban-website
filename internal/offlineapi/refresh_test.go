@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 func TestRequestRefreshDoesNotBlock(t *testing.T) {
@@ -23,7 +23,7 @@ func TestRefresherOutlivesAPanickingRefresh(t *testing.T) {
 	t.Cleanup(func() { refreshDebounce = prev })
 
 	s := NewService(Deps{
-		Datastore: func() (*mtgmatcher.Backend, time.Time) { panic("no datastore") },
+		Datastore: func() (*matcher.Backend, time.Time) { panic("no datastore") },
 	})
 	recoveredRuns := make(chan any)
 	s.StartRefresher(func(_ string, fn func()) func() {

@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/ratelimit"
 	"github.com/mtgban/mtgban-website/userstate"
 )
@@ -143,7 +143,7 @@ func (s *site) renderShared(w http.ResponseWriter, r *http.Request, status int, 
 // sharedListCap rows. Unreadable JSON is an empty list. A row whose id names
 // no card is dropped, and the rest are drawn from b: the owner's synced
 // text and art would reach every visitor, and Merge would copy them.
-func sharedRows(b *mtgmatcher.Backend, raw json.RawMessage) []sharedFavorite {
+func sharedRows(b *matcher.Backend, raw json.RawMessage) []sharedFavorite {
 	var all []sharedEntry
 	err := json.Unmarshal(raw, &all)
 	if err != nil {
@@ -187,7 +187,7 @@ func sharedRows(b *mtgmatcher.Backend, raw json.RawMessage) []sharedFavorite {
 
 // sharedCard is the row for a card id the way search shows the card, and
 // the query its result links to.
-func sharedCard(b *mtgmatcher.Backend, id string) sharedFavorite {
+func sharedCard(b *matcher.Backend, id string) sharedFavorite {
 	card := uuid2card(b, id, false)
 	co, _ := b.GetUUID(id)
 	treatments := make([]string, 0, len(card.Treatments))

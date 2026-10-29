@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // The query genQuery builds is what a uuid search is rebuilt into, what the
@@ -64,7 +64,7 @@ func TestTheRebuiltQueryFindsThePrintingItNames(t *testing.T) {
 func TestTheRebuiltQueryKeepsTheMarksTheNumberCarries(t *testing.T) {
 	skipWithoutDatastore(t)
 
-	var tagged *mtgmatcher.CardObject
+	var tagged *matcher.CardObject
 	for _, uuid := range backend().GetUUIDs() {
 		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed || co.Number == co.PlainNumber {

@@ -12,25 +12,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/banprice"
 )
 
 // v2Backend holds one Cardmarket product sold in two finishes, with two
 // uuids of its nonfoil, and a sealed product.
-func v2Backend() *mtgmatcher.Backend {
-	card := func(uuid, finish string) *mtgmatcher.CardObject {
-		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid, Identifiers: map[string]string{"mcmId": "600001"}}}
+func v2Backend() *matcher.Backend {
+	card := func(uuid, finish string) *matcher.CardObject {
+		co := &matcher.CardObject{Card: matcher.Card{UUID: uuid, Identifiers: map[string]string{"mcmId": "600001"}}}
 		co.Finish = finish
 		return co
 	}
-	box := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: "box", Identifiers: map[string]string{"mcmId": "700"}}, Sealed: true}
-	return &mtgmatcher.Backend{
+	box := &matcher.CardObject{Card: matcher.Card{UUID: "box", Identifiers: map[string]string{"mcmId": "700"}}, Sealed: true}
+	return &matcher.Backend{
 		AllUUIDs:       []string{"lor-1", "lor-2", "lor-3"},
 		AllSealedUUIDs: []string{"box"},
-		UUIDs: map[string]*mtgmatcher.CardObject{
+		UUIDs: map[string]*matcher.CardObject{
 			"lor-1": card("lor-1", "nonfoil"),
 			"lor-2": card("lor-2", "coldfoil"),
 			"lor-3": card("lor-3", "nonfoil"),
@@ -400,17 +400,17 @@ func TestPriceAPIv2EveryEndpoint(t *testing.T) {
 // and Sealed for sealed product, on retail and buylist alike. v1 keeps the
 // datastore's.
 func TestPriceAPIv2CardmarketIDs(t *testing.T) {
-	card := func(uuid, mcmID string, sealed bool) *mtgmatcher.CardObject {
-		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid, Identifiers: map[string]string{}}, Sealed: sealed}
+	card := func(uuid, mcmID string, sealed bool) *matcher.CardObject {
+		co := &matcher.CardObject{Card: matcher.Card{UUID: uuid, Identifiers: map[string]string{}}, Sealed: sealed}
 		if mcmID != "" {
 			co.Identifiers["mcmId"] = mcmID
 		}
 		co.Finish = "nonfoil"
 		return co
 	}
-	b := &mtgmatcher.Backend{
+	b := &matcher.Backend{
 		AllUUIDs: []string{"unlisted", "moved", "unpriced", "trend-only", "box"},
-		UUIDs: map[string]*mtgmatcher.CardObject{
+		UUIDs: map[string]*matcher.CardObject{
 			"unlisted":   card("unlisted", "", false),
 			"moved":      card("moved", "600001", false),
 			"unpriced":   card("unpriced", "620000", false),
@@ -501,7 +501,7 @@ type PriceAPIOutputV2 struct {
 }
 
 // collectV2 gathers a section's walk into one map.
-func collectV2(t testing.TB, b *mtgmatcher.Backend, section *v2Section) banprice.V2 {
+func collectV2(t testing.TB, b *matcher.Backend, section *v2Section) banprice.V2 {
 	t.Helper()
 	out := banprice.V2{}
 	err := section.walk(b, func(id string, finishes map[string]map[string][]banprice.Entry) error {
@@ -517,25 +517,25 @@ func collectV2(t testing.TB, b *mtgmatcher.Backend, section *v2Section) banprice
 	return out
 }
 
-func sellerPricesV2(t testing.TB, b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
+func sellerPricesV2(t testing.TB, b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
 	return collectV2(t, b, sellerSectionV2(b, mode, enabledStores, filterByEdition, filterByHash, filterByFinish, sealed))
 }
 
-func vendorPricesV2(t testing.TB, b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
+func vendorPricesV2(t testing.TB, b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
 	return collectV2(t, b, vendorSectionV2(b, mode, enabledStores, filterByEdition, filterByHash, filterByFinish, sealed))
 }
 
 // TestWriteV2Response pins the streamed response to the bytes json.Encoder
 // writes for the same prices, a section with no card left out included.
 func TestWriteV2Response(t *testing.T) {
-	card := func(uuid string) *mtgmatcher.CardObject {
-		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid}}
+	card := func(uuid string) *matcher.CardObject {
+		co := &matcher.CardObject{Card: matcher.Card{UUID: uuid}}
 		co.Finish = "nonfoil"
 		return co
 	}
-	b := &mtgmatcher.Backend{
+	b := &matcher.Backend{
 		AllUUIDs: []string{"a&b", "c"},
-		UUIDs:    map[string]*mtgmatcher.CardObject{"a&b": card("a&b"), "c": card("c")},
+		UUIDs:    map[string]*matcher.CardObject{"a&b": card("a&b"), "c": card("c")},
 	}
 	ck := mtgban.InventoryRecord{}
 	ck.Add("a&b", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1.5, Quantity: 2})
@@ -543,7 +543,7 @@ func TestWriteV2Response(t *testing.T) {
 	trend := mtgban.InventoryRecord{}
 	trend.Add("c", &mtgban.InventoryEntry{Price: 1e-7})
 	section := func(records ...mtgban.InventoryRecord) *v2Section {
-		s := &v2Section{keyOf: func(co *mtgmatcher.CardObject) string { return co.UUID }}
+		s := &v2Section{keyOf: func(co *matcher.CardObject) string { return co.UUID }}
 		for i, record := range records {
 			s.stores = append(s.stores, newV2Store([]string{"CK", "MKMTrend"}[i], record, true, i == 0, false, nil))
 		}
@@ -724,7 +724,7 @@ func TestV1SharedIDKeepsTheBestPrice(t *testing.T) {
 // A NaN or infinite price is no price: v1 and v2 leave it out rather than
 // fail to encode the response around it.
 func TestPriceAPISkipsNonFinitePrices(t *testing.T) {
-	co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: "lor-1", Identifiers: map[string]string{"mcmId": "600001"}}}
+	co := &matcher.CardObject{Card: matcher.Card{UUID: "lor-1", Identifiers: map[string]string{"mcmId": "600001"}}}
 	co.Finish = "nonfoil"
 	record := map[string][]mtgban.InventoryEntry{"lor-1": {
 		{Conditions: "NM", Price: math.NaN(), Quantity: 1},
@@ -737,7 +737,7 @@ func TestPriceAPISkipsNonFinitePrices(t *testing.T) {
 		t.Errorf("v2 entries %+v, want MP's alone", v2)
 	}
 
-	b := &mtgmatcher.Backend{AllUUIDs: []string{"lor-1"}, UUIDs: map[string]*mtgmatcher.CardObject{"lor-1": co}}
+	b := &matcher.Backend{AllUUIDs: []string{"lor-1"}, UUIDs: map[string]*matcher.CardObject{"lor-1": co}}
 	out := map[string]map[string]*BanPrice{}
 	processEntry(b, out, record["lor-1"], "mtgban", "lor-1", "CT", true, true, true)
 	wire, err := json.Marshal(out)

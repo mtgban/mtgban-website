@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 )
 

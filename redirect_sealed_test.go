@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // sealedRedirectQuery is what a path redirects the sealed tab to ask.
@@ -31,7 +31,7 @@ func sealedRedirectQuery(t *testing.T, path string) string {
 }
 
 // sealedPath is the /sealed/<set>/<slug> shape an inbound link arrives in.
-func sealedPath(co *mtgmatcher.CardObject) string {
+func sealedPath(co *matcher.CardObject) string {
 	return "/sealed/" + url.PathEscape(co.SetCode) + "/" + sealedSlug(co.Name)
 }
 

@@ -387,7 +387,7 @@ func renderGlobal(t *testing.T, source, query string) string {
 func TestGlobalSealedDropsVolatile(t *testing.T) {
 	sealed := backend().GetSealedUUIDs()
 	if len(sealed) == 0 {
-		t.Skip("mtgmatcher data not loaded")
+		t.Skip("matcher data not loaded")
 	}
 	seedVolatileSealed(t, sealed[0])
 	row := `data-arb-id="` + sealed[0] + `"`

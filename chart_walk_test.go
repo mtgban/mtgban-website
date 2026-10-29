@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
@@ -30,7 +30,7 @@ type snapshotVisit struct {
 // what it visited, keyed for assertions rather than in visit order.
 func collectSnapshotVisits(start time.Time) map[string]snapshotVisit {
 	got := map[string]snapshotVisit{}
-	walkSnapshotPrices(backend(), start, func(card *mtgmatcher.CardObject, config DatasetConfig, date string, price float64) {
+	walkSnapshotPrices(backend(), start, func(card *matcher.CardObject, config DatasetConfig, date string, price float64) {
 		got[config.PublicName] = snapshotVisit{
 			CardID: card.UUID, Dataset: config.PublicName,
 			Provider: config.Provider, Date: date, Price: price,

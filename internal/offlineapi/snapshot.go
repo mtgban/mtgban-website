@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/internal/offline"
 )
 
@@ -26,7 +26,7 @@ type manifestFile struct {
 
 // computeFingerprints hashes every in-memory price tuple, per set, resolving
 // each uuid's set code against b.
-func (s *Service) computeFingerprints(b *mtgmatcher.Backend) map[string]string {
+func (s *Service) computeFingerprints(b *matcher.Backend) map[string]string {
 	fps := map[string]*offline.Fingerprint{}
 	add := func(store, uuid, tag string, price float64, qty int) {
 		co, err := b.GetUUID(uuid)

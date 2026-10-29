@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // Which words are a set filter and which are a card's name, decided against
@@ -65,7 +65,7 @@ func TestSetFilterNamesNothing(t *testing.T) {
 //
 //	YUGIOH_PATH=... go test -run NameThatIsFilterSyntaxIsStillFound
 func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
-	var games []mtgmatcher.Game
+	var games []matcher.Game
 	for game := range gameDatastores {
 		games = append(games, game)
 	}
@@ -82,7 +82,7 @@ func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
 			t.Logf("%s: %v", game, err)
 			continue
 		}
-		loaded, err := mtgmatcher.Open(game, f)
+		loaded, err := matcher.Open(game, f)
 		f.Close()
 		if err != nil {
 			t.Errorf("%s: %v", game, err)

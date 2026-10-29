@@ -4,15 +4,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 func TestFormatFilter(t *testing.T) {
-	skip := func(filters []string, co *mtgmatcher.CardObject) bool {
+	skip := func(filters []string, co *matcher.CardObject) bool {
 		return applyCardFilter(backend(), "format", filters, co)
 	}
 
-	co := &mtgmatcher.CardObject{}
+	co := &matcher.CardObject{}
 	co.Legalities = map[string]string{
 		"standard": "Legal",
 		"vintage":  "Restricted",
@@ -121,7 +121,7 @@ func TestCollectorNumberPLST(t *testing.T) {
 	// The List mirrors the original printing's set code in its collector
 	// numbers (eg "AKH-127") - the dashed shape the range parser must not
 	// split, and that range comparisons reduce to the embedded value.
-	co := &mtgmatcher.CardObject{}
+	co := &matcher.CardObject{}
 	co.Number = "AKH-127"
 	co.PlainNumber = "AKH-127"
 
@@ -447,7 +447,7 @@ func TestSetNumberShorthand(t *testing.T) {
 func TestCollectorNumberStrict(t *testing.T) {
 	// The loaded game's rules reduce a loose number; an empty backend has none.
 	skipWithoutDatastore(t)
-	co := &mtgmatcher.CardObject{}
+	co := &matcher.CardObject{}
 	co.Number = "107★"
 	co.PlainNumber = "107"
 
@@ -462,7 +462,7 @@ func TestCollectorNumberStrict(t *testing.T) {
 	if len(elem.Values) != 1 || elem.Values[0] != "107★" {
 		t.Errorf("cn should keep a decorated query as typed, got %v", elem.Values)
 	}
-	plain := &mtgmatcher.CardObject{}
+	plain := &matcher.CardObject{}
 	plain.Number = "107"
 	plain.PlainNumber = "107"
 	if skip := applyCardFilter(backend(), "number", elem.Values, plain); !skip {

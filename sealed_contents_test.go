@@ -4,15 +4,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/sealed"
 )
 
 // productWithBothKinds finds a product that holds a fixed list and cards it
 // might come with, which is the only shape any of this is for. Chosen by
 // scanning rather than pinned, so the test fails for being wrong instead of
 // for a product having been reprinted.
-func productWithBothKinds(t *testing.T) *mtgmatcher.CardObject {
+func productWithBothKinds(t *testing.T) *matcher.CardObject {
 	t.Helper()
 	for _, code := range backend().GetAllSets() {
 		set, err := backend().GetSet(code)
@@ -301,7 +301,7 @@ func TestTheSettingPicksWhatALinkOpens(t *testing.T) {
 // twoProductsWithBothKinds finds two distinct products that each hold a
 // fixed list and cards they might come with, so a query naming both has two
 // guaranteed lists to take back out rather than one.
-func twoProductsWithBothKinds(t *testing.T) (a, b *mtgmatcher.CardObject) {
+func twoProductsWithBothKinds(t *testing.T) (a, b *matcher.CardObject) {
 	t.Helper()
 	for _, code := range backend().GetAllSets() {
 		set, err := backend().GetSet(code)
@@ -355,7 +355,7 @@ func TestVariableNamesSeveralProductsExcludesEachOnesGuaranteedCards(t *testing.
 		foundSet[id] = true
 	}
 
-	for _, co := range []*mtgmatcher.CardObject{a, b} {
+	for _, co := range []*matcher.CardObject{a, b} {
 		deck, err := sealed.ProductDecklist(backend(), co.SetCode, co.UUID)
 		if err != nil {
 			t.Fatal(err)

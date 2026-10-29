@@ -12,7 +12,7 @@ func TestMagicVariantNormalized(t *testing.T) {
 		want MagicVariant
 	}{
 		{
-			name: "strips mtgmatcher suffix and normalizes english",
+			name: "strips matcher suffix and normalizes english",
 			in:   MagicVariant{MtgjsonUUID: "abcdef01-2345-6789-abcd-ef0123456789_f", Language: "English"},
 			want: MagicVariant{MtgjsonUUID: "abcdef01-2345-6789-abcd-ef0123456789", Language: ""},
 		},

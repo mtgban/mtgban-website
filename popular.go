@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/observability"
 )
 
@@ -274,7 +274,7 @@ func popularTopCards(ds *datastore, query string) []string {
 // popularRankQuery turns a vote key into the query that picks its tile's
 // art, the query its tile links to, and its label. Empty for a key it
 // does not know.
-func popularRankQuery(b *mtgmatcher.Backend, rank observability.SearchRank) (searchQuery, linkQuery, label string) {
+func popularRankQuery(b *matcher.Backend, rank observability.SearchRank) (searchQuery, linkQuery, label string) {
 	switch {
 	case strings.HasPrefix(rank.Key, "card:"):
 		name := strings.TrimPrefix(rank.Key, "card:")

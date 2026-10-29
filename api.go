@@ -23,15 +23,15 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 )
 
 var ErrMissingTCGId = errors.New("tcg id not found")
 
-func getLastSold(ctx context.Context, b *mtgmatcher.Backend, cardID string, anyLang bool) ([]tcgplayer.LatestSalesData, error) {
+func getLastSold(ctx context.Context, b *matcher.Backend, cardID string, anyLang bool) ([]tcgplayer.LatestSalesData, error) {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func getLastSold(ctx context.Context, b *mtgmatcher.Backend, cardID string, anyL
 	return latestSales, nil
 }
 
-func getDecklist(b *mtgmatcher.Backend, uuid string) ([]string, error) {
+func getDecklist(b *matcher.Backend, uuid string) ([]string, error) {
 	co, err := b.GetUUID(uuid)
 	if err != nil {
 		return nil, err
@@ -145,7 +145,7 @@ func uuid2BuylistCSV(w *csv.Writer, ids, qtys []string, vendor string, header []
 	return nil
 }
 
-func SCGRetailRedirect(ctx context.Context, b *mtgmatcher.Backend, ids, qtys, conds []string) (string, error) {
+func SCGRetailRedirect(ctx context.Context, b *matcher.Backend, ids, qtys, conds []string) (string, error) {
 	if len(qtys) != len(ids) || len(conds) != len(ids) {
 		return "", errors.New("mismatched card, quantity and condition lists")
 	}
@@ -276,7 +276,7 @@ func mergeCSVRows(ids, qtys, conds []string) []csvRow {
 // (our names don't always match theirs exactly, see commit 1e39d5d). Cards
 // missing from the catalog keep these columns blank - TCGplayer skips the
 // check when they're empty.
-func UUID2TCGCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string) error {
+func UUID2TCGCSV(b *matcher.Backend, w *csv.Writer, ids, qtys, conds []string) error {
 	market, err := findSellerInventory("TCGPlayer")
 	if err != nil {
 		return err
@@ -417,7 +417,7 @@ var mkmConditionMap = map[mtgban.Condition]string{
 // If absent, quantity will be computed on the fly and entries will be merged
 // in a single entry (tcgplayer does not support csv operations with identical
 // items) and conditions will be set to NM.
-func UUID2MKMCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string) error {
+func UUID2MKMCSV(b *matcher.Backend, w *csv.Writer, ids, qtys, conds []string) error {
 	trend, _ := findSellerInventory("MKMTrend")
 	low, _ := findSellerInventory("MKMLow")
 
@@ -516,7 +516,7 @@ type OpenSearchURL struct {
 // at the origin the request reached it by, so each game's host names its own
 // search; a request from a host that is not ours gets this game's public one.
 func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
-	gameName := mtgmatcher.Title(string(Config().Game))
+	gameName := matcher.Title(string(Config().Game))
 	base := externalURL(r)
 
 	images := []OpenSearchImage{

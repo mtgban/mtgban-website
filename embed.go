@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/siteorigin"
@@ -49,7 +49,7 @@ func searchEntries2embed(results []SearchEntry, grades map[string]mtgban.Conditi
 
 // firstEmbedCard names the card an embed speaks for when it can only speak
 // for one: the earliest by set, over every card the search found.
-func firstEmbedCard(b *mtgmatcher.Backend, found map[string]map[mtgban.Condition][]SearchEntry) string {
+func firstEmbedCard(b *matcher.Backend, found map[string]map[mtgban.Condition][]SearchEntry) string {
 	sortedKeys := make([]string, 0, len(found))
 	for cardID := range found {
 		sortedKeys = append(sortedKeys, cardID)
@@ -64,7 +64,7 @@ func firstEmbedCard(b *mtgmatcher.Backend, found map[string]map[mtgban.Condition
 }
 
 // Retrieve cards from Sellers using the very first result
-func ProcessEmbedSearchResultsSellers(b *mtgmatcher.Backend, foundSellers map[string]map[mtgban.Condition][]SearchEntry, index bool) []embed.Entry {
+func ProcessEmbedSearchResultsSellers(b *matcher.Backend, foundSellers map[string]map[mtgban.Condition][]SearchEntry, index bool) []embed.Entry {
 	if len(foundSellers) == 0 {
 		return nil
 	}
@@ -145,7 +145,7 @@ func lastSales2embed(sales []tcgplayer.LatestSalesData) []embed.Sale {
 }
 
 // Retrieve cards from Vendors using the very first result
-func ProcessEmbedSearchResultsVendors(b *mtgmatcher.Backend, foundVendors map[string]map[mtgban.Condition][]SearchEntry) []embed.Entry {
+func ProcessEmbedSearchResultsVendors(b *matcher.Backend, foundVendors map[string]map[mtgban.Condition][]SearchEntry) []embed.Entry {
 	if len(foundVendors) == 0 {
 		return nil
 	}
@@ -169,7 +169,7 @@ func externalURL(r *http.Request) string {
 // <game>.mtgban.com for every other game.
 func publicOrigin() string {
 	game := Config().Game
-	if game == mtgmatcher.GameMagic {
+	if game == matcher.GameMagic {
 		return DefaultExternalURL
 	}
 	return "https://" + string(game) + ".mtgban.com"

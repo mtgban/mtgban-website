@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/banprice"
 )
@@ -20,7 +20,7 @@ import (
 // the same stores, filters and id modes.
 
 // v2Finish is the finish a card's prices are filed under in v2.
-func v2Finish(co *mtgmatcher.CardObject) string {
+func v2Finish(co *matcher.CardObject) string {
 	if co.Sealed {
 		return banprice.FinishSealed
 	}
@@ -47,9 +47,9 @@ func v2CardmarketShelves(sealed bool) []string {
 // it, since the datastore's Cardmarket ids are incomplete. The shelves come
 // from the one sellers snapshot handed in, so one response keys every card
 // from the same shelves.
-func v2Keyer(b *mtgmatcher.Backend, mode string, sealed bool, sellers []mtgban.Seller) func(*mtgmatcher.CardObject) string {
+func v2Keyer(b *matcher.Backend, mode string, sealed bool, sellers []mtgban.Seller) func(*matcher.CardObject) string {
 	if mode != "mkm" {
-		return func(co *mtgmatcher.CardObject) string { return getIDFromMode(b, mode, co) }
+		return func(co *matcher.CardObject) string { return getIDFromMode(b, mode, co) }
 	}
 	var shelves []mtgban.InventoryRecord
 	for _, name := range v2CardmarketShelves(sealed) {
@@ -59,7 +59,7 @@ func v2Keyer(b *mtgmatcher.Backend, mode string, sealed bool, sellers []mtgban.S
 			}
 		}
 	}
-	return func(co *mtgmatcher.CardObject) string {
+	return func(co *matcher.CardObject) string {
 		for _, shelf := range shelves {
 			entries := shelf[co.UUID]
 			if len(entries) > 0 && entries[0].OriginalID != "" {
@@ -72,7 +72,7 @@ func v2Keyer(b *mtgmatcher.Backend, mode string, sealed bool, sellers []mtgban.S
 
 // v2Cards is the cards a filtered request asks for, kept to its finish and
 // to singles or sealed, and whether the request is filtered at all.
-func v2Cards(b *mtgmatcher.Backend, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) ([]string, bool) {
+func v2Cards(b *matcher.Backend, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) ([]string, bool) {
 	if filterByEdition == "" && filterByHash == nil {
 		return nil, false
 	}
@@ -86,7 +86,7 @@ func v2Cards(b *mtgmatcher.Backend, filterByEdition string, filterByHash []strin
 // response is written rather than gathered first.
 type v2Section struct {
 	stores []v2Store
-	keyOf  func(*mtgmatcher.CardObject) string
+	keyOf  func(*matcher.CardObject) string
 	// The cards a filtered request asks for; a full dump walks every card
 	// a store prices.
 	cardIDs  []string
@@ -101,7 +101,7 @@ type v2Section struct {
 type v2Store struct {
 	name  string
 	cards func(yield func(string) bool)
-	file  func(list []banprice.Entry, cardID string, co *mtgmatcher.CardObject) []banprice.Entry
+	file  func(list []banprice.Entry, cardID string, co *matcher.CardObject) []banprice.Entry
 }
 
 // newV2Store reads a store's record: every priced entry it has for a card,
@@ -117,7 +117,7 @@ func newV2Store[T mtgban.GenericEntry](name string, record map[string][]T, withQ
 				}
 			}
 		},
-		file: func(list []banprice.Entry, cardID string, co *mtgmatcher.CardObject) []banprice.Entry {
+		file: func(list []banprice.Entry, cardID string, co *matcher.CardObject) []banprice.Entry {
 			entries := record[cardID]
 			var stocked mtgban.Condition
 			for i := range entries {
@@ -156,7 +156,7 @@ func newV2Store[T mtgban.GenericEntry](name string, record map[string][]T, withQ
 }
 
 // sellerSectionV2 is the retail section of a request.
-func sellerSectionV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) *v2Section {
+func sellerSectionV2(b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) *v2Section {
 	sellers := GetSellers()
 	section := newV2Section(b, mode, filterByEdition, filterByHash, filterByFinish, sealed, sellers)
 	for _, seller := range sellers {
@@ -171,7 +171,7 @@ func sellerSectionV2(b *mtgmatcher.Backend, mode string, enabledStores []string,
 }
 
 // vendorSectionV2 is the buylist section of a request.
-func vendorSectionV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) *v2Section {
+func vendorSectionV2(b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) *v2Section {
 	section := newV2Section(b, mode, filterByEdition, filterByHash, filterByFinish, sealed, GetSellers())
 	for _, vendor := range GetVendors() {
 		info := vendor.Info()
@@ -187,13 +187,13 @@ func vendorSectionV2(b *mtgmatcher.Backend, mode string, enabledStores []string,
 
 // searchSectionV2 is a section over the cards a search found, deduplicated,
 // keyed off the sellers snapshot handed in.
-func searchSectionV2(b *mtgmatcher.Backend, mode string, cardIDs []string, sealed bool, sellers []mtgban.Seller) *v2Section {
+func searchSectionV2(b *matcher.Backend, mode string, cardIDs []string, sealed bool, sellers []mtgban.Seller) *v2Section {
 	return &v2Section{keyOf: v2Keyer(b, mode, sealed, sellers), cardIDs: dedupeKeys(cardIDs), filtered: true}
 }
 
 // sellerSearchV2 is the retail section of a v2 search: the cards it found,
 // with every entry the search's store, condition and price filters keep.
-func sellerSearchV2(b *mtgmatcher.Backend, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
+func sellerSearchV2(b *matcher.Backend, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
 	sellers := GetSellers()
 	section := searchSectionV2(b, mode, cardIDs, sealed, sellers)
 	for _, seller := range sellers {
@@ -220,7 +220,7 @@ func sellerSearchV2(b *mtgmatcher.Backend, mode string, cardIDs []string, config
 }
 
 // vendorSearchV2 is the buylist section of a v2 search.
-func vendorSearchV2(b *mtgmatcher.Backend, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
+func vendorSearchV2(b *matcher.Backend, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
 	section := searchSectionV2(b, mode, cardIDs, sealed, GetSellers())
 	for _, vendor := range GetVendors() {
 		if shouldSkipStoreNG(vendor, config.StoreFilters) {
@@ -245,7 +245,7 @@ func vendorSearchV2(b *mtgmatcher.Backend, mode string, cardIDs []string, config
 	return section
 }
 
-func newV2Section(b *mtgmatcher.Backend, mode, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool, sellers []mtgban.Seller) *v2Section {
+func newV2Section(b *matcher.Backend, mode, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool, sellers []mtgban.Seller) *v2Section {
 	section := &v2Section{keyOf: v2Keyer(b, mode, sealed, sellers)}
 	section.cardIDs, section.filtered = v2Cards(b, filterByEdition, filterByHash, filterByFinish, sealed)
 	if filterByFinish != "" && !section.filtered {
@@ -257,13 +257,13 @@ func newV2Section(b *mtgmatcher.Backend, mode, filterByEdition string, filterByH
 // v2Printing is one card a section prices, under the id it is keyed by.
 type v2Printing struct {
 	id, cardID, finish string
-	co                 *mtgmatcher.CardObject
+	co                 *matcher.CardObject
 }
 
 // walk hands emit each card of the section in id order, with every store's
 // prices for it: the entries of every printing the id covers, merged. The
 // map emit is handed is reused for the next card, so emit must not keep it.
-func (section *v2Section) walk(b *mtgmatcher.Backend, emit func(id string, finishes map[string]map[string][]banprice.Entry) error) error {
+func (section *v2Section) walk(b *matcher.Backend, emit func(id string, finishes map[string]map[string][]banprice.Entry) error) error {
 	cardIDs := section.cardIDs
 	if !section.filtered {
 		priced := map[string]struct{}{}
@@ -360,7 +360,7 @@ func v2Stock(store string) func(cardID string, condition mtgban.Condition) (int,
 // v2FinishList is every finish v2 keys the game's prices by, commonest
 // first: the singles' finishes, and sealed. It walks the whole catalog, so
 // newDatastore builds it once per load.
-func v2FinishList(b *mtgmatcher.Backend) []banprice.Finish {
+func v2FinishList(b *matcher.Backend) []banprice.Finish {
 	counts := map[string]int{}
 	for _, uuid := range b.GetUUIDs() {
 		co, err := b.GetUUID(uuid)

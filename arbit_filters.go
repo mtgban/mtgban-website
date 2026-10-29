@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/banprice"
 )
 
@@ -461,7 +461,7 @@ func previewSample(entries []mtgban.ArbitEntry, limits arbitRowFilter, noQuantit
 
 // apply builds the options one comparison runs with, and the filter its
 // rows go through after.
-func (st arbitState) apply(b *mtgmatcher.Backend, m arbitMode) (*mtgban.ArbitOpts, arbitRowFilter) {
+func (st arbitState) apply(b *matcher.Backend, m arbitMode) (*mtgban.ArbitOpts, arbitRowFilter) {
 	l := st.limits(m)
 	opts := &mtgban.ArbitOpts{
 		MinSpread:             l.MinSpread,
@@ -495,10 +495,10 @@ func (st arbitState) apply(b *mtgmatcher.Backend, m arbitMode) (*mtgban.ArbitOpt
 		}
 		if st.Finishes.Set {
 			kept := st.Finishes.Values
-			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
+			opts.CustomCardFilter = func(co *matcher.CardObject) (float64, bool) {
 				finish := co.Finish
 				if finish == "" {
-					finish = mtgmatcher.FinishNonfoil
+					finish = matcher.FinishNonfoil
 				}
 				return 1, !slices.Contains(kept, finish)
 			}
@@ -658,7 +658,7 @@ func (st arbitState) field(key string, value, fallback, floor float64) arbitFiel
 
 // newArbitBar lays out the bar for one comparison, whose source is named,
 // with the price columns labelled as its tables label them.
-func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *mtgmatcher.Backend, sourceShort string) arbitBar {
+func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *matcher.Backend, sourceShort string) arbitBar {
 	bar := arbitBar{Sort: st.Sort, Set: st.changed(m)}
 
 	bar.Condition = st.Conditions.group("cond", "Condition", m.Sealed)

@@ -18,7 +18,7 @@ import (
 // rather than in internal/docparse.
 func TestUploadSealedCSV(t *testing.T) {
 	if len(backend().GetSealedUUIDs()) == 0 {
-		t.Skip("mtgmatcher data not loaded; skipping")
+		t.Skip("matcher data not loaded; skipping")
 	}
 
 	parser := newUploadParser(backend())

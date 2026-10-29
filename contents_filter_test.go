@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/sealed"
 )
 
 // A contents: or variable: query that names no product has nothing to be the
@@ -120,10 +120,10 @@ func TestCommaQuotedListsTokenize(t *testing.T) {
 // union test flaky, so this checks pairs (capped, since real datastores
 // carry thousands of products) until it finds one that is genuinely
 // disjoint.
-func twoDisjointSealedProducts(t *testing.T) (a, b *mtgmatcher.CardObject) {
+func twoDisjointSealedProducts(t *testing.T) (a, b *matcher.CardObject) {
 	t.Helper()
 	type candidate struct {
-		co   *mtgmatcher.CardObject
+		co   *matcher.CardObject
 		deck []string
 	}
 	var candidates []candidate
@@ -244,7 +244,7 @@ func TestContentsMultipleExactProductsUnion(t *testing.T) {
 func TestContentsSubstringFallsBackToProductType(t *testing.T) {
 	skipWithoutDatastore(t)
 
-	var co *mtgmatcher.CardObject
+	var co *matcher.CardObject
 	var term string
 	for _, code := range backend().GetAllSets() {
 		set, err := backend().GetSet(code)

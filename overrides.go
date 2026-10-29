@@ -7,8 +7,8 @@ import (
 	"log"
 	"strings"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/simplecloud"
 
 	"github.com/mtgban/mtgban-website/internal/bucketstore"
@@ -77,7 +77,7 @@ func saveKeyOverrides(overrides KeyOverrides) error {
 // overrides: any non-empty target UUID that does not resolve to a known card.
 // Wrong-key UUIDs are not validated — a stale/typo'd key is a harmless no-op at
 // load time, whereas a bogus target would silently create a dead inventory key.
-func validateKeyOverrides(b *mtgmatcher.Backend, overrides KeyOverrides) []string {
+func validateKeyOverrides(b *matcher.Backend, overrides KeyOverrides) []string {
 	var bad []string
 	for shorthand, byKind := range overrides {
 		for kind, remap := range byKind {
@@ -123,7 +123,7 @@ type OverrideCard struct {
 }
 
 // uuidCardLabel renders a card as "Name · Edition (SET) #Number · Finish".
-func uuidCardLabel(co *mtgmatcher.CardObject) string {
+func uuidCardLabel(co *matcher.CardObject) string {
 	label := fmt.Sprintf("%s · %s (%s) #%s", co.Name, co.Edition, co.SetCode, co.Number)
 	switch {
 	case co.Sealed:
@@ -137,7 +137,7 @@ func uuidCardLabel(co *mtgmatcher.CardObject) string {
 }
 
 // newOverrideCard builds the display data for a card uuid, or nil if unknown.
-func newOverrideCard(b *mtgmatcher.Backend, uuid string) *OverrideCard {
+func newOverrideCard(b *matcher.Backend, uuid string) *OverrideCard {
 	co, err := b.GetUUID(uuid)
 	if err != nil {
 		return nil
@@ -153,7 +153,7 @@ func newOverrideCard(b *mtgmatcher.Backend, uuid string) *OverrideCard {
 // printing that shares its name — the realistic targets when fixing a bad
 // match. Everything comes from the in-memory card database at render time;
 // there is no lookup endpoint. Returns nil when the uuid is unknown.
-func overrideFixCandidates(b *mtgmatcher.Backend, wrongUUID string) (wrong *OverrideCard, candidates []OverrideCard) {
+func overrideFixCandidates(b *matcher.Backend, wrongUUID string) (wrong *OverrideCard, candidates []OverrideCard) {
 	co, err := b.GetUUID(wrongUUID)
 	if err != nil {
 		return nil, nil
@@ -193,7 +193,7 @@ func (s *site) reloadOverriddenScrapers(shorthands map[string]struct{}) {
 		for kind, list := range scrapersConfig {
 			for _, shorthand := range list {
 				if _, ok := shorthands[shorthand]; ok {
-					go func(bucket simplecloud.Reader, game mtgmatcher.Game, name, kind, shorthand string) {
+					go func(bucket simplecloud.Reader, game matcher.Game, name, kind, shorthand string) {
 						defer recoverJob("override reload " + name + "/" + kind + "/" + shorthand)
 						err := loadScraperWithRetry(bucket, game, name, kind, shorthand)
 						if errors.Is(err, errDroppedDump) {

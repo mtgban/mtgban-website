@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // TestCollectorNumberPlainForm pins a loose number query to the plain number
@@ -58,7 +58,7 @@ func TestCollectorNumberPlainForm(t *testing.T) {
 		},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
-			co := &mtgmatcher.CardObject{}
+			co := &matcher.CardObject{}
 			co.Number = tt.number
 			co.PlainNumber = tt.original
 
@@ -88,7 +88,7 @@ func TestCollectorNumberStrictIsVerbatim(t *testing.T) {
 		{"so the plain number misses the marked printing", "cns:107", "107★", false},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
-			co := &mtgmatcher.CardObject{}
+			co := &matcher.CardObject{}
 			co.Number = tt.number
 			co.PlainNumber = tt.number
 
@@ -124,7 +124,7 @@ func TestCollectorNumberWithTotal(t *testing.T) {
 		{"a number written with a slash matches whole", "cn:MON219/MON220", "MON219/MON220", "", true},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
-			co := &mtgmatcher.CardObject{}
+			co := &matcher.CardObject{}
 			co.Number = tt.number
 			co.PlainNumber = tt.number
 			co.SetTotal = tt.total
@@ -247,7 +247,7 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 			continue
 		}
 		id := co.Identifiers["tcgplayerProductId"]
-		if id == "" || ds.backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, id) != uuid {
+		if id == "" || ds.backend.ConvertID(matcher.IDSpaceTCGplayer, id) != uuid {
 			continue
 		}
 		numbered := len(ds.numbers.loose[id]) != 0 || len(ds.numbers.strict[id]) != 0
@@ -268,7 +268,7 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 	if len(idlookup.CardFilters) != 1 || idlookup.CardFilters[0].Name != "idlookup" {
 		t.Errorf("id:%s is not an id lookup: %+v", carried, idlookup.CardFilters)
 	}
-	uuid := ds.backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, uncarried)
+	uuid := ds.backend.ConvertID(matcher.IDSpaceTCGplayer, uncarried)
 	if config := parseSearchQuery(ds, uncarried, nil, nil, nil); !slices.Equal(config.UUIDs, []string{uuid}) {
 		t.Errorf("%q reaches %v, want the TCGplayer id's %s", uncarried, config.UUIDs, uuid)
 	}
@@ -302,7 +302,7 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 
 	// Without the snapshot a number is an id or a name, and the bot embeds
 	// the product its id names.
-	carriedUUID := ds.backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, carried)
+	carriedUUID := ds.backend.ConvertID(matcher.IDSpaceTCGplayer, carried)
 	if config := parseSearchOptionsNG(ds.backend, carried, nil, nil, nil); !slices.Equal(config.UUIDs, []string{carriedUUID}) {
 		t.Errorf("%q without the snapshot reaches %v, want the TCGplayer id's %s", carried, config.UUIDs, carriedUUID)
 	}

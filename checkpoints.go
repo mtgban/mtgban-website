@@ -12,7 +12,7 @@ import (
 
 	"github.com/mtgban/simplecloud"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/internal/bucketstore"
 )
 
@@ -379,7 +379,7 @@ func setCheckpointsFromEditions(ds *datastore, cardName string, earliest time.Ti
 // reliable signal: expansion/core are full new-card sets, draft_innovation is
 // a half-step down (Conspiracy/Battlebond/MH-style), and the rest (commander,
 // promo, masters, starter, etc.) are typically companion products.
-func releasePriority(b *mtgmatcher.Backend, code string) int {
+func releasePriority(b *matcher.Backend, code string) int {
 	set, err := b.GetSet(code)
 	if err != nil {
 		return 0
@@ -401,7 +401,7 @@ func releasePriority(b *mtgmatcher.Backend, code string) int {
 // perCardSetCheckpoints emits a reprint checkpoint at each distinct date the
 // card was printed in the given set. Falls back to the set's release date for
 // printings that don't carry a per-card date in MTGJSON.
-func perCardSetCheckpoints(b *mtgmatcher.Backend, cardName string, e EditionEntry, earliest, now time.Time) []ChartCheckpoint {
+func perCardSetCheckpoints(b *matcher.Backend, cardName string, e EditionEntry, earliest, now time.Time) []ChartCheckpoint {
 	cards := b.MatchInSet(cardName, e.Code)
 	if len(cards) == 0 {
 		return nil

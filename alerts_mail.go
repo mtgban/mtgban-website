@@ -13,7 +13,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 
 	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/mailer"
@@ -173,7 +173,7 @@ func (s *site) sendAlertConfirm(ctx context.Context, userHash, to, link string) 
 }
 
 // alertCardImage is a card's thumbnail, else its full image.
-func alertCardImage(b *mtgmatcher.Backend, cardID string) string {
+func alertCardImage(b *matcher.Backend, cardID string) string {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return ""
@@ -185,7 +185,7 @@ func alertCardImage(b *mtgmatcher.Backend, cardID string) string {
 }
 
 // alertMailDeliverer sends digests through the site's mailer and templates.
-func (s *site) alertMailDeliverer(b *mtgmatcher.Backend) alerts.Deliverer {
+func (s *site) alertMailDeliverer(b *matcher.Backend) alerts.Deliverer {
 	return originMailDeliverer{mail: alerts.MailDeliverer{
 		Mailer:    s.alertMailer(),
 		Templates: s.mailTemplates,

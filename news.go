@@ -14,8 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 const (
@@ -287,7 +287,7 @@ var newspaperColumnSetters = map[string]func(*NewspaperResult, string){
 	"custom_sort":           func(r *NewspaperResult, s string) { r.CustomSort = s },
 }
 
-func getResults(b *mtgmatcher.Backend, db *sql.DB, query string) ([]NewspaperResult, error) {
+func getResults(b *matcher.Backend, db *sql.DB, query string) ([]NewspaperResult, error) {
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -381,35 +381,35 @@ func getResults(b *mtgmatcher.Backend, db *sql.DB, query string) ([]NewspaperRes
 // gameMap names every game a deployment can be configured as. For a game
 // missing from it, the newspaper stays empty and every refresh logs an
 // error, so an entry has to exist before an instance of that game is stood
-// up - which is why the games mtgmatcher registers are all here whether or
+// up - which is why the games matcher registers are all here whether or
 // not one is deployed yet. Each name is TCGplayer's productLineName, spelled
 // exactly: the newspaper files its rows under it and the pages match it
 // with =.
-var gameMap = map[mtgmatcher.Game]string{
-	mtgmatcher.GameMagic:         "Magic: The Gathering",
-	mtgmatcher.GameLorcana:       "Disney Lorcana",
-	mtgmatcher.GameOnePiece:      "One Piece Card Game",
-	mtgmatcher.GameYuGiOh:        "YuGiOh",
-	mtgmatcher.GameRiftbound:     "Riftbound: League of Legends Trading Card Game",
-	mtgmatcher.GameFleshAndBlood: "Flesh and Blood TCG",
-	mtgmatcher.GamePokemon:       "Pokemon",
-	mtgmatcher.GameGundam:        "Gundam Card Game",
-	mtgmatcher.GamePalworld:      "Palworld OFFICIAL CARD GAME",
+var gameMap = map[matcher.Game]string{
+	matcher.GameMagic:         "Magic: The Gathering",
+	matcher.GameLorcana:       "Disney Lorcana",
+	matcher.GameOnePiece:      "One Piece Card Game",
+	matcher.GameYuGiOh:        "YuGiOh",
+	matcher.GameRiftbound:     "Riftbound: League of Legends Trading Card Game",
+	matcher.GameFleshAndBlood: "Flesh and Blood TCG",
+	matcher.GamePokemon:       "Pokemon",
+	matcher.GameGundam:        "Gundam Card Game",
+	matcher.GamePalworld:      "Palworld OFFICIAL CARD GAME",
 }
 
 // gameBadgeMap is the short form the brand wears under the wordmark on a
 // non-Magic deployment. gameMap's full names are what prose wants and what a
 // two-line lockup cannot hold: "Riftbound: League of Legends Trading Card
 // Game" is wider than the navbar leaves for the logo.
-var gameBadgeMap = map[mtgmatcher.Game]string{
-	mtgmatcher.GameLorcana:       "Lorcana",
-	mtgmatcher.GameOnePiece:      "One Piece",
-	mtgmatcher.GameYuGiOh:        "Yu-Gi-Oh!",
-	mtgmatcher.GameRiftbound:     "Riftbound",
-	mtgmatcher.GameFleshAndBlood: "Flesh and Blood",
-	mtgmatcher.GamePokemon:       "Pokémon",
-	mtgmatcher.GameGundam:        "Gundam",
-	mtgmatcher.GamePalworld:      "Palworld",
+var gameBadgeMap = map[matcher.Game]string{
+	matcher.GameLorcana:       "Lorcana",
+	matcher.GameOnePiece:      "One Piece",
+	matcher.GameYuGiOh:        "Yu-Gi-Oh!",
+	matcher.GameRiftbound:     "Riftbound",
+	matcher.GameFleshAndBlood: "Flesh and Blood",
+	matcher.GamePokemon:       "Pokémon",
+	matcher.GameGundam:        "Gundam",
+	matcher.GamePalworld:      "Palworld",
 }
 
 // Cache of card UUIDs that appear in the newspaper spike score pages.
@@ -467,7 +467,7 @@ func noteNewspaperStaleness(pageVars *PageVars) {
 // return value reports whether the results are good enough to replace what is
 // already cached: a failed query, an empty response, or a response that lost
 // more than half of the rows we had all keep the older data.
-func refreshNewspaperEdition(b *mtgmatcher.Backend, label, query string, cached []NewspaperResult) ([]NewspaperResult, bool) {
+func refreshNewspaperEdition(b *matcher.Backend, label, query string, cached []NewspaperResult) ([]NewspaperResult, bool) {
 	results, err := getResults(b, NewNewspaperDB, query)
 	if err != nil {
 		log.Println(query, err)
@@ -525,7 +525,7 @@ func (s *site) cacheNewspaper() {
 }
 
 // cacheNewspaperWith refreshes every newspaper page, matching rows through b.
-func (s *site) cacheNewspaperWith(b *mtgmatcher.Backend) {
+func (s *site) cacheNewspaperWith(b *matcher.Backend) {
 	log.Println("Caching Newspaper data")
 
 	newspaperUUIDs := map[string]struct{}{}

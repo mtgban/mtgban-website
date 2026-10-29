@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // These are go-mtgban's workflow names; its workflows_test.go pins the other side.
 func TestNewBantoolWorkflow(t *testing.T) {
 	tests := []struct {
-		game  mtgmatcher.Game
+		game  matcher.Game
 		store string
 		want  bantoolWorkflow
 	}{

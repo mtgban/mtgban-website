@@ -3,8 +3,8 @@ package main
 import (
 	"slices"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/internal/alerts"
 )
@@ -62,7 +62,7 @@ func alertStorePrices(cardID string, sealed bool, side alerts.Side, blocklist []
 }
 
 // alertCardSnapshot is the display snapshot kept on the alert row.
-func alertCardSnapshot(b *mtgmatcher.Backend, cardID string) (alerts.Card, bool, bool) {
+func alertCardSnapshot(b *matcher.Backend, cardID string) (alerts.Card, bool, bool) {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return alerts.Card{}, false, false

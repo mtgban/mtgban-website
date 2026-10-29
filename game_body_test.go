@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
 
@@ -55,7 +55,7 @@ func TestBodyCarriesTheGame(t *testing.T) {
 		{"home.html", false},   // base-landing.html
 		{"search.html", true},  // base-mobile.html
 	} {
-		for _, game := range []mtgmatcher.Game{"yugioh", DefaultGame} {
+		for _, game := range []matcher.Game{"yugioh", DefaultGame} {
 			Config().Game = game
 			rendered := renderPage(t, page.name, page.mobile, PageVars{UserNav: &NavElem{Short: "b"}, IsMobile: page.mobile})
 

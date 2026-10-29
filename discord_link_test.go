@@ -9,7 +9,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // offeredPrinting is the printing a reply offers on this site: the uuid its
@@ -39,7 +39,7 @@ var offeredLinkRE = regexp.MustCompile(`\]\((https://[^)]+)\)`)
 // tcgplayerProductIDOf is the id TCGplayer files a printing under: the etched
 // product where the printing is etched, the plain one otherwise. The two are
 // one id space, which is what lets a single lookup answer either.
-func tcgplayerProductIDOf(co *mtgmatcher.CardObject) string {
+func tcgplayerProductIDOf(co *matcher.CardObject) string {
 	if co.Etched {
 		return co.Identifiers["tcgplayerEtchedProductId"]
 	}
@@ -52,7 +52,7 @@ func tcgplayerProductIDOf(co *mtgmatcher.CardObject) string {
 // holding one of the store's Skip words ("Helpful ...") would have the bot
 // ignore the message, which is a property of the skip list and not of the
 // mapping these tests are about.
-func tcgplayerLinkFor(co *mtgmatcher.CardObject) string {
+func tcgplayerLinkFor(co *matcher.CardObject) string {
 	id := tcgplayerProductIDOf(co)
 	if id == "" {
 		return ""
@@ -68,7 +68,7 @@ func tcgplayerLinkFor(co *mtgmatcher.CardObject) string {
 // no lookup can tell which of them a link meant. TCGplayer sells a Secret
 // Lair's English and Japanese printings as one product - SLD #1112 and
 // #1112jpn both file under 450544 - and a handful of dagger variants the same
-// way. mtgmatcher keeps the first filer and drops the rest, deterministically,
+// way. matcher keeps the first filer and drops the rest, deterministically,
 // so the answer is a real printing of the right card under the right name; it
 // just is not always the one a caller started from.
 func tcgplayerSharedProductIDs() map[string]bool {
@@ -100,7 +100,7 @@ func tcgplayerSharedProductIDs() map[string]bool {
 // manapoolLinkFor spells the address Mana Pool files a printing under: its set
 // and its number as printed, with the finish in the query rather than in the
 // path.
-func manapoolLinkFor(co *mtgmatcher.CardObject) string {
+func manapoolLinkFor(co *matcher.CardObject) string {
 	finish := "nonfoil"
 	if co.Etched {
 		finish = "etched"
@@ -260,7 +260,7 @@ func TestTCGplayerEtchedIDNamesTheEtchedPrinting(t *testing.T) {
 	skipWithoutDatastore(t)
 
 	var checked, missed int
-	for id, uuid := range backend().ExternalIdentifiers[mtgmatcher.IDSpaceTCGplayer] {
+	for id, uuid := range backend().ExternalIdentifiers[matcher.IDSpaceTCGplayer] {
 		base, err := backend().GetUUID(uuid)
 		if err != nil || base.Identifiers["tcgplayerEtchedProductId"] != id {
 			continue
@@ -386,7 +386,7 @@ func TestBanSearchLinkAddressesThePrinting(t *testing.T) {
 	}
 
 	for _, tt := range []struct {
-		co   *mtgmatcher.CardObject
+		co   *matcher.CardObject
 		page string
 	}{
 		{single, "https://www.mtgban.com/search"},
@@ -440,7 +440,7 @@ func TestStoreLinkDescriptionOffersOnlyWhatItResolved(t *testing.T) {
 
 	for _, tt := range []struct {
 		name string
-		co   *mtgmatcher.CardObject
+		co   *matcher.CardObject
 		want string
 	}{
 		{"a card", single, "[Check the card on our website too](" + banSearchLink(single, "1234") + ")"},

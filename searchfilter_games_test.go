@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // gameDatastores names each game by the variable its datastore path lives in.
 // They are local builds, so a run without them skips rather than bundling a
 // trimmed copy of any of them.
-var gameDatastores = map[mtgmatcher.Game]string{
+var gameDatastores = map[matcher.Game]string{
 	"lorcana":       "LORCANA_PATH",
 	"riftbound":     "RIFTBOUND_PATH",
 	"onepiece":      "ONEPIECE_PATH",
@@ -52,7 +52,7 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 			t.Logf("%s: %v", game, err)
 			continue
 		}
-		loaded, err := mtgmatcher.Open(game, f)
+		loaded, err := matcher.Open(game, f)
 		f.Close()
 		if err != nil {
 			t.Errorf("%s: %v", game, err)
@@ -69,7 +69,7 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 				if err != nil || co.Sealed || co.SetCode == "" || co.Number == "" {
 					continue
 				}
-				if mtgmatcher.ExtractNumberAny(co.Number) == "" ||
+				if matcher.ExtractNumberAny(co.Number) == "" ||
 					!strings.ContainsFunc(co.Number, isNotDigit) {
 					continue
 				}
@@ -120,7 +120,7 @@ func TestLetteredNumberReachesItsPrintingInEveryGame(t *testing.T) {
 			t.Logf("%s: %v", game, err)
 			continue
 		}
-		loaded, err := mtgmatcher.Open(game, f)
+		loaded, err := matcher.Open(game, f)
 		f.Close()
 		if err != nil {
 			t.Errorf("%s: %v", game, err)
@@ -192,7 +192,7 @@ func TestNumberWithTotalReachesItsPrintingInEveryGame(t *testing.T) {
 			t.Logf("%s: %v", game, err)
 			continue
 		}
-		loaded, err := mtgmatcher.Open(game, f)
+		loaded, err := matcher.Open(game, f)
 		f.Close()
 		if err != nil {
 			t.Errorf("%s: %v", game, err)
@@ -256,7 +256,7 @@ func TestNumberWithTotalReachesItsPrintingInEveryGame(t *testing.T) {
 // checked.
 func TestPrintedNumberReachesItsPrintingInEveryGame(t *testing.T) {
 	// The printings each number has to reach, and nothing else.
-	examples := map[mtgmatcher.Game]map[string]string{
+	examples := map[matcher.Game]map[string]string{
 		"yugioh":   {"LOB-E027": "The Furious Sea King", "LOB-027": "Aqua Madoor", "info-067": "That's 10!"},
 		"gundam":   {"GD01-001": "Gundam"},
 		"onepiece": {"OP03-003": "Izo"},
@@ -273,7 +273,7 @@ func TestPrintedNumberReachesItsPrintingInEveryGame(t *testing.T) {
 			t.Logf("%s: %v", game, err)
 			continue
 		}
-		loaded, err := mtgmatcher.Open(game, f)
+		loaded, err := matcher.Open(game, f)
 		f.Close()
 		if err != nil {
 			t.Errorf("%s: %v", game, err)
@@ -304,7 +304,7 @@ func TestPrintedNumberReachesItsPrintingInEveryGame(t *testing.T) {
 				}
 				split, printed := splitPrintedNumber(ds.backend, co.Number)
 				if !printed || !strings.EqualFold(split[0], co.SetCode) ||
-					mtgmatcher.ExtractNumberAny(split[1]) == "" {
+					matcher.ExtractNumberAny(split[1]) == "" {
 					continue
 				}
 				checked++
@@ -338,13 +338,13 @@ func TestPrintedNumberReachesItsPrintingInEveryGame(t *testing.T) {
 }
 
 // searchHits runs a query and returns the keys it reaches with their cards.
-func searchHits(t *testing.T, ds *datastore, query string) ([]string, []*mtgmatcher.CardObject) {
+func searchHits(t *testing.T, ds *datastore, query string) ([]string, []*matcher.CardObject) {
 	t.Helper()
 	keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 	if err != nil {
 		t.Errorf("%q: %v", query, err)
 	}
-	var hits []*mtgmatcher.CardObject
+	var hits []*matcher.CardObject
 	for _, key := range keys {
 		hit, err := ds.backend.GetUUID(key)
 		if err == nil {
@@ -359,7 +359,7 @@ func searchHits(t *testing.T, ds *datastore, query string) ([]string, []*mtgmatc
 // Yu-Gi-Oh's "7", or a name holds the words: "skyscraper 2".
 func TestBareNumberInEveryGame(t *testing.T) {
 	// The cn: query each number reaches what, or "" for a name.
-	examples := map[mtgmatcher.Game]map[string]string{
+	examples := map[matcher.Game]map[string]string{
 		"pokemon": {"017": "cn:17", "17": "cn:17", "#123": "cn:123", "charizard 4": "charizard cn:4"},
 		"lorcana": {"204": "cn:204"},
 		"yugioh":  {"7": "", "skyscraper 2": ""},
@@ -376,7 +376,7 @@ func TestBareNumberInEveryGame(t *testing.T) {
 			t.Logf("%s: %v", game, err)
 			continue
 		}
-		loaded, err := mtgmatcher.Open(game, f)
+		loaded, err := matcher.Open(game, f)
 		f.Close()
 		if err != nil {
 			t.Errorf("%s: %v", game, err)

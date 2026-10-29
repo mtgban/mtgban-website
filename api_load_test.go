@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -28,7 +28,7 @@ func apiLoadSig(t *testing.T, store string) string {
 
 // withLocalDumpsBucket points DataBucket at a fresh temp directory, and
 // resets Config.Game, the sellers, vendors and scraper index around it.
-func withLocalDumpsBucket(t *testing.T, game mtgmatcher.Game) {
+func withLocalDumpsBucket(t *testing.T, game matcher.Game) {
 	t.Helper()
 	t.Chdir(t.TempDir())
 

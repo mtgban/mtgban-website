@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/internal/palette"
 )
 
@@ -40,7 +40,7 @@ type catalogCard struct {
 // mirrored from MTGJSON crossed with Scryfall's bulk data and keyed on the
 // scryfall id, while every other game is mirrored out of mtgban's own
 // datastore and keyed on the product the card is a printing of.
-func imageKey(co *mtgmatcher.CardObject, magic bool) string {
+func imageKey(co *matcher.CardObject, magic bool) string {
 	if co.Images["full"] == "" {
 		return ""
 	}
@@ -65,18 +65,18 @@ func imageKey(co *mtgmatcher.CardObject, magic bool) string {
 
 // datastoreImageKey names the one image all finishes of a product share: its
 // TCGplayer product id or, where the card names no product, the key its
-// finishes share (mtgmatcher.PrintingKey). img-downloader's datastore
+// finishes share (matcher.PrintingKey). img-downloader's datastore
 // provider files images under the same expression; change both together.
 //
 // It reads fields because a datastore id is opaque (go-mtgban's
-// mtgmatcher/datastore.go says why). Cutting the uuid at its last underscore
+// matcher/datastore.go says why). Cutting the uuid at its last underscore
 // gave 14,780 products more than one key and 12,857 a key another had too.
-func datastoreImageKey(co *mtgmatcher.CardObject) string {
-	return mtgmatcher.ProductKeyOf(co.Identifiers, mtgmatcher.PrintingKey(co.Card))
+func datastoreImageKey(co *matcher.CardObject) string {
+	return matcher.ProductKeyOf(co.Identifiers, matcher.PrintingKey(co.Card))
 }
 
 // newCatalogCard builds a catalog entry from a card object and its store list.
-func newCatalogCard(co *mtgmatcher.CardObject, products []string, magic bool) catalogCard {
+func newCatalogCard(co *matcher.CardObject, products []string, magic bool) catalogCard {
 	card := catalogCard{
 		Name:     co.Name,
 		Number:   co.Number,
@@ -131,7 +131,7 @@ type catalogFragments struct {
 
 // buildCatalogFragments marshals the cards and sets of backend, keyed on
 // source. Returns nil when the datastore holds no cards.
-func (s *Service) buildCatalogFragments(backend *mtgmatcher.Backend, source time.Time) (*catalogFragments, error) {
+func (s *Service) buildCatalogFragments(backend *matcher.Backend, source time.Time) (*catalogFragments, error) {
 	cards := map[string]catalogCard{}
 	magic := s.magicImageKeys()
 	addCard := func(uuid string) {
@@ -144,7 +144,7 @@ func (s *Service) buildCatalogFragments(backend *mtgmatcher.Backend, source time
 			for _, name := range s.deps.FinishNames(co) {
 				// The Foil and Etched flags answer the names every game shares
 				switch name {
-				case mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
+				case matcher.FinishNonfoil, matcher.FinishFoil, matcher.FinishEtched:
 					continue
 				}
 				card.Finishes = append(card.Finishes, name)
@@ -217,7 +217,7 @@ func (s *Service) buildCatalogFragments(backend *mtgmatcher.Backend, source time
 // refreshCatalog rebuilds the gzipped catalog document from backend and
 // scraper list. Only the store list is rebuilt per call: the cards and sets
 // are reused until source no longer matches the cached fragments.
-func (s *Service) refreshCatalog(backend *mtgmatcher.Backend, source time.Time) {
+func (s *Service) refreshCatalog(backend *matcher.Backend, source time.Time) {
 	frags := s.fragments
 	if frags == nil || !frags.source.Equal(source) {
 		next, err := s.buildCatalogFragments(backend, source)

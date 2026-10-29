@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/xuri/excelize/v2"
 
 	"github.com/mtgban/mtgban-website/internal/docparse"
@@ -863,9 +863,9 @@ func collectionPage(header []string, rows map[string][]string, order []string) i
 // A backend that knows one TCGplayer product id, so a row's id attribute is
 // taken over the columns, as it is on a real page.
 func collectionParser() *docparse.Parser {
-	return newUploadParser(&mtgmatcher.Backend{
-		ExternalIdentifiers: map[mtgmatcher.IDSpace]map[string]string{
-			mtgmatcher.IDSpaceTCGplayer: {"1234": "fzz-uuid"},
+	return newUploadParser(&matcher.Backend{
+		ExternalIdentifiers: map[matcher.IDSpace]map[string]string{
+			matcher.IDSpaceTCGplayer: {"1234": "fzz-uuid"},
 		},
 	})
 }

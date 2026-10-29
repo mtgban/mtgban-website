@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // TestRegexpFilterCompiledWithQuery pins the pattern to the filter it was
@@ -29,7 +29,7 @@ func TestRegexpFilterCompiledWithQuery(t *testing.T) {
 		},
 	} {
 		t.Run(tt.query, func(t *testing.T) {
-			co := &mtgmatcher.CardObject{}
+			co := &matcher.CardObject{}
 			co.Number = "635"
 			co.Name = "Toxin Sliver"
 			co.Edition = "Secret Lair Drop"

@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/url"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 
 	"github.com/mtgban/mtgban-website/internal/alerts"
 )
@@ -77,7 +77,7 @@ func (s *site) pokeAlerts(kinds ...string) {
 }
 
 // alertsReady is the datastore in and at least one market side loaded.
-func alertsReady(b *mtgmatcher.Backend) bool {
+func alertsReady(b *matcher.Backend) bool {
 	return alertsReadyFrom(len(b.GetUUIDs()), len(GetSellers()), len(GetVendors()))
 }
 

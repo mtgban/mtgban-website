@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // A game other than Magic searches by substring, since its card names carry a
@@ -15,7 +15,7 @@ func TestDefaultSearchModePerGame(t *testing.T) {
 
 	for _, tc := range []struct {
 		name  string
-		game  mtgmatcher.Game
+		game  matcher.Game
 		query string
 		want  string
 	}{

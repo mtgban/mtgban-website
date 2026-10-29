@@ -17,7 +17,7 @@ price dumps into memory and serves search, bulk-upload valuation, arbitrage,
 newspaper reports, price charts, a signed price API, and a Discord bot.
 
 The card database and scraper abstractions come from the sibling module
-`github.com/mtgban/go-mtgban` (`mtgmatcher` = card identity/lookup; `mtgban` =
+`github.com/mtgban/go-mtgban` (`matcher` = card identity/lookup; `mtgban` =
 `Seller`/`Vendor` interfaces and `InventoryRecord`/`BuylistRecord` price maps).
 
 ## Build, run, test
@@ -210,7 +210,7 @@ yet, which is not something committing code can do. Pushing a
 `gundam-*`/`palworld-*` tag before that exists just fails the workflow's
 `doctl apps create-deployment` step with an unknown-app error. (An earlier
 version of this file also claimed `go.mod`'s go-mtgban pin predated the
-commit that added their `mtgmatcher` packages — checked directly and that
+commit that added their `matcher` packages — checked directly and that
 was wrong: both were already registered at the pinned `v0.8.3`, games.go
 blank-imports included, so no dependency bump was ever needed for this.)
 
@@ -274,8 +274,8 @@ commit to this repo can complete on its own.
    field must not ride on every login is in
    `docs/adr/0001-api-handoff-email-check.md`.
 
-3. **Card identity goes through `mtgmatcher`.** Resolve cards through the
-   `*mtgmatcher.Backend` a function was handed (`b.Match`, `b.GetUUID`,
+3. **Card identity goes through `matcher`.** Resolve cards through the
+   `*matcher.Backend` a function was handed (`b.Match`, `b.GetUUID`,
    `b.MatchID`) — don't hand-roll UUID or set/number/finish parsing.
 
 4. **Page registration is declarative.** Add a page by adding a `NavElem` (its

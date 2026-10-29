@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 const (
@@ -127,7 +127,7 @@ var FilterOptConfig = map[string]FilterOpt{
 			// lookup scans every vendor. A missing SYP is a nil map, on
 			// which nothing is listed.
 			syp, _ := findVendorBuylist("SYP")
-			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
+			opts.CustomCardFilter = func(co *matcher.CardObject) (float64, bool) {
 				_, onSypList := syp[co.UUID]
 				if !onSypList {
 					return 0, true
@@ -146,7 +146,7 @@ var FilterOptConfig = map[string]FilterOpt{
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomCardFilter
 			inv, _ := findSellerInventory("STKS")
-			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
+			opts.CustomCardFilter = func(co *matcher.CardObject) (float64, bool) {
 				_, onStocks := inv[co.UUID]
 				if !onStocks {
 					return 0, true
@@ -232,7 +232,7 @@ func arbitCardIDs(entries []mtgban.ArbitEntry) []string {
 // arbitLess returns the comparator for sorting entries in the given
 // mode, or nil for unknown modes (caller leaves the slice unsorted,
 // matching the prior switch's absence of a default case).
-func arbitLess(b *mtgmatcher.Backend, entries []mtgban.ArbitEntry, mode string, globalMode bool) func(i, j *mtgban.ArbitEntry) bool {
+func arbitLess(b *matcher.Backend, entries []mtgban.ArbitEntry, mode string, globalMode bool) func(i, j *mtgban.ArbitEntry) bool {
 	switch mode {
 	case "available":
 		return func(i, j *mtgban.ArbitEntry) bool {

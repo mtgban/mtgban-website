@@ -9,7 +9,7 @@ the card's set code cut out of the fill in the page's own background colour.
 The pieces, and where each lives:
 
 - `colorRarityMap` (`utils.go`) — one hex (or `var(--normal)`) per rarity,
-  keyed by its `mtgmatcher.RarityName` (`superrare` for "Super Rare"), the
+  keyed by its `matcher.RarityName` (`superrare` for "Super Rare"), the
   spelling a card carries its rarity in. The lookup folds `co.Rarity` the
   same way.
 - `img/setsymbol/<game>/*.svg` (optional) — one outline per rarity, named by
@@ -26,13 +26,13 @@ The pieces, and where each lives:
 - `img/backs/<game>.webp` — the card back, served at `/img/backs/<game>.webp`
   by the `card_back` template func.
 - `registeredGames` (`games_coverage_test.go`) — kept in step with
-  go-mtgban's `mtgmatcher/games/games.go` by hand; nothing generates it.
+  go-mtgban's `matcher/games/games.go` by hand; nothing generates it.
 
 ## Adding a game
 
 1. **Get the exact rarity vocabulary.** The game's datastore lists its
    rarities, rarest first, under `data.properties.rarity`; each one's
-   `mtgmatcher.RarityName` is the key `colorRarityMap` must use, and the list
+   `matcher.RarityName` is the key `colorRarityMap` must use, and the list
    is the climb order for step 3. Cross-check against the real datastore
    JSON (paths in go-mtgban's `.env`): count cards per rarity, and confirm
    nothing in the list is actually empty.
@@ -110,7 +110,7 @@ The pieces, and where each lives:
    `setsymbol_test.go`'s `TestSetSymbolsLoadForARegisteredGame` and
    `TestSetSymbolImages` cover the rendering path, `games_coverage_test.go`
    covers registration. None of this needs go.mod's go-mtgban pin bumped to
-   a version that ships the game's `mtgmatcher` package — `colorRarityMap`
+   a version that ships the game's `matcher` package — `colorRarityMap`
    is plain data with no import on it. Bumping the dependency is a separate,
    later step for actually deploying the game, not part of badge setup.
 

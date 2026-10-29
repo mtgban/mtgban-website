@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/bucketstore"
 	"github.com/mtgban/mtgban-website/internal/offline"
 	"github.com/mtgban/mtgban-website/internal/palette"
@@ -24,19 +24,19 @@ type Deps struct {
 	// Datastore returns the current card datastore, never nil, and when it
 	// was loaded, together: a catalog refresh reads this once so the cards
 	// it marshals and the source time it keys them on describe the same load.
-	Datastore func() (*mtgmatcher.Backend, time.Time)
+	Datastore func() (*matcher.Backend, time.Time)
 	// Allow authenticates a request and returns the caller's email.
 	Allow func(r *http.Request) (email string, ok bool)
 
 	// CanonicalSetCode returns the canonical (uppercased) set code for the
 	// given input, matched against b. Returns an error if the set is
 	// unknown. Main provides this by wrapping b.GetSet.
-	CanonicalSetCode func(b *mtgmatcher.Backend, setCode string) (string, error)
+	CanonicalSetCode func(b *matcher.Backend, setCode string) (string, error)
 
 	// BuildSetPayload gathers and converts one set's prices, retail from
 	// the given sellers and buylist from the given vendors, matched against
 	// b (main owns BanPrice and the getters).
-	BuildSetPayload func(b *mtgmatcher.Backend, setCode string, sellers, vendors []string) (*offline.SetPayload, error)
+	BuildSetPayload func(b *matcher.Backend, setCode string, sellers, vendors []string) (*offline.SetPayload, error)
 
 	// EnabledStores returns the non-blocklisted shorthands of each side:
 	// the sellers not on the retail block list and the vendors not on the
@@ -47,20 +47,20 @@ type Deps struct {
 	Vendors func() []mtgban.Vendor
 
 	ScraperName       func(shorthand string) string
-	CardObjectSources func(co *mtgmatcher.CardObject) []string
+	CardObjectSources func(co *matcher.CardObject) []string
 
 	// FinishNames are the names f: reaches a card by, and Finishes the list
 	// the palette offers them in. The catalog carries both, so f: and its
 	// menu work offline too. Finishes takes the same backend the catalog
 	// refresh already read, rather than reading its own.
-	FinishNames func(co *mtgmatcher.CardObject) []string
-	Finishes    func(b *mtgmatcher.Backend) []palette.Finish
+	FinishNames func(co *matcher.CardObject) []string
+	Finishes    func(b *matcher.Backend) []palette.Finish
 
 	// Game names the card game this deployment serves. It decides how image
 	// keys are derived, because Magic's mirror keys on the scryfall id while
 	// every other game keys on the card's TCGplayer product. Nil or empty
 	// means Magic, which is what a deployment that never set it is.
-	Game func() mtgmatcher.Game
+	Game func() matcher.Game
 
 	// Bucket factories: paths are read per call so config edits are picked
 	// up without rebuilding the service.
@@ -124,7 +124,7 @@ func (s *Service) magicImageKeys() bool {
 		return true
 	}
 	game := s.deps.Game()
-	return game == "" || game == mtgmatcher.GameMagic
+	return game == "" || game == matcher.GameMagic
 }
 
 // Handle dispatches /api/offline/ endpoints.

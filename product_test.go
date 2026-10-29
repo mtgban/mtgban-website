@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -16,7 +16,7 @@ func almostEqual(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
 func TestAllEditionsByCategoryCoversAllEditions(t *testing.T) {
 	editions := currentDatastore().editions
 	if len(editions.AllEditionsKeys) == 0 {
-		t.Skip("mtgmatcher data not loaded; skipping")
+		t.Skip("matcher data not loaded; skipping")
 	}
 	categorized := 0
 	for _, entries := range editions.AllEditionsByCategory {
@@ -31,7 +31,7 @@ func TestAllEditionsByCategoryCoversAllEditions(t *testing.T) {
 func TestAllEditionsByCategoryHasKnownCategories(t *testing.T) {
 	editions := currentDatastore().editions
 	if len(editions.AllEditionsByCategory) == 0 {
-		t.Skip("mtgmatcher data not loaded; skipping")
+		t.Skip("matcher data not loaded; skipping")
 	}
 	wanted := []string{"Expansions", "Commander Decks", "Core Sets"}
 	for _, w := range wanted {
@@ -46,15 +46,15 @@ func TestAllEditionsByCategoryHasKnownCategories(t *testing.T) {
 // lists must rank by date, then by name, and do so on every build: the tied
 // ones used to come out in map order.
 func TestEditionCategoriesTiedOnDateSortByName(t *testing.T) {
-	b := &mtgmatcher.Backend{Sets: map[string]*mtgmatcher.Set{}}
-	for _, set := range []*mtgmatcher.Set{
+	b := &matcher.Backend{Sets: map[string]*matcher.Set{}}
+	for _, set := range []*matcher.Set{
 		{Code: "EXP", Type: "expansion", ReleaseDate: "2026-11-13"},
 		{Code: "CMD", Type: "commander", ReleaseDate: "2026-11-13"},
 		{Code: "FUN", Type: "funny", ReleaseDate: "2026-11-13"},
 		{Code: "BOX", Type: "box", ReleaseDate: "2017-11-24"},
 	} {
 		set.Name = set.Code
-		set.SealedProduct = []mtgmatcher.SealedProduct{{UUID: set.Code + "-box"}}
+		set.SealedProduct = []matcher.SealedProduct{{UUID: set.Code + "-box"}}
 		b.Sets[set.Code] = set
 		b.AllSets = append(b.AllSets, set.Code)
 	}
@@ -196,7 +196,7 @@ func TestCardFilterOnHotlist(t *testing.T) {
 		{"new", true, true},
 		{"none", false, false},
 	} {
-		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: tc.card}}
+		co := &matcher.CardObject{Card: matcher.Card{UUID: tc.card}}
 		// cardFilterOn reports whether to skip the card.
 		if cardFilterOn([]string{"hotlist"}, co) == tc.hotlist {
 			t.Errorf("on:hotlist %s: kept %v, want %v", tc.card, !tc.hotlist, tc.hotlist)

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // TestChronoSortIsOneOrderInEverySet sorts every set of every game's
@@ -31,7 +31,7 @@ func TestChronoSortIsOneOrderInEverySet(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer f.Close()
-			loaded, err := mtgmatcher.Open(game, f)
+			loaded, err := matcher.Open(game, f)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -46,7 +46,7 @@ func TestChronoSortIsOneOrderInEverySet(t *testing.T) {
 // their set code, so OP01-005 precedes OP01-021 whatever their languages.
 func TestChronoSortReadsEqualValuesOneWay(t *testing.T) {
 	printing := func(uuid, number, language string, promos ...string) *SortingData {
-		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid, Number: number, Language: language, PromoTypes: promos}}
+		co := &matcher.CardObject{Card: matcher.Card{UUID: uuid, Number: number, Language: language, PromoTypes: promos}}
 		return &SortingData{co: co, numberPrefix: setCodePrefix(number)}
 	}
 	for _, want := range [][]*SortingData{
@@ -67,7 +67,7 @@ func TestChronoSortReadsEqualValuesOneWay(t *testing.T) {
 // nonfoil, then every foil, each in language order.
 func TestNumberSortPutsFinishBeforeLanguage(t *testing.T) {
 	printing := func(uuid, language string, finish int) *SortingData {
-		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid, Number: "12", Language: language}}
+		co := &matcher.CardObject{Card: matcher.Card{UUID: uuid, Number: "12", Language: language}}
 		return &SortingData{co: co, finish: finish}
 	}
 	want := []*SortingData{printing("a", "English", 0), printing("b", "Japanese", 0), printing("c", "English", 1), printing("d", "Japanese", 1)}
@@ -86,7 +86,7 @@ func TestNumberSortPutsFinishBeforeLanguage(t *testing.T) {
 // and 3b, each keep their finishes together.
 func TestNumberSortKeepsEachNumbersFinishesTogether(t *testing.T) {
 	printing := func(number string, finish int) *SortingData {
-		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: number + strconv.Itoa(finish), Number: number, Language: "English"}}
+		co := &matcher.CardObject{Card: matcher.Card{UUID: number + strconv.Itoa(finish), Number: number, Language: "English"}}
 		return &SortingData{co: co, finish: finish, numberPrefix: setCodePrefix(number)}
 	}
 	for _, want := range [][]*SortingData{
@@ -105,7 +105,7 @@ func TestNumberSortKeepsEachNumbersFinishesTogether(t *testing.T) {
 	}
 }
 
-func checkSetOrders(t *testing.T, b *mtgmatcher.Backend) {
+func checkSetOrders(t *testing.T, b *matcher.Backend) {
 	t.Helper()
 	chrono := cmpSets
 	number := func(a, b *SortingData) bool { return cmpNumberAndFinish(a, b, false) }
