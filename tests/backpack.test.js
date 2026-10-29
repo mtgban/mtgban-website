@@ -65,19 +65,21 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
         minus.push(less);
         return btn;
     });
-    // Upload optimizer sections, each a take button and rows of [id, qty, unticked, cond].
+    // Upload optimizer sections, each an add and a take button and rows of [id, qty, unticked, cond].
     const optSections = sections.map((rows) => {
         const section = el('div'); section.classes.add('opt-store');
+        const add = el('button'); add.classes.add('pack-add-btn'); add.hidden = true;
         const take = el('button'); take.classes.add('pack-take-btn'); take.hidden = true;
         const fold = el('button'); fold.classes.add('section-fold');
-        section.append(take, fold);
+        section.append(add, take, fold);
         rows.forEach(([id, qty, unticked, cond = '']) => {
             const tr = el('tr'); tr.setAttribute('data-opt-id', id); tr.setAttribute('data-opt-cond', cond); tr.setAttribute('data-load-qty', String(qty));
+            Object.entries({ 'data-load-name': 'Card ' + id, 'data-load-set': 'S', 'data-load-number': '7', 'data-opt-edition': 'Set', 'data-opt-img': 'img/' + id, 'data-opt-finish-tag': '', 'data-opt-finish-class': '', 'data-opt-cw': 'false' }).forEach(([k, v]) => tr.setAttribute(k, v));
             if (unticked) tr.classes.add('opt-removed');
             section.appendChild(tr);
         });
         body.appendChild(section);
-        return { section, take, fold, rows: section.children.filter((c) => c.tag === 'tr') };
+        return { section, add, take, fold, rows: section.children.filter((c) => c.tag === 'tr') };
     });
     const storageListeners = [];
     const pageshowListeners = [];
@@ -1507,6 +1509,79 @@ describe('taking an Upload store section out', () => {
         const before = p.m.mtgban_backpack;
         p.window.takeRowsFromBackpack(p.optSections[0].take);
         expect(p.m.mtgban_backpack).toBe(before);
+        expect(p.window.Backpack.undo()).toBe(false);
+    });
+});
+
+describe('adding an Upload store section', () => {
+    const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.pack, e.id, e.cond, e.qty]);
+
+    test('shows while the section has a ticked row', () => {
+        const p = page({ sections: [[['a', 1], ['b', 1, true]], [['b', 1, true]]] });
+        expect(p.optSections.map((s) => s.add.hidden)).toEqual([false, true]);
+        const s = p.optSections[1];
+        s.rows[0].classes.delete('opt-removed');
+        p.fireChange(s.rows[0]);
+        expect(s.add.hidden).toBe(false);
+    });
+
+    test('adds the ticked rows\' copies in their grades, in the section\'s order', () => {
+        const p = page({ sections: [[['a', 2, false, 'NM'], ['b', 1, false, 'SP'], ['a', 1, false, 'NM'], ['c', 3, true], ['d', 1]]] });
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(live(p)).toEqual([[1, 'a', 'NM', 3], [1, 'b', 'SP', 1], [1, 'd', 'NM', 1]]);
+        const a = p.stored()[0];
+        expect([a.name, a.edition, a.set, a.number, a.img]).toEqual(['Card a', 'Set', 'S', '7', 'img/a']);
+        expect(ids['backpack-toast'].textContent).toBe('Added 5 copies to the backpack');
+        expect(p.optSections[0].take.hidden).toBe(false);
+        expect(p.navCount.textContent).toBe('5');
+    });
+
+    test('joins the copies a card already has in that grade', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'b', name: 'B', qty: 1, t: 1, m: 1, del: 1 }], sections: [[['a', 3], ['b', 2]]] });
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(live(p).sort()).toEqual([[1, 'a', 'NM', 5], [1, 'b', 'NM', 2]]);
+        expect(p.stored().find((e) => e.id === 'a').name).toBe('A');
+    });
+
+    test('adds to the active backpack', () => {
+        const p = page({ tabs: 3, active: 2, tabList: [{ pack: 1, name: 'Main' }, { pack: 2, name: 'Trade' }], sections: [[['a', 1]]] });
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(live(p)).toEqual([[2, 'a', 'NM', 1]]);
+        expect(ids['backpack-toast'].textContent).toBe('Added 1 copy to Trade');
+    });
+
+    test('adds new cards only while there is room, and says what did not fit', () => {
+        const p = page({ max: 2, store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], sections: [[['b', 2], ['c', 1], ['a', 1]]] });
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(live(p).sort()).toEqual([[1, 'a', 'NM', 2], [1, 'b', 'NM', 2]]);
+        expect(ids['backpack-toast'].textContent).toBe('Added 3 copies to the backpack; 1 did not fit');
+    });
+
+    test('holds a card to 999 copies', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 998, t: 1, m: 1 }], sections: [[['a', 5]]] });
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(live(p)).toEqual([[1, 'a', 'NM', 999]]);
+        expect(ids['backpack-toast'].textContent).toBe('Added 1 copy to the backpack; 4 did not fit');
+        const before = p.m.mtgban_backpack;
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(p.m.mtgban_backpack).toBe(before);
+        expect(ids['backpack-toast'].textContent).toBe('999 copies is the most for one product');
+    });
+
+    test('a full backpack writes nothing and says so', () => {
+        const p = page({ max: 1, store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], sections: [[['b', 1]]] });
+        const before = p.m.mtgban_backpack;
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(p.m.mtgban_backpack).toBe(before);
+        expect(ids['backpack-toast'].textContent).toBe('Backpack is full (1 products)');
+        expect(p.window.Backpack.undo()).toBe(false);
+    });
+
+    test('one undo takes the whole section back out', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 2, t: 1, m: 1 }], sections: [[['a', 1], ['b', 3]]] });
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(p.window.Backpack.undo()).toBe(true);
+        expect(live(p)).toEqual([[1, 'a', 'NM', 2]]);
         expect(p.window.Backpack.undo()).toBe(false);
     });
 });
