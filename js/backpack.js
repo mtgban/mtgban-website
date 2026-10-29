@@ -1030,7 +1030,10 @@
             art.addEventListener("dragend", function () { r.classList.remove("dragging"); });
         }
         var body = text("div", "backpack-row-body");
-        var name = text("div", "backpack-row-name", e.name || e.id);
+        // A bare id searches that one printing and fills the box with its query.
+        var name = text("a", "backpack-row-name", e.name || e.id);
+        name.setAttribute("href", "/search?q=" + encodeURIComponent(e.id));
+        name.setAttribute("draggable", "false");
         var where = text("div", "backpack-row-where", (e.edition || "") + (e.set ? " (" + e.set + ")" : "") + (e.number ? " #" + e.number : ""));
         body.append(name, where);
         if (e.finishTag) body.appendChild(text("span", "backpack-row-finish " + (e.finishClass || ""), e.finishTag));
@@ -1269,7 +1272,7 @@
 
     // trapTab keeps Tab and Shift+Tab cycling inside the open panel.
     function trapTab(ev) {
-        var items = Array.prototype.filter.call(panel.querySelectorAll("button, input, select, [tabindex]"), function (n) {
+        var items = Array.prototype.filter.call(panel.querySelectorAll("a[href], button, input, select, [tabindex]"), function (n) {
             if (n.disabled || n.closest("#ban-confirm-dialog")) return false;
             for (var a = n; a && a !== panel.parentNode; a = a.parentNode) if (a.hidden) return false;
             return true;
