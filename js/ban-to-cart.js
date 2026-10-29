@@ -34,6 +34,8 @@
         store = haStore();
     } else if (location.hostname === "www.cardkingdom.com") {
         store = ckStore();
+    } else if (location.hostname === "www.tcgplayer.com") {
+        store = tcgStore();
     }
     // A store whose cart names a row other than the link does maps it
     var key = (store && store.key) || function (id) {
@@ -1046,6 +1048,99 @@
                 }).join("&") + "&future_order=1";
                 var body = await call("/" + locale + "/cart/add.json?" + query);
                 progress.got = Number(body.delta_changed_quantity) || 0;
+            })
+        };
+    }
+
+    // tcgStore loads TCGplayer's cart, kept under the StoreCart_PRODUCTION
+    // cookie's key for a guest too, with the live listings of each row's sku
+    // at or under BAN's price, cheapest first: a listing names its seller,
+    // which the cart's add needs. A row is named <product>-<sku>-<price
+    // cents>-<split>, m for every seller's listings, d for Direct's alone.
+    function tcgStore() {
+        function cartKey() {
+            var cookie = /(?:^|; )StoreCart_PRODUCTION=([^;]*)/.exec(document.cookie);
+            var key = cookie && /(?:^|&)CK=(\w+)/.exec(decodeURIComponent(cookie[1]));
+            return key ? key[1] : "";
+        }
+        function call(url, body) {
+            return fetch(url, {
+                method: "POST",
+                credentials: "include",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(body)
+            });
+        }
+        function add(sku, listing, take) {
+            return call("https://mpgateway.tcgplayer.com/v1/cart/" + cartKey() + "/item/add", {
+                sku: sku,
+                sellerKey: listing.sellerKey,
+                channelId: 0,
+                requestedQuantity: take,
+                isDirect: !!listing.directListing,
+                countryCode: "US"
+            });
+        }
+        // listings are one page of a row's live listings at or under its
+        // price, cheapest first, 50 being the most TCGplayer answers
+        async function listings(want, from) {
+            var term = {sellerStatus: "Live", channelId: 0, productConditionId: [want.sku], listingType: ["standard"]};
+            var range = {quantity: {gte: 1}, price: {lte: want.cents / 100}};
+            if (want.direct) {
+                term["direct-seller"] = true;
+                term.directProduct = true;
+                range.directInventory = {gte: 1};
+            }
+            var resp = await call("https://mp-search-api.tcgplayer.com/v1/product/" + want.product + "/listings", {
+                filters: {term: term, range: range, exclude: {channelExclusion: 0}},
+                context: {shippingCountry: "US", cart: {}},
+                from: from,
+                size: 50,
+                sort: {field: "price", order: "asc"}
+            });
+            if (!resp.ok) {
+                throw new Error("TCGplayer refused the list (" + resp.status + ").");
+            }
+            var body = await resp.json();
+            return (body.results && body.results[0] && body.results[0].results) || [];
+        }
+        return {
+            name: "TCGplayer",
+            loggedIn: function () {
+                return cartKey() !== "";
+            },
+            upload: listingsUpload("TCGplayer", "tcg", async function (id, need, progress) {
+                var row = /^(\d+)-(\d+)-(\d+)-([md])$/.exec(id);
+                var want = row && {product: row[1], sku: Number(row[2]), cents: Number(row[3]), direct: row[4] === "d"};
+                for (var from = 0; want && progress.got < need; from += 50) {
+                    var page = await listings(want, from);
+                    for (var i = 0; i < page.length && progress.got < need; i++) {
+                        if (Math.round(page[i].price * 100) > want.cents) {
+                            continue;
+                        }
+                        var take = Math.min(need - progress.got, page[i].quantity);
+                        var resp = await add(want.sku, page[i], take);
+                        // A listing with fewer left than asked, sold since or
+                        // partly held in the cart, adds none and says what it
+                        // has left, which is asked for once; one with none is
+                        // passed over
+                        if (resp.status === 422) {
+                            var left = ((await resp.json().catch(Object)).results || [])[0] || {};
+                            take = Math.min(take, left.sellerQuantityAvailable - left.itemQuantityInCart);
+                            resp = take > 0 ? await add(want.sku, page[i], take) : resp;
+                        }
+                        if (resp.status === 422) {
+                            continue;
+                        }
+                        if (!resp.ok) {
+                            throw new Error("TCGplayer refused the list (" + resp.status + ").");
+                        }
+                        progress.got += take;
+                    }
+                    if (page.length < 50) {
+                        break;
+                    }
+                }
             })
         };
     }

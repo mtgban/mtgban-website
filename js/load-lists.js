@@ -100,7 +100,8 @@ function cartLink(href, items, rows, qtys) {
 }
 
 // cartPage is the cart page a link opens, list and all: the link itself, or
-// the u query of SCG's partner redirector, which carries the list inside it.
+// the u query of SCG's or TCGplayer's partner redirector, which carries the
+// list inside it.
 function cartPage(href) {
     var page = new URL(href).searchParams.get('u');
     return page && page.indexOf('#') >= 0 ? page : href;

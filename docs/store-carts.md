@@ -10,12 +10,13 @@ Hareruya has both: a form that takes a whole store
 list, and one call per card for its buylist. Mana Pool's public optimizer
 takes a whole list and answers with the listings to put in its cart, and
 Card Trader's add takes every listing of a card a buyer could have and
-fills the quantity from them. Game Nerdz's and Vegas Singles' buylists run
+fills the quantity from them. TCGplayer's add takes one seller's listing,
+which its listings call names. Game Nerdz's and Vegas Singles' buylists run
 on StorePass, whose page keeps the cart and prices it itself, so the loader
 adds through the page's own code; Game Nerdz's store is a BigCommerce one,
 filled one SKU at a time.
 Star City Games and Strike Zone have a CSV import, but no way to hand it a
-list from another site. The upload page reaches all twelve through one
+list from another site. The upload page reaches all thirteen through one
 bookmarklet, BAN-to-Cart, run on the store's page. ABU was measured
 against a real account on 2026-10-07, CSI, Strike Zone and Hareruya
 against a guest cart and SCG and Mint against a real account on
@@ -23,7 +24,8 @@ against a guest cart and SCG and Mint against a real account on
 store, Mana Pool, Manaleak and Card Trader against a guest cart on
 2026-10-13, and Game Nerdz and Vegas Singles against a guest cart on
 2026-10-14. Card Kingdom's builder add was measured against a guest cart
-and a real account on 2026-10-25.
+and a real account on 2026-10-25, and TCGplayer against a real account and
+a guest cart on 2026-10-28.
 
 ## ABU: the calls
 
@@ -428,6 +430,67 @@ POST /<locale>/cart/add.json?quantity=3&product_ids[]=387303611&product_ids[]=44
 | 3 asked of five listings at or under 19¢ | 3 added, from two of them, in 0.75 s |
 | `price.currency` under `it-IT`, `de-DE`, `en-EU` / `en-US` | EUR / USD |
 
+## TCGplayer: the listings at load time
+
+TCGplayer's cart holds sellers' listings, and its add names the seller,
+which BAN's dumps do not carry. Like Card Trader's, a listing BAN saw may
+be sold by load time, so the loader reads the sku's live listings, through
+the call TCGplayer's product page makes, and adds them cheapest first, as
+many as the row asks, every one at or under BAN's price:
+
+```
+POST https://mp-search-api.tcgplayer.com/v1/product/1828/listings
+{"filters": {"term": {"sellerStatus": "Live", "channelId": 0, "productConditionId": [15955],
+   "listingType": ["standard"]}, "range": {"quantity": {"gte": 1}, "price": {"lte": 0.25}},
+   "exclude": {"channelExclusion": 0}}, "context": {"shippingCountry": "US", "cart": {}},
+ "from": 0, "size": 50, "sort": {"field": "price", "order": "asc"}}
+POST https://mpgateway.tcgplayer.com/v1/cart/<cart key>/item/add
+{"sku": 15955, "sellerKey": "<the listing's>", "channelId": 0, "requestedQuantity": 1,
+ "isDirect": false, "countryCode": "US"}
+```
+
+- A row names `<product>-<sku>-<price cents>-<split>` (`tcgCartID`): the
+  product and sku go-mtgban's `tcgplayer` scraper stores as `OriginalID`
+  and `InstanceID` on its `TCG Player` (`TCGplayer` in the other games)
+  and `TCG Direct` rows, the price BAN shows, and `m` for every seller's
+  listings or `d` for Direct's alone. The sku names one condition,
+  printing and language. The market price, sealed and the index splits
+  get no button: the first is no listing, the others name no sku.
+- The listings call answers a guest too, 50 listings a page at most (100
+  is a 400), filtered by the sku (`productConditionId`), the price and,
+  for `d`, `direct-seller`, `directProduct` and `directInventory`.
+  `listingType: standard` leaves out photo listings, whose add takes a
+  key of their own. Shipping is not counted, as BAN's price leaves it out,
+  and only sellers shipping to the US are asked for.
+- The cart is the one named by `CK` in the `StoreCart_PRODUCTION` cookie,
+  which a guest has too; with no key the loader asks for a login. An add
+  adds to what the cart holds of that listing, at the listing's own price
+  whatever is sent, and answers 422 `CartItemQuantityNotAvailable`,
+  adding nothing, for more than the listing has left, with
+  `sellerQuantityAvailable` and `itemQuantityInCart`; the loader asks
+  once more for the difference, and passes over a listing with none. Direct's listings go into one TCGplayer Direct
+  package, the others one package per seller, each with its shipping, so
+  TCGplayer's own Optimize on the cart page may repack them cheaper.
+- A load adds to the cart, so two tabs take turns on `ban-to-cart-tcg`,
+  and a call refused partway leaves the rest on the page as Card Trader's
+  does, the card it stopped in at what it still lacks.
+- TCGplayer's partner redirector,
+  `partner.tcgplayer.com/c/<code>/1830156/21018?u=<page>`, opens the
+  cart with the list inside `u`, fragment and all, and the campaign tags
+  added to the cart page's query. A link past about 8 KB gets a server
+  error instead; a 1,000-row list after the link, outside `u`, arrives
+  whole, credited the same way.
+
+| Sent | Result |
+|---|---|
+| a card's listings at or under 30¢ | 10 of 154 Near Mint English listings |
+| 1 copy of a seller's listing, sent at a price other than its own | added at the listing's price |
+| 5 of a listing with 1 | 422, none added |
+| a listing already in the cart, again | its quantity in the cart goes up by one |
+| a Direct listing, `isDirect: false` | added to the Direct package anyway |
+| the loader on a guest cart: 2 at or under 25¢, 2 Direct at or under 40¢, 1 at or under 1¢ | 4 copies added, $1.30, the cart at 3 packages with the copy it held; the 1¢ row left out |
+| the same list through the partner redirector, the bookmark's code, an empty real account's cart | 4 copies added, $1.30, in 3 packages: Direct's, and one per seller of a single 25¢ copy; the 1¢ row left out |
+
 ## Strike Zone: the CSV import
 
 Strike Zone buys and sells through one cart, whose Tools menu has a CSV
@@ -607,24 +670,29 @@ uploads page offers takes the whole list and prices it itself:
 Each store split the upload optimizer lists gets a "Load at" button where
 the store's cart can take it: ABU's, CSI's, Strike Zone's, Hareruya's,
 Mint's, Manaleak's and Game Nerdz's buylist and store splits, Mana Pool's
-store split, Card Trader's three store splits, Card Kingdom's store split,
+store split, Card Trader's three store splits, TCGplayer's listings and
+Direct splits, Card Kingdom's store split,
 and SCG's and Vegas Singles' buylist splits. CSI's and Card Kingdom's store
 buttons sit beside their deck builder buttons, and Mana Pool's beside its
-mass entry button, all of which post only names. SCG's store side and
+mass entry button, all of which post only names; TCGplayer's sits beside
+its mass entry, which posts product ids with no condition or finish. SCG's store side and
 CK's buylist already have their own imports. The arbit and reverse pages give
 each section the same buttons: "Load at" for the store it buys from and
 "Load buylist at" for the store it sells to, each row in the condition the
 store sells it in (`cartLoadForArbit`). Mint's feed caps its stock at
-8 and Card Trader's is gone by load time (`cartAsksMost`), so their store
-buttons ask for what the buylist takes, or 999 where the buylist names no
-amount, and the store trims it to what it has, Card Trader to the listings
-at or under BAN's price; the link carries those quantities
+8 and Card Trader's and TCGplayer Direct's are gone by load time
+(`cartAsksMost`), so their store buttons ask for what the buylist takes,
+or 999 where the buylist names no amount, and the store trims it to what it
+has, Card Trader and Direct to the listings at or under BAN's price; the link carries those quantities
 (`data-load-qtys`) for the rows left ticked. Mana Pool's feed gives no
 stock either, but its button asks for the row's quantity, as other stores'
 do: the optimizer fills a line from the cheapest listings up, at rising
 prices, and the section's spread was worked out from the cheapest copy
 alone. A Mana Pool row's quantity is 0, so in practice that is one copy a
-row, the one the spread priced. The global page compares two
+row, the one the spread priced. TCGplayer's every-seller button asks the
+same: its loader stays at or under BAN's price, but each seller ships its
+own package, whose shipping a spread worked out on one copy does not
+cover. The global page compares two
 stores' listings and sells nowhere, so a section gets only "Load at", for
 the store whose copies its rows are: the page's own store, or on sealed
 the section's, as `scraperCompare` picks its seller.
@@ -658,14 +726,16 @@ the section's, as `scraperCompare` picks its seller.
   an affiliate code is configured for the store, the page is opened the way
   the store's own links from us are (`cartAffiliates`), so the cart it fills
   is credited the same way: Card Kingdom's `partner` and `utm_*` query,
-  Mint's `utm_*` query, CSI's `utm_referrer`, and SCG's partner redirector,
-  `goto.starcitygames.com/c/<code>/…?u=<page>`, with the fragment inside
+  Mint's `utm_*` query, CSI's `utm_referrer`, and SCG's and TCGplayer's
+  partner redirectors, `goto.starcitygames.com/c/<code>/…?u=<page>` and
+  `partner.tcgplayer.com/c/<code>/…?u=<page>`, with the fragment inside
   `u`: the redirector puts its own query before it, and a privacy tool
-  that skips the redirect and opens `u` alone gets the list too. The
-  redirector answers 400 past about 8,000 characters, so a link that
-  would run past 7,000 (`scgRedirectMax`, a couple of hundred rows)
-  keeps the list after it instead, where a tool that skips the redirect
-  loses it.
+  that skips the redirect and opens `u` alone gets the list too. SCG's
+  answers 400 past about 8,000 characters, and TCGplayer's a server error
+  between 7,464 and 8,528, so a link that would run past 7,000
+  (`redirectorMax`, a couple of hundred rows) keeps the list after it
+  instead (`throughRedirector`), where the browser carries it through the
+  redirect and a tool that skips the redirect loses it.
   `js/load-lists.js` rewrites the list inside `u` as rows are unticked.
 - Pressing the button first shows a panel (`js/cart-prompt.js`, from the
   `cart-prompt` partial both pages share), named for the store and side
@@ -673,8 +743,8 @@ the section's, as `scraperCompare` picks its seller.
   `js/ban-to-cart.js` as a `javascript:` link (`cart_bookmarklet`),
   without its indentation, blank lines and whole-line comments
   (`stripLoader`), which keeps it under Firefox's limit of 65,536
-  characters on a bookmark's URL: about 56,000 with twelve stores.
-  `TestCartBookmarklet` fails past 60,000, so the store that takes it
+  characters on a bookmark's URL: about 63,900 with thirteen stores.
+  `TestCartBookmarklet` fails past 64,000, so the store that takes it
   there is a decision about the loader's size rather than a surprise. It
   says to click the bookmark after the store's page loads, since nothing
   on that page can. Its Continue @ store button continues to the store, and
@@ -701,6 +771,10 @@ On Card Trader it reads each card's live listings in the row's storefront,
 grade, language and finish, hands every one at or under BAN's price to
 Card Trader's add, says what it cut and left out, and reloads the cart;
 stopped partway, it says what it added and leaves only the rest on the page.
+On TCGplayer it reads each card's live listings of its sku, Direct's alone
+for a Direct row, adds the cheapest at or under BAN's price one seller at a
+time until it has the row's quantity, says what it cut and left out, and
+reloads the cart; stopped partway, it leaves only the rest on the page.
 On Mana Pool it asks the optimizer for the list, again with the cards it
 has fewer of cut to that and the ones it has none of left out, adds the
 listings it answers with to the cart, says what it cut and left out, and
@@ -773,6 +847,8 @@ cookies to, and every call must echo SCG's `XSRF-TOKEN` cookie.
   listings at or under BAN's price in one grade and finish.
 - Card Trader's other games live beyond a Lorcana card's listings and a
   Flesh and Blood card's `fab_foil_new` filter.
+- Whether a TCGplayer guest's cart follows the user at login, and a
+  shipping country other than the US.
 - Mana Pool's cart for a signed-in user: whether the queued changes the
   loader adds reach the account's cart, as they do for Mana Pool's own
   adds, or the account's copy replaces them.
