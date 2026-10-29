@@ -107,8 +107,7 @@ Boot sequence (`main()`):
    a reload requested before this finishes is queued to run once it ends
    instead of racing it (one waits at most, the latest request), and a panic
    building a snapshot is recovered instead of killing the process. `loadDatastore` opens the site's game via
-   `matcher.Open(datastoreGame(), reader)` (not the old
-   `matcher.LoadDatastore()`), builds the numbers/names/editions
+   `matcher.Open(datastoreGame(), reader)`, builds the numbers/names/editions
    snapshots and the palette's sets/promos/finishes lists from it
    (`s.newDatastore()`, site.go), publishes backend and snapshots
    together in one `s.ds.Store()`, then itself spawns

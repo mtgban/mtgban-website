@@ -208,11 +208,7 @@ all set up as of 2026-09-15 — see below — but neither has a DigitalOcean App
 Platform app or its `DO_<GAME>_APP_ID`/`DO_API_TOKEN` secret provisioned
 yet, which is not something committing code can do. Pushing a
 `gundam-*`/`palworld-*` tag before that exists just fails the workflow's
-`doctl apps create-deployment` step with an unknown-app error. (An earlier
-version of this file also claimed `go.mod`'s go-mtgban pin predated the
-commit that added their `matcher` packages — checked directly and that
-was wrong: both were already registered at the pinned `v0.8.3`, games.go
-blank-imports included, so no dependency bump was ever needed for this.)
+`doctl apps create-deployment` step with an unknown-app error.
 
 ### Deploying a new game
 
