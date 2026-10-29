@@ -591,7 +591,7 @@ override; phone UA detection via `mileusna/useragent`).
   copies in the active backpack (`mtgban_backpack_active`, per device);
   the panel moves an entry to another condition or adds the card in one
   more. Each backpack holds `SearchBackpackMax` products, and a tier keeps
-  `SearchBackpackTabs` backpacks, clamped so they hold 5000 together, the
+  `SearchBackpackTabs` backpacks, clamped so they hold 7000 together, the
   most a gzipped sync body carries under its 1 MB. The panel's tabs pick
   the active backpack, named in the synced `mtgban_backpack_tabs`
   preference; a row dragged onto another tab, or its dropdown's "Move
