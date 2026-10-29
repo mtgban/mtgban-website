@@ -3047,9 +3047,13 @@ func shouldSkipCardNG(b *mtgmatcher.Backend, cardID string, filters []FilterElem
 	if err != nil {
 		return true
 	}
+	return shouldSkipCard(b, co, filters)
+}
 
+// shouldSkipCard is shouldSkipCardNG for a card already looked up.
+func shouldSkipCard(b *mtgmatcher.Backend, co *mtgmatcher.CardObject, filters []FilterElem) bool {
 	for i := range filters {
-		skip := shouldSkipCardNG(b, cardID, filters[i].Subfilters)
+		skip := shouldSkipCard(b, co, filters[i].Subfilters)
 		if skip {
 			return true
 		}
