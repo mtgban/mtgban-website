@@ -180,6 +180,45 @@ func TestOptimizerMergesOpenedCopies(t *testing.T) {
 	}
 }
 
+// TestTotalsCapOpenedCopies holds the page's store and index totals to the
+// copies the optimizer lists, a card opened from several products capped as
+// one card, while each product's section and an uploaded row count whole.
+func TestTotalsCapOpenedCopies(t *testing.T) {
+	rows := uploadRows{
+		resultPrices:  map[string]map[string]float64{},
+		totalEntries:  map[string]float64{},
+		openedCounted: map[optimizedKey]int{},
+		tallies:       map[string]*unpackedTally{},
+	}
+	st := uploadSettings{maxQty: 3}
+	prices := uploadPrices{results: map[string]map[string]*BanPrice{"card": {"CK": {Regular: 2}}}}
+	indexes := uploadIndexes{results: map[string]map[string]*BanPrice{"card": {"TCGLow": {Regular: 1}}}}
+	for _, entry := range []*UploadEntry{
+		{CardID: "card", UnpackedFrom: "deck1"},
+		{CardID: "card", UnpackedFrom: "deck2"},
+		{CardID: "card", UnpackedFrom: "deck3"},
+		{CardID: "card", UnpackedFrom: "deck4"},
+		{CardID: "card"},
+	} {
+		row := uploadRow{UploadEntry: entry, priceKey: "card", qty: 1, counts: true}
+		rows.tallyIndexes(row, st, indexes)
+		offers := rows.tallyOffers(row, false, st, prices, indexes)
+		if offers["CK"] != 2 {
+			t.Fatalf("offer %v, want the row's own 2", offers["CK"])
+		}
+	}
+
+	if rows.totalEntries["CK"] != 8 || rows.totalEntries["TCGLow"] != 4 {
+		t.Errorf("totals CK %v and TCGLow %v, want 8 and 4: three opened copies and the uploaded one",
+			rows.totalEntries["CK"], rows.totalEntries["TCGLow"])
+	}
+	for _, deck := range []string{"deck1", "deck2", "deck3", "deck4"} {
+		if rows.tallies[deck].Totals["CK"] != 2 || rows.tallies[deck].Totals["TCGLow"] != 1 {
+			t.Errorf("%s's section totals %v, want its own copy's", deck, rows.tallies[deck].Totals)
+		}
+	}
+}
+
 // TestOptimizerKeepsUploadedCopiesApart leaves a row uploaded with a price of
 // its own out of the opened copies' row: it was judged on that price, which
 // the opened ones do not have.
