@@ -429,6 +429,8 @@
 
     // Upload checks its own grant; a page without BAN_BACKPACK sends as before.
     function canUpload() { return !(window.BAN_BACKPACK && window.BAN_BACKPACK.canUpload === false); }
+    // onUpload says whether this is Upload, the one page naming what it priced.
+    function onUpload() { return !!window.BAN_BACKPACK && "priced" in window.BAN_BACKPACK; }
 
     function send(mode) {
         if (!canUpload() || !ordered().length) return;
@@ -1106,6 +1108,8 @@
         var name = text("a", "backpack-row-name", e.name || e.id);
         name.setAttribute("href", "/search?q=" + encodeURIComponent(e.id));
         name.setAttribute("draggable", "false");
+        // Leaving Upload loses its results, so there the name opens a tab.
+        if (onUpload()) name.setAttribute("target", "_blank");
         var where = text("div", "backpack-row-where", (e.edition || "") + (e.set ? " (" + e.set + ")" : "") + (e.number ? " #" + e.number : ""));
         body.append(name, where);
         if (e.finishTag) body.appendChild(text("span", "backpack-row-finish " + (e.finishClass || ""), e.finishTag));
