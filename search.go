@@ -254,11 +254,13 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 
 // searchSuggestions adapts a parsed search that found nothing into the
 // suggest package's inputs. The did-you-mean is a whole query: the closest
-// name with the filters typed, an is: naming a set code read as s:.
-func searchSuggestions(b *mtgmatcher.Backend, rawQuery string, config SearchConfig, sealed bool) (string, []suggest.AltSearch) {
+// name with the filters typed, each read under the key that finds cards
+// (see rekeyFilters).
+func searchSuggestions(ds *datastore, rawQuery string, config SearchConfig, pinned []FilterElem, sealed bool) (string, []suggest.AltSearch) {
 	if config.SearchMode == "hashing" {
 		return "", nil
 	}
+	b := ds.backend
 	alts := suggest.Build(suggest.Params{
 		RawQuery:       rawQuery,
 		CleanQuery:     quoteIfFilter(config.CleanQuery),
@@ -268,18 +270,20 @@ func searchSuggestions(b *mtgmatcher.Backend, rawQuery string, config SearchConf
 		Backend:        b,
 	})
 
-	filters, fixed := suggest.SetCodeFilters(b, config.AppliedFilters)
 	name := suggest.Closest(b, config.CleanQuery, sealed)
-	if name == "" && !fixed {
-		return "", alts
-	}
-	if name == "" {
+	corrected := name != ""
+	if !corrected {
 		name = config.CleanQuery
 	}
+	var query []string
 	if name != "" {
-		filters = append([]string{quoteIfFilter(name)}, filters...)
+		query = append(query, quoteIfFilter(name))
 	}
-	return strings.Join(filters, " "), alts
+	filters, rekeyed := rekeyFilters(ds, query, config.AppliedFilters, pinned, sealed)
+	if !corrected && !rekeyed {
+		return "", alts
+	}
+	return strings.Join(append(query, filters...), " "), alts
 }
 
 // searchFallback re-reads a search whose name matched nothing, in the order a
@@ -687,7 +691,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(result.keys) == 0 {
 		pageVars.PopularSearches = getPopularSearches(ds)
-		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
+		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(ds, query, config, pinned, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}
