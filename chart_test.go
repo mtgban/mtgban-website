@@ -443,9 +443,9 @@ func withDatasets(t *testing.T, datasets []DatasetConfig) {
 // color, in what order.
 func TestBuildProviderRegistryMirrorsConfig(t *testing.T) {
 	withDatasets(t, []DatasetConfig{
-		{PublicName: "Custom Market Name", Index: 3, Provider: timeseries.ProviderTCGMarket, Color: "pink"},
-		{PublicName: "Card Kingdom Buylist", Index: 1, Provider: timeseries.ProviderCKBuylist, Color: "blue"},
-		{PublicName: "Cardmarket Trend", Index: 5, Provider: timeseries.ProviderMKMTrend, Color: "grey"},
+		{PublicName: "Custom Market Name", Provider: timeseries.ProviderTCGMarket, Color: "pink"},
+		{PublicName: "Card Kingdom Buylist", Provider: timeseries.ProviderCKBuylist, Color: "blue"},
+		{PublicName: "Cardmarket Trend", Provider: timeseries.ProviderMKMTrend, Color: "grey"},
 	})
 	buildProviderRegistry()
 
@@ -463,8 +463,8 @@ func TestBuildProviderRegistryMirrorsConfig(t *testing.T) {
 // it, which is how a config mistake becomes visible instead of silent.
 func TestBuildProviderRegistrySkipsDatasetsWithoutProvider(t *testing.T) {
 	withDatasets(t, []DatasetConfig{
-		{PublicName: "TCGplayer Low", Index: 2, Provider: timeseries.ProviderTCGLow, Color: "red"},
-		{PublicName: "No provider id", Index: 6, Color: "black"},
+		{PublicName: "TCGplayer Low", Provider: timeseries.ProviderTCGLow, Color: "red"},
+		{PublicName: "No provider id", Color: "black"},
 	})
 	buildProviderRegistry()
 
@@ -487,8 +487,8 @@ func TestBuildProviderRegistryEmptyConfig(t *testing.T) {
 // the first one wins so the legend has no duplicate series.
 func TestBuildProviderRegistryDeduplicates(t *testing.T) {
 	withDatasets(t, []DatasetConfig{
-		{PublicName: "TCGplayer Low", Index: 2, Provider: timeseries.ProviderTCGLow, Color: "red"},
-		{PublicName: "TCGplayer Low (sealed)", Index: 8, Provider: timeseries.ProviderTCGLow, Color: "green"},
+		{PublicName: "TCGplayer Low", Provider: timeseries.ProviderTCGLow, Color: "red"},
+		{PublicName: "TCGplayer Low (sealed)", Provider: timeseries.ProviderTCGLow, Color: "green"},
 	})
 	buildProviderRegistry()
 
@@ -502,7 +502,7 @@ func TestBuildProviderRegistryDeduplicates(t *testing.T) {
 // it, so the rebuild must not race them. Run with -race.
 func TestProviderRegistryRebuildDoesNotRaceCharts(t *testing.T) {
 	withDatasets(t, []DatasetConfig{
-		{PublicName: "TCGplayer Low", Index: 2, Provider: timeseries.ProviderTCGLow, Color: "red"},
+		{PublicName: "TCGplayer Low", Provider: timeseries.ProviderTCGLow, Color: "red"},
 	})
 	buildProviderRegistry()
 	results := syntheticSeries(30, []int16{timeseries.ProviderTCGLow}, 1)

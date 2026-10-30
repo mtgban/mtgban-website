@@ -31,9 +31,9 @@
             <div class="news-filter-bar screener-filter-bar">
                 <div class="news-fg">
                     <label class="news-fl" for="scr-metric">Metric</label>
-                    <select name="metric" id="scr-metric" onchange="window.screenerGo && screenerGo(this.form)">
+                    <select name="provider" id="scr-metric" onchange="window.screenerGo && screenerGo(this.form)">
                         {{range .Metrics}}
-                            <option value="{{.Index}}" {{if eq .Index $.Screener.SelMetric}}selected{{end}}>{{.Name}}</option>
+                            <option value="{{.Provider}}" {{if .Is $.Screener.SelMetric}}selected{{end}}>{{.Name}}</option>
                         {{end}}
                     </select>
                 </div>
@@ -156,7 +156,7 @@
              region the filters live in - so the edition facets arrive with the
              rows that produced them. */}}
         <noscript>
-            <p class="page-subtitle"><a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&rows=1">Load the results</a></p>
+            <p class="page-subtitle"><a href="/screener?provider={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&rows=1">Load the results</a></p>
         </noscript>
         <script>
         (function () {
@@ -223,12 +223,12 @@
 
             <div class="pagination framed">
                 {{if ne .CurrentIndex 1}}
-                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}">&lt;</a>
+                    <a href="/screener?provider={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}">&lt;</a>
                 {{end}}
                 <span class="cur">{{.CurrentIndex}}</span>
                 <span class="pg-info">/ {{.TotalIndex}}</span>
                 {{if ne .CurrentIndex .TotalIndex}}
-                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}">&gt;</a>
+                    <a href="/screener?provider={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}">&gt;</a>
                 {{end}}
             </div>
 
@@ -251,7 +251,7 @@
 {{define "screener-sort"}}
     {{$s := .Vars.Screener}}
     <span class="sort-links">
-        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_was={{$s.MinPriorPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=desc">&#9660;</a>
-        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_was={{$s.MinPriorPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=asc">&#9650;</a>
+        <a href="/screener?provider={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_was={{$s.MinPriorPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=desc">&#9660;</a>
+        <a href="/screener?provider={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_was={{$s.MinPriorPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=asc">&#9650;</a>
     </span>
 {{end}}
