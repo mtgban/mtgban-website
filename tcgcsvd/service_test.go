@@ -16,23 +16,11 @@ import (
 // construction and game selection, neither of which touches storage.
 type stubStore struct{ readOnly bool }
 
-func (s stubStore) ReadOnly() bool { return s.readOnly }
-func (s stubStore) EnsureTCGSchema(context.Context) error {
-	return nil
-}
+func (s stubStore) ReadOnly() bool                                { return s.readOnly }
 func (s stubStore) EnsureTCGProductsSchema(context.Context) error { return nil }
-func (s stubStore) EnsureTCGCategoryPartition(context.Context, int) error {
-	return nil
-}
-func (s stubStore) EnsurePriceDatesSchema(context.Context) error { return nil }
-func (s stubStore) GetTCGLatestDate(context.Context, int) (time.Time, bool, error) {
-	return time.Time{}, false, nil
-}
+func (s stubStore) EnsurePriceDatesSchema(context.Context) error  { return nil }
 func (s stubStore) LatestIngestDate(context.Context, int) (time.Time, bool, error) {
 	return time.Time{}, false, nil
-}
-func (s stubStore) UpsertTCGPrices(context.Context, []timeseries.TCGPriceRow, int) (int, error) {
-	return 0, nil
 }
 func (s stubStore) UpsertTCGProducts(context.Context, []timeseries.TCGProduct, int) (int, error) {
 	return 0, nil
@@ -172,7 +160,7 @@ type failingStore struct {
 	err error
 }
 
-func (s failingStore) EnsureTCGSchema(context.Context) error         { return s.err }
+func (s failingStore) EnsurePriceDatesSchema(context.Context) error  { return s.err }
 func (s failingStore) EnsureTCGProductsSchema(context.Context) error { return s.err }
 func (s failingStore) TryAdvisoryLock(context.Context, int64) (bool, func(), error) {
 	return true, func() {}, nil

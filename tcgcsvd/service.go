@@ -20,13 +20,9 @@ import (
 // and free of any dependency on how the caller built its connection pool.
 type Store interface {
 	ReadOnly() bool
-	EnsureTCGSchema(ctx context.Context) error
 	EnsureTCGProductsSchema(ctx context.Context) error
-	EnsureTCGCategoryPartition(ctx context.Context, categoryID int) error
 	EnsurePriceDatesSchema(ctx context.Context) error
-	GetTCGLatestDate(ctx context.Context, categoryID int) (time.Time, bool, error)
 	LatestIngestDate(ctx context.Context, categoryID int) (time.Time, bool, error)
-	UpsertTCGPrices(ctx context.Context, rows []timeseries.TCGPriceRow, batchSize int) (int, error)
 	UpsertTCGProducts(ctx context.Context, products []timeseries.TCGProduct, batchSize int) (int, error)
 	EnsureTCGVariants(ctx context.Context, vs []timeseries.TCGVariant) (map[timeseries.TCGVariant]int64, error)
 	UpsertLongPrices(ctx context.Context, rows []timeseries.LongPrice, batchSize int) (int, error)
@@ -181,21 +177,4 @@ func (s *Service) WithCrawlLock(ctx context.Context, job string, fn func() error
 	}
 	defer release()
 	return fn()
-}
-
-// ensurePartitions makes sure tcg_prices has a dedicated partition for each
-// game's category before any upsert. tcg_prices is LIST-partitioned by
-// category_id (games never share rows), so each game needs its own partition;
-// without one, that game's rows route to the catch-all default partition instead
-// of a per-game partition. EnsureTCGSchema already pre-creates partitions for the
-// known TCGplayer categories, so this is a no-op for them and mainly covers a
-// configured category not yet listed in the schema. Call it after EnsureTCGSchema,
-// before ingesting.
-func (s *Service) ensurePartitions(ctx context.Context, games []tcgcsv.GameConfig) error {
-	for _, g := range games {
-		if err := s.store.EnsureTCGCategoryPartition(ctx, g.CategoryID); err != nil {
-			return err
-		}
-	}
-	return nil
 }

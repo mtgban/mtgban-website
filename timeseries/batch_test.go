@@ -61,10 +61,6 @@ func TestBatchBounds(t *testing.T) {
 // The per-table batch caps must keep a full batch under Postgres's parameter
 // limit, since staying under it is the whole reason the upserts split at all.
 func TestTCGBatchConstantsUnderParamLimit(t *testing.T) {
-	if tcgMaxBatch*tcgColsPerRow > pgMaxParams {
-		t.Errorf("tcgMaxBatch %d * %d cols = %d exceeds %d",
-			tcgMaxBatch, tcgColsPerRow, tcgMaxBatch*tcgColsPerRow, pgMaxParams)
-	}
 	if tcgProductMaxBatch*tcgProductColsPerRow > pgMaxParams {
 		t.Errorf("tcgProductMaxBatch %d * %d cols = %d exceeds %d",
 			tcgProductMaxBatch, tcgProductColsPerRow, tcgProductMaxBatch*tcgProductColsPerRow, pgMaxParams)

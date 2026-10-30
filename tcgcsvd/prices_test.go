@@ -22,17 +22,13 @@ type recordingStore struct {
 	latest time.Time
 
 	mu   sync.Mutex
-	rows []timeseries.TCGPriceRow
+	rows []timeseries.LongPrice
 }
 
 // The snapshot fallback crawls under the crawl lock, so a store that never
 // grants it would make every test here a skip.
 func (s *recordingStore) TryAdvisoryLock(context.Context, int64) (bool, func(), error) {
 	return true, func() {}, nil
-}
-
-func (s *recordingStore) GetTCGLatestDate(context.Context, int) (time.Time, bool, error) {
-	return s.LatestIngestDate(context.Background(), 0)
 }
 
 func (s *recordingStore) LatestIngestDate(context.Context, int) (time.Time, bool, error) {
@@ -42,18 +38,31 @@ func (s *recordingStore) LatestIngestDate(context.Context, int) (time.Time, bool
 	return s.latest, true, nil
 }
 
-func (s *recordingStore) UpsertTCGPrices(_ context.Context, rows []timeseries.TCGPriceRow, _ int) (int, error) {
+// EnsureTCGVariants files every variant under its deterministic ban_id.
+func (s *recordingStore) EnsureTCGVariants(_ context.Context, vs []timeseries.TCGVariant) (map[timeseries.TCGVariant]int64, error) {
+	ids := make(map[timeseries.TCGVariant]int64, len(vs))
+	for _, v := range vs {
+		ids[v], _ = timeseries.TCGBanID(v)
+	}
+	return ids, nil
+}
+
+func (s *recordingStore) UpsertLongPrices(_ context.Context, rows []timeseries.LongPrice, _ int) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.rows = append(s.rows, rows...)
 	return len(rows), nil
 }
 
-func (s *recordingStore) stored() []timeseries.TCGPriceRow {
+func (s *recordingStore) stored() []timeseries.LongPrice {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([]timeseries.TCGPriceRow(nil), s.rows...)
+	return append([]timeseries.LongPrice(nil), s.rows...)
 }
+
+// pricesPerFakeProduct is the price columns fakeTCGCSV serves above zero for
+// its one product (low, mid, high, market; direct low is null).
+const pricesPerFakeProduct = 4
 
 // fakeTCGCSV stands in for tcgcsv.com: one game, one group, one price, and an
 // /archive/ tree that answers with archiveStatus.
@@ -125,14 +134,17 @@ func TestBackfillFallsBackToTheSnapshot(t *testing.T) {
 	}
 
 	rows := store.stored()
-	if len(rows) != 1 {
-		t.Fatalf("stored %d rows, want 1", len(rows))
+	if len(rows) != pricesPerFakeProduct {
+		t.Fatalf("stored %d rows, want %d", len(rows), pricesPerFakeProduct)
 	}
-	if want := today.Format("2006-01-02"); rows[0].Date != want {
-		t.Errorf("row date = %q, want the snapshot date %q", rows[0].Date, want)
-	}
-	if rows[0].CategoryID != 71 || rows[0].ProductID != 454229 || rows[0].SubTypeName != "Holofoil" {
-		t.Errorf("unexpected row: %+v", rows[0])
+	banID, _ := timeseries.TCGBanID(timeseries.TCGVariant{CategoryID: 71, ProductID: 454229, SubType: "Holofoil"})
+	for _, r := range rows {
+		if want := today.Format("2006-01-02"); r.Date != want {
+			t.Errorf("row date = %q, want the snapshot date %q", r.Date, want)
+		}
+		if r.BanID != banID {
+			t.Errorf("unexpected row: %+v, want ban_id %d", r, banID)
+		}
 	}
 	// One refusal is enough to know the whole archive is gone.
 	if n := fake.calls(); n != 1 {
@@ -157,9 +169,9 @@ func TestBackfillSnapshotIgnoresTheFreshnessGate(t *testing.T) {
 	if err := svc.Backfill(context.Background(), BackfillOptions{Force: true}); err != nil {
 		t.Fatalf("Backfill: %v", err)
 	}
-	if rows := store.stored(); len(rows) != 1 {
-		t.Fatalf("stored %d rows, want 1 despite the category already holding %s",
-			len(rows), today.Format("2006-01-02"))
+	if rows := store.stored(); len(rows) != pricesPerFakeProduct {
+		t.Fatalf("stored %d rows, want %d despite the category already holding %s",
+			len(rows), pricesPerFakeProduct, today.Format("2006-01-02"))
 	}
 
 	// The daily job still gates: an unchanged snapshot writes nothing.
@@ -291,8 +303,7 @@ func (s *failingVariantsStore) EnsureTCGVariants(context.Context, []timeseries.T
 }
 
 // The charts read only the long table, so a day it misses is a gap. A
-// failed long-form write must fail the category before the legacy upsert,
-// whose dates the freshness gate reads, or the next run skips the day.
+// failed long-form write must fail the category and write nothing.
 func TestIngestFailsBeforeTheGateOnALongFormError(t *testing.T) {
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	fake := &fakeTCGCSV{lastUpdated: today.Add(20 * time.Hour), archiveStatus: http.StatusForbidden}
@@ -304,6 +315,6 @@ func TestIngestFailsBeforeTheGateOnALongFormError(t *testing.T) {
 		t.Fatalf("IngestLatest = %v, want the long-form error", err)
 	}
 	if rows := store.stored(); len(rows) != 0 {
-		t.Errorf("legacy upsert stored %d rows after the long-form write failed, want 0", len(rows))
+		t.Errorf("stored %d rows after the long-form write failed, want 0", len(rows))
 	}
 }

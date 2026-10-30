@@ -55,7 +55,7 @@ we carry.
 ```
 
 Magic is deliberately absent: its prices are keyed by mtgjson uuid in
-`product_prices` and come from a different pipeline. Categories 21, 69 and 70
+`prices` and come from a different pipeline. Categories 21, 69 and 70
 are junk per the tcgcsv FAQ and should never be listed.
 
 To see what is configured and how current each game is:

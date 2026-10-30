@@ -11,13 +11,27 @@ import (
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
+// priceRow is one tcgcsv price as ingested: a game's prices for a TCGplayer
+// product and sub-type on a day. Price fields are pointers so a null stays
+// distinct from 0.
+type priceRow struct {
+	Date        string
+	CategoryID  int
+	ProductID   int
+	SubTypeName string
+
+	LowPrice       *float64
+	MidPrice       *float64
+	HighPrice      *float64
+	MarketPrice    *float64
+	DirectLowPrice *float64
+}
+
 // writeLongForm writes non-Magic price rows into the long prices table,
 // resolving each (category, product, sub-type) to a ban_id, filing the new
-// ones under timeseries.TCGBanID, and emitting one
-// LongPrice per set price column (> 0, zeros omitted like the backfill). The
-// charts read only this table, so callers write it before the legacy
-// tcgplayer_nonmagic_product_prices upsert, whose dates gate the next run.
-func (s *Service) writeLongForm(ctx context.Context, rows []timeseries.TCGPriceRow) (int, error) {
+// ones under timeseries.TCGBanID, and emitting one LongPrice per set price
+// column (> 0, zeros omitted like the backfill). It returns the rows written.
+func (s *Service) writeLongForm(ctx context.Context, rows []priceRow) (int, error) {
 	variants := make([]timeseries.TCGVariant, len(rows))
 	for i, r := range rows {
 		variants[i] = timeseries.TCGVariant{CategoryID: r.CategoryID, ProductID: r.ProductID, SubType: r.SubTypeName}
@@ -56,10 +70,10 @@ func (s *Service) writeLongForm(ctx context.Context, rows []timeseries.TCGPriceR
 	return s.store.UpsertLongPrices(ctx, longRows, 0)
 }
 
-// priceToRow maps a tcgcsv price into a tcg_prices row. The pointer price
-// fields carry through unchanged so genuine nulls stay distinct from 0.
-func priceToRow(date string, categoryID int, p tcgcsv.Price) timeseries.TCGPriceRow {
-	return timeseries.TCGPriceRow{
+// priceToRow maps a tcgcsv price into a priceRow. The pointer price fields
+// carry through unchanged so genuine nulls stay distinct from 0.
+func priceToRow(date string, categoryID int, p tcgcsv.Price) priceRow {
+	return priceRow{
 		Date:           date,
 		CategoryID:     categoryID,
 		ProductID:      p.ProductID,
@@ -91,7 +105,7 @@ type BackfillOptions struct {
 	Force bool
 }
 
-// Backfill fills tcg_prices over the requested range, from tcgcsv's daily
+// Backfill fills the long prices table over the requested range, from tcgcsv's daily
 // archives where they are served and from the current snapshot where they are
 // not. Invoked by the -tcgcsv-backfill server flag and by cmd/tcgcsvd.
 func (s *Service) Backfill(ctx context.Context, opts BackfillOptions) error {
@@ -136,7 +150,7 @@ func (s *Service) Backfill(ctx context.Context, opts BackfillOptions) error {
 	return s.backfill(ctx, games, from, to, resume)
 }
 
-// backfill fills tcg_prices for the given games over [from, to]. It prefers
+// backfill fills the long prices table for the given games over [from, to]. It prefers
 // tcgcsv's daily archives, which are the only thing that can reach a past day,
 // and falls back to the current snapshot when tcgcsv isn't serving them -- the
 // live per-group price files it now asks callers to read instead.
@@ -144,13 +158,7 @@ func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from,
 	if s.store.ReadOnly() {
 		return errors.New("tcgcsv: price database is read-only; nothing would be written")
 	}
-	if err := s.store.EnsureTCGSchema(ctx); err != nil {
-		return err
-	}
 	if err := s.store.EnsurePriceDatesSchema(ctx); err != nil {
-		return err
-	}
-	if err := s.ensurePartitions(ctx, games); err != nil {
 		return err
 	}
 
@@ -234,7 +242,7 @@ func (s *Service) backfillFromSnapshot(ctx context.Context, games []tcgcsv.GameC
 	return nil
 }
 
-// backfillFromArchive fills tcg_prices from tcgcsv's daily archives for each of
+// backfillFromArchive fills the long prices table from tcgcsv's daily archives for each of
 // the given games, one day at a time. When resume is set it skips a day for a
 // category once that category already has data on or after it (the default
 // backfill's per-category high-water mark); when resume is false it fetches
@@ -311,7 +319,7 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 		}
 
 		dateStr := day.Format("2006-01-02")
-		var rows []timeseries.TCGPriceRow
+		var rows []priceRow
 		for cat, prices := range byCat {
 			for _, p := range prices {
 				rows = append(rows, priceToRow(dateStr, cat, p))
@@ -327,12 +335,9 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 			continue
 		}
 
-		if _, err := s.writeLongForm(ctx, rows); err != nil {
-			return fmt.Errorf("tcgcsv backfill long-form %s: %w", dateStr, err)
-		}
-		n, err := s.store.UpsertTCGPrices(ctx, rows, 0)
+		n, err := s.writeLongForm(ctx, rows)
 		if err != nil {
-			return fmt.Errorf("tcgcsv backfill upsert %s: %w", dateStr, err)
+			return fmt.Errorf("tcgcsv backfill long-form %s: %w", dateStr, err)
 		}
 		totalRows += n
 		daysWithData++
@@ -369,7 +374,7 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 func (s *Service) IsStashingPrices() bool { return s.pricesStashing.Load() }
 
 // StashPrices pulls tcgcsv's current snapshot for every configured game into
-// tcg_prices. It is the cron/admin entry point: only one run proceeds at a time
+// the long prices table. It is the cron/admin entry point: only one run proceeds at a time
 // per process, only the process holding the crawl lock crawls, and it no-ops
 // when the current snapshot is already stored.
 //
@@ -408,13 +413,7 @@ func (s *Service) IngestLatest(ctx context.Context) error {
 	if s.store.ReadOnly() {
 		return errors.New("tcgcsv: price database is read-only; nothing would be written")
 	}
-	if err := s.store.EnsureTCGSchema(ctx); err != nil {
-		return err
-	}
 	if err := s.store.EnsurePriceDatesSchema(ctx); err != nil {
-		return err
-	}
-	if err := s.ensurePartitions(ctx, s.games); err != nil {
 		return err
 	}
 
@@ -505,7 +504,7 @@ func (s *Service) ingestGame(ctx context.Context, categoryID int, snapshot time.
 	if err != nil {
 		return 0, fmt.Errorf("groups: %w", err)
 	}
-	var rows []timeseries.TCGPriceRow
+	var rows []priceRow
 	for _, grp := range groups {
 		prices, err := s.client.Prices(ctx, categoryID, grp.GroupID)
 		if err != nil {
@@ -519,12 +518,9 @@ func (s *Service) ingestGame(ctx context.Context, categoryID int, snapshot time.
 		return 0, nil
 	}
 
-	if _, err := s.writeLongForm(ctx, rows); err != nil {
-		return 0, fmt.Errorf("long-form: %w", err)
-	}
-	n, err := s.store.UpsertTCGPrices(ctx, rows, 0)
+	n, err := s.writeLongForm(ctx, rows)
 	if err != nil {
-		return 0, fmt.Errorf("upsert: %w", err)
+		return 0, fmt.Errorf("long-form: %w", err)
 	}
 	log.Printf("tcgcsv snapshot %s: category %d, %d rows (%d groups)", dateStr, categoryID, n, len(groups))
 	return n, nil

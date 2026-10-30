@@ -73,6 +73,7 @@ mobile drawer does the same, with a second request to `/data/chart`.
   statement already covers.
 - The legacy wide tables (`product_prices` 38GB, the non-Magic TCGplayer
   price tables ~20GB) are a quarter of the database and compete for that
-  979MB. Nothing reads or writes `product_prices`; the tcgcsv ingest still
-  writes the non-Magic ones and takes its dates from them.
+  979MB. Nothing reads or writes `product_prices`, and the non-Magic ones are no
+  longer written by the tcgcsv ingest; they are dropped in Phase A's last
+  step.
 - The app is in NYC1 and the databases in SFO3: `deploy/REGION-MOVE.md`.
