@@ -105,9 +105,10 @@ type BackfillOptions struct {
 	Force bool
 }
 
-// Backfill fills the long prices table over the requested range, from tcgcsv's daily
-// archives where they are served and from the current snapshot where they are
-// not. Invoked by the -tcgcsv-backfill server flag and by cmd/tcgcsvd.
+// Backfill fills the long prices table over the requested range, from
+// tcgcsv's daily archives where they are served and from the current snapshot
+// where they are not. Invoked by the -tcgcsv-backfill server flag and by
+// cmd/tcgcsvd.
 func (s *Service) Backfill(ctx context.Context, opts BackfillOptions) error {
 	games, err := s.SelectGames(opts.Categories)
 	if err != nil {
@@ -150,10 +151,10 @@ func (s *Service) Backfill(ctx context.Context, opts BackfillOptions) error {
 	return s.backfill(ctx, games, from, to, resume)
 }
 
-// backfill fills the long prices table for the given games over [from, to]. It prefers
-// tcgcsv's daily archives, which are the only thing that can reach a past day,
-// and falls back to the current snapshot when tcgcsv isn't serving them -- the
-// live per-group price files it now asks callers to read instead.
+// backfill fills the long prices table for the given games over [from, to]. It
+// prefers tcgcsv's daily archives, which are the only thing that can reach a
+// past day, and falls back to the current snapshot when tcgcsv isn't serving
+// them -- the live per-group price files it now asks callers to read instead.
 func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from, to time.Time, resume bool) error {
 	if s.store.ReadOnly() {
 		return errors.New("tcgcsv: price database is read-only; nothing would be written")
@@ -242,14 +243,14 @@ func (s *Service) backfillFromSnapshot(ctx context.Context, games []tcgcsv.GameC
 	return nil
 }
 
-// backfillFromArchive fills the long prices table from tcgcsv's daily archives for each of
-// the given games, one day at a time. When resume is set it skips a day for a
-// category once that category already has data on or after it (the default
-// backfill's per-category high-water mark); when resume is false it fetches
-// every day in [from, to]. Archives are downloaded only for days that at least
-// one category still needs, so resumed re-runs are cheap and a game added to the
-// config today pulls its whole history while the games already current skip
-// every day.
+// backfillFromArchive fills the long prices table from tcgcsv's daily archives
+// for each of the given games, one day at a time. When resume is set it skips a
+// day for a category once that category already has data on or after it (the
+// default backfill's per-category high-water mark); when resume is false it
+// fetches every day in [from, to]. Archives are downloaded only for days that
+// at least one category still needs, so resumed re-runs are cheap and a game
+// added to the config today pulls its whole history while the games already
+// current skip every day.
 func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameConfig, from, to time.Time, resume bool) error {
 	// Resume cursor: the newest date already stored per category. Consulted only
 	// when resuming; an explicit range or force fetches every day in [from, to].
@@ -374,9 +375,9 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 func (s *Service) IsStashingPrices() bool { return s.pricesStashing.Load() }
 
 // StashPrices pulls tcgcsv's current snapshot for every configured game into
-// the long prices table. It is the cron/admin entry point: only one run proceeds at a time
-// per process, only the process holding the crawl lock crawls, and it no-ops
-// when the current snapshot is already stored.
+// the long prices table. It is the cron/admin entry point: only one run
+// proceeds at a time per process, only the process holding the crawl lock
+// crawls, and it no-ops when the current snapshot is already stored.
 //
 // Pass a context that outlives a request but not the process — the caller's
 // shutdown context — so a stop ends the ingest where it is instead of leaving

@@ -1,6 +1,6 @@
--- tcg_products is the catalog metadata behind tcg_prices: one row per TCGplayer
--- product, carrying the human-facing name/number/rarity and image so a
--- product_id in tcg_prices can be resolved to a real card. Sourced from
+-- tcg_products is the catalog metadata behind the non-Magic variants: one row per
+-- TCGplayer product, carrying the human-facing name/number/rarity and image so a
+-- variant's product_id can be resolved to a real card. Sourced from
 -- tcgcsv's live products endpoints (archives carry prices only).
 --
 -- Applied idempotently at startup by (*Client).EnsureTCGProductsSchema.

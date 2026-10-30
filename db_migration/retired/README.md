@@ -9,7 +9,7 @@ they are now.
 ## Backfill tools
 
 These built the long tables (`variants`, `prices`) from the wide
-`product_prices` and `tcgplayer_nonmagic_product_prices` (dropped by
+`product_prices` and `tcgplayer_nonmagic_product_prices` (to be dropped by
 `db_migration/wide_tables/drop_nonmagic.sql`), and checked the two
 against each other. The site has read only the long tables since 2026-10-02, so
 they have nothing left to do, and each would now do harm:

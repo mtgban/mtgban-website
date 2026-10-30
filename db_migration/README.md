@@ -6,11 +6,10 @@ price)` table, with a `providers` lookup, in place of the two wide price tables
 (`product_prices`, `tcgplayer_nonmagic_product_prices`).
 
 The site reads and writes only the long tables for Magic; nothing touches
-`product_prices` any more. The tcgcsv ingest writes only the long tables,
-and takes its dates from `price_dates`. Everything
-that has already run against production, the backfill tools and the one-off
-repairs alike, is in `retired/` as text and must not run again; its README says
-why.
+`product_prices` any more. The tcgcsv ingest writes only the long tables, and
+takes its dates from `price_dates`. Everything that has already run against
+production, the backfill tools and the one-off repairs alike, is in `retired/`
+as text and must not run again; its README says why.
 
 ## A fresh database
 
