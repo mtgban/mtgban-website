@@ -434,14 +434,26 @@ func (c *Client) UpsertLongPrices(ctx context.Context, rows []LongPrice, batchSi
 	}
 	rows = dedupeLongPrices(rows)
 
-	months := partitionMonths(rows)
-	for i, m := range months {
-		err := c.EnsurePricePartition(ctx, m)
-		if err != nil && i == len(months)-1 {
-			// No row in this batch lands in the month after, so its failure must not stop the write.
-			log.Printf("timeseries: ensure next month's partition: %v", err)
-		} else if err != nil {
-			return 0, fmt.Errorf("partitions: %w", err)
+	layout, err := c.priceLayout(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("partitions: %w", err)
+	}
+	if layout == "ban_id" {
+		for _, cat := range partitionCategories(rows) {
+			if err := c.EnsureCategoryPartition(ctx, cat); err != nil {
+				return 0, fmt.Errorf("partitions: %w", err)
+			}
+		}
+	} else {
+		months := partitionMonths(rows)
+		for i, m := range months {
+			err := c.ensureMonthPartition(ctx, m)
+			if err != nil && i == len(months)-1 {
+				// No row in this batch lands in the month after, so its failure must not stop the write.
+				log.Printf("timeseries: ensure next month's partition: %v", err)
+			} else if err != nil {
+				return 0, fmt.Errorf("partitions: %w", err)
+			}
 		}
 	}
 
@@ -504,8 +516,13 @@ func partitionMonths(rows []LongPrice) []time.Time {
 // StrayRowLimit bounds the stray-row count, so the hourly check stays cheap.
 const StrayRowLimit = 10000
 
-// StrayPriceRows counts the rows that reached prices_default, up to StrayRowLimit.
+// StrayPriceRows counts the rows that reached prices_default, up to
+// StrayRowLimit. The ban_id layout has no default partition: 0, uncounted.
 func (c *Client) StrayPriceRows(ctx context.Context) (int64, error) {
+	var has bool
+	if err := c.db.QueryRowContext(ctx, `SELECT to_regclass('public.prices_default') IS NOT NULL`).Scan(&has); err != nil || !has {
+		return 0, err
+	}
 	var n int64
 	err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT 1 FROM prices_default LIMIT $1) s`, StrayRowLimit).Scan(&n)
 	return n, err
@@ -547,11 +564,24 @@ func (c *Client) EnsurePriceDatesSchema(ctx context.Context) error {
 // EnsurePricePartition creates the monthly range partition of prices covering
 // the given day if it does not already exist, behind the DDL advisory lock so
 // concurrent creators serialize. UpsertLongPrices runs it before every write;
-// the startup calls stay as a courtesy. Idempotent; no-op on a read-only client.
+// the startup calls stay as a courtesy. It applies to the monthly layout and
+// is a no-op once prices is partitioned by ban_id. Idempotent; no-op on a
+// read-only client.
 func (c *Client) EnsurePricePartition(ctx context.Context, day time.Time) error {
 	if c.readOnly {
 		return nil
 	}
+	layout, err := c.priceLayout(ctx)
+	if err != nil {
+		return err
+	}
+	if layout != "date" {
+		return nil
+	}
+	return c.ensureMonthPartition(ctx, day)
+}
+
+func (c *Client) ensureMonthPartition(ctx context.Context, day time.Time) error {
 	start := time.Date(day.Year(), day.Month(), 1, 0, 0, 0, 0, time.UTC)
 	end := start.AddDate(0, 1, 0)
 	name := fmt.Sprintf("prices_%04d_%02d", start.Year(), start.Month())
@@ -561,6 +591,59 @@ func (c *Client) EnsurePricePartition(ctx context.Context, day time.Time) error 
 		name, start.Format("2006-01-02"), end.Format("2006-01-02"))
 	if err := c.execDDL(ctx, q); err != nil {
 		return fmt.Errorf("timeseries: ensure price partition %s: %w", name, err)
+	}
+	return nil
+}
+
+// priceLayout names the column prices is partitioned by first: "date" or "ban_id".
+func (c *Client) priceLayout(ctx context.Context) (string, error) {
+	var col string
+	err := c.db.QueryRowContext(ctx, `SELECT a.attname FROM pg_partitioned_table p
+  JOIN pg_attribute a ON a.attrelid = p.partrelid AND a.attnum = p.partattrs[0]
+ WHERE p.partrelid = 'public.prices'::regclass`).Scan(&col)
+	if err != nil {
+		return "", fmt.Errorf("timeseries: price layout: %w", err)
+	}
+	if col != "date" && col != "ban_id" {
+		return "", fmt.Errorf("timeseries: price layout: prices is partitioned by %q", col)
+	}
+	return col, nil
+}
+
+// partitionCategories returns the sorted distinct category (ban_id >> 40) of
+// every row past the Magic sequence ids; nil when there are none.
+func partitionCategories(rows []LongPrice) []int {
+	seen := map[int]bool{}
+	for _, r := range rows {
+		if r.BanID >= 1<<tcgBanIDCategoryShift {
+			seen[int(r.BanID>>tcgBanIDCategoryShift)] = true
+		}
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+	return slices.Sorted(maps.Keys(seen))
+}
+
+// EnsureCategoryPartition creates the ban_id partition holding one non-Magic
+// category's block, if missing. No-op on the monthly layout and on a
+// read-only client.
+func (c *Client) EnsureCategoryPartition(ctx context.Context, category int) error {
+	if c.readOnly {
+		return nil
+	}
+	layout, err := c.priceLayout(ctx)
+	if err != nil {
+		return err
+	}
+	if layout != "ban_id" {
+		return nil
+	}
+	// Name and bounds are integers, safe to interpolate.
+	q := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS prices_cat_%d PARTITION OF prices FOR VALUES FROM (%d) TO (%d)`,
+		category, int64(category)<<tcgBanIDCategoryShift, int64(category+1)<<tcgBanIDCategoryShift)
+	if err := c.execDDL(ctx, q); err != nil {
+		return fmt.Errorf("timeseries: ensure category partition %d: %w", category, err)
 	}
 	return nil
 }

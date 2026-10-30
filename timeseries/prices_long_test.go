@@ -2,6 +2,7 @@ package timeseries
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"slices"
 	"strings"
@@ -152,5 +153,31 @@ func TestBuildMoverRowsQueryMaterializes(t *testing.T) {
 	query, _ := buildMoverRowsQuery(ProviderTCGLow, CategoryMagic, time.Now(), time.Now(), 0, 0)
 	if n := strings.Count(query, "AS MATERIALIZED ("); n != 2 {
 		t.Errorf("query materializes %d of its two arms:\n%s", n, query)
+	}
+}
+
+func TestPartitionCategoriesSkipsSequenceIDs(t *testing.T) {
+	rows := []LongPrice{
+		{BanID: 65432}, {BanID: 91<<40 | 7<<8}, {BanID: 3<<40 | 1<<8 | 2}, {BanID: 91<<40 | 2},
+	}
+	if got, want := partitionCategories(rows), []int{3, 91}; !slices.Equal(got, want) {
+		t.Errorf("partitionCategories = %v, want %v", got, want)
+	}
+	if got := partitionCategories([]LongPrice{{BanID: 1}}); got != nil {
+		t.Errorf("sequence-only rows = %v, want nil", got)
+	}
+}
+
+func TestUpsertFailsWhenTheLayoutIsUnknown(t *testing.T) {
+	db, err := sql.Open("postgres", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	c := &Client{db: db}
+	day := time.Now().UTC().Format("2006-01-02")
+	n, err := c.UpsertLongPrices(context.Background(), []LongPrice{{BanID: 1, Date: day, Provider: 1, Price: 1}}, 0)
+	if err == nil || !strings.Contains(err.Error(), "database is closed") || n != 0 {
+		t.Errorf("UpsertLongPrices = %d, %v; want 0 and a database is closed error", n, err)
 	}
 }
