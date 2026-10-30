@@ -439,6 +439,12 @@ func (c *Client) UpsertLongPrices(ctx context.Context, rows []LongPrice, batchSi
 	}
 	rows = dedupeLongPrices(rows)
 
+	for _, m := range partitionMonths(rows) {
+		if err := c.EnsurePricePartition(ctx, m); err != nil {
+			return 0, fmt.Errorf("partitions: %w", err)
+		}
+	}
+
 	tx, err := c.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -462,6 +468,31 @@ func (c *Client) UpsertLongPrices(ctx context.Context, rows []LongPrice, batchSi
 		return 0, err
 	}
 	return total, nil
+}
+
+// partitionMonths returns the sorted first-of-month (UTC) of every month a
+// row falls in, plus the month after the latest. Unparseable dates are skipped.
+func partitionMonths(rows []LongPrice) []time.Time {
+	seen := map[time.Time]bool{}
+	for _, r := range rows {
+		d, err := time.Parse("2006-01-02", r.Date)
+		if err != nil {
+			continue
+		}
+		seen[time.Date(d.Year(), d.Month(), 1, 0, 0, 0, 0, time.UTC)] = true
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+	months := slices.SortedFunc(maps.Keys(seen), time.Time.Compare)
+	return append(months, months[len(months)-1].AddDate(0, 1, 0))
+}
+
+// StrayPriceRows counts the rows that reached prices_default.
+func (c *Client) StrayPriceRows(ctx context.Context) (int64, error) {
+	var n int64
+	err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM prices_default`).Scan(&n)
+	return n, err
 }
 
 func buildLongUpsertQuery(batch []LongPrice) (string, []any) {
@@ -499,9 +530,8 @@ func (c *Client) EnsurePriceDatesSchema(ctx context.Context) error {
 
 // EnsurePricePartition creates the monthly range partition of prices covering
 // the given day if it does not already exist, behind the DDL advisory lock so
-// concurrent creators serialize. Call it at startup and from the daily cron so a
-// write never races ahead of an existing partition (plan section 13). Idempotent;
-// no-op on a read-only client.
+// concurrent creators serialize. UpsertLongPrices runs it before every write;
+// the startup calls stay as a courtesy. Idempotent; no-op on a read-only client.
 func (c *Client) EnsurePricePartition(ctx context.Context, day time.Time) error {
 	if c.readOnly {
 		return nil

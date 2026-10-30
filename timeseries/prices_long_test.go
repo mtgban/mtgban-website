@@ -8,6 +8,24 @@ import (
 	"time"
 )
 
+func TestPartitionMonthsCoversRowsAndTheNextMonth(t *testing.T) {
+	rows := []LongPrice{
+		{Date: "2026-11-30"}, {Date: "2026-10-01"}, {Date: "2026-11-02"},
+	}
+	got := partitionMonths(rows)
+	want := []time.Time{
+		time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC),
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("partitionMonths = %v, want %v", got, want)
+	}
+	if partitionMonths(nil) != nil {
+		t.Error("no rows should need no partitions")
+	}
+}
+
 func TestDedupeLongPrices(t *testing.T) {
 	rows := []LongPrice{
 		{BanID: 1, Date: "2024-02-08", Provider: ProviderTCGLow, Price: 1.00},

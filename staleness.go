@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"maps"
@@ -74,9 +75,40 @@ func classifyStaleTransition(was, is bool) staleTransition {
 // checkStaleness notifies only on a transition. In-memory only: a restart
 // may announce every already-stale row once more.
 var staleAlarmState = struct {
-	mu    sync.Mutex
-	stale map[string]bool
+	mu          sync.Mutex
+	stale       map[string]bool
+	strayPrices bool
 }{stale: map[string]bool{}}
+
+// strayNotify announces a stray-rows change; overridable in tests.
+var strayNotify = func(kind, message string) { ServerNotify(kind, message) }
+
+// strayPriceRows counts the archive rows in prices_default; overridable in tests.
+var strayPriceRows = func(ctx context.Context) (int64, error) {
+	if PricesArchiveDB == nil {
+		return 0, nil
+	}
+	return PricesArchiveDB.StrayPriceRows(ctx)
+}
+
+// checkStrayPrices announces rows in prices_default when they appear and when
+// they clear. Callers must hold staleAlarmState.mu.
+func checkStrayPrices(_ time.Time) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	n, err := strayPriceRows(ctx)
+	if err != nil {
+		log.Println("stray price rows:", err)
+		return
+	}
+	switch stray := n > 0; {
+	case stray && !staleAlarmState.strayPrices:
+		strayNotify("timeseries", fmt.Sprintf("%d price rows sit in prices_default: a month's partition was missing when they were written", n))
+	case !stray && staleAlarmState.strayPrices:
+		strayNotify("timeseries", "prices_default is empty again")
+	}
+	staleAlarmState.strayPrices = n > 0
+}
 
 // staleMessageBudget is how much of the alarm one message carries: under
 // the 2000 characters Discord takes, with room for notify's dev marker.
@@ -346,6 +378,7 @@ func checkStaleness() {
 		changes = appendDropChanges(changes, kind, now)
 	}
 	announceStaleChanges(changes)
+	checkStrayPrices(now)
 }
 
 // appendDropChanges announces each of kind's dropped stores once when it
