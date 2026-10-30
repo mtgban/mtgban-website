@@ -826,6 +826,9 @@ type EntryRule struct {
 	// SkipSets holds the set codes whose cards the rule never prices; their
 	// sealed products are still priced
 	SkipSets []string
+	// ReleasedBy, when set, is the latest release date the rule prices,
+	// sealed products included; one with no known date is not priced
+	ReleasedBy time.Time
 
 	MinPrice float64
 	Rate     float64
@@ -865,6 +868,12 @@ func processEntry[T mtgban.GenericEntry](b *matcher.Backend, out map[string]map[
 		}
 		if !co.Sealed && slices.Contains(rule.SkipSets, co.SetCode) {
 			return
+		}
+		if !rule.ReleasedBy.IsZero() {
+			released, err := b.CardReleaseDate(cardID)
+			if err != nil || released.IsZero() || released.After(rule.ReleasedBy) {
+				return
+			}
 		}
 		if entries[base].Pricing() < rule.MinPrice {
 			return

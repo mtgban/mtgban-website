@@ -5,7 +5,9 @@ import (
 	"net/http/httptest"
 	"slices"
 	"testing"
+	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
@@ -85,5 +87,59 @@ func TestCustomBuylistSkipsSets(t *testing.T) {
 	}
 	if found[cardID] == nil || found[sealedID] == nil {
 		t.Errorf("search priced %v, want the plain card %s and the sealed product %s", found, cardID, sealedID)
+	}
+}
+
+// The custom buylist prices a card or sealed product only once it has been
+// out by the rule's date, on upload and on search and arbit alike.
+func TestCustomBuylistSkipsUnreleased(t *testing.T) {
+	ids := []string{firstPlainCard(t), backend().GetSealedUUIDs()[0]}
+	for _, id := range ids {
+		co, err := backend().GetUUID(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		released, err := backend().CardReleaseDate(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		before := released.Add(-24 * time.Hour)
+
+		if customBuylistSkips(backend(), co, released) {
+			t.Errorf("%s skipped on its release date %s", id, released.Format(time.DateOnly))
+		}
+		if !customBuylistSkips(backend(), co, before) {
+			t.Errorf("%s priced before its release date %s", id, released.Format(time.DateOnly))
+		}
+
+		priced := func(releasedBy time.Time) bool {
+			out := map[string]map[string]*BanPrice{}
+			rule := EntryRule{ReleasedBy: releasedBy, Rate: 0.5}
+			processEntry(backend(), out, []mtgban.InventoryEntry{{Conditions: "NM", Price: 10}}, "", id, "CUSTOM", false, false, false, rule)
+			return out[id]["CUSTOM"] != nil
+		}
+		if !priced(released) || priced(before) {
+			t.Errorf("%s priced %v on its release date and %v the day before, want true and false", id, priced(released), priced(before))
+		}
+	}
+}
+
+// A card whose set lists no release date counts as not out yet, whatever
+// the rule's date.
+func TestCustomBuylistSkipsUndated(t *testing.T) {
+	co := &matcher.CardObject{}
+	co.UUID, co.SetCode = "promo", "UND"
+	b := &matcher.Backend{
+		UUIDs: map[string]*matcher.CardObject{co.UUID: co},
+		Sets:  map[string]*matcher.Set{"UND": {}},
+	}
+	releasedBy := time.Now()
+	if !customBuylistSkips(b, co, releasedBy) {
+		t.Error("undated card priced by the custom buylist")
+	}
+	out := map[string]map[string]*BanPrice{}
+	processEntry(b, out, []mtgban.InventoryEntry{{Conditions: "NM", Price: 10}}, "", co.UUID, "CUSTOM", false, false, false, EntryRule{ReleasedBy: releasedBy})
+	if out[co.UUID]["CUSTOM"] != nil {
+		t.Error("undated card priced on upload by the custom buylist")
 	}
 }
