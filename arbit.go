@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -363,6 +364,13 @@ func arbit(s *site, ds *datastore, w http.ResponseWriter, r *http.Request, rever
 
 	blocklistVendors := arbitBlockedVendors(sig)
 
+	// The reader's custom buylist is one more vendor to sell to
+	var customRule customBuylistRule
+	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
+	if !reverse && (canUploadCustom || (DevMode && !SigCheck)) {
+		customRule = readCustomBuylistRule(r)
+	}
+
 	if r.FormValue("page") == "options" {
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
 		return
@@ -382,7 +390,8 @@ func arbit(s *site, ds *datastore, w http.ResponseWriter, r *http.Request, rever
 	start := time.Now()
 
 	scraperCompare(ds, w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
-		AllResults: true,
+		AllResults:    true,
+		CustomBuylist: customRule,
 	})
 
 	user := GetParamFromSig(sig, "UserEmail")
@@ -461,6 +470,10 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 type scraperCompareOpts struct {
 	AllResults bool // false caps the result list (MaxArbitResults, or MaxResultsGlobalLimit in global mode)
 	AnySpread  bool // lower Global's spread floor to MinSpreadGlobalPro
+
+	// The reader's custom buylist, compared against as a vendor; none at
+	// a zero rate
+	CustomBuylist customBuylistRule
 }
 
 // hasNoQty tells whether a table has no quantity column: a store keeping no
@@ -511,6 +524,87 @@ func suspectPriceFor(globalMode, reverseMode bool, sourceShort, scraperShort str
 // seller: a sealed index prices nothing anyone can buy, so it is left out.
 func comparableSeller(info mtgban.ScraperInfo) bool {
 	return !info.SealedMode || !info.MetadataOnly
+}
+
+// customBuylistVendor is the reader's custom buylist as a vendor: the
+// reference seller's prices at the rule's rate, for the cards one seller
+// sells, built for one request.
+type customBuylistVendor struct {
+	info    mtgban.ScraperInfo
+	buylist mtgban.BuylistRecord
+}
+
+func (v *customBuylistVendor) Load(context.Context) error    { return nil }
+func (v *customBuylistVendor) Info() mtgban.ScraperInfo      { return v.info }
+func (v *customBuylistVendor) Buylist() mtgban.BuylistRecord { return v.buylist }
+
+// newCustomBuylistVendor prices the cards seller sells by the rule, against
+// the sealed reference when seller trades sealed, or nil without a reference.
+func newCustomBuylistVendor(b *matcher.Backend, rule customBuylistRule, seller mtgban.Seller) *customBuylistVendor {
+	sealed := seller.Info().SealedMode
+	refName, shorthand := rule.seller, customStore
+	if sealed {
+		refName, shorthand = rule.sealedSeller, customSealedStore
+	}
+	ref, err := findSellerInventory(refName)
+	if err != nil {
+		return nil
+	}
+	// An index files its one price under whatever grade its scraper uses,
+	// so it buys at NM only
+	isIndex := slices.Contains(UploadIndexComparePriceList, refName)
+
+	buylist := mtgban.BuylistRecord{}
+	for cardID := range seller.Inventory() {
+		co, err := b.GetUUID(cardID)
+		if err != nil || (!co.Sealed && slices.Contains(customBuylistSkipSets, co.SetCode)) {
+			continue
+		}
+		entries := customBuylistEntries(ref[cardID], rule, isIndex)
+		if len(entries) > 0 {
+			buylist[cardID] = entries
+		}
+	}
+
+	return &customBuylistVendor{
+		info: mtgban.ScraperInfo{
+			Name:       "Custom Buylist",
+			Shorthand:  shorthand,
+			SealedMode: sealed,
+		},
+		buylist: buylist,
+	}
+}
+
+// customBuylistEntries is what the rule pays for one card: the reference's
+// best price of each grade at the rate, NM first as Arbit reads it. The
+// minimum price gates the card on its best price, and a card the reference
+// lists no NM copy of is not bought.
+func customBuylistEntries(inventory []mtgban.InventoryEntry, rule customBuylistRule, isIndex bool) []mtgban.BuylistEntry {
+	var entries []mtgban.BuylistEntry
+	for _, entry := range inventory {
+		if unpriced(entry.Price) {
+			continue
+		}
+		grade := entry.Conditions
+		if isIndex {
+			grade = mtgban.NM
+		}
+		if len(entries) == 0 && (grade != mtgban.NM || entry.Price < rule.minPrice) {
+			return nil
+		}
+		if slices.ContainsFunc(entries, func(e mtgban.BuylistEntry) bool { return e.Conditions == grade }) {
+			continue
+		}
+		entries = append(entries, mtgban.BuylistEntry{
+			Conditions: grade,
+			BuyPrice:   entry.Price * rule.rate,
+		})
+		if isIndex {
+			break
+		}
+	}
+	return entries
 }
 
 func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
@@ -709,6 +803,13 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 
 			scrapers = append(scrapers, vendor)
 		}
+
+		if cmp.CustomBuylist.rate > 0 {
+			custom := newCustomBuylistVendor(b, cmp.CustomBuylist, source.(mtgban.Seller))
+			if custom != nil {
+				scrapers = append(scrapers, custom)
+			}
+		}
 	}
 
 	// The grades the reader dropped, which TCGDirect's own below must not
@@ -846,8 +947,12 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 			creditInfo = source.Info()
 		}
 
+		name := scraperName(scraper.Info().Shorthand)
+		if name == "" {
+			name = scraper.Info().Name
+		}
 		entry := Arbitrage{
-			Name:             scraperName(scraper.Info().Shorthand),
+			Name:             name,
 			Key:              scraper.Info().Shorthand,
 			Arbit:            arbit,
 			HasNoCredit:      creditInfo.CreditMultiplier == 0,
