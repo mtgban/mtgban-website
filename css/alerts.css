@@ -387,14 +387,33 @@
 .alert-ref-pick { width: auto; max-width: 22em; font-size: var(--text-md); }
 .alert-ref-pick:disabled { opacity: 0.45; }
 
-/* Store columns: checkbox, name, then the price in the chosen condition. */
+/* Store columns: checkbox, name, then the price in the chosen condition.
+   The picked-only stores sit in a tinted column of their own, which wraps
+   below the rest when the modal is narrow. */
 .alert-modal .alert-stores {
-    column-width: 16em;
-    column-gap: 1.5em;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em 1.5em;
     padding: 0.4em 0.75em;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     background: var(--surface-2);
+}
+.alert-stores-main {
+    flex: 1 1 24em;
+    min-width: 0;
+    column-width: 16em;
+    column-gap: 1.5em;
+}
+.alert-stores-main:empty { display: none; }
+.alert-stores-picked {
+    flex: 1 1 12em;
+    max-width: 18em;
+    min-width: 0;
+    margin: -0.15em -0.4em;
+    padding: 0.15em 0.4em;
+    border-radius: var(--radius-sm);
+    background: var(--accent-muted);
 }
 .alert-modal .alert-stores label {
     display: flex;

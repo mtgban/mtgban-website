@@ -150,13 +150,6 @@
         return best;
     }
 
-    // storesNote is the hint beside the store list, naming the picked-only
-    // stores that watching every store leaves out.
-    function storesNote(stores) {
-        var left = (stores || []).filter(function (s) { return s.picked_only; }).map(function (s) { return s.name || s.shorthand; });
-        return 'leave all unchecked to watch every one' + (left.length ? ' but ' + left.join(', ') : '');
-    }
-
     // referenceUsed is whether either threshold is a percentage, the only
     // thing the reference price is measured for.
     function referenceUsed(aboveKind, belowKind) {
@@ -215,15 +208,15 @@
         setPills('condition', state.condition);
     }
 
+    var PICKED_ONLY_TIP = 'These stores are not enabled unless explicitly selected';
+
     // Every store on the side is listed, by name, so an alert can watch one
-    // not offering the card yet.
+    // not offering the card yet; the picked-only ones get a column of their own.
     function renderStores() {
         var host = document.getElementById('alert-stores');
         var stores = ((state.options && state.options.stores) || []).slice().sort(function (a, b) {
             return (a.name || a.shorthand).localeCompare(b.name || b.shorthand);
         });
-        var note = document.querySelector('#alert-stores-label .alert-label-note');
-        if (note) note.textContent = storesNote(stores);
         host.innerHTML = '';
         if (!stores.length) {
             var p = document.createElement('p');
@@ -232,10 +225,20 @@
             host.appendChild(p);
             return;
         }
+        var main = document.createElement('div');
+        main.className = 'alert-stores-main';
+        host.appendChild(main);
+        var picked = null;
         stores.forEach(function (s) {
+            if (s.picked_only && !picked) {
+                picked = document.createElement('div');
+                picked.className = 'alert-stores-picked';
+                picked.title = PICKED_ONLY_TIP;
+                host.appendChild(picked);
+            }
             var label = document.createElement('label');
             label.setAttribute('data-shorthand', s.shorthand);
-            label.title = s.name || s.shorthand;
+            label.title = (s.name || s.shorthand) + (s.picked_only ? '\n' + PICKED_ONLY_TIP : '');
             var box = document.createElement('input');
             box.type = 'checkbox';
             box.name = 'stores';
@@ -249,7 +252,7 @@
             label.appendChild(box);
             label.appendChild(name);
             label.appendChild(price);
-            host.appendChild(label);
+            (s.picked_only ? picked : main).appendChild(label);
         });
         renderStorePrices();
     }
@@ -1249,5 +1252,5 @@
 
     window.openAlertModal = open;
     window.closeAlertModal = close;
-    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, channelNote: channelNote, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig, deleteAllPrompt: deleteAllPrompt, deletedNote: deletedNote, existingForCard: existingForCard, bestPrice: bestPrice, storesNote: storesNote, referenceUsed: referenceUsed };
+    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, channelNote: channelNote, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig, deleteAllPrompt: deleteAllPrompt, deletedNote: deletedNote, existingForCard: existingForCard, bestPrice: bestPrice, referenceUsed: referenceUsed };
 })();
