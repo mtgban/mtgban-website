@@ -29,6 +29,9 @@ const (
 	ProviderSealedEV     int16 = 13
 )
 
+// TCGCSVProviders are the provider ids the tcgcsv ingest writes.
+var TCGCSVProviders = []int16{ProviderTCGLow, ProviderTCGMarket, ProviderTCGMid, ProviderTCGHigh, ProviderTCGDirectLow}
+
 // MagicVariant is the language-aware, condition-agnostic identity of a Magic
 // printing in the variants table. NormalizeUUID / NormalizeLanguage must have
 // been applied before it is used as a cache key or a lookup, or the live write

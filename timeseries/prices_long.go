@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"log"
 	"maps"
 	"slices"
 	"strings"
@@ -284,6 +285,29 @@ func recordPriceDates(ctx context.Context, tx *sql.Tx, rows []LongPrice) error {
 	return nil
 }
 
+// LatestIngestDate returns the day every tcgcsv provider has reached for a
+// category, the least advanced provider's newest day; ok is false when it has
+// none. A site's stash files today under providers 3 and 4 twice a day, which
+// cannot advance 5 to 7. A provider that stops appearing for a category makes
+// it re-ingest nightly until that day expires, which is idempotent.
+func (c *Client) LatestIngestDate(ctx context.Context, categoryID int) (time.Time, bool, error) {
+	ids := make([]int64, len(TCGCSVProviders))
+	for i, p := range TCGCSVProviders {
+		ids[i] = int64(p)
+	}
+	var newest sql.NullTime
+	err := c.db.QueryRowContext(ctx, `
+		SELECT min(m) FROM (
+			SELECT max(date) AS m FROM price_dates
+			 WHERE category = $1 AND provider = ANY($2)
+			 GROUP BY provider) x`,
+		categoryID, pq.Array(ids)).Scan(&newest)
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("timeseries: latest ingest date: %w", err)
+	}
+	return newest.Time, newest.Valid, nil
+}
+
 // ExpirePriceDates drops the days in price_dates older than the screener can
 // ask for: its longest window is a year, and a month more keeps that window for
 // a game whose newest day lags. No-op on a read-only client.
@@ -439,8 +463,13 @@ func (c *Client) UpsertLongPrices(ctx context.Context, rows []LongPrice, batchSi
 	}
 	rows = dedupeLongPrices(rows)
 
-	for _, m := range partitionMonths(rows) {
-		if err := c.EnsurePricePartition(ctx, m); err != nil {
+	months := partitionMonths(rows)
+	for i, m := range months {
+		err := c.EnsurePricePartition(ctx, m)
+		if err != nil && i == len(months)-1 {
+			// No row in this batch lands in the month after, so its failure must not stop the write.
+			log.Printf("timeseries: ensure next month's partition: %v", err)
+		} else if err != nil {
 			return 0, fmt.Errorf("partitions: %w", err)
 		}
 	}

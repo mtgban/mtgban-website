@@ -522,19 +522,17 @@ func (s *site) openDBs() (err error) {
 				log.Println("warning: could not ensure tcg_products schema:", serr)
 			}
 		}
-		// Long-form writes: make sure price_dates and the current and next
-		// month's price partitions exist ahead of any write. Writes-only.
-		if longFormWrites() {
-			if serr := PricesArchiveDB.EnsurePriceDatesSchema(context.Background()); serr != nil {
-				log.Println("warning: could not ensure price_dates:", serr)
-			}
-			now := time.Now()
-			if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now); serr != nil {
-				log.Println("warning: could not ensure current price partition:", serr)
-			}
-			if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now.AddDate(0, 1, 0)); serr != nil {
-				log.Println("warning: could not ensure next price partition:", serr)
-			}
+		// Make sure price_dates and the current and next month's price
+		// partitions exist ahead of any write. Writes-only.
+		if serr := PricesArchiveDB.EnsurePriceDatesSchema(context.Background()); serr != nil {
+			log.Println("warning: could not ensure price_dates:", serr)
+		}
+		now := time.Now()
+		if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now); serr != nil {
+			log.Println("warning: could not ensure current price partition:", serr)
+		}
+		if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now.AddDate(0, 1, 0)); serr != nil {
+			log.Println("warning: could not ensure next price partition:", serr)
 		}
 	}
 

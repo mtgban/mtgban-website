@@ -248,7 +248,7 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 	latest := make(map[int]time.Time)
 	if resume {
 		for _, g := range games {
-			d, ok, err := s.store.GetTCGLatestDate(ctx, g.CategoryID)
+			d, ok, err := s.store.LatestIngestDate(ctx, g.CategoryID)
 			if err != nil {
 				return fmt.Errorf("tcgcsv: latest date for category %d: %w", g.CategoryID, err)
 			}
@@ -327,11 +327,8 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 			continue
 		}
 
-		if s.longForm {
-			_, err := s.writeLongForm(ctx, rows)
-			if err != nil {
-				return fmt.Errorf("tcgcsv backfill long-form %s: %w", dateStr, err)
-			}
+		if _, err := s.writeLongForm(ctx, rows); err != nil {
+			return fmt.Errorf("tcgcsv backfill long-form %s: %w", dateStr, err)
 		}
 		n, err := s.store.UpsertTCGPrices(ctx, rows, 0)
 		if err != nil {
@@ -494,7 +491,7 @@ func (s *Service) ingestSnapshot(ctx context.Context, games []tcgcsv.GameConfig,
 // failure leaves the category untouched and safe to retry.
 func (s *Service) ingestGame(ctx context.Context, categoryID int, snapshot time.Time, dateStr string, force bool) (int, error) {
 	if !force {
-		latest, ok, err := s.store.GetTCGLatestDate(ctx, categoryID)
+		latest, ok, err := s.store.LatestIngestDate(ctx, categoryID)
 		if err != nil {
 			return 0, fmt.Errorf("latest date: %w", err)
 		}
@@ -522,11 +519,8 @@ func (s *Service) ingestGame(ctx context.Context, categoryID int, snapshot time.
 		return 0, nil
 	}
 
-	if s.longForm {
-		_, err := s.writeLongForm(ctx, rows)
-		if err != nil {
-			return 0, fmt.Errorf("long-form: %w", err)
-		}
+	if _, err := s.writeLongForm(ctx, rows); err != nil {
+		return 0, fmt.Errorf("long-form: %w", err)
 	}
 	n, err := s.store.UpsertTCGPrices(ctx, rows, 0)
 	if err != nil {

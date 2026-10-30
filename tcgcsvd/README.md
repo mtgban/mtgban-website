@@ -153,17 +153,23 @@ of the server's config is ignored, so the deployed file works unchanged:
 - `infrastructure_path` — the infrastructure file the deployments share, read
   for `sql_config` when the config sets none of its own
 - `tcgcsv_config` — the chosen categories and the User-Agent
-- `timeseries_config.long_form_writes` — dual-write into the long `prices` table
-- `game` — a game other than Magic always writes the long `prices` table,
-  whatever the flag above says
 - `discord.server_webhook_url` — optional, for job-level success and failure notices
+
+The ingest always writes the long `prices` table, and gates each category on
+the least advanced TCGplayer provider (3 to 7): the oldest of their newest
+`price_dates` days. A site's own stash files 3 and 4 and cannot advance 5 to 7.
+A provider that stops appearing for a category makes it re-ingest nightly,
+which is idempotent.
 
 ## Running it as its own service
 
 The website still registers the crons when `tcgcsv_config` and a price database
 are both present. To move ingestion off the web servers, drop `tcgcsv_config`
 from their config (the crons then stay unregistered and the admin button reports
-ingestion as unconfigured) and give the box a unit and a timer:
+ingestion as unconfigured) and give the box a unit and a timer. A server
+without `tcgcsv_config` writes TCGplayer Low and Market for its own game from
+its stash, twice a day; those cannot advance the ingest's gate, since the stash
+never writes 5 to 7 (see Configuration above).
 
 ```ini
 # /etc/systemd/system/tcgcsvd@.service   —  %i is the job: daily, products
@@ -196,7 +202,6 @@ config from the servers.
 
 ```go
 svc, err := tcgcsvd.New(*cfg.TCGCSVConfig, db,
-    tcgcsvd.WithLongFormWrites(cfg.TimeseriesConfig.LongFormWrites),
     tcgcsvd.WithNotifier(ServerNotify),
     tcgcsvd.WithProductReport(logMatchReport))
 if err != nil {

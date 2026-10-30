@@ -22,11 +22,6 @@ import (
 )
 
 type TimeseriesConfig struct {
-	// LongFormWrites makes the tcgcsv ingest write the long tables (variants +
-	// prices) as well as its own wide one. Charts and analytics read only the
-	// long tables, and the snapshot writes nothing else. See db_migration/.
-	LongFormWrites bool `json:"long_form_writes"`
-
 	// CheckpointsPath is the curated checkpoints document a game other than
 	// Magic draws its chart markers from.
 	CheckpointsPath string `json:"checkpoints_path"`
@@ -43,19 +38,6 @@ type DatasetConfig struct {
 	Color      string `json:"color"`
 	HasSealed  bool   `json:"has_sealed,omitempty"`
 	OnlySealed bool   `json:"only_sealed,omitempty"`
-}
-
-// longFormWrites reports whether this deployment's tcgcsv ingest writes the
-// long prices table. A Magic deployment opts in with the flag. A non-Magic one
-// always does: its charts read only the long table, and its snapshot leaves the
-// TCGplayer series to the ingest (tcgcsvOwnedProviders).
-//
-// An unset game is the default one, the same reading datastoreGame and the rest
-// of the site give it, so it is compared through that rather than against the
-// raw field: a config that spells out "game": "" is a Magic deployment, not a
-// game with no wide table.
-func longFormWrites() bool {
-	return datastoreGame() != DefaultGame || Config().TimeseriesConfig.LongFormWrites
 }
 
 // providerForDatasetIndex resolves a legacy dataset Index to its provider id via
@@ -818,24 +800,15 @@ func writeSnapshot(ctx context.Context, start time.Time, snapshot longSnapshot) 
 // where the snapshot reaches only the cards the site's scraper loaded, so
 // handing the ids to the narrower writer would trade coverage for nothing.
 //
-// What that leans on is the ingest writing the long form, which is implied for a
-// non-Magic game rather than flagged (longFormWrites, and the same reading in
-// cmd/tcgcsvd for a deployment that runs the job out of process). An ingest
-// writing only the legacy wide table would leave these series with no writer at
-// all.
-var tcgcsvOwnedProviders = []int16{
-	timeseries.ProviderTCGLow,
-	timeseries.ProviderTCGMarket,
-	timeseries.ProviderTCGMid,
-	timeseries.ProviderTCGHigh,
-	timeseries.ProviderTCGDirectLow,
-}
+// What that leans on is the ingest always writing the long form.
+var tcgcsvOwnedProviders = timeseries.TCGCSVProviders
 
 // tcgcsvOwnsTCGSeries reports whether the tcgcsv ingest covers this
 // deployment's own game. The cron that runs it is registered off the same
 // config section, so a game listed there is one whose TCGplayer prices arrive
 // without the snapshot's help. A deployment carrying no tcgcsv_config at all
-// keeps writing them itself, since nothing else would.
+// keeps writing them itself, since nothing else would. Those rows cannot
+// advance the ingest's gate (timeseries.LatestIngestDate).
 func tcgcsvOwnsTCGSeries() bool {
 	if Config().TCGCSVConfig == nil {
 		return false

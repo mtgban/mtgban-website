@@ -13,45 +13,6 @@ import (
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
-// withGameAndFlags points the config at one game and one long-form write
-// flag for the duration of a test.
-func withGameAndFlags(t *testing.T, game matcher.Game, writes bool) {
-	t.Helper()
-	prevGame := Config().Game
-	prevTS := Config().TimeseriesConfig
-	t.Cleanup(func() {
-		Config().Game = prevGame
-		Config().TimeseriesConfig = prevTS
-	})
-	Config().Game = game
-	Config().TimeseriesConfig.LongFormWrites = writes
-}
-
-// The write flag is Magic's cutover, deployment by deployment. A non-Magic game
-// is not part of it: the wide table's mtgjson_uuid is a Postgres uuid column, so
-// a game that numbers its cards has no legacy path to be cut over from, and
-// leaving its writes behind a flag is what left its charts with only the
-// datasets the tcgcsv ingest writes on its own (issue #280).
-func TestLongFormGatesForNonMagic(t *testing.T) {
-	for _, tc := range []struct {
-		game      matcher.Game
-		writes    bool
-		wantWrite bool
-	}{
-		{DefaultGame, false, false},
-		{DefaultGame, true, true},
-		{matcher.GameLorcana, false, true},
-		{matcher.GameLorcana, true, true},
-		{"pokemon", false, true},
-	} {
-		withGameAndFlags(t, tc.game, tc.writes)
-		if got := longFormWrites(); got != tc.wantWrite {
-			t.Errorf("longFormWrites(game=%s writes=%v) = %v, want %v",
-				tc.game, tc.writes, got, tc.wantWrite)
-		}
-	}
-}
-
 // A dataset with a provider id and a card with a variant produce one row per
 // visit, carrying the config's provider rather than its legacy column index.
 func TestNonMagicSnapshotAddStoresOneRowPerProvider(t *testing.T) {
