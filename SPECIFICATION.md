@@ -746,9 +746,9 @@ product + sub-type), and a date-partitioned `prices(ban_id, date, provider,
 price)` table with one row per provider. Charts, buylist metrics and the
 screener read only these. The wide Magic table `product_prices` is still in the
 database, but nothing reads or writes it. The non-Magic wide table
-`tcgplayer_nonmagic_product_prices` is still written by the tcgcsv ingest,
-which always writes the long tables too and takes its resume and freshness
-dates from `price_dates`.
+`tcgplayer_nonmagic_product_prices` is no longer written either: the tcgcsv
+ingest writes only the long tables and takes its resume and freshness dates
+from `price_dates`.
 
 `stashInTimeseries()` (cron `0 */12 * * *`, §2.1) snapshots current prices
 twice daily, normalizing non-NM conditions up via grade multipliers

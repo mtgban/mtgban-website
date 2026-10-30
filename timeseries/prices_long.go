@@ -424,8 +424,8 @@ func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays i
 }
 
 // dedupeLongPrices collapses rows sharing (ban_id, date, provider) to their last
-// occurrence — one INSERT ... ON CONFLICT DO UPDATE errors if a key appears twice
-// (mirrors dedupeTCGPriceRows).
+// occurrence; one INSERT ... ON CONFLICT DO UPDATE errors if a key appears twice
+// at once.
 func dedupeLongPrices(rows []LongPrice) []LongPrice {
 	type key struct {
 		banID    int64
@@ -551,7 +551,7 @@ func (c *Client) EnsurePriceDatesSchema(ctx context.Context) error {
 	if c.readOnly {
 		return nil
 	}
-	if err := c.execTCGDDL(ctx, priceDatesSchemaSQL); err != nil {
+	if err := c.execDDL(ctx, priceDatesSchemaSQL); err != nil {
 		return fmt.Errorf("timeseries: ensure price_dates: %w", err)
 	}
 	return nil
@@ -572,7 +572,7 @@ func (c *Client) EnsurePricePartition(ctx context.Context, day time.Time) error 
 	q := fmt.Sprintf(
 		`CREATE TABLE IF NOT EXISTS %s PARTITION OF prices FOR VALUES FROM ('%s') TO ('%s')`,
 		name, start.Format("2006-01-02"), end.Format("2006-01-02"))
-	if err := c.execTCGDDL(ctx, q); err != nil {
+	if err := c.execDDL(ctx, q); err != nil {
 		return fmt.Errorf("timeseries: ensure price partition %s: %w", name, err)
 	}
 	return nil
