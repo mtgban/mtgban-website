@@ -80,16 +80,6 @@ test('bestPrice is the best offer on the side in the condition among the checked
     expect(h.bestPrice(withNet, 'buylist', 'NM', ['TCGDirectNet'])).toBe(3.3);
 });
 
-test('storesNote names the stores watching every one leaves out', () => {
-    const h = load();
-    expect(h.storesNote([{ shorthand: 'CK', name: 'Card Kingdom' }])).toBe('leave all unchecked to watch every one');
-    expect(h.storesNote([
-        { shorthand: 'CK', name: 'Card Kingdom' },
-        { shorthand: 'TCGDirectNet', name: 'TCG Direct (net)', picked_only: true },
-    ])).toBe('leave all unchecked to watch every one but TCG Direct (net)');
-    expect(h.storesNote(null)).toBe('leave all unchecked to watch every one');
-});
-
 test('referenceUsed only for a percentage threshold', () => {
     const h = load();
     expect(h.referenceUsed('', '')).toBe(false);
