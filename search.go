@@ -2115,28 +2115,50 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 // World Championship Decks, PTC included. Their sealed products are priced.
 var customBuylistSkipSets = append([]string{"CED", "CEI", "30A"}, wcSets...)
 
-// Append a virtual buylist to search results, priced off the reference
-// seller inventories according to the custom buylist rule settings
-func searchCustomBuylist(b *matcher.Backend, r *http.Request, cardIDs []string, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+// customBuylistRule is the reader's custom buylist as the upload settings
+// save it: the reference sellers' prices at a rate, from a minimum price.
+type customBuylistRule struct {
+	rate, minPrice       float64
+	seller, sealedSeller string
+}
+
+// readCustomBuylistRule reads the reader's custom buylist rule, the zero
+// rule, at no rate, when none is enabled.
+func readCustomBuylistRule(r *http.Request) customBuylistRule {
 	customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
 	if !slices.Contains(customOpts, "enabled") {
-		return
+		return customBuylistRule{}
 	}
 
 	rate, _ := strconv.ParseFloat(readCookie(r, "UploadCustomRate"), 64)
 	if rate <= 0 {
-		return
+		return customBuylistRule{}
 	}
 	minPrice, _ := strconv.ParseFloat(readCookie(r, "UploadCustomMinPrice"), 64)
 
-	customSeller := readCookie(r, "UploadCustomBuyer")
-	customSealedSeller := readCookie(r, "UploadCustomSealedBuyer")
-	singles, _ := findSellerInventory(customSeller)
-	sealed, _ := findSellerInventory(customSealedSeller)
+	return customBuylistRule{
+		rate:         rate,
+		minPrice:     minPrice,
+		seller:       readCookie(r, "UploadCustomBuyer"),
+		sealedSeller: readCookie(r, "UploadCustomSealedBuyer"),
+	}
+}
+
+// Append a virtual buylist to search results, priced off the reference
+// seller inventories according to the custom buylist rule settings
+func searchCustomBuylist(b *matcher.Backend, r *http.Request, cardIDs []string, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+	rule := readCustomBuylistRule(r)
+	if rule.rate == 0 {
+		return
+	}
+	rate, minPrice := rule.rate, rule.minPrice
+
+	singles, _ := findSellerInventory(rule.seller)
+	sealed, _ := findSellerInventory(rule.sealedSeller)
 
 	// Index price sources have a single meaningful price, while regular
 	// retailers list one price per condition
-	isIndex := slices.Contains(UploadIndexComparePriceList, customSeller)
+	isIndex := slices.Contains(UploadIndexComparePriceList, rule.seller)
 
 	// Decklist/hashing searches repeat a key once per copy; foundVendors is
 	// keyed by the unique card, so dedupe to avoid appending an entry per copy.
