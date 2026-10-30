@@ -97,14 +97,15 @@ CREATE TABLE IF NOT EXISTS public.prices (
 ) PARTITION BY RANGE (date);
 
 -- Monthly partitions covering both source ranges (Magic 2020-09 →, non-Magic
--- 2024-02 →) with future headroom. IF NOT EXISTS makes this re-runnable.
+-- 2024-02 →) up to next month; the writers create later ones (UpsertLongPrices).
+-- IF NOT EXISTS makes this re-runnable.
 DO $$
 DECLARE
     m date;
     part_name text;
 BEGIN
     FOR m IN
-        SELECT generate_series('2020-09-01'::date, '2028-12-01'::date, interval '1 month')::date
+        SELECT generate_series('2020-09-01'::date, (date_trunc('month', current_date) + interval '1 month')::date, interval '1 month')::date
     LOOP
         part_name := 'prices_' || to_char(m, 'YYYY_MM');
         EXECUTE format(
