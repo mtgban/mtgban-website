@@ -142,17 +142,40 @@
         try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
     }
 
+    // The recent searches list is js/recent-searches.js's: an entry is named
+    // by q, carries its label, link, pin and art beside it, and a removal
+    // stays behind as a del tombstone so user-state.js can sync it.
+    function putRecentSearch(entry) {
+        var key = entry.q.toLowerCase();
+        var rest = getJSON(RECENT_KEY).filter(function (s) {
+            return (s.q || '').toLowerCase() !== key;
+        });
+        var live = rest.filter(function (s) { return !s.del; }).slice(0, MAX_RECENT - 1);
+        var gone = rest.filter(function (s) { return s.del; });
+        setJSON(RECENT_KEY, [entry].concat(live, gone));
+    }
+
     function recordRecentSearch(query, scope) {
         if (!query || query.trim().length < 2) return;
-        query = query.trim();
-        var recent = getJSON(RECENT_KEY).filter(function (s) {
-            return (s.q || '').toLowerCase() !== query.toLowerCase();
-        });
-        var entry = { q: query, t: Date.now() };
+        var t = Date.now();
+        var entry = { q: query.trim(), t: t, m: t };
         if (scope) entry.sc = scope;
-        recent.unshift(entry);
-        if (recent.length > MAX_RECENT) recent = recent.slice(0, MAX_RECENT);
-        setJSON(RECENT_KEY, recent);
+        putRecentSearch(entry);
+    }
+
+    // Runs a stored search again: it moves to the top as it was.
+    function rerunRecentSearch(entry) {
+        entry.t = entry.m = Date.now();
+        putRecentSearch(entry);
+    }
+
+    // Where a stored search goes: the link the search page saved with it, else
+    // its query. The link comes back out of storage, so it is resolved and
+    // kept only on this site (utils.js) rather than trusted.
+    function recentSearchHref(s) {
+        var href = sameSiteURL(s.u);
+        if (href) return href;
+        return '/search?q=' + encodeURIComponent(s.q) + (s.sc ? '&scope=' + encodeURIComponent(s.sc) : '');
     }
 
     // Current query: page box, navbar box, then the URL's q param.
@@ -290,8 +313,10 @@
 
     function deleteRecentSearch(query) {
         if (!query) return;
-        var recent = getJSON(RECENT_KEY).filter(function (r) {
-            return (r.q || '').toLowerCase() !== query.toLowerCase();
+        var now = Date.now();
+        var recent = getJSON(RECENT_KEY);
+        recent.forEach(function (r) {
+            if (r.q === query && !r.del) { r.del = now; r.m = now; }
         });
         setJSON(RECENT_KEY, recent);
         showToast('Removed from recent');
@@ -801,18 +826,19 @@
     // ════════════════════════════════════════════════════════════════
 
     function getRecentResults(query, limit) {
-        var recent = getJSON(RECENT_KEY);
+        var recent = getJSON(RECENT_KEY).filter(function (r) { return r.q && !r.del; });
         var out = [];
         for (var i = 0; i < recent.length && out.length < limit; i++) {
             var r = recent[i];
-            if (!query || scoreMatch(query, r.q, null) > 0) {
+            var title = r.d || r.q;
+            if (!query || scoreMatch(query, title, r.q) > 0) {
                 out.push({
-                    type: 'recent', title: r.q, subtitle: r.sc ? 'Recent search in ' + r.sc : 'Recent search', icon: 'clock',
+                    type: 'recent', title: title, subtitle: r.sc ? 'Recent search in ' + r.sc : 'Recent search', icon: 'clock',
                     recentQuery: r.q,
-                    action: (function (q, sc) { return function () {
-                        recordRecentSearch(q, sc);
-                        window.location.href = '/search?q=' + encodeURIComponent(q) + (sc ? '&scope=' + encodeURIComponent(sc) : '');
-                    }; })(r.q, r.sc)
+                    action: (function (s) { return function () {
+                        rerunRecentSearch(s);
+                        window.location.href = recentSearchHref(s);
+                    }; })(r)
                 });
             }
         }

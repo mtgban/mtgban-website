@@ -26,9 +26,10 @@ function fakeElement() {
     });
 }
 
-// Opens the palette's recent view over a stored list, and presses Enter on
-// its first row. Hands back the row's markup, where it went, and the list.
-function runRecent(stored) {
+// Opens the palette's recent view over a stored list, and presses a key
+// (Enter by default) on its first row. Hands back the row's markup, where it
+// went, and the list.
+function runRecent(stored, key = { key: 'Enter' }) {
     const values = new Map([['mtgban_recent_searches', JSON.stringify(stored)]]);
     const localStorage = {
         getItem: key => values.get(key) || null,
@@ -51,7 +52,7 @@ function runRecent(stored) {
         querySelectorAll: () => [],
         addEventListener: () => {},
     };
-    const location = { href: '', pathname: '/search', search: '' };
+    const location = { href: 'https://mtgban.test/search', origin: 'https://mtgban.test', pathname: '/search', search: '' };
     const window = {
         __BAN_PALETTE: { nav: [] },
         innerWidth: 1280,
@@ -66,7 +67,7 @@ function runRecent(stored) {
     input.value = '<';
     input.handlers.input();
     const html = overlay.querySelector('#cp-results').innerHTML;
-    input.handlers.keydown({ key: 'Enter', preventDefault() {} });
+    input.handlers.keydown({ ...key, preventDefault() {} });
     return { html, href: location.href, searches: JSON.parse(values.get('mtgban_recent_searches')) };
 }
 
@@ -83,4 +84,41 @@ test('a recent search with no bar runs by its query alone', () => {
     expect(html).not.toContain('Recent search in');
     expect(href).toBe('/search?q=bolt');
     expect(searches[0].sc).toBeUndefined();
+});
+
+test('a sealed search runs again on the sealed page it was found on', () => {
+    const stored = [{ q: 'Furby', u: '/sealed?q=Furby', img: 'furby.jpg', pinned: 5, t: 1, m: 1 }];
+    const { href, searches } = runRecent(stored);
+    expect(href).toBe('https://mtgban.test/sealed?q=Furby');
+    expect(searches[0]).toMatchObject({ q: 'Furby', u: '/sealed?q=Furby', img: 'furby.jpg', pinned: 5 });
+    expect(searches[0].m).toBeGreaterThan(1);
+});
+
+test('a stored link that leaves the site runs by its query instead', () => {
+    for (const u of ['//evil.test/x', 'javascript:alert(1)', '/\\evil.test', '/\t/evil.test', '/\n/evil.test', '/\r/evil.test', 'https://evil.test/']) {
+        const { href } = runRecent([{ q: 'bolt', u, t: 1 }]);
+        expect(href).toBe('/search?q=bolt');
+    }
+});
+
+test('a recent search reads as its label', () => {
+    const { html } = runRecent([{ q: '0a1b2c3d-uuid', d: 'Lightning Bolt [LEA] {161}', t: 1 }]);
+    expect(html).toContain('Lightning Bolt [LEA] {161}');
+    expect(html).not.toContain('0a1b2c3d-uuid');
+});
+
+test('a removed search stays out of the list and stays removed', () => {
+    const stored = [{ q: 'gone', del: 2, t: 1, m: 2 }, { q: 'bolt', t: 1 }];
+    const { html, href, searches } = runRecent(stored);
+    expect(html).not.toContain('gone');
+    expect(href).toBe('/search?q=bolt');
+    expect(searches.find(s => s.q === 'gone')).toMatchObject({ del: 2 });
+});
+
+test('removing a recent search leaves a tombstone for the sync', () => {
+    const { searches } = runRecent([{ q: 'bolt', t: 1 }], { key: 'Delete', shiftKey: true });
+    expect(searches).toHaveLength(1);
+    expect(searches[0].q).toBe('bolt');
+    expect(searches[0].del).toBeGreaterThan(0);
+    expect(searches[0].m).toBe(searches[0].del);
 });
