@@ -2103,7 +2103,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, blMode bool, st uplo
 			customBuylist = slices.Contains(customOpts, "enabled")
 		}
 		if st.canUploadCustom && customBuylist {
-			rule := EntryRule{SkipSets: customBuylistSkipSets}
+			rule := EntryRule{SkipSets: customBuylistSkipSets, ReleasedBy: time.Now().Add(-customBuylistMinAge)}
 			if v := uploadFloatSetting(r, "customminprice", "UploadCustomMinPrice"); v > 0 {
 				rule.MinPrice = v
 			}

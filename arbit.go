@@ -555,9 +555,10 @@ func newCustomBuylistVendor(b *matcher.Backend, rule customBuylistRule, seller m
 	isIndex := slices.Contains(UploadIndexComparePriceList, refName)
 
 	buylist := mtgban.BuylistRecord{}
+	releasedBy := time.Now().Add(-customBuylistMinAge)
 	for cardID := range seller.Inventory() {
 		co, err := b.GetUUID(cardID)
-		if err != nil || (!co.Sealed && slices.Contains(customBuylistSkipSets, co.SetCode)) {
+		if err != nil || customBuylistSkips(b, co, releasedBy) {
 			continue
 		}
 		entries := customBuylistEntries(ref[cardID], rule, isIndex)

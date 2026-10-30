@@ -2115,6 +2115,18 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 // World Championship Decks, PTC included. Their sealed products are priced.
 var customBuylistSkipSets = append([]string{"CED", "CEI", "30A"}, wcSets...)
 
+// customBuylistMinAge is how long a card or sealed product has to have been
+// out before the custom buylist prices it.
+const customBuylistMinAge = 14 * 24 * time.Hour
+
+// customBuylistSkips reports whether the custom buylist leaves co unpriced:
+// a card of customBuylistSkipSets, or anything not known to be out by
+// releasedBy.
+func customBuylistSkips(b *matcher.Backend, co *matcher.CardObject, releasedBy time.Time) bool {
+	released, err := b.CardReleaseDate(co.UUID)
+	return err != nil || released.IsZero() || released.After(releasedBy) || (!co.Sealed && slices.Contains(customBuylistSkipSets, co.SetCode))
+}
+
 // customBuylistRule is the reader's custom buylist as the upload settings
 // save it: the reference sellers' prices at a rate, from a minimum price.
 type customBuylistRule struct {
@@ -2152,6 +2164,7 @@ func searchCustomBuylist(b *matcher.Backend, r *http.Request, cardIDs []string, 
 		return
 	}
 	rate, minPrice := rule.rate, rule.minPrice
+	releasedBy := time.Now().Add(-customBuylistMinAge)
 
 	singles, _ := findSellerInventory(rule.seller)
 	sealed, _ := findSellerInventory(rule.sealedSeller)
@@ -2164,7 +2177,7 @@ func searchCustomBuylist(b *matcher.Backend, r *http.Request, cardIDs []string, 
 	// keyed by the unique card, so dedupe to avoid appending an entry per copy.
 	for _, cardID := range dedupeKeys(cardIDs) {
 		co, err := b.GetUUID(cardID)
-		if err != nil || (!co.Sealed && slices.Contains(customBuylistSkipSets, co.SetCode)) {
+		if err != nil || customBuylistSkips(b, co, releasedBy) {
 			continue
 		}
 

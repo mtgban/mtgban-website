@@ -2,16 +2,18 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
-// firstPlainCard returns a nonfoil single to hang the price entries on.
+// firstPlainCard returns a nonfoil single, out long enough for the custom
+// buylist to price, to hang the price entries on.
 func firstPlainCard(t *testing.T) string {
 	t.Helper()
 	for _, id := range backend().GetUUIDs() {
 		co, err := backend().GetUUID(id)
-		if err == nil && !co.Sealed && !co.Foil && !co.Etched {
+		if err == nil && !co.Sealed && !co.Foil && !co.Etched && !customBuylistSkips(backend(), co, time.Now().Add(-customBuylistMinAge)) {
 			return id
 		}
 	}
