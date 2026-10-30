@@ -3,6 +3,7 @@ package timeseries
 import (
 	"context"
 	"fmt"
+	"os"
 	"slices"
 	"testing"
 	"time"
@@ -38,14 +39,22 @@ func TestLongFormLive(t *testing.T) {
 		t.Fatalf("EnsurePriceDatesSchema: %v", err)
 	}
 
+	// The month after next, so the write is accepted and its partition is new.
+	scratch := os.Getenv("TCGLIVE_SCRATCH") == "1"
+	now := time.Now().UTC()
+	mon := time.Date(now.Year(), now.Month()+2, 1, 0, 0, 0, 0, time.UTC)
+	monthDay, strayDay := mon.Format("2006-01")+"-15", mon.AddDate(0, 1, 0).Format("2006-01")+"-15"
+	monthTable, strayTable := "prices_"+mon.Format("2006_01"), "prices_"+mon.AddDate(0, 1, 0).Format("2006_01")
+
 	cleanup := func() {
 		// prices first (FK -> providers, variants), then variants, then provider.
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, liveSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider BETWEEN $1 AND $2 AND ban_id IN (SELECT ban_id FROM variants WHERE tcgp_category_id=$3)`,
 			ProviderTCGLow, ProviderTCGDirectLow, liveSentinelCatLong)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE category=$1`, liveSentinelCatLong)
-		// Drops the far-future partitions; this runs only against the scratch database.
-		_, _ = c.db.ExecContext(ctx, `DROP TABLE IF EXISTS prices_2031_06, prices_2031_07`)
+		if scratch {
+			_, _ = c.db.ExecContext(ctx, `DROP TABLE IF EXISTS `+monthTable+`, `+strayTable)
+		}
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1`, liveSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE mtgjson_uuid IN ($1,$2) OR tcgp_category_id=$3`,
 			liveSentinelUUID, liveSentinelUUIDAlt, liveSentinelCatLong)
@@ -122,35 +131,40 @@ func TestLongFormLive(t *testing.T) {
 		t.Fatalf("unchanged re-upsert = %d, %v; want 0 rows", n, err)
 	}
 
-	// --- a stray row in the month after does not stop the write ---
-	if _, err := c.db.ExecContext(ctx, `INSERT INTO prices (ban_id, date, provider, price) VALUES ($1, '2031-07-15', $2, 1)`,
-		banBase, liveSentinelProvider); err != nil {
-		t.Fatalf("insert stray row: %v", err)
-	}
-	var inDefault int
-	if err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM prices_default WHERE provider=$1`, liveSentinelProvider).Scan(&inDefault); err != nil || inDefault != 1 {
-		t.Fatalf("stray rows in prices_default = %d, %v; want 1", inDefault, err)
-	}
-	if _, err := c.UpsertLongPrices(ctx, []LongPrice{{BanID: banBase, Date: "2031-06-15", Provider: liveSentinelProvider, Price: 1}}, 0); err != nil {
-		t.Fatalf("upsert beside a stray row: %v", err)
-	}
-	var month, next bool
-	if err := c.db.QueryRowContext(ctx, `SELECT to_regclass('prices_2031_06') IS NOT NULL, to_regclass('prices_2031_07') IS NOT NULL`).Scan(&month, &next); err != nil || !month || next {
-		t.Fatalf("prices_2031_06 exists = %v, prices_2031_07 exists = %v, %v; want true, false", month, next, err)
-	}
-	_, _ = c.db.ExecContext(ctx, `DELETE FROM prices_default WHERE provider=$1`, liveSentinelProvider)
+	// --- partition-creating cases, on the scratch database only ---
+	if scratch {
+		// A stray row in the month after does not stop the write.
+		if _, err := c.db.ExecContext(ctx, `INSERT INTO prices (ban_id, date, provider, price) VALUES ($1, $2, $3, 1)`,
+			banBase, strayDay, liveSentinelProvider); err != nil {
+			t.Fatalf("insert stray row: %v", err)
+		}
+		var inDefault int
+		if err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM prices_default WHERE provider=$1`, liveSentinelProvider).Scan(&inDefault); err != nil || inDefault != 1 {
+			t.Fatalf("stray rows in prices_default = %d, %v; want 1", inDefault, err)
+		}
+		if _, err := c.UpsertLongPrices(ctx, []LongPrice{{BanID: banBase, Date: monthDay, Provider: liveSentinelProvider, Price: 1}}, 0); err != nil {
+			t.Fatalf("upsert beside a stray row: %v", err)
+		}
+		var month, next bool
+		if err := c.db.QueryRowContext(ctx, `SELECT to_regclass($1) IS NOT NULL, to_regclass($2) IS NOT NULL`, monthTable, strayTable).Scan(&month, &next); err != nil || !month || next {
+			t.Fatalf("%s exists = %v, %s exists = %v, %v; want true, false", monthTable, month, strayTable, next, err)
+		}
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices_default WHERE provider=$1`, liveSentinelProvider)
 
-	// --- a far-future write creates its own partitions ---
-	if _, err := c.UpsertLongPrices(ctx, []LongPrice{{BanID: banBase, Date: "2031-06-15", Provider: liveSentinelProvider, Price: 1}}, 0); err != nil {
-		t.Fatalf("far-future upsert: %v", err)
+		// A write in the month after next creates its own partitions.
+		if _, err := c.UpsertLongPrices(ctx, []LongPrice{{BanID: banBase, Date: monthDay, Provider: liveSentinelProvider, Price: 1}}, 0); err != nil {
+			t.Fatalf("future upsert: %v", err)
+		}
+		var both bool
+		if err := c.db.QueryRowContext(ctx, `SELECT to_regclass($1) IS NOT NULL AND to_regclass($2) IS NOT NULL`, monthTable, strayTable).Scan(&both); err != nil || !both {
+			t.Fatalf("partitions %s and %s exist = %v, %v; want true", monthTable, strayTable, both, err)
+		}
+		// Later assertions read the sentinel's series, so take the probe row out.
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1 AND date=$2`, liveSentinelProvider, monthDay)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1 AND date=$2`, liveSentinelProvider, monthDay)
+	} else {
+		t.Log("partition-creating cases skipped: set TCGLIVE_SCRATCH=1 on a scratch database to run them")
 	}
-	var both bool
-	if err := c.db.QueryRowContext(ctx, `SELECT to_regclass('prices_2031_06') IS NOT NULL AND to_regclass('prices_2031_07') IS NOT NULL`).Scan(&both); err != nil || !both {
-		t.Fatalf("partitions for 2031-06 and 2031-07 exist = %v, %v; want true", both, err)
-	}
-	// Later assertions read the sentinel's series, so take the probe row out.
-	_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1 AND date='2031-06-15'`, liveSentinelProvider)
-	_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1 AND date='2031-06-15'`, liveSentinelProvider)
 
 	// --- HGetAllLong: canonical (lang='') series only ---
 	hist, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, false, Lookback(3650))

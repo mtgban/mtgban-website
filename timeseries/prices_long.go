@@ -461,6 +461,9 @@ func (c *Client) UpsertLongPrices(ctx context.Context, rows []LongPrice, batchSi
 	if c.readOnly || len(rows) == 0 {
 		return 0, nil
 	}
+	if d, bad := futureDated(rows, time.Now().UTC()); bad {
+		return 0, fmt.Errorf("refusing a row dated %s: past the month after next", d)
+	}
 	rows = dedupeLongPrices(rows)
 
 	months := partitionMonths(rows)
@@ -499,6 +502,19 @@ func (c *Client) UpsertLongPrices(ctx context.Context, rows []LongPrice, batchSi
 	return total, nil
 }
 
+// futureDated returns the first row date past the last day of the month after
+// next, so a typo cannot create a permanent partition.
+func futureDated(rows []LongPrice, now time.Time) (string, bool) {
+	limit := time.Date(now.Year(), now.Month()+3, 1, 0, 0, 0, 0, time.UTC)
+	for _, r := range rows {
+		d, err := time.Parse("2006-01-02", r.Date)
+		if err == nil && !d.Before(limit) {
+			return r.Date, true
+		}
+	}
+	return "", false
+}
+
 // partitionMonths returns the sorted first-of-month (UTC) of every month a
 // row falls in, plus the month after the latest. Unparseable dates are skipped.
 func partitionMonths(rows []LongPrice) []time.Time {
@@ -517,10 +533,13 @@ func partitionMonths(rows []LongPrice) []time.Time {
 	return append(months, months[len(months)-1].AddDate(0, 1, 0))
 }
 
-// StrayPriceRows counts the rows that reached prices_default.
+// StrayRowLimit bounds the stray-row count, so the hourly check stays cheap.
+const StrayRowLimit = 10000
+
+// StrayPriceRows counts the rows that reached prices_default, up to StrayRowLimit.
 func (c *Client) StrayPriceRows(ctx context.Context) (int64, error) {
 	var n int64
-	err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM prices_default`).Scan(&n)
+	err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT 1 FROM prices_default LIMIT $1) s`, StrayRowLimit).Scan(&n)
 	return n, err
 }
 

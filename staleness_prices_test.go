@@ -4,8 +4,24 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 )
+
+func TestStrayPricesSayAtLeastAtTheBound(t *testing.T) {
+	var notes []string
+	prevNotify, prevRows, prevLimit := strayNotify, strayPriceRows, strayRowLimit
+	t.Cleanup(func() { strayNotify, strayPriceRows, strayRowLimit = prevNotify, prevRows, prevLimit })
+	strayNotify = func(kind, msg string) { notes = append(notes, kind+": "+msg) }
+	strayRowLimit = 50
+	strayPriceRows = func(context.Context) (int64, error) { return 50, nil }
+	prevState := staleAlarmState.strayPrices
+	t.Cleanup(func() { staleAlarmState.strayPrices = prevState })
+	staleAlarmState.strayPrices = false
+
+	checkStrayPrices()
+	if len(notes) != 1 || !strings.Contains(notes[0], "at least 50 price rows") {
+		t.Fatalf("notes = %q, want one alarm saying at least 50", notes)
+	}
+}
 
 func TestStrayPricesAnnounceOnceUntilClear(t *testing.T) {
 	var notes []string
@@ -15,16 +31,15 @@ func TestStrayPricesAnnounceOnceUntilClear(t *testing.T) {
 	count := int64(3)
 	strayPriceRows = func(context.Context) (int64, error) { return count, nil }
 
-	now := time.Now()
-	checkStrayPrices(now)
-	checkStrayPrices(now.Add(time.Hour))
+	checkStrayPrices()
+	checkStrayPrices()
 	if len(notes) != 1 || !strings.Contains(notes[0], "3 price rows") {
 		t.Fatalf("notes = %q, want one alarm naming 3 rows", notes)
 	}
 	count = 0
-	checkStrayPrices(now.Add(2 * time.Hour))
+	checkStrayPrices()
 	count = 1
-	checkStrayPrices(now.Add(3 * time.Hour))
+	checkStrayPrices()
 	if len(notes) != 3 {
 		t.Fatalf("notes = %q, want the clear and the new alarm announced", notes)
 	}

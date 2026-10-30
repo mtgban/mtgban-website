@@ -14,6 +14,9 @@ import (
 //	TCGLIVE_HOST=... TCGLIVE_PORT=5432 TCGLIVE_USER=... TCGLIVE_PASSWORD=... \
 //	TCGLIVE_DBNAME=card_prices TCGLIVE_SSLMODE=require \
 //	go test ./timeseries/ -run Live -v
+//
+// Cases that create or drop partitions run only with TCGLIVE_SCRATCH=1, which
+// marks the database as a scratch one; without it they log that they skipped.
 func liveConfig(t *testing.T) SQLConfig {
 	t.Helper()
 	host := os.Getenv("TCGLIVE_HOST")
