@@ -2,6 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"html/template"
+	"net/http/httptest"
+	"os"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -196,12 +202,15 @@ func TestScreenerResultFieldValue(t *testing.T) {
 
 func TestValidMetricAndWindow(t *testing.T) {
 	withDatasets(t, []DatasetConfig{
-		{Index: 2, PublicName: "TCGplayer Low"},
-		{Index: 3, PublicName: "TCGplayer Market"},
+		{Provider: timeseries.ProviderTCGLow, PublicName: "TCGplayer Low"},
+		{Provider: timeseries.ProviderTCGMarket, PublicName: "TCGplayer Market"},
 	})
 
-	if !validMetric(2) {
-		t.Error("metric 2 (TCG Low) should be valid")
+	if !validMetric(3) {
+		t.Error("metric 3 (TCG Low) should be valid")
+	}
+	if validMetric(2) {
+		t.Error("metric 2 (the old index value) should be invalid")
 	}
 	if validMetric(99) {
 		t.Error("metric 99 should be invalid")
@@ -214,6 +223,109 @@ func TestValidMetricAndWindow(t *testing.T) {
 	}
 	if validWindow(31) {
 		t.Error("window 31 is not a preset, should be invalid")
+	}
+}
+
+func TestScreenerProviderIgnoresTheOldMetricParameter(t *testing.T) {
+	withDatasets(t, []DatasetConfig{
+		{Provider: timeseries.ProviderCKBuylist, PublicName: "Card Kingdom Buylist"},
+		{Provider: timeseries.ProviderTCGLow, PublicName: "TCGplayer Low"},
+		{Provider: timeseries.ProviderTCGMarket, PublicName: "TCGplayer Market"},
+	})
+
+	for _, tc := range []struct {
+		query string
+		want  int
+	}{
+		{"metric=2", int(timeseries.ProviderTCGLow)},
+		{"metric=4", int(timeseries.ProviderTCGLow)},
+		{"provider=4", 4},
+		{"provider=99", int(timeseries.ProviderTCGLow)},
+		{"", int(timeseries.ProviderTCGLow)},
+	} {
+		r := httptest.NewRequest("GET", "/screener?"+tc.query, nil)
+		if got := screenerProvider(r); got != tc.want {
+			t.Errorf("%q: provider = %d, want %d", tc.query, got, tc.want)
+		}
+	}
+}
+
+func TestScreenerMetricListCarriesProviders(t *testing.T) {
+	withDatasets(t, []DatasetConfig{
+		{Provider: timeseries.ProviderTCGLow, PublicName: "TCGplayer Low"},
+		{PublicName: "No provider"},
+		{Provider: timeseries.ProviderTCGMarket, PublicName: "TCGplayer Market"},
+	})
+
+	var got []int16
+	for _, m := range screenerMetricList() {
+		got = append(got, m.Provider)
+	}
+	if !slices.Equal(got, []int16{3, 4}) {
+		t.Errorf("providers = %v, want [3 4]", got)
+	}
+}
+
+func TestScreenerMetricListKeepsTheFirstOfASharedProvider(t *testing.T) {
+	withDatasets(t, []DatasetConfig{
+		{Provider: timeseries.ProviderTCGLow, PublicName: "First"},
+		{Provider: timeseries.ProviderTCGLow, PublicName: "Second"},
+		{Provider: timeseries.ProviderTCGMarket, PublicName: "Other"},
+	})
+	got := screenerMetricList()
+	if len(got) != 2 || got[0].Name != "First" || got[1].Name != "Other" {
+		t.Errorf("metrics = %+v, want First then Other", got)
+	}
+}
+
+// TestScreenerSelectMarksTheChosenProvider renders the page's own metric
+// select and expects exactly one selected option, the chosen provider's.
+func TestScreenerSelectMarksTheChosenProvider(t *testing.T) {
+	withDatasets(t, []DatasetConfig{
+		{Provider: timeseries.ProviderTCGLow, PublicName: "TCGplayer Low"},
+		{Provider: timeseries.ProviderTCGMarket, PublicName: "TCGplayer Market"},
+		{Provider: timeseries.ProviderTCGMid, PublicName: "TCGplayer Mid"},
+	})
+
+	page, err := os.ReadFile("templates/screener.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(page)
+	start := strings.Index(src, `<select name="provider"`)
+	if start < 0 {
+		t.Fatal(`templates/screener.html has no <select name="provider">`)
+	}
+	end := strings.Index(src[start:], "</select>")
+	if end < 0 {
+		t.Fatal("the provider select is not closed")
+	}
+	snippet := "{{with .Screener}}" + src[start:start+end+len("</select>")] + "{{end}}"
+	tmpl, err := template.New("select").Funcs(funcMap).Parse(snippet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chosen := int(timeseries.ProviderTCGMarket)
+	var b strings.Builder
+	vars := PageVars{Screener: &ScreenerVars{Metrics: screenerMetricList(), SelMetric: chosen}}
+	if err := tmpl.Execute(&b, vars); err != nil {
+		t.Fatal(err)
+	}
+
+	var options, selected []string
+	for _, opt := range strings.Split(b.String(), "<option")[1:] {
+		opt = opt[:strings.Index(opt, ">")]
+		options = append(options, opt)
+		if strings.Contains(opt, "selected") {
+			selected = append(selected, opt)
+		}
+	}
+	if len(options) != 3 {
+		t.Fatalf("rendered %d options, want 3:\n%s", len(options), b.String())
+	}
+	if len(selected) != 1 || !strings.Contains(selected[0], fmt.Sprintf(`value="%d"`, chosen)) {
+		t.Errorf("selected options = %q, want only value=%q", selected, fmt.Sprint(chosen))
 	}
 }
 

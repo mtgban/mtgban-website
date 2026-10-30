@@ -112,10 +112,12 @@ build that still reads it.
 ## 5. Drop the legacy write path
 
 The snapshot writes only the long tables, so nothing writes `product_prices`
-and it can be archived or dropped. Still to go:
-`tcgplayer_nonmagic_product_prices`, which the tcgcsv ingest writes and takes
-its dates from, and the `index` field of datasets, which the screener and the
-buylist metrics still key on.
+and it can be archived or dropped. The tcgcsv ingest writes only the long
+tables and takes its dates from `price_dates`, and the `index` field of
+datasets is gone: the screener and the buylist metrics key on `provider`.
+`tcgplayer_nonmagic_product_prices` is left to drop, which
+`wide_tables/drop_nonmagic.sql` does after two nights of the ingest and with
+a volume snapshot in hand (`wide_tables/README.md`).
 
 ## 6. Validate + finalize the FK
 

@@ -15,15 +15,23 @@ import (
 )
 
 type ScreenerMetric struct {
-	Index int
-	Name  string
+	Provider int16
+	Name     string
 }
+
+// Is reports whether the metric is the one selected, for the template's select.
+func (m ScreenerMetric) Is(selected int) bool { return int(m.Provider) == selected }
 
 func screenerMetricList() []ScreenerMetric {
 	datasets := Datasets()
 	out := make([]ScreenerMetric, 0, len(datasets))
+	seen := map[int16]bool{}
 	for _, d := range datasets {
-		out = append(out, ScreenerMetric{Index: d.Index, Name: d.PublicName})
+		if d.Provider == 0 || seen[d.Provider] {
+			continue
+		}
+		seen[d.Provider] = true
+		out = append(out, ScreenerMetric{Provider: d.Provider, Name: d.PublicName})
 	}
 	return out
 }
@@ -44,13 +52,22 @@ var screenerWindows = []ScreenerWindow{
 	{365, "1 year"},
 }
 
-func validMetric(index int) bool {
+func validMetric(provider int) bool {
 	for _, d := range Datasets() {
-		if d.Index == index {
+		if provider != 0 && int(d.Provider) == provider {
 			return true
 		}
 	}
 	return false
+}
+
+// screenerProvider reads the provider form value; the old "metric" index is ignored.
+func screenerProvider(r *http.Request) int {
+	p := atoiDefault(r.FormValue("provider"), int(timeseries.ProviderTCGLow))
+	if !validMetric(p) {
+		return int(timeseries.ProviderTCGLow)
+	}
+	return p
 }
 
 func validWindow(days int) bool {
@@ -292,15 +309,11 @@ func gameTCGCategory() int {
 
 // overridable in tests
 var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
-	provider, ok := providerForDatasetIndex(metric)
-	if !ok {
-		return nil, fmt.Errorf("screener: no provider configured for metric %d", metric)
-	}
 	category := gameTCGCategory()
 	if category < 0 {
 		return nil, fmt.Errorf("screener: no TCGplayer category known for game %q", Config().Game)
 	}
-	return PricesArchiveDB.GetMoversLong(ctx, provider, window, minPrice, minPriorPrice, category)
+	return PricesArchiveDB.GetMoversLong(ctx, int16(metric), window, minPrice, minPriorPrice, category)
 }
 
 // moverCardID resolves a mover row to this game's uuid: Magic rows carry the
@@ -481,11 +494,8 @@ func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.ParseForm()
-	metric := atoiDefault(r.FormValue("metric"), 2)
+	metric := screenerProvider(r)
 	window := atoiDefault(r.FormValue("window"), 30)
-	if !validMetric(metric) {
-		metric = 2
-	}
 	if !validWindow(window) {
 		window = 30
 	}
@@ -512,7 +522,7 @@ func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 	pageIndex, _ := strconv.Atoi(r.FormValue("index"))
 
 	// Fresh load with no filter params: apply the landing defaults.
-	if r.FormValue("metric") == "" && r.FormValue("min_price") == "" && r.FormValue("min_pct") == "" {
+	if r.FormValue("provider") == "" && r.FormValue("min_price") == "" && r.FormValue("min_pct") == "" {
 		minPrice = 5
 		minPct = 20
 	}

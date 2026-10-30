@@ -955,11 +955,11 @@ func buylistMetrics(b *matcher.Backend, store string, reducers map[string]buylis
 		return nil
 	}
 
-	var datasetIndex int
+	var provider int16
 	var found bool
 	for _, config := range Datasets() {
 		if slices.Contains(config.Buylist, store) {
-			datasetIndex = config.Index
+			provider = config.Provider
 			found = true
 			break
 		}
@@ -980,8 +980,7 @@ func buylistMetrics(b *matcher.Backend, store string, reducers map[string]buylis
 	// One aggregate query for the whole buylist instead of N per-card lookups.
 	// Postgres computes the stats; each reducer just selects the field it
 	// cares about.
-	provider, ok := providerForDatasetIndex(datasetIndex)
-	if !ok {
+	if provider == 0 {
 		log.Println(store, "has no provider configured")
 		return nil
 	}

@@ -17,8 +17,8 @@ import (
 // visit, carrying the config's provider rather than its legacy column index.
 func TestNonMagicSnapshotAddStoresOneRowPerProvider(t *testing.T) {
 	var s longSnapshot
-	mkm := DatasetConfig{PublicName: "Cardmarket Low", Index: 4, Provider: timeseries.ProviderMKMLow}
-	csi := DatasetConfig{PublicName: "Cool Stuff Inc Buylist", Index: 9, Provider: timeseries.ProviderCSIBuylist}
+	mkm := DatasetConfig{PublicName: "Cardmarket Low", Provider: timeseries.ProviderMKMLow}
+	csi := DatasetConfig{PublicName: "Cool Stuff Inc Buylist", Provider: timeseries.ProviderCSIBuylist}
 
 	s.add(4242, mkm, "2026-09-24", 1.5)
 	s.add(4242, csi, "2026-09-24", 0.75)
@@ -40,8 +40,8 @@ func TestNonMagicSnapshotAddStoresOneRowPerProvider(t *testing.T) {
 // two are counted apart because they need different fixes.
 func TestNonMagicSnapshotAddCountsSkipsSeparately(t *testing.T) {
 	var s longSnapshot
-	noProvider := DatasetConfig{PublicName: "Star City Games Buylist", Index: 6}
-	scg := DatasetConfig{PublicName: "Star City Games Buylist", Index: 6, Provider: timeseries.ProviderSCGBuylist}
+	noProvider := DatasetConfig{PublicName: "Star City Games Buylist"}
+	scg := DatasetConfig{PublicName: "Star City Games Buylist", Provider: timeseries.ProviderSCGBuylist}
 
 	s.add(4242, noProvider, "2026-09-24", 3)
 	s.add(0, scg, "2026-09-24", 3)
@@ -79,7 +79,7 @@ func TestNonMagicSnapshotSkippedSilentWhenClean(t *testing.T) {
 // dedupe keeps the last, so the last writer has to be last in the slice.
 func TestNonMagicSnapshotKeepsLastWriteLast(t *testing.T) {
 	var s longSnapshot
-	low := DatasetConfig{PublicName: "TCGplayer Low", Index: 2, Provider: timeseries.ProviderTCGLow}
+	low := DatasetConfig{PublicName: "TCGplayer Low", Provider: timeseries.ProviderTCGLow}
 	s.add(7, low, "2026-09-24", 1)
 	s.add(7, low, "2026-09-24", 2)
 

@@ -31,25 +31,11 @@ type DatasetConfig struct {
 	Retail     []string `json:"retail,omitempty"`
 	Buylist    []string `json:"buylist,omitempty"`
 	PublicName string   `json:"public_name"`
-	Index      int      `json:"index"`
-	// Provider is the id in the providers lookup table this dataset maps to
-	// (long form). Replaces the positional Index once the legacy path is dropped.
+	// Provider is the id in the providers lookup table this dataset maps to.
 	Provider   int16  `json:"provider"`
 	Color      string `json:"color"`
 	HasSealed  bool   `json:"has_sealed,omitempty"`
 	OnlySealed bool   `json:"only_sealed,omitempty"`
-}
-
-// providerForDatasetIndex resolves a legacy dataset Index to its provider id via
-// the config. Used by the read callers (aggregate stats, movers) that still take
-// an index. Returns false if no dataset carries that index or its provider is unset.
-func providerForDatasetIndex(index int) (int16, bool) {
-	for _, c := range Datasets() {
-		if c.Index == index {
-			return c.Provider, c.Provider != 0
-		}
-	}
-	return 0, false
 }
 
 type Dataset struct {
@@ -197,8 +183,8 @@ func buildProviderRegistry() {
 	registry := make([]providerDisplay, 0, len(datasets))
 	for _, d := range datasets {
 		if d.Provider == 0 {
-			log.Printf("dataset %q (index %d) has no \"provider\" id in the config: it won't chart, dual-write, or screen",
-				d.PublicName, d.Index)
+			log.Printf("dataset %q has no \"provider\" id in the config: it won't chart, dual-write, or screen",
+				d.PublicName)
 			continue
 		}
 		if seen[d.Provider] {
