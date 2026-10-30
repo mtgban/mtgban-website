@@ -15,6 +15,7 @@ import (
 
 	"github.com/mtgban/mtgban-website/internal/notify"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
+	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 // StaleAfter is how long a store's retail or buylist data may go without a
@@ -83,6 +84,9 @@ var staleAlarmState = struct {
 // strayNotify announces a stray-rows change; overridable in tests.
 var strayNotify = func(kind, message string) { ServerNotify(kind, message) }
 
+// strayRowLimit is where the stray-row count stops; overridable in tests.
+var strayRowLimit = int64(timeseries.StrayRowLimit)
+
 // strayPriceRows counts the archive rows in prices_default; overridable in tests.
 var strayPriceRows = func(ctx context.Context) (int64, error) {
 	if PricesArchiveDB == nil {
@@ -93,7 +97,7 @@ var strayPriceRows = func(ctx context.Context) (int64, error) {
 
 // checkStrayPrices announces rows in prices_default when they appear and when
 // they clear. Callers must hold staleAlarmState.mu.
-func checkStrayPrices(_ time.Time) {
+func checkStrayPrices() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	n, err := strayPriceRows(ctx)
@@ -103,7 +107,11 @@ func checkStrayPrices(_ time.Time) {
 	}
 	switch stray := n > 0; {
 	case stray && !staleAlarmState.strayPrices:
-		strayNotify("timeseries", fmt.Sprintf("%d price rows sit in prices_default: a month's partition was missing when they were written", n))
+		count := fmt.Sprint(n)
+		if n >= strayRowLimit {
+			count = "at least " + count
+		}
+		strayNotify("timeseries", fmt.Sprintf("%s price rows sit in prices_default: a month's partition was missing when they were written", count))
 	case !stray && staleAlarmState.strayPrices:
 		strayNotify("timeseries", "prices_default is empty again")
 	}
@@ -378,7 +386,7 @@ func checkStaleness() {
 		changes = appendDropChanges(changes, kind, now)
 	}
 	announceStaleChanges(changes)
-	checkStrayPrices(now)
+	checkStrayPrices()
 }
 
 // appendDropChanges announces each of kind's dropped stores once when it

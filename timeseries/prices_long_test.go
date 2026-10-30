@@ -1,6 +1,7 @@
 package timeseries
 
 import (
+	"context"
 	"os"
 	"slices"
 	"strings"
@@ -23,6 +24,37 @@ func TestPartitionMonthsCoversRowsAndTheNextMonth(t *testing.T) {
 	}
 	if partitionMonths(nil) != nil {
 		t.Error("no rows should need no partitions")
+	}
+	if got := partitionMonths([]LongPrice{{Date: "garbage"}, {Date: ""}}); got != nil {
+		t.Errorf("unparseable dates gave %v, want none", got)
+	}
+}
+
+func TestUpsertRefusesFarFutureDates(t *testing.T) {
+	now := time.Date(2026, 10, 30, 0, 0, 0, 0, time.UTC)
+	cases := []struct {
+		date string
+		bad  bool
+	}{
+		{"2026-10-30", false},
+		{"2026-11-15", false},
+		{"2026-12-31", false},
+		{"2027-01-01", true},
+		{"2031-06-15", true},
+		{"garbage", false},
+	}
+	for _, tc := range cases {
+		got, bad := futureDated([]LongPrice{{Date: "2026-10-01"}, {Date: tc.date}}, now)
+		if bad != tc.bad || (bad && got != tc.date) {
+			t.Errorf("futureDated(%q) = %q, %v; want bad=%v", tc.date, got, bad, tc.bad)
+		}
+	}
+	// The refusal comes before any database work, so a nil-db client shows it.
+	c := &Client{}
+	far := time.Now().UTC().AddDate(5, 0, 0).Format("2006-01-02")
+	_, err := c.UpsertLongPrices(context.Background(), []LongPrice{{BanID: 1, Date: far, Provider: 1, Price: 1}}, 0)
+	if err == nil || !strings.Contains(err.Error(), far) {
+		t.Errorf("UpsertLongPrices err = %v, want one naming %s", err, far)
 	}
 }
 
