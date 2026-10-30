@@ -20,7 +20,7 @@ func TestLookupVariantAnswersFromTheWarmedMap(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	c := &Client{db: db}
 
-	want := VariantInfo{BanID: 13456, MtgjsonUUID: "7c3ea479-e463-58e7-b1b0-b217c77dae79", IsFoil: true}
+	want := VariantInfo{BanID: 13456, MtgbanID: "7c3ea479-e463-58e7-b1b0-b217c77dae79_f", MtgjsonUUID: "7c3ea479-e463-58e7-b1b0-b217c77dae79", IsFoil: true}
 	c.variants.publish(&variantIndex{byBanID: map[int64]VariantInfo{want.BanID: want}})
 
 	got, ok, err := c.LookupVariant(context.Background(), want.BanID)

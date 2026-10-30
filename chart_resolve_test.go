@@ -237,10 +237,9 @@ func TestTCGSubTypeForCardByName(t *testing.T) {
 	}
 }
 
-// The canonical read path keys on a Postgres uuid column, so a target that
-// resolved to no ban_id has to be judged before it is asked about: the id a
-// non-Magic game hands back is a type error waiting to happen, not a miss.
-func TestHasCanonicalIdentity(t *testing.T) {
+// A target that resolved to no ban_id is read by its Magic id, which another
+// game's card id never is.
+func TestHasMagicID(t *testing.T) {
 	tests := []struct {
 		name string
 		uuid string
@@ -256,9 +255,9 @@ func TestHasCanonicalIdentity(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := hasCanonicalIdentity(&chartTarget{UUID: test.uuid})
+			got := hasMagicID(&chartTarget{MtgbanID: magicID(&matcher.CardObject{Card: matcher.Card{UUID: test.uuid}})})
 			if got != test.want {
-				t.Errorf("hasCanonicalIdentity(%q) = %t, want %t", test.uuid, got, test.want)
+				t.Errorf("hasMagicID(%q) = %t, want %t", test.uuid, got, test.want)
 			}
 		})
 	}
@@ -405,17 +404,17 @@ func TestMagicTargetNamesThePrinting(t *testing.T) {
 	checked := 0
 	for _, id := range b.GetUUIDs() {
 		co, err := b.GetUUID(id)
-		if err != nil || co.Sealed || magicVariant(co).MtgjsonUUID == co.UUID {
+		if err != nil || co.Sealed || magicAlias(co).MtgjsonUUID == co.UUID {
 			continue
 		}
-		original, err := b.GetUUID(magicVariant(co).MtgjsonUUID)
+		original, err := b.GetUUID(magicAlias(co).MtgjsonUUID)
 		if err != nil {
 			continue
 		}
 		for _, want := range []*matcher.CardObject{co, original} {
-			mv := magicVariant(want)
+			mv := magicAlias(want)
 			vi := timeseries.VariantInfo{BanID: 7, MtgjsonUUID: mv.MtgjsonUUID, IsFoil: mv.IsFoil, IsEtched: mv.IsEtched,
-				IsAlt: mv.IsAlt, Language: *timeseries.NormalizeLanguage(&mv.Language)}
+				IsAlt: mv.IsAlt, Language: *timeseries.NormalizeLanguage(&mv.Language), MtgbanID: magicID(want)}
 			got := magicTarget(b, vi.BanID, vi)
 			if got.SearchID != want.UUID || got.Label != want.String() {
 				t.Errorf("SearchID %q, Label %q; want %q, %q", got.SearchID, got.Label, want.UUID, want.String())
@@ -425,5 +424,30 @@ func TestMagicTargetNamesThePrinting(t *testing.T) {
 	}
 	if checked == 0 {
 		t.Fatal("no printing filed under another uuid in the datastore")
+	}
+}
+
+func TestMagicTargetWithoutAnIDFallsBackToTheFinish(t *testing.T) {
+	co, err := backend().GetUUID("1b3a28ad-41ca-587a-9feb-5f40154976da")
+	if err != nil {
+		t.Skip("matcher data not loaded")
+	}
+	vi := timeseries.VariantInfo{BanID: 7, MtgjsonUUID: timeseries.NormalizeUUID(co.UUID)}
+	got := magicTarget(backend(), 7, vi)
+	if got.SearchID == "" || got.Name != co.Name || got.Label != co.String() || got.MtgbanID != "" {
+		t.Errorf("target = %+v", got)
+	}
+	copied, err := backend().GetUUID(co.UUID + "_alt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	vi.MtgbanID = copied.UUID
+	if got := magicTarget(backend(), 7, vi); got.SearchID != vi.MtgbanID || got.MtgbanID != vi.MtgbanID || got.Label != copied.String() {
+		t.Errorf("target = %+v, want the copy's own id", got)
+	}
+	// An id the datastore no longer knows is named by its alias.
+	vi.MtgbanID = co.UUID + "_retired"
+	if got := magicTarget(backend(), 7, vi); got.SearchID != co.UUID || got.Name != co.Name || got.Label != co.String() || got.MtgbanID != vi.MtgbanID {
+		t.Errorf("target = %+v, want the alias's printing under the stored id", got)
 	}
 }

@@ -29,7 +29,7 @@ func variantMapRows(b *matcher.Backend) ([]variantMapRow, int) {
 			skipped++
 			continue
 		}
-		alias := magicVariant(co)
+		alias := magicAlias(co)
 		alias.MtgjsonUUID = timeseries.NormalizeUUID(alias.MtgjsonUUID)
 		alias.Language = *timeseries.NormalizeLanguage(&alias.Language)
 		rows = append(rows, variantMapRow{Alias: alias, MtgbanID: co.UUID})
