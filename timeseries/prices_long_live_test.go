@@ -41,6 +41,8 @@ func TestLongFormLive(t *testing.T) {
 	cleanup := func() {
 		// prices first (FK -> providers, variants), then variants, then provider.
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, liveSentinelProvider)
+		// Drops the far-future partitions; this runs only against the scratch database.
+		_, _ = c.db.ExecContext(ctx, `DROP TABLE IF EXISTS prices_2031_06, prices_2031_07`)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1`, liveSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE mtgjson_uuid IN ($1,$2) OR tcgp_category_id=$3`,
 			liveSentinelUUID, liveSentinelUUIDAlt, liveSentinelCatLong)
@@ -116,6 +118,18 @@ func TestLongFormLive(t *testing.T) {
 	if n, err := c.UpsertLongPrices(ctx, []LongPrice{rows[1]}, 0); err != nil || n != 0 {
 		t.Fatalf("unchanged re-upsert = %d, %v; want 0 rows", n, err)
 	}
+
+	// --- a far-future write creates its own partitions ---
+	if _, err := c.UpsertLongPrices(ctx, []LongPrice{{BanID: banBase, Date: "2031-06-15", Provider: liveSentinelProvider, Price: 1}}, 0); err != nil {
+		t.Fatalf("far-future upsert: %v", err)
+	}
+	var both bool
+	if err := c.db.QueryRowContext(ctx, `SELECT to_regclass('prices_2031_06') IS NOT NULL AND to_regclass('prices_2031_07') IS NOT NULL`).Scan(&both); err != nil || !both {
+		t.Fatalf("partitions for 2031-06 and 2031-07 exist = %v, %v; want true", both, err)
+	}
+	// Later assertions read the sentinel's series, so take the probe row out.
+	_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1 AND date='2031-06-15'`, liveSentinelProvider)
+	_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1 AND date='2031-06-15'`, liveSentinelProvider)
 
 	// --- HGetAllLong: canonical (lang='') series only ---
 	hist, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, false, Lookback(3650))
