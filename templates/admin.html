@@ -542,6 +542,7 @@
                         <span class="act-icon">📸</span> Take Snapshot
                         {{if .DisableChart}}<span title="Stashing in progress">⚠️</span>{{end}}
                     </button>
+                    <a class="admin-action" href="/admin?download=variantmap" title="TSV joining each archive alias to its matcher id, for the mtgban_id backfill">Export variant map</a>
                     <button type="submit" class="admin-action" name="tool" value="tcgcsv" onclick="return confirm('Ingest the latest TCGCSV prices?')">
                         <span class="act-icon">🃏</span> Ingest TCGCSV Prices
                     </button>
