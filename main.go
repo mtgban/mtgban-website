@@ -521,6 +521,9 @@ func (s *site) openDBs() (err error) {
 		if serr := PricesArchiveDB.EnsurePriceDatesSchema(context.Background()); serr != nil {
 			log.Println("warning: could not ensure price_dates:", serr)
 		}
+		if serr := PricesArchiveDB.EnsureVariantsSchema(context.Background()); serr != nil {
+			log.Println("warning: could not ensure variants.mtgban_id:", serr)
+		}
 		now := time.Now()
 		if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now); serr != nil {
 			log.Println("warning: could not ensure current price partition:", serr)

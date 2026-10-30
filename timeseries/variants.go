@@ -3,6 +3,7 @@ package timeseries
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"fmt"
 	"strings"
 	"sync"
@@ -670,4 +671,19 @@ func (c *Client) EnsureTCGVariants(ctx context.Context, vs []TCGVariant) (map[TC
 		out[v] = banID
 	}
 	return out, rows.Err()
+}
+
+//go:embed schema_variants_mtgban_id.sql
+var variantsMtgbanIDSchemaSQL string
+
+// EnsureVariantsSchema adds variants.mtgban_id and its unique index if they
+// are missing. Idempotent; no-op on a read-only client.
+func (c *Client) EnsureVariantsSchema(ctx context.Context) error {
+	if c.readOnly {
+		return nil
+	}
+	if err := c.execDDL(ctx, variantsMtgbanIDSchemaSQL); err != nil {
+		return fmt.Errorf("timeseries: ensure variants.mtgban_id: %w", err)
+	}
+	return nil
 }

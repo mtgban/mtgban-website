@@ -38,6 +38,17 @@ func TestLongFormLive(t *testing.T) {
 	if err := c.EnsurePriceDatesSchema(ctx); err != nil {
 		t.Fatalf("EnsurePriceDatesSchema: %v", err)
 	}
+	if err := c.EnsureVariantsSchema(ctx); err != nil {
+		t.Fatalf("EnsureVariantsSchema: %v", err)
+	}
+	var haveCol int
+	var haveIdx bool
+	if err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_name='variants' AND column_name='mtgban_id'`).Scan(&haveCol); err != nil || haveCol != 1 {
+		t.Fatalf("variants.mtgban_id column count = %d, err %v; want 1", haveCol, err)
+	}
+	if err := c.db.QueryRowContext(ctx, `SELECT to_regclass('variants_mtgban_id_uk') IS NOT NULL`).Scan(&haveIdx); err != nil || !haveIdx {
+		t.Fatalf("variants_mtgban_id_uk missing: %v", err)
+	}
 
 	// The month after next, so the write is accepted and its partition is new.
 	scratch := os.Getenv("TCGLIVE_SCRATCH") == "1"

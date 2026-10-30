@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS public.variants (
     tcgp_category_id integer,                         -- NOT NULL for non-Magic
     tcgp_product_id  integer,                         -- NOT NULL for non-Magic
     tcgp_sub_type    text,                            -- NOT NULL ('' if none) for non-Magic
+    mtgban_id        text,                            -- the matcher's id; NULL for non-Magic and for printings the datastore no longer knows
     CONSTRAINT variants_identity_ck CHECK (
         (mtgjson_uuid IS NOT NULL
              AND tcgp_category_id IS NULL AND tcgp_product_id IS NULL AND tcgp_sub_type IS NULL)
@@ -79,6 +80,11 @@ CREATE TABLE IF NOT EXISTS public.variants (
 CREATE UNIQUE INDEX IF NOT EXISTS variants_mtg_uk ON public.variants
     (mtgjson_uuid, is_foil, is_etched, is_alt, language)
     WHERE mtgjson_uuid IS NOT NULL;
+
+-- The matcher's id (partial: NULL until backfilled, and for non-Magic).
+CREATE UNIQUE INDEX IF NOT EXISTS variants_mtgban_id_uk ON public.variants
+    (mtgban_id)
+    WHERE mtgban_id IS NOT NULL;
 
 -- Non-Magic identity (partial). Also the backfill join key.
 CREATE UNIQUE INDEX IF NOT EXISTS variants_tcg_uk ON public.variants
