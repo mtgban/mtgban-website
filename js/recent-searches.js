@@ -16,21 +16,20 @@
     //
     // The path is only ever written by the server, but it is read back out of
     // localStorage, which the sync round-trips and anything on the origin can
-    // write. So it is checked rather than trusted: one leading slash and no
-    // second one means a path on this site, which is the only shape the server
-    // produces and the only one that cannot carry a scheme. A "javascript:"
-    // or "//evil.test" that got into the store is dropped for the query form,
-    // which was the only link this list had before.
-    function samePathOnThisSite(u) {
-        return typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/' && u.charAt(1) !== '\\';
+    // write. So it is resolved rather than trusted, and kept only as a path
+    // on this site (utils.js): a "javascript:", "//evil.test" or "/\t/evil.test"
+    // that got into the store is dropped for the query form.
+    function sitePath(u) {
+        var href = sameSiteURL(u);
+        if (!href) return '';
+        var url = new URL(href);
+        return url.pathname + url.search + url.hash;
     }
     function entryHref(s) {
-        if (samePathOnThisSite(s.u)) return s.u;
-        return '?q=' + encodeURIComponent(s.q) + scopeParam(s.sc);
+        return sitePath(s.u) || '?q=' + encodeURIComponent(s.q) + scopeParam(s.sc);
     }
     function artRefreshHref(s) {
-        if (samePathOnThisSite(s.u)) return s.u;
-        return '/search?q=' + encodeURIComponent(s.q) + scopeParam(s.sc);
+        return sitePath(s.u) || '/search?q=' + encodeURIComponent(s.q) + scopeParam(s.sc);
     }
     // The pinned bar the search ran under, so the link runs it under the same.
     function scopeParam(scope) {

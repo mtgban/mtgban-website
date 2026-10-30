@@ -120,7 +120,7 @@ function runListPage({pathname = '/search', search = '', pending = null, url = '
         querySelector: () => null,
     };
     const window = {
-        location: {pathname, search, href: 'https://mtgban.test' + pathname + search},
+        location: {pathname, search, href: 'https://mtgban.test' + pathname + search, origin: 'https://mtgban.test'},
         BAN_SEARCH_RESULT: {found: true, label: '', url},
         addEventListener: () => {},
     };
@@ -156,6 +156,13 @@ test('a multi-result sealed search keeps the pinned bar in its route', () => {
 test('a search that named one printing still links by its own path', () => {
     const {hrefs} = runListPage({search: '?q=bolt&scope=s%3Asos', pending: 'bolt', url: '/search?q=Lightning%20Bolt%20s%3Asos'});
     expect(hrefs).toEqual(['/search?q=Lightning%20Bolt%20s%3Asos']);
+});
+
+test('a stored link that leaves the site links by its query instead', () => {
+    for (const u of ['//evil.test/x', 'javascript:alert(1)', '/\\evil.test', '/\t/evil.test', '/\n/evil.test', '/\r/evil.test', 'https://evil.test/']) {
+        const {hrefs} = runListPage({stored: [{q: 'bolt', u, t: 1, m: 1}]});
+        expect(hrefs).toEqual(['?q=bolt']);
+    }
 });
 
 test('the same query under another pinned bar replaces the entry', () => {
