@@ -26,11 +26,18 @@
     }
     function entryHref(s) {
         if (samePathOnThisSite(s.u)) return s.u;
-        return '?q=' + encodeURIComponent(s.q);
+        return '?q=' + encodeURIComponent(s.q) + scopeParam(s.sc);
     }
     function artRefreshHref(s) {
         if (samePathOnThisSite(s.u)) return s.u;
-        return '/search?q=' + encodeURIComponent(s.q);
+        return '/search?q=' + encodeURIComponent(s.q) + scopeParam(s.sc);
+    }
+    // The pinned bar the search ran under, so the link runs it under the same.
+    function scopeParam(scope) {
+        return scope ? '&scope=' + encodeURIComponent(scope) : '';
+    }
+    function scopeHtml(s, cls) {
+        return s.sc ? ' <span class="' + cls + '">' + escapeHtml(s.sc) + '</span>' : '';
     }
     function getLiveSearches() { return getRecentSearches().filter(ListStorage.isLive); }
 
@@ -67,7 +74,9 @@
     // The label is the readable query the server rebuilt for this search, and
     // is stored only when it says something the raw query doesn't: an ordinary
     // search is already its own best label, while a uuid is a wall of letters.
-    function addSearch(query, label, href) {
+    // The entry is still named by its query alone, so a search run again under
+    // another pinned bar replaces the one before it.
+    function addSearch(query, label, href, scope) {
         query = query.trim();
         if (!query || query.length < 2) return;
 
@@ -96,6 +105,10 @@
         href = (href || '').trim();
         if (href) {
             entry.u = href;
+        }
+        scope = (scope || '').trim();
+        if (scope) {
+            entry.sc = scope;
         }
         searches.unshift(entry);
 
@@ -154,7 +167,7 @@
             searches.forEach(function(s) {
                 html += '<a class="m-recent-item" href="' + escapeAttr(entryHref(s)) + '">';
                 html += '<span class="m-recent-icon">&#128269;</span>';
-                html += '<span class="m-recent-query">' + escapeHtml(displayQuery(s)) + '</span>';
+                html += '<span class="m-recent-query">' + escapeHtml(displayQuery(s)) + scopeHtml(s, 'm-recent-scope') + '</span>';
                 html += '<span class="m-recent-arrow">&rsaquo;</span>';
                 html += '</a>';
             });
@@ -194,7 +207,7 @@
                     html += '</div>';
                 }
                 html += '<div class="landing-item-info">';
-                html += '<span class="landing-item-query">' + escapeHtml(displayQuery(s)) + '</span>';
+                html += '<span class="landing-item-query">' + escapeHtml(displayQuery(s)) + scopeHtml(s, 'landing-item-scope') + '</span>';
                 html += '</div>';
                 html += '<div class="landing-item-actions">';
                 html += '<button class="landing-item-pin' + (s.pinned ? ' pinned' : '') + '" data-q="' + escapeAttr(s.q) + '" onclick="window.toggleRecentPin(this.dataset.q, event)" title="' + (s.pinned ? 'Unpin' : 'Pin to top') + '">';
@@ -269,12 +282,19 @@
                     } catch (e) {
                         // No sessionStorage: fall back to recording the search
                         // unconditionally, which is what always happened before.
-                        addSearch(input.value);
+                        var box = document.getElementById('nav-scopebox');
+                        addSearch(input.value, '', '', box ? box.value : '');
                     }
                 }
             });
         });
     }
+
+    // For a search that reaches its page some other way than these forms, as
+    // the pinned bar's GO does (js/scope.js).
+    window.notePendingSearch = function(q) {
+        try { sessionStorage.setItem(PENDING_KEY, q); } catch (e) {}
+    };
 
     // A typed search that found something is also one vote for the landing
     // page's popular strip, for signed-in readers only. The server resolves
@@ -303,6 +323,7 @@
         // No query means this is not the answer to anything, so leave a
         // pending search waiting for the page that is.
         if (!q) return;
+        var scope = (params.get('scope') || '').trim();
 
         var pending;
         try {
@@ -321,9 +342,9 @@
         // A multi-result sealed search has no per-card canonical URL, but its
         // route still matters when the landing page later refreshes its art.
         if (!href && window.location.pathname === '/sealed') {
-            href = '/sealed?q=' + encodeURIComponent(q);
+            href = '/sealed?q=' + encodeURIComponent(q) + scopeParam(scope);
         }
-        addSearch(q, answer.label, href);
+        addSearch(q, answer.label, href, scope);
     }
 
     function updateResultArt(searches, query, img, crop, foil, cw) {

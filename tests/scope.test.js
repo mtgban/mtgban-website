@@ -25,7 +25,7 @@ function element(extra = {}) {
 
 // Runs scope.js over a bar holding `pinned`, and hands back the pieces plus
 // wherever the page was sent. autocomplete stands in for the shared one.
-function loadBar(pinned, extra = {}, autocomplete = undefined) {
+function loadBar(pinned, extra = {}, autocomplete = undefined, query = 'bolt') {
     const nodes = {
         'nav-pin-btn': element(),
         'nav-scope': element(),
@@ -44,15 +44,17 @@ function loadBar(pinned, extra = {}, autocomplete = undefined) {
     };
     const window = {
         location: {
-            href: 'https://example.test/search?q=bolt&sort=alpha' +
+            href: 'https://example.test/search?q=' + query + '&sort=alpha' +
                 (pinned ? '&scope=' + encodeURIComponent(pinned) : ''),
             pathname: '/search',
             assign: url => navigated.push(url),
         },
     };
+    const pending = [];
+    window.notePendingSearch = q => pending.push(q);
     new Function('window', 'document', 'URL', 'autocomplete', 'location', source)(
         window, document, URL, autocomplete, window.location);
-    return { nodes, navigated };
+    return { nodes, navigated, pending };
 }
 
 test('GO runs the bar the way Enter does', () => {
@@ -66,6 +68,24 @@ test('GO runs the bar the way Enter does', () => {
     // The rest of the url is why this rewrites rather than submitting a form.
     expect(url.searchParams.get('q')).toBe('bolt');
     expect(url.searchParams.get('sort')).toBe('alpha');
+});
+
+// The page GO opens records the search under the new bar, the same as one
+// the form submitted (js/recent-searches.js).
+test('GO leaves the search for the recents list to record', () => {
+    const { nodes, pending } = loadBar('s:LEA');
+
+    nodes['nav-scope-go'].handlers.click();
+
+    expect(pending).toEqual(['bolt']);
+});
+
+test('GO with no query leaves nothing for the recents list', () => {
+    const { nodes, pending } = loadBar('s:LEA', {}, undefined, '');
+
+    nodes['nav-scope-go'].handlers.click();
+
+    expect(pending).toEqual([]);
 });
 
 test('GO and Enter send the same request', () => {
