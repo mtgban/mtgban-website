@@ -5,6 +5,10 @@ Implements `~/Desktop/card_prices_redesign_plan.md`: one identity space
 price)` table, with a `providers` lookup, in place of the two wide price tables
 (`product_prices`, `tcgplayer_nonmagic_product_prices`).
 
+Magic rows are filed under `variants.mtgban_id`, the matcher's id, with the
+five alias columns kept for lookups; non-Magic rows have none (`mtgban_id/`
+adds the column and backfills it).
+
 The site reads and writes only the long tables for Magic; nothing touches
 `product_prices` any more. The tcgcsv ingest writes only the long tables, and
 takes its dates from `price_dates`. Everything that has already run against
