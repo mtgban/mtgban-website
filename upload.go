@@ -31,6 +31,7 @@ import (
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/archidekt"
 	"github.com/mtgban/mtgban-website/cardconduit"
 	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/internal/docparse"
@@ -1980,6 +1981,8 @@ func loadUploadEntries(r *http.Request, b *matcher.Backend, in uploadInput, maxR
 				uploadedData, uploadName, err = loadMoxfield(r.Context(), b, u.Path, maxRows)
 			case "manabox.app", "www.manabox.app":
 				uploadedData, uploadName, err = loadManabox(r.Context(), b, in.remoteURL, maxRows)
+			case "archidekt.com", "www.archidekt.com":
+				uploadedData, uploadName, err = loadArchidekt(r.Context(), b, in.remoteURL, maxRows)
 			case "app.getcollectr.com":
 				uploadedData, uploadName, err = loadCollectr(r.Context(), b, in.remoteURL, maxRows)
 			case "docs.google.com":
@@ -2730,6 +2733,31 @@ func loadManabox(ctx context.Context, b *matcher.Backend, link string, maxRows i
 	items, deckName, err := manabox.Load(ctx, link, maxRows)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to fetch ManaBox deck: %w", err)
+	}
+
+	var uploadEntries []UploadEntry
+	for _, item := range items {
+		cardID, err := b.MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
+		entry := UploadEntry{
+			Card: matcher.InputCard{
+				Name: item.Name,
+				Foil: item.IsFoil,
+			},
+			HasQuantity:   true,
+			Quantity:      item.Quantity,
+			CardID:        cardID,
+			MismatchError: err,
+		}
+		uploadEntries = append(uploadEntries, entry)
+	}
+
+	return uploadEntries, deckName, nil
+}
+
+func loadArchidekt(ctx context.Context, b *matcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
+	items, deckName, err := archidekt.Load(ctx, link, maxRows)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch Archidekt deck: %w", err)
 	}
 
 	var uploadEntries []UploadEntry
