@@ -34,6 +34,7 @@ import (
 	"github.com/mtgban/mtgban-website/archidekt"
 	"github.com/mtgban/mtgban-website/cardconduit"
 	"github.com/mtgban/mtgban-website/collectr"
+	"github.com/mtgban/mtgban-website/cubecobra"
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/internal/xlsread"
@@ -1983,6 +1984,8 @@ func loadUploadEntries(r *http.Request, b *matcher.Backend, in uploadInput, maxR
 				uploadedData, uploadName, err = loadManabox(r.Context(), b, in.remoteURL, maxRows)
 			case "archidekt.com", "www.archidekt.com":
 				uploadedData, uploadName, err = loadArchidekt(r.Context(), b, in.remoteURL, maxRows)
+			case "cubecobra.com", "www.cubecobra.com":
+				uploadedData, uploadName, err = loadCubeCobra(r.Context(), b, in.remoteURL, maxRows)
 			case "app.getcollectr.com":
 				uploadedData, uploadName, err = loadCollectr(r.Context(), b, in.remoteURL, maxRows)
 			case "docs.google.com":
@@ -2777,6 +2780,31 @@ func loadArchidekt(ctx context.Context, b *matcher.Backend, link string, maxRows
 	}
 
 	return uploadEntries, deckName, nil
+}
+
+func loadCubeCobra(ctx context.Context, b *matcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
+	items, cubeName, err := cubecobra.Load(ctx, link, maxRows)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch CubeCobra cube: %w", err)
+	}
+
+	var uploadEntries []UploadEntry
+	for _, item := range items {
+		cardID, err := b.MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
+		entry := UploadEntry{
+			Card: matcher.InputCard{
+				Name: item.Name,
+				Foil: item.IsFoil,
+			},
+			HasQuantity:   true,
+			Quantity:      1,
+			CardID:        cardID,
+			MismatchError: err,
+		}
+		uploadEntries = append(uploadEntries, entry)
+	}
+
+	return uploadEntries, cubeName, nil
 }
 
 // loadCollectr fetches a public Collectr showcase (through the configured

@@ -634,7 +634,8 @@ Accepts CSV (delimiter auto-detect: comma → tab → `;`, plus a `sep=`
 header-row override), XLS (`internal/xlsread`; a compound file is read as
 one whatever its name), XLSX (`excelize`, behind unzip and column limits), Google
 Sheets, Moxfield decks/collections (`moxfield` package), ManaBox and
-Archidekt decks (`manabox`, `archidekt`), TCGplayer
+Archidekt decks (`manabox`, `archidekt`), CubeCobra cubes
+(`cubecobra`), TCGplayer
 collection scrapes (goquery), **Collectr showcase pages** (new `collectr`
 package, `app.getcollectr.com`, Magic/Lorcana only), and plain decklists.
 Header/row parsing has moved out of `upload.go` into the `internal/docparse`
@@ -1013,6 +1014,7 @@ staleness alarm's map and messages, from 15 minutes after startup.
 | `moxfield/` | Moxfield deck & paginated collection importer → `Item` list |
 | `manabox/` | Reader for public decks from ManaBox's cloud API |
 | `archidekt/` | Reader for public decks from Archidekt's API |
+| `cubecobra/` | Reader for public cubes from CubeCobra's JSON API |
 | `cardconduit/` | CardConduit bulk-estimate POST client |
 | `banprice/` | Wire types for the price API — `Price`, `ConditionTags` — in the exact JSON shape `api_banprice.go` and the templates share |
 | `collectr/` | Client for Collectr showcase pages (product listings, Magic + Lorcana categories) |
