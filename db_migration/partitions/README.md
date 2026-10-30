@@ -2,9 +2,18 @@
 
 `prices` was created with a partition for every month up to 2028-12, so the
 archive carried a long tail of empty ones the planner had to consider.
-`UpsertLongPrices` now creates the partitions for the months it writes plus the
-next one, and `01_schema.sql` pre-creates only up to next month.
+On the monthly layout `UpsertLongPrices` creates the partitions for the
+months it writes plus the next one. The monthly loop that pre-created them
+was `01_schema.sql` before the repartition; a fresh database's schema is now
+partitioned by `ban_id`.
 `drop_future.sql` removes the empty ones already there.
+
+All of this applies to the monthly layout only, so only until the
+repartition's swap (`../repartition/README.md`): after it `prices` is
+partitioned by `ban_id`, has no monthly partitions and no default one, and
+the script has nothing to drop. It and this README are retired in the docs
+pass after `prices_old` is dropped. Until then the stray-row repair below
+is the one the census refuses on.
 
 ## What it does
 

@@ -3,7 +3,7 @@
 -- object rolls back and re-running skips already-built objects and resumes.
 -- Safe to run while the old tables still serve all reads: nothing reads the new
 -- prices table until code cutover, so the ACCESS EXCLUSIVE locks are harmless.
--- On a partitioned table each index/PK builds per-partition, so sort temp stays
+-- On a partitioned table each index builds per-partition, so sort temp stays
 -- small (one partition at a time), not one giant sort.
 \timing on
 
@@ -13,19 +13,11 @@ SET maintenance_work_mem = '1GB';
 SET max_parallel_maintenance_workers = 2;
 SET synchronous_commit = off;
 
--- Primary key (D6). Includes date because a range-partitioned unique constraint
--- must contain the partition key. Also the definitive duplicate check: fails if
--- any (ban_id, date, provider) is duplicated.
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint
-                   WHERE conname='prices_pkey' AND conrelid='public.prices'::regclass) THEN
-        RAISE NOTICE 'building prices_pkey ...';
-        ALTER TABLE public.prices ADD CONSTRAINT prices_pkey PRIMARY KEY (ban_id, date, provider);
-    ELSE
-        RAISE NOTICE 'prices_pkey exists, skipping';
-    END IF;
-END $$;
+-- Unique key (D6), in place of a primary key. Includes ban_id, the partition
+-- key. Also the definitive duplicate check: fails if any (ban_id, date,
+-- provider) is duplicated. INCLUDE keeps the per-card chart read index-only.
+CREATE UNIQUE INDEX IF NOT EXISTS prices_uk ON public.prices (ban_id, date, provider)
+    INCLUDE (price);
 
 -- Per-provider analytics scans (D7): GetAggregatePriceStats / GetMovers scan one
 -- provider across many cards since a date. INCLUDE keeps it index-only.
