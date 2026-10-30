@@ -36,5 +36,3 @@ func liveConfig(t *testing.T) SQLConfig {
 		SSLMode:  os.Getenv("TCGLIVE_SSLMODE"),
 	}
 }
-
-func f(v float64) *float64 { return &v }
