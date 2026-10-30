@@ -193,6 +193,7 @@
             if (u.host === 'moxfield.com' || u.host === 'www.moxfield.com')  return { label: 'Moxfield deck' };
             if (u.host === 'manabox.app' || u.host === 'www.manabox.app')    return { label: 'ManaBox deck' };
             if (u.host === 'archidekt.com' || u.host === 'www.archidekt.com') return { label: 'Archidekt deck' };
+            if (u.host === 'cubecobra.com' || u.host === 'www.cubecobra.com') return { label: 'CubeCobra cube' };
             if (u.host === 'docs.google.com')                                 return { label: 'Google Sheets' };
             return null;
         } catch (e) {
