@@ -13,7 +13,8 @@ import (
 // TCGDirectNet is what a card nets sold through TCGplayer Direct and
 // CKBLLast is the last price Card Kingdom bought at, neither an offer to
 // buy it now; ABUCredit is ABU Games' offer in store credit, beside its
-// cash one. An alert on every buylist leaves them out.
+// cash one. An alert on every buylist leaves them out, and every buylist
+// outside the US with them.
 var alertPickedOnlyStores = []string{"TCGDirectNet", "CKBLLast", "ABUCredit"}
 
 // alertStorePrices lists every non-index store of the card's kind (sealed
@@ -37,7 +38,8 @@ func alertStorePrices(cardID string, sealed bool, side alerts.Side, blocklist []
 		}
 		out = append(out, alerts.StorePrice{
 			Shorthand: info.Shorthand, Name: scraperName(info.Shorthand), Prices: prices,
-			PickedOnly: slices.Contains(alertPickedOnlyStores, info.Shorthand),
+			PickedOnly: slices.Contains(alertPickedOnlyStores, info.Shorthand) ||
+				side == alerts.SideBuylist && info.CountryFlag != "",
 		})
 	}
 	if side == alerts.SideRetail {
