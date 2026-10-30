@@ -693,7 +693,7 @@
     // is re-derived on each device from the search results page.
     function trimRecent(s) {
         return {
-            q: s.q, t: s.t, m: s.m, del: s.del, pinned: s.pinned,
+            q: s.q, sc: s.sc, t: s.t, m: s.m, del: s.del, pinned: s.pinned,
             set: s.set, keyrune: s.keyrune
         };
     }

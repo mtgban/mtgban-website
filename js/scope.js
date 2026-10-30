@@ -102,6 +102,12 @@
         } else {
             url.searchParams.delete('scope');
         }
+        // A search run again under another bar is one the recents list keeps
+        // under that bar, as it does one submitted from the form.
+        var q = (url.searchParams.get('q') || '').trim();
+        if (q && typeof window.notePendingSearch === 'function') {
+            window.notePendingSearch(q);
+        }
         window.location.assign(url.toString());
     }
 

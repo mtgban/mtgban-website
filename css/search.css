@@ -2752,6 +2752,11 @@ body.modal-embed .cp-overlay {
     color: var(--normal);
 }
 
+/* The pinned bar the search ran under, muted from the query's own colour. */
+.landing-item-scope {
+    opacity: 0.6;
+}
+
 .landing-item-arrow {
     display: none;
 }

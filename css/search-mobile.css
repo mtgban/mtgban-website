@@ -1195,6 +1195,11 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     text-overflow: ellipsis;
 }
 
+/* The pinned bar the search ran under, muted from the query's own colour. */
+.m-recent-scope {
+    opacity: 0.6;
+}
+
 .m-recent-arrow {
     flex-shrink: 0;
     font-size: 1.1rem;
