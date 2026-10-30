@@ -32,6 +32,10 @@ func (s *recordingStore) TryAdvisoryLock(context.Context, int64) (bool, func(), 
 }
 
 func (s *recordingStore) GetTCGLatestDate(context.Context, int) (time.Time, bool, error) {
+	return s.LatestIngestDate(context.Background(), 0)
+}
+
+func (s *recordingStore) LatestIngestDate(context.Context, int) (time.Time, bool, error) {
 	if s.latest.IsZero() {
 		return time.Time{}, false, nil
 	}
@@ -294,7 +298,6 @@ func TestIngestFailsBeforeTheGateOnALongFormError(t *testing.T) {
 	fake := &fakeTCGCSV{lastUpdated: today.Add(20 * time.Hour), archiveStatus: http.StatusForbidden}
 	store := &failingVariantsStore{}
 	svc, _ := fakeService(t, fake, store)
-	svc.longForm = true
 
 	err := svc.IngestLatest(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "variants refused") {

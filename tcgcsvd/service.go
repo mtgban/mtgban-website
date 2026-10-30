@@ -25,6 +25,7 @@ type Store interface {
 	EnsureTCGCategoryPartition(ctx context.Context, categoryID int) error
 	EnsurePriceDatesSchema(ctx context.Context) error
 	GetTCGLatestDate(ctx context.Context, categoryID int) (time.Time, bool, error)
+	LatestIngestDate(ctx context.Context, categoryID int) (time.Time, bool, error)
 	UpsertTCGPrices(ctx context.Context, rows []timeseries.TCGPriceRow, batchSize int) (int, error)
 	UpsertTCGProducts(ctx context.Context, products []timeseries.TCGProduct, batchSize int) (int, error)
 	EnsureTCGVariants(ctx context.Context, vs []timeseries.TCGVariant) (map[timeseries.TCGVariant]int64, error)
@@ -36,12 +37,11 @@ type Store interface {
 // with New and share a single instance per process: the single-flight guards
 // that keep two ingests from overlapping live on it.
 type Service struct {
-	client   *tcgcsv.Client
-	store    Store
-	games    []tcgcsv.GameConfig
-	longForm bool
-	notify   func(kind, message string)
-	report   func(categoryID int, products []timeseries.TCGProduct)
+	client *tcgcsv.Client
+	store  Store
+	games  []tcgcsv.GameConfig
+	notify func(kind, message string)
+	report func(categoryID int, products []timeseries.TCGProduct)
 
 	pricesStashing   atomic.Bool
 	productsStashing atomic.Bool
@@ -55,13 +55,6 @@ type Option func(*Service)
 // is logged either way; without a notifier the logs are the only record.
 func WithNotifier(fn func(kind, message string)) Option {
 	return func(s *Service) { s.notify = fn }
-}
-
-// WithLongFormWrites dual-writes each price row into the long prices table,
-// resolving every (category, product, sub-type) to a ban_id. Mirrors the
-// timeseries_config.long_form_writes flag; off by default.
-func WithLongFormWrites(on bool) Option {
-	return func(s *Service) { s.longForm = on }
 }
 
 // WithProductReport hands each synced game's catalog to fn after it is stored.

@@ -28,6 +28,9 @@ func (s stubStore) EnsurePriceDatesSchema(context.Context) error { return nil }
 func (s stubStore) GetTCGLatestDate(context.Context, int) (time.Time, bool, error) {
 	return time.Time{}, false, nil
 }
+func (s stubStore) LatestIngestDate(context.Context, int) (time.Time, bool, error) {
+	return time.Time{}, false, nil
+}
 func (s stubStore) UpsertTCGPrices(context.Context, []timeseries.TCGPriceRow, int) (int, error) {
 	return 0, nil
 }

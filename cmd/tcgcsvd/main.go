@@ -2,9 +2,8 @@
 // server: the daily price pull, the weekly product catalog sync, and the
 // historical backfill. It reads the same config.json the server does, and only
 // the keys the ingest needs: sql_config (from the file infrastructure_path
-// names, unless it sets its own), tcgcsv_config, game and
-// timeseries_config.long_form_writes (which decide whether it writes the long
-// prices table), and discord.server_webhook_url for its job reports. It runs
+// names, unless it sets its own), tcgcsv_config, and
+// discord.server_webhook_url for its job reports. It runs
 // the two scheduled jobs under the same cross-process crawl lock, so it can run
 // beside a server that still has its crons enabled without both crawling
 // tcgcsv.com at once.
@@ -58,31 +57,9 @@ type config struct {
 	// InfrastructurePath names the infrastructure file the deployments share,
 	// read for sql_config when the config sets none.
 	InfrastructurePath string `json:"infrastructure_path"`
-	// Game is what the deployment this config belongs to serves. A non-Magic
-	// one charts out of the long prices table and nothing else, and its own
-	// snapshot leaves the TCGplayer series to this ingest, so the long-form
-	// write is implied for it rather than flagged. Same reading the server's
-	// longFormWrites gives the field.
-	Game    string `json:"game"`
-	Discord struct {
+	Discord            struct {
 		ServerWebhookURL string `json:"server_webhook_url"`
 	} `json:"discord"`
-
-	TimeseriesConfig struct {
-		LongFormWrites bool `json:"long_form_writes"`
-	} `json:"timeseries_config"`
-}
-
-// defaultGame is the game an unset "game" means, the same reading the server
-// gives it: a config that spells out "game": "" is a Magic deployment.
-const defaultGame = "magic"
-
-// longFormWrites reports whether this ingest has to land in the long prices
-// table. The raw flag is the Magic cutover; a non-Magic deployment is not part
-// of it because the wide table cannot hold one of its rows, and its site skips
-// the TCGplayer providers on the assumption this job writes them.
-func (c *config) longFormWrites() bool {
-	return (c.Game != "" && c.Game != defaultGame) || c.TimeseriesConfig.LongFormWrites
 }
 
 // loadConfig reads the config from wherever the path names - a local file, a
@@ -175,7 +152,7 @@ func main() {
 		log.Fatalln("tcgcsvd: opening the price database:", err)
 	}
 
-	opts := []tcgcsvd.Option{tcgcsvd.WithLongFormWrites(cfg.longFormWrites())}
+	var opts []tcgcsvd.Option
 	if cfg.Discord.ServerWebhookURL != "" {
 		// Synchronous on purpose: a one-shot process would exit before a
 		// backgrounded post ever left the machine.
@@ -225,7 +202,7 @@ func printGames(ctx context.Context, svc *tcgcsvd.Service, db *timeseries.Client
 	fmt.Printf("%-24s %-8s %s\n", "GAME", "CATEGORY", "LATEST STORED")
 	for _, g := range svc.Games() {
 		stored := "none"
-		latest, ok, err := db.GetTCGLatestDate(ctx, g.CategoryID)
+		latest, ok, err := db.LatestIngestDate(ctx, g.CategoryID)
 		if err != nil {
 			return fmt.Errorf("latest date for category %d: %w", g.CategoryID, err)
 		}

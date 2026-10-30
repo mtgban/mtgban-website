@@ -368,8 +368,7 @@ sharing the price database re-read it (access_notify.go). The same listener
 hears `patreon_poke`, whose payload is the email hash of a reader to poke
 (§3.2) rather than a file to re-read, and which no instance name skips.
 
-`timeseries_config` holds `long_form_writes` (§5.6) and `checkpoints_path`
-(§2.3). The `stores` section (`StoresConfig`) says which stores show where,
+`timeseries_config` holds `checkpoints_path` (§2.3). The `stores` section (`StoresConfig`) says which stores show where,
 by shorthand: `api_demo_stores` (what an unsigned API request gets, §5.7),
 `search_block_list`,
 `search_buylist_block_list`, `sleepers_block_list`,
@@ -748,9 +747,8 @@ price)` table with one row per provider. Charts, buylist metrics and the
 screener read only these. The wide Magic table `product_prices` is still in the
 database, but nothing reads or writes it. The non-Magic wide table
 `tcgplayer_nonmagic_product_prices` is still written by the tcgcsv ingest,
-which takes its resume and freshness dates from it, and
-`Config.TimeseriesConfig.LongFormWrites` makes that ingest write the long
-tables too.
+which always writes the long tables too and takes its resume and freshness
+dates from `price_dates`.
 
 `stashInTimeseries()` (cron `0 */12 * * *`, §2.1) snapshots current prices
 twice daily, normalizing non-NM conditions up via grade multipliers

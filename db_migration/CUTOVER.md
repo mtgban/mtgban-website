@@ -38,7 +38,7 @@ The index→provider mapping (plan 17.5):
 ```jsonc
 // config.json
 "timeseries_config": {
-    "long_form_writes": false   // step 2 flips this on
+    "long_form_writes": false   // gone: a config may still carry it, and it is ignored
 }
 
 // the datasets file
@@ -66,9 +66,10 @@ unused on that path (pick ids past the wide columns), while `provider`,
 { "public_name": "TCGplayer Direct Low", "index": 22, "provider": 7, "color": "rgb(153, 102, 255)" },
 ```
 
-## 2. Turn on dual-write (`long_form_writes: true`), deploy
+## 2. Deploy the dual-write
 
-Now every 12h stash and every daily tcgcsv ingest writes the legacy wide row AND
+The `long_form_writes` flag is gone and the dual-write is always on; a config that
+still carries it is ignored. Now every 12h stash and every daily tcgcsv ingest writes the legacy wide row AND
 the long row (variants + prices). Reads are still legacy. Startup also ensures the
 current+next month partitions exist and warms the variant→ban_id cache.
 

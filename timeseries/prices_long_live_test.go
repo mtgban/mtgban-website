@@ -41,6 +41,9 @@ func TestLongFormLive(t *testing.T) {
 	cleanup := func() {
 		// prices first (FK -> providers, variants), then variants, then provider.
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, liveSentinelProvider)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider BETWEEN $1 AND $2 AND ban_id IN (SELECT ban_id FROM variants WHERE tcgp_category_id=$3)`,
+			ProviderTCGLow, ProviderTCGDirectLow, liveSentinelCatLong)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE category=$1`, liveSentinelCatLong)
 		// Drops the far-future partitions; this runs only against the scratch database.
 		_, _ = c.db.ExecContext(ctx, `DROP TABLE IF EXISTS prices_2031_06, prices_2031_07`)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1`, liveSentinelProvider)
@@ -118,6 +121,24 @@ func TestLongFormLive(t *testing.T) {
 	if n, err := c.UpsertLongPrices(ctx, []LongPrice{rows[1]}, 0); err != nil || n != 0 {
 		t.Fatalf("unchanged re-upsert = %d, %v; want 0 rows", n, err)
 	}
+
+	// --- a stray row in the month after does not stop the write ---
+	if _, err := c.db.ExecContext(ctx, `INSERT INTO prices (ban_id, date, provider, price) VALUES ($1, '2031-07-15', $2, 1)`,
+		banBase, liveSentinelProvider); err != nil {
+		t.Fatalf("insert stray row: %v", err)
+	}
+	var inDefault int
+	if err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM prices_default WHERE provider=$1`, liveSentinelProvider).Scan(&inDefault); err != nil || inDefault != 1 {
+		t.Fatalf("stray rows in prices_default = %d, %v; want 1", inDefault, err)
+	}
+	if _, err := c.UpsertLongPrices(ctx, []LongPrice{{BanID: banBase, Date: "2031-06-15", Provider: liveSentinelProvider, Price: 1}}, 0); err != nil {
+		t.Fatalf("upsert beside a stray row: %v", err)
+	}
+	var month, next bool
+	if err := c.db.QueryRowContext(ctx, `SELECT to_regclass('prices_2031_06') IS NOT NULL, to_regclass('prices_2031_07') IS NOT NULL`).Scan(&month, &next); err != nil || !month || next {
+		t.Fatalf("prices_2031_06 exists = %v, prices_2031_07 exists = %v, %v; want true, false", month, next, err)
+	}
+	_, _ = c.db.ExecContext(ctx, `DELETE FROM prices_default WHERE provider=$1`, liveSentinelProvider)
 
 	// --- a far-future write creates its own partitions ---
 	if _, err := c.UpsertLongPrices(ctx, []LongPrice{{BanID: banBase, Date: "2031-06-15", Provider: liveSentinelProvider, Price: 1}}, 0); err != nil {
@@ -230,6 +251,30 @@ func TestLongFormLive(t *testing.T) {
 		t.Fatalf("tcg resolve not idempotent: %d vs %d err=%v", tcgBan, tcgBan2, err)
 	}
 
+	// The ingest gate counts only the TCGplayer providers, not another provider's day.
+	if _, err := c.UpsertLongPrices(ctx, []LongPrice{
+		{BanID: tcgBan, Date: "2024-03-01", Provider: ProviderTCGLow, Price: 1},
+		{BanID: tcgBan, Date: "2024-03-09", Provider: liveSentinelProvider, Price: 1},
+	}, 0); err != nil {
+		t.Fatalf("UpsertLongPrices (gate): %v", err)
+	}
+	if d, ok, err := c.LatestIngestDate(ctx, liveSentinelCatLong); err != nil || !ok || d.Format("2006-01-02") != "2024-03-01" {
+		t.Errorf("LatestIngestDate = %v ok=%v err=%v, want 2024-03-01", d, ok, err)
+	}
+	// A stash's provider 3 and 4 rows after the ingest's provider 5 day do not advance it.
+	if _, err := c.UpsertLongPrices(ctx, []LongPrice{
+		{BanID: tcgBan, Date: "2024-03-05", Provider: ProviderTCGMid, Price: 1},
+		{BanID: tcgBan, Date: "2024-03-08", Provider: ProviderTCGLow, Price: 1},
+		{BanID: tcgBan, Date: "2024-03-08", Provider: ProviderTCGMarket, Price: 1},
+	}, 0); err != nil {
+		t.Fatalf("UpsertLongPrices (stash): %v", err)
+	}
+	if d, ok, err := c.LatestIngestDate(ctx, liveSentinelCatLong); err != nil || !ok || d.Format("2006-01-02") != "2024-03-05" {
+		t.Errorf("LatestIngestDate after a stash = %v ok=%v err=%v, want the provider 5 day 2024-03-05", d, ok, err)
+	}
+	if _, ok, err := c.LatestIngestDate(ctx, 999003); err != nil || ok {
+		t.Errorf("LatestIngestDate(empty) ok=%v err=%v, want false", ok, err)
+	}
 	// A second sub-type on the same product: the finishes a non-Magic card is
 	// charted by, which the read path has to tell apart.
 	foilBan, err := c.ResolveTCGBanID(ctx, TCGVariant{CategoryID: liveSentinelCatLong, ProductID: liveSentinelProdLong, SubType: "Cold Foil"})

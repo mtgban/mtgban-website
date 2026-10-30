@@ -95,7 +95,6 @@ refresh of the current catalog every time:
 As a library, from a process that already has a *timeseries.Client:
 
 	svc, err := tcgcsvd.New(*cfg.TCGCSVConfig, db,
-	    tcgcsvd.WithLongFormWrites(true),
 	    tcgcsvd.WithNotifier(func(kind, message string) { ServerNotify(kind, message) }))
 	go svc.StashPrices(ctx)
 
