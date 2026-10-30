@@ -68,13 +68,16 @@ unused on that path (pick ids past the wide columns), while `provider`,
 
 ## 2. Deploy the dual-write
 
-The `long_form_writes` flag is gone and the dual-write is always on; a config that
-still carries it is ignored. Now every 12h stash and every daily tcgcsv ingest writes the legacy wide row AND
-the long row (variants + prices). Reads are still legacy. Startup also ensures the
-current+next month partitions exist and warms the variant→ban_id cache.
+Done, and since superseded by step 5: the dual-write is over. Every 12h stash
+and every daily tcgcsv ingest writes only the long tables (variants + prices)
+and files the days it wrote in `price_dates`, in the same transaction. Each
+write first ensures the partitions of the months it writes and the month after
+(`UpsertLongPrices`); startup ensures the current and next month as a courtesy
+and warms the variant to ban_id cache. The `long_form_writes` flag is gone; a
+config that still carries it is ignored.
 
-A long-form write failure is logged (ServerNotify / log), never fatal — the legacy
-write already persisted the snapshot.
+A write failure is reported through the job's notices and that run's rows are
+not stored: there is no legacy write behind them any more.
 
 ## 3. Verify live-write parity
 
@@ -115,9 +118,14 @@ The snapshot writes only the long tables, so nothing writes `product_prices`
 and it can be archived or dropped. The tcgcsv ingest writes only the long
 tables and takes its dates from `price_dates`, and the `index` field of
 datasets is gone: the screener and the buylist metrics key on `provider`.
+The deployed datasets files may still carry `"index"` keys, which
+`loadDatasets` ignores but the admin Datasets editor refuses when a file with
+them is pasted (remove the key). During a rolling deploy an older build
+reading a datasets file the new editor saved sees no index and charts nothing
+until it is redeployed, so deploy all sites before editing datasets.
 `tcgplayer_nonmagic_product_prices` is left to drop, which
-`wide_tables/drop_nonmagic.sql` does after two nights of the ingest and with
-a volume snapshot in hand (`wide_tables/README.md`).
+`wide_tables/drop_nonmagic.sql` does after two nights of the ingest and with a
+volume snapshot in hand (`wide_tables/README.md`).
 
 ## 6. Validate + finalize the FK
 

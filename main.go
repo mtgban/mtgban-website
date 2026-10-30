@@ -645,7 +645,7 @@ func main() {
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 
 	var maintenance tcgcsvMaintenance
-	flag.BoolVar(&maintenance.backfill, "tcgcsv-backfill", false, "Backfill tcg_prices from tcgcsv archives, then exit (archives are withdrawn upstream: stores the current snapshot instead when the range covers it)")
+	flag.BoolVar(&maintenance.backfill, "tcgcsv-backfill", false, "Backfill the long prices table from tcgcsv archives, then exit (archives are withdrawn upstream: stores the current snapshot instead when the range covers it)")
 	flag.StringVar(&maintenance.backfillOptions.From, "tcgcsv-from", "", "Backfill start date YYYY-MM-DD (default: earliest archive, 2024-02-08; an explicit date fetches the whole range, bypassing the resume cursor)")
 	flag.StringVar(&maintenance.backfillOptions.To, "tcgcsv-to", "", "Backfill end date YYYY-MM-DD (default: today)")
 	flag.BoolVar(&maintenance.backfillOptions.Force, "tcgcsv-force", false, "Re-ingest dates already stored (ignore the resume cursor)")

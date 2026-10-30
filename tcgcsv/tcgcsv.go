@@ -1,7 +1,7 @@
 // Package tcgcsv is a client for tcgcsv.com, a public daily mirror and
 // historical archive of TCGplayer's catalog and pricing. It exposes the
 // category -> group -> products/prices hierarchy used to ingest multi-game
-// prices (Lorcana first) into the tcg_prices table.
+// prices (Lorcana first) into the long prices table.
 //
 // Etiquette (per tcgcsv.com/faq): a descriptive User-Agent is required,
 // requests are throttled, and a full sync should run at most once per 24h. Use

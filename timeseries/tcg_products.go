@@ -12,7 +12,7 @@ import (
 var tcgProductsSchemaSQL string
 
 // TCGProduct is one row of the tcg_products catalog table: the metadata behind
-// a TCGplayer product that tcg_prices rows reference by product_id.
+// a TCGplayer product that non-Magic variants reference by product_id.
 type TCGProduct struct {
 	ProductID  int    `json:"product_id"`
 	CategoryID int    `json:"category_id"`

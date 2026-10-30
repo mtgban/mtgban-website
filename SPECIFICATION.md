@@ -61,9 +61,10 @@ read the scraper dumps from; see §2.3), `-dev` (hot-reload templates,
 relaxed auth), `-sig` (force signature checks in dev), `-noload`,
 `-stores` (comma-separated stores to load at startup; see §2.3), `-nonews`,
 `-log` (default `logs/`), and a `tcgcsv-*` family — `-tcgcsv-backfill`,
-`-tcgcsv-daily`, `-tcgcsv-products` each run one ingest job against
-`tcg_prices`/`tcg_products` and exit without starting the web server (the
-same jobs `cmd/tcgcsvd` runs as its own process); `-tcgcsv-from`/
+`-tcgcsv-daily`, `-tcgcsv-products` each run one ingest job (the first two
+into the long `prices` table, the last into `tcg_products`) and exit without
+starting the web server (the same jobs `cmd/tcgcsvd` runs as its own
+process); `-tcgcsv-from`/
 `-tcgcsv-to`/`-tcgcsv-force`/`-tcgcsv-categories` tune the backfill, which
 since tcgcsv withdrew its archives stores the current snapshot in their
 place (`docs/tcgcsv-archive-withdrawal.md`). There is
@@ -89,9 +90,9 @@ Boot sequence (`main()`):
    loaded and `ListenAndServe` never runs.
 4. Otherwise: `loadKeyOverrides()`, create `LogDir`, load Google credentials,
    `openDBs()` → `PricesArchiveDB` (PostgreSQL, `timeseries` package, price
-   history for charts, plus `tcg_prices`/`tcg_products` when TCGCSV
-   ingestion is configured), `NewNewspaperDB` (PostgreSQL), `UserStateDB`
-   (cross-device sync, only if `user_state_config` is set), and
+   history for charts, which the TCGCSV ingest writes too, plus
+   `tcg_products` when it is configured), `NewNewspaperDB` (PostgreSQL),
+   `UserStateDB` (cross-device sync, only if `user_state_config` is set), and
    `ObservabilityDB` (usage telemetry, only if `observability_config` + an
    instance name are set), each one's settings read from
    `Infrastructure()` (§2.4). Then `startAccessReloadListener()` (picks up
@@ -368,9 +369,9 @@ sharing the price database re-read it (access_notify.go). The same listener
 hears `patreon_poke`, whose payload is the email hash of a reader to poke
 (§3.2) rather than a file to re-read, and which no instance name skips.
 
-`timeseries_config` holds `checkpoints_path` (§2.3). The `stores` section (`StoresConfig`) says which stores show where,
-by shorthand: `api_demo_stores` (what an unsigned API request gets, §5.7),
-`search_block_list`,
+`timeseries_config` holds `checkpoints_path` (§2.3). The `stores` section
+(`StoresConfig`) says which stores show where, by shorthand: `api_demo_stores`
+(what an unsigned API request gets, §5.7), `search_block_list`,
 `search_buylist_block_list`, `sleepers_block_list`,
 `upload_sealed_block_list`, `global_allow_list`, `global_probe_list`, and
 `api_only_stores`, the stores only the price API serves.
@@ -746,7 +747,7 @@ product + sub-type), and a date-partitioned `prices(ban_id, date, provider,
 price)` table with one row per provider. Charts, buylist metrics and the
 screener read only these. The wide Magic table `product_prices` is still in the
 database, but nothing reads or writes it. The non-Magic wide table
-`tcgplayer_nonmagic_product_prices` is dropped by
+`tcgplayer_nonmagic_product_prices` is to be dropped by
 `db_migration/wide_tables/drop_nonmagic.sql`: the tcgcsv ingest writes only
 the long tables and takes its resume and freshness dates from `price_dates`.
 Datasets carry a `provider` id and no `index`.
