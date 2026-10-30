@@ -742,12 +742,14 @@ built separately, by `newEditionsSnapshot()` as part of a datastore load
 
 `timeseries` is a PostgreSQL client over the long tables (`db_migration/`): a
 13-row `providers` lookup, a `variants` table (one row per printing: Magic
-keyed by `(mtgjson_uuid, is_foil, is_etched, is_alt, language)`, where
+filed under `mtgban_id`, the matcher's id, with the alias columns
+`(mtgjson_uuid, is_foil, is_etched, is_alt, language)` kept for lookups, where
 `is_alt` marks the Alternate Fourth Edition copies, and non-Magic by TCGplayer
-product + sub-type), and a date-partitioned `prices(ban_id, date, provider,
-price)` table with one row per provider. Charts, buylist metrics and the
-screener read only these. The wide Magic table `product_prices` is still in the
-database, but nothing reads or writes it. The non-Magic wide table
+product + sub-type, with no `mtgban_id`), and a date-partitioned
+`prices(ban_id, date, provider, price)` table with one row per provider.
+Charts, buylist metrics and the screener read only these. The wide Magic table
+`product_prices` is still in the database, but nothing reads or writes it. The
+non-Magic wide table
 `tcgplayer_nonmagic_product_prices` is to be dropped by
 `db_migration/wide_tables/drop_nonmagic.sql`: the tcgcsv ingest writes only
 the long tables and takes its resume and freshness dates from `price_dates`.
@@ -757,7 +759,7 @@ Datasets carry a `provider` id and no `index`.
 twice daily, normalizing non-NM conditions up via grade multipliers
 (`defaultGradeMap`: NM 1×, SP 1.25×, MP 1.67×, HP 2.5×, PO 4×), into the long
 tables: a Magic deployment through `stashMagicTimeseries`, which resolves each
-card's `magicVariant` with `ResolveMagicBanID`, and any other through
+card's `magicID` with `ResolveMagicBanID`, and any other through
 `stashNonMagicTimeseries`. A non-Magic deployment's ban_ids are not drawn
 from the identity sequence: a new non-Magic variant is filed under `timeseries.TCGBanID`,
 `category<<40 | product<<8 | sub-type code`, by the snapshot and the tcgcsv
