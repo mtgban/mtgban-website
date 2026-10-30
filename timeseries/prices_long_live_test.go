@@ -25,7 +25,9 @@ const (
 	liveSentinelUUIDAlt  = "ffffffff-0000-0000-0000-000000000002"
 	liveSentinelCatLong  = 999002
 	liveSentinelProdLong = 888111
-	liveSentinelProvider = int16(999)
+	// Inside the derived-id range, so its variants get category-block ids.
+	liveSentinelCatDerived = 8190
+	liveSentinelProvider   = int16(999)
 )
 
 func TestLongFormLive(t *testing.T) {
@@ -87,14 +89,25 @@ func TestLongFormLive(t *testing.T) {
 	monthDay, strayDay := mon.Format("2006-01")+"-15", mon.AddDate(0, 1, 0).Format("2006-01")+"-15"
 	monthTable, strayTable := "prices_"+mon.Format("2006_01"), "prices_"+mon.AddDate(0, 1, 0).Format("2006_01")
 
+	layout, err := c.priceLayout(ctx)
+	if err != nil {
+		t.Fatalf("priceLayout: %v", err)
+	}
+	catTable := fmt.Sprintf("prices_cat_%d", liveSentinelCatDerived)
+
 	cleanup := func() {
 		// prices first (FK -> providers, variants), then variants, then provider.
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, liveSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider BETWEEN $1 AND $2 AND ban_id IN (SELECT ban_id FROM variants WHERE tcgp_category_id=$3)`,
 			ProviderTCGLow, ProviderTCGDirectLow, liveSentinelCatLong)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE category=$1`, liveSentinelCatLong)
-		if scratch {
+		if scratch && layout == "date" {
 			_, _ = c.db.ExecContext(ctx, `DROP TABLE IF EXISTS `+monthTable+`, `+strayTable)
+		}
+		if scratch && layout == "ban_id" {
+			_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE ban_id IN (SELECT ban_id FROM variants WHERE tcgp_category_id=$1)`, liveSentinelCatDerived)
+			_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE tcgp_category_id=$1`, liveSentinelCatDerived)
+			_, _ = c.db.ExecContext(ctx, `DROP TABLE IF EXISTS `+catTable)
 		}
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1`, liveSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE mtgjson_uuid IN ($1,$2) OR tcgp_category_id=$3`,
@@ -167,7 +180,37 @@ func TestLongFormLive(t *testing.T) {
 	}
 
 	// --- partition-creating cases, on the scratch database only ---
-	if scratch {
+	if scratch && layout == "ban_id" {
+		// The category's partition is made by the write, and no month's is.
+		_, _ = c.db.ExecContext(ctx, `DROP TABLE IF EXISTS `+catTable)
+		catBan, err := c.ResolveTCGBanID(ctx, TCGVariant{CategoryID: liveSentinelCatDerived, ProductID: liveSentinelProdLong, SubType: "Normal"})
+		if err != nil {
+			t.Fatalf("ResolveTCGBanID: %v", err)
+		}
+		if _, err := c.UpsertLongPrices(ctx, []LongPrice{{BanID: catBan, Date: "2024-02-08", Provider: liveSentinelProvider, Price: 1}}, 0); err != nil {
+			t.Fatalf("category upsert: %v", err)
+		}
+		var made bool
+		var home string
+		if err := c.db.QueryRowContext(ctx, `SELECT to_regclass($1) IS NOT NULL`, catTable).Scan(&made); err != nil || !made {
+			t.Fatalf("%s exists = %v, %v; want true", catTable, made, err)
+		}
+		if err := c.db.QueryRowContext(ctx, `SELECT tableoid::regclass::text FROM prices WHERE ban_id=$1`, catBan).Scan(&home); err != nil || home != catTable {
+			t.Fatalf("row lives in %q, %v; want %s", home, err, catTable)
+		}
+		if err := c.EnsurePricePartition(ctx, mon); err != nil {
+			t.Fatalf("EnsurePricePartition on ban_id: %v", err)
+		}
+		var month bool
+		if err := c.db.QueryRowContext(ctx, `SELECT to_regclass($1) IS NOT NULL`, monthTable).Scan(&month); err != nil || month {
+			t.Fatalf("%s exists = %v, %v; want false on the ban_id layout", monthTable, month, err)
+		}
+		if n, err := c.StrayPriceRows(ctx); err != nil || n != 0 {
+			t.Fatalf("StrayPriceRows = %d, %v; want 0", n, err)
+		}
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE ban_id=$1`, catBan)
+	} else if scratch {
+		t.Log("ban_id cases skipped: prices is still partitioned by month")
 		// A stray row in the month after does not stop the write.
 		if _, err := c.db.ExecContext(ctx, `INSERT INTO prices (ban_id, date, provider, price) VALUES ($1, $2, $3, 1)`,
 			banBase, strayDay, liveSentinelProvider); err != nil {
@@ -197,7 +240,7 @@ func TestLongFormLive(t *testing.T) {
 		// Later assertions read the sentinel's series, so take the probe row out.
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1 AND date=$2`, liveSentinelProvider, monthDay)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1 AND date=$2`, liveSentinelProvider, monthDay)
-	} else {
+	} else if !scratch {
 		t.Log("partition-creating cases skipped: set TCGLIVE_SCRATCH=1 on a scratch database to run them")
 	}
 
@@ -645,12 +688,23 @@ func TestEnsureTCGVariantsLive(t *testing.T) {
 		t.Fatalf("EnsurePriceDatesSchema: %v", err)
 	}
 
+	scratch := os.Getenv("TCGLIVE_SCRATCH") == "1"
+	layout, err := c.priceLayout(ctx)
+	if err != nil {
+		t.Fatalf("priceLayout: %v", err)
+	}
+	catTable := fmt.Sprintf("prices_cat_%d", derivedSentinelCat)
+
 	cleanup := func() {
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, derivedSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1`, derivedSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE tcgp_category_id IN ($1,$2)`,
 			derivedSentinelCat, derivedSentinelCatOver)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM providers WHERE id=$1`, derivedSentinelProvider)
+		// The derived-id write creates its category's partition on the ban_id layout.
+		if scratch && layout == "ban_id" {
+			_, _ = c.db.ExecContext(ctx, `DROP TABLE IF EXISTS `+catTable)
+		}
 	}
 	cleanup()
 	t.Cleanup(cleanup)
