@@ -309,6 +309,11 @@ func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *Pa
 		return true
 	}
 
+	if r.FormValue("download") == "variantmap" {
+		serveVariantMap(w, s.backend())
+		return true
+	}
+
 	logs := r.FormValue("logs")
 	if logs != "" {
 		// Check among the Page loggers
