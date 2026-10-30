@@ -16,18 +16,14 @@ var errChartIDNotFound = errors.New("chart id not found")
 // chartTarget is a resolved, game-agnostic chart identity. The read mode is:
 //   - BanID != 0: chart this exact variant via HGetAllByBanID (a ban: id, or a
 //     resolved TCGplayer product). Precise about language/finish/alt/sub-type.
-//   - BanID == 0: canonical uuid path via (UUID, Foil, Etched, Alt) through
-//     HGetAllLong.
+//   - BanID == 0: the Magic id path via MtgbanID through HGetAllLong.
 //
 // Datasets are derived from whichever providers have data (see getChartDatasets),
 // so the target carries no game flag or provider list — a new game just works.
 type chartTarget struct {
-	BanID  int64
-	UUID   string // mtgjson uuid, for the canonical path and display
-	Foil   bool
-	Etched bool
-	Alt    bool // the Alternate Fourth Edition copy, for the canonical path
-	Name   string
+	BanID    int64
+	MtgbanID string // the matcher's Magic id, for the id path
+	Name     string
 	// Label names this printing on a roster chart, where two printings of
 	// one card share a Name.
 	Label string
@@ -122,16 +118,10 @@ func maybeUUIDString(s string) bool {
 	return len(s) == 36 && strings.Count(s, "-") == 4
 }
 
-// hasCanonicalIdentity reports whether a target that resolved to no ban_id can
-// still be read by the canonical path. That path keys on mtgjson_uuid, which is
-// a Postgres uuid column, so only a Magic uuid qualifies: a non-Magic card
-// arrives carrying its matcher id ("omn071_695162_rainbow"), and handing that
-// to a uuid column earns a 22P02 rather than an empty result.
-//
-// Normalise first, since matcher tags the finish onto the id it hands back
-// ("<uuid>_f") while the archive stores the base uuid beside a finish flag.
-func hasCanonicalIdentity(target *chartTarget) bool {
-	return maybeUUIDString(timeseries.NormalizeUUID(target.UUID))
+// hasMagicID reports whether a target that resolved to no ban_id can still be
+// read by its Magic id; a non-Magic card has none.
+func hasMagicID(target *chartTarget) bool {
+	return target.MtgbanID != ""
 }
 
 // matcherTarget resolves a game-native card id through matcher — an mtgjson
@@ -152,10 +142,11 @@ func matcherTarget(ctx context.Context, b *matcher.Backend, id string) (*chartTa
 	}
 	if err == nil {
 		// Prefer the resolved ban_id so the chart reads the exact variant (skips
-		// the canonical resolution HGetAllLong does in SQL); a cold cache / unknown
-		// product leaves BanID 0 and the canonical uuid path takes over.
+		// the id lookup HGetAllLong does in SQL); a cold cache / unknown
+		// product leaves BanID 0 and the Magic id path takes over.
 		return &chartTarget{
-			UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Alt: magicVariant(co).IsAlt, Name: co.Name,
+			MtgbanID: magicID(co),
+			Name:     co.Name,
 			Label:    co.String(),
 			BanID:    resolveBanIDForCard(ctx, co),
 			SearchID: searchID,
@@ -166,7 +157,7 @@ func matcherTarget(ctx context.Context, b *matcher.Backend, id string) (*chartTa
 	if maybeUUIDString(id) {
 		// A Magic uuid we have prices for but the datastore retired.
 		if banID, ok, lerr := PricesArchiveDB.LookupMagicBanIDByUUID(ctx, id); lerr == nil && ok {
-			return &chartTarget{BanID: banID, UUID: id}, nil
+			return &chartTarget{BanID: banID}, nil
 		}
 		return nil, errChartIDNotFound
 	}
@@ -181,7 +172,7 @@ func matcherTarget(ctx context.Context, b *matcher.Backend, id string) (*chartTa
 
 // cachedBanIDForCard maps a resolved matcher card to our surrogate ban_id from
 // the in-memory variant caches, game-agnostically and with no DB round-trip, using
-// whichever identity the variants table keys on for its game: the mtgjson uuid for
+// whichever identity the variants table keys on for its game: the mtgban_id for
 // Magic, otherwise the card's TCGplayer product id for non-Magic games (Lorcana,
 // Pokemon, ...), which have no uuid. Returns 0 when nothing is cached (cold cache /
 // new printing), so a caller can fall back to the game-native id. Safe to call per
@@ -190,8 +181,10 @@ func cachedBanIDForCard(co *matcher.CardObject) int64 {
 	if PricesArchiveDB == nil {
 		return 0
 	}
-	if banID, ok := PricesArchiveDB.CachedMagicBanID(magicVariant(co)); ok {
-		return banID
+	if id := magicID(co); id != "" {
+		if banID, ok := PricesArchiveDB.CachedMagicBanID(id); ok {
+			return banID
+		}
 	}
 	if pid, ok := tcgProductID(co); ok {
 		// One product covers every finish, so the card's own sub-type decides
@@ -228,7 +221,7 @@ func chartIDForCard(b *matcher.Backend, cardID string) string {
 // resolveBanIDForCard is cachedBanIDForCard for the single chart-open path, where a
 // DB round-trip is affordable: on an in-memory miss it resolves a non-Magic product
 // against the variants table, so a cold cache (or a product ingested since warm-up)
-// still charts precisely. A Magic miss stays 0 — the canonical uuid path covers it.
+// still charts precisely. A Magic miss stays 0, and the chart reads by its mtgban_id.
 func resolveBanIDForCard(ctx context.Context, co *matcher.CardObject) int64 {
 	if banID := cachedBanIDForCard(co); banID != 0 {
 		return banID
@@ -323,7 +316,8 @@ func targetFromTCGID(ctx context.Context, b *matcher.Backend, tcgID int) (*chart
 	if matched, err := b.MatchID(idStr); err == nil {
 		if co, err := b.GetUUID(matched); err == nil {
 			return &chartTarget{
-				UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Alt: magicVariant(co).IsAlt, Name: co.Name,
+				MtgbanID: magicID(co),
+				Name:     co.Name,
 				Label:    co.String(),
 				BanID:    resolveBanIDForCard(ctx, co),
 				SearchID: matched,
@@ -358,45 +352,25 @@ func targetFromBanID(ctx context.Context, b *matcher.Backend, banID int64) (*cha
 
 // magicTarget builds a Magic chart target for a ban_id's variant.
 func magicTarget(b *matcher.Backend, banID int64, vi timeseries.VariantInfo) *chartTarget {
-	uuid, found := variantPrinting(b, vi)
-	if !found {
-		uuid = magicFinishSearchID(b, vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched)
-	}
 	t := &chartTarget{
-		BanID:  banID,
-		UUID:   vi.MtgjsonUUID,
-		Foil:   vi.IsFoil,
-		Etched: vi.IsEtched,
-		Alt:    vi.IsAlt,
+		BanID:    banID,
+		MtgbanID: vi.MtgbanID,
 		// The printing the ban_id names, on its finish.
-		SearchID: uuid,
+		SearchID: vi.MtgbanID,
 	}
 	// Display name comes from matcher, read off the finish's own id so
 	// the label names it (the chart uses BanID for data).
 	co, err := b.GetUUID(t.SearchID)
+	if err != nil {
+		// No id, or one the datastore no longer knows: name it by its alias.
+		t.SearchID = magicFinishSearchID(b, vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched)
+		co, err = b.GetUUID(t.SearchID)
+	}
 	if err == nil {
 		t.Name = co.Name
 		t.Label = co.String()
 	}
 	return t
-}
-
-// variantPrinting is the matcher's id for the printing the archive files as
-// vi. The archive keeps mtgjson's 36 characters and tells the copies the
-// matcher makes of a printing from their original by is_alt or language, so
-// it is looked for among the printings of the original's name.
-func variantPrinting(b *matcher.Backend, vi timeseries.VariantInfo) (string, bool) {
-	co, err := b.GetUUID(vi.MtgjsonUUID)
-	if err != nil {
-		return "", false
-	}
-	for _, id := range b.Hashes[matcher.Normalize(co.Name)] {
-		printing, err := b.GetUUID(id)
-		if err == nil && vi.Names(magicVariant(printing)) {
-			return id, true
-		}
-	}
-	return "", false
 }
 
 // nonMagicTarget builds a non-Magic chart target, resolving the display name from

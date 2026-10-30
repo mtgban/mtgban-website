@@ -531,6 +531,10 @@ func (s *site) openDBs() (err error) {
 		if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now.AddDate(0, 1, 0)); serr != nil {
 			log.Println("warning: could not ensure next price partition:", serr)
 		}
+		// A chart read over a column the ensure just added failed to prepare in NewClient.
+		if serr := PricesArchiveDB.PrepareStatements(context.Background()); serr != nil {
+			log.Println("warning: chart reads left unprepared:", serr)
+		}
 	}
 
 	if infra.UserStateConfig == nil {

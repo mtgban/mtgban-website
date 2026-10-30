@@ -2,6 +2,7 @@ package timeseries
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -11,7 +12,7 @@ import (
 
 // TestLongFormLive exercises the long-form (variants + prices) code end to end
 // against a real Postgres: ban_id minting + caching, the long upsert, and the
-// four read paths (HGetAllLong canonical resolution, GetEarliestDateLong,
+// four read paths (HGetAllLong by mtgban_id, GetEarliestDateLong,
 // GetAggregatePriceStatsLong, GetMoversLong).
 //
 // Like TestTCGPricesLive it is skipped unless TCGLIVE_HOST is set, and it only
@@ -50,6 +51,35 @@ func TestLongFormLive(t *testing.T) {
 		t.Fatalf("variants_mtgban_id_uk missing: %v", err)
 	}
 
+	// Once both exist the ensure runs no DDL, checked through the lock: ADD
+	// COLUMN waits behind any reader, so it would time out behind this one.
+	reader, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin reader: %v", err)
+	}
+	if _, err := reader.ExecContext(ctx, `LOCK TABLE variants IN ACCESS SHARE MODE`); err != nil {
+		t.Fatalf("lock variants: %v", err)
+	}
+	behind, cancel := context.WithTimeout(ctx, 2*time.Second)
+	ensureErr := c.EnsureVariantsSchema(behind)
+	ddlErr := c.execDDL(behind, variantsMtgbanIDSchemaSQL)
+	cancel()
+	_ = reader.Rollback()
+	if ensureErr != nil {
+		t.Fatalf("EnsureVariantsSchema behind a reader: %v; want no DDL", ensureErr)
+	}
+	if ddlErr == nil {
+		t.Fatal("the DDL itself ran behind the reader, so the probe proves nothing")
+	}
+
+	// A client whose prepare failed gets its statements on a later call.
+	unprepared := &Client{db: c.db}
+	if err := unprepared.PrepareStatements(ctx); err != nil || unprepared.stmtHGetAllLong == nil || unprepared.stmtHGetAllByBanID == nil {
+		t.Fatalf("PrepareStatements = %v, statements %v %v; want both", err, unprepared.stmtHGetAllLong, unprepared.stmtHGetAllByBanID)
+	}
+	_ = unprepared.stmtHGetAllLong.Close()
+	_ = unprepared.stmtHGetAllByBanID.Close()
+
 	// The month after next, so the write is accepted and its partition is new.
 	scratch := os.Getenv("TCGLIVE_SCRATCH") == "1"
 	now := time.Now().UTC()
@@ -84,40 +114,34 @@ func TestLongFormLive(t *testing.T) {
 	}
 
 	// --- mint + cache idempotence ---
-	base := MagicVariant{MtgjsonUUID: liveSentinelUUID} // lang="", alt=false (canonical)
-	banBase, err := c.ResolveMagicBanID(ctx, base)
+	base := liveSentinelUUID
+	banBase, err := c.ResolveMagicBanID(ctx, base, MagicVariant{MtgjsonUUID: base})
 	if err != nil {
 		t.Fatalf("ResolveMagicBanID: %v", err)
 	}
-	again, err := c.ResolveMagicBanID(ctx, base)
+	again, err := c.ResolveMagicBanID(ctx, base, MagicVariant{MtgjsonUUID: base})
 	if err != nil || again != banBase {
 		t.Fatalf("resolve not idempotent: %d vs %d err=%v", banBase, again, err)
 	}
-	// A fresh client (cold cache) must resolve the same row via ON CONFLICT.
+	// A fresh client (cold cache) must resolve the same row by its id.
 	c2, err := NewClient(liveConfig(t))
 	if err != nil {
 		t.Fatalf("NewClient 2: %v", err)
 	}
 	defer c2.Close()
-	if cold, err := c2.ResolveMagicBanID(ctx, base); err != nil || cold != banBase {
+	if cold, err := c2.ResolveMagicBanID(ctx, base, MagicVariant{MtgjsonUUID: base}); err != nil || cold != banBase {
 		t.Fatalf("cold resolve = %d, want %d (err=%v)", cold, banBase, err)
 	}
 
-	// A non-canonical sibling (Japanese) of the same (uuid, foil, etched).
-	banJa, err := c.ResolveMagicBanID(ctx, MagicVariant{MtgjsonUUID: liveSentinelUUIDAlt, Language: "Japanese"})
+	// A Japanese printing has its own id.
+	ja := liveSentinelUUIDAlt
+	banJa, err := c.ResolveMagicBanID(ctx, ja, MagicVariant{MtgjsonUUID: liveSentinelUUIDAlt, Language: "Japanese"})
 	if err != nil {
 		t.Fatalf("ResolveMagicBanID ja: %v", err)
 	}
-	// Give the sibling the SAME uuid so canonical resolution has to choose. We
-	// can't via ResolveMagicBanID (different uuid), so insert a same-uuid ja row.
-	var banBaseJa int64
-	if err := c.db.QueryRowContext(ctx, `
-		INSERT INTO variants (mtgjson_uuid, language) VALUES ($1,'Japanese') RETURNING ban_id`,
-		liveSentinelUUID).Scan(&banBaseJa); err != nil {
-		t.Fatalf("insert same-uuid ja variant: %v", err)
-	}
 	// An Alternate Fourth Edition copy keeps its original's uuid.
-	banBaseAlt, err := c.ResolveMagicBanID(ctx, MagicVariant{MtgjsonUUID: liveSentinelUUID, IsAlt: true})
+	alt := base + "_alt"
+	banBaseAlt, err := c.ResolveMagicBanID(ctx, alt, MagicVariant{MtgjsonUUID: base, IsAlt: true})
 	if err != nil {
 		t.Fatalf("ResolveMagicBanID alt: %v", err)
 	}
@@ -126,7 +150,7 @@ func TestLongFormLive(t *testing.T) {
 	rows := []LongPrice{
 		{BanID: banBase, Date: "2024-02-08", Provider: liveSentinelProvider, Price: 5.00},
 		{BanID: banBase, Date: "2024-02-20", Provider: liveSentinelProvider, Price: 7.00},
-		{BanID: banBaseJa, Date: "2024-02-20", Provider: liveSentinelProvider, Price: 99.00}, // canonical must ignore
+		{BanID: banJa, Date: "2024-02-20", Provider: liveSentinelProvider, Price: 99.00},
 		{BanID: banBaseAlt, Date: "2024-02-01", Provider: liveSentinelProvider, Price: 500.00},
 	}
 	if _, err := c.UpsertLongPrices(ctx, rows, 0); err != nil {
@@ -177,13 +201,13 @@ func TestLongFormLive(t *testing.T) {
 		t.Log("partition-creating cases skipped: set TCGLIVE_SCRATCH=1 on a scratch database to run them")
 	}
 
-	// --- HGetAllLong: canonical (lang='') series only ---
-	hist, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, false, Lookback(3650))
+	// --- HGetAllLong: one printing's series by its id ---
+	hist, err := c.HGetAllLong(ctx, base, Lookback(3650))
 	if err != nil {
 		t.Fatalf("HGetAllLong: %v", err)
 	}
 	if got := hist["2024-02-20"][liveSentinelProvider]; got != 8.00 {
-		t.Errorf("HGetAllLong 2024-02-20 = %v, want 8.00 (overwrite + canonical, not the 99.00 ja row)", got)
+		t.Errorf("HGetAllLong 2024-02-20 = %v, want 8.00 (the overwrite)", got)
 	}
 	if got := hist["2024-02-08"][liveSentinelProvider]; got != 5.00 {
 		t.Errorf("HGetAllLong 2024-02-08 = %v, want 5.00", got)
@@ -191,7 +215,7 @@ func TestLongFormLive(t *testing.T) {
 	if _, ok := hist["2024-02-01"]; ok {
 		t.Error("HGetAllLong read the alt copy's 2024-02-01 row")
 	}
-	histAlt, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, true, Lookback(3650))
+	histAlt, err := c.HGetAllLong(ctx, alt, Lookback(3650))
 	if err != nil {
 		t.Fatalf("HGetAllLong alt: %v", err)
 	}
@@ -202,7 +226,7 @@ func TestLongFormLive(t *testing.T) {
 	// The read goes through the statement cache, which is what keeps its
 	// hundred-partition plan from being rebuilt per call. A second read must
 	// answer the same and must not add a second entry for the same text.
-	histAgain, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, false, Lookback(3650))
+	histAgain, err := c.HGetAllLong(ctx, base, Lookback(3650))
 	if err != nil {
 		t.Fatalf("HGetAllLong (second): %v", err)
 	}
@@ -213,8 +237,8 @@ func TestLongFormLive(t *testing.T) {
 		t.Error("NewClient did not keep the chart read prepared")
 	}
 
-	// --- GetEarliestDateLong: MIN across all matching ban_ids ---
-	earliest, err := c.GetEarliestDateLong(ctx, liveSentinelUUID, false, false, false, Lookback(3650))
+	// --- GetEarliestDateLong: MIN over the printing's rows ---
+	earliest, err := c.GetEarliestDateLong(ctx, base, Lookback(3650))
 	if err != nil {
 		t.Fatalf("GetEarliestDateLong: %v", err)
 	}
@@ -229,24 +253,69 @@ func TestLongFormLive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAggregatePriceStatsLong: %v", err)
 	}
-	s, ok := stats[AggregatePriceKey{MtgjsonUUID: liveSentinelUUID}]
+	s, ok := stats[base]
 	if !ok {
 		t.Fatalf("no aggregate stats for sentinel; got %d keys", len(stats))
 	}
-	// Grouped by (uuid, foil, etched, alt) ACROSS language (matching the legacy
-	// GetAggregatePriceStats), so the same-uuid Japanese row (99.00) is included
-	// alongside the base 5.00 and 8.00: max 99, min 5, count 3. Only the
-	// 2024-02-08 row is before the cutoff: prior max 5.
-	if s.Max != 99.00 || s.Min != 5.00 || s.Count != 3 || s.PriorMax != 5.00 {
-		t.Errorf("stats = %+v, want max 99 min 5 count 3 prior max 5", s)
+	// Keyed per printing: 5.00 and 8.00, of which only 2024-02-08 is before the
+	// cutoff.
+	if s.Max != 8.00 || s.Min != 5.00 || s.Count != 2 || s.PriorMax != 5.00 {
+		t.Errorf("stats = %+v, want max 8 min 5 count 2 prior max 5", s)
 	}
 	// The alt copy is its own card, so its 500.00 stays out of the above.
-	sAlt, ok := stats[AggregatePriceKey{MtgjsonUUID: liveSentinelUUID, IsAlt: true}]
+	sAlt, ok := stats[alt]
 	if !ok {
 		t.Fatalf("no aggregate stats for the sentinel's alt copy; got %d keys", len(stats))
 	}
 	if sAlt.Max != 500.00 || sAlt.Min != 500.00 || sAlt.Count != 1 || sAlt.PriorMax != 500.00 {
 		t.Errorf("alt stats = %+v, want max 500 min 500 count 1 prior max 500", sAlt)
+	}
+	// So is the Japanese printing.
+	if sJa, ok := stats[ja]; !ok || sJa.Max != 99.00 || sJa.Min != 99.00 || sJa.Count != 1 {
+		t.Errorf("ja stats = %+v (ok=%v), want max 99 min 99 count 1", sJa, ok)
+	}
+
+	// --- adopts an alias-only row ---
+	var banFoil int64
+	if err := c.db.QueryRowContext(ctx, `INSERT INTO variants (mtgjson_uuid, is_foil) VALUES ($1, true) RETURNING ban_id`,
+		liveSentinelUUID).Scan(&banFoil); err != nil {
+		t.Fatalf("insert alias-only row: %v", err)
+	}
+	foil := base + "_f"
+	if got, err := c.ResolveMagicBanID(ctx, foil, MagicVariant{MtgjsonUUID: base, IsFoil: true}); err != nil || got != banFoil {
+		t.Fatalf("resolve over an alias-only row = %d, %v; want its ban_id %d", got, err, banFoil)
+	}
+	var adopted string
+	if err := c.db.QueryRowContext(ctx, `SELECT mtgban_id FROM variants WHERE ban_id=$1`, banFoil).Scan(&adopted); err != nil || adopted != foil {
+		t.Fatalf("alias-only row mtgban_id = %q, %v; want %q", adopted, err, foil)
+	}
+
+	// --- refuses a respelled id ---
+	_, err = c.ResolveMagicBanID(ctx, base+"_x", MagicVariant{MtgjsonUUID: base, IsFoil: true})
+	var respelled *ErrVariantRespelled
+	if !errors.As(err, &respelled) || respelled.Stored != foil {
+		t.Fatalf("respelled resolve err = %v, want an ErrVariantRespelled naming %q", err, foil)
+	}
+	var minted int
+	if err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM variants WHERE mtgban_id=$1`, base+"_x").Scan(&minted); err != nil || minted != 0 {
+		t.Fatalf("rows filed under the respelled id = %d, %v; want 0", minted, err)
+	}
+	// A lost adoption (UPDATE hits 0 rows) is reachable only by a race; it returns the same ErrVariantRespelled.
+
+	// --- an id already filed keeps its row and alias ---
+	etched := base + "_e"
+	banEtched, err := c.ResolveMagicBanID(ctx, etched, MagicVariant{MtgjsonUUID: base, IsEtched: true})
+	if err != nil {
+		t.Fatalf("ResolveMagicBanID etched: %v", err)
+	}
+	// c2's cache is cold, so the second ask reaches the table.
+	if got, err := c2.ResolveMagicBanID(ctx, etched, MagicVariant{MtgjsonUUID: base, IsEtched: true, Language: "French"}); err != nil || got != banEtched {
+		t.Fatalf("resolve of a filed id under another alias = %d, %v; want its row %d", got, err, banEtched)
+	}
+	var etchedFlag bool
+	var etchedLang string
+	if err := c.db.QueryRowContext(ctx, `SELECT is_etched, language FROM variants WHERE ban_id=$1`, banEtched).Scan(&etchedFlag, &etchedLang); err != nil || !etchedFlag || etchedLang != "" {
+		t.Fatalf("filed row's alias = etched %v language %q, %v; want etched, English", etchedFlag, etchedLang, err)
 	}
 
 	// --- GetMoversLong: 2024-02-08 -> 2024-02-20 for the sentinel ---
@@ -356,7 +425,6 @@ func TestLongFormLive(t *testing.T) {
 	if got, ok := c3.CachedMagicBanID(base); ok {
 		t.Errorf("category-scoped warm cached magic variant %d; it should not have been read", got)
 	}
-	_ = banJa
 }
 
 // Sentinels for the game-scoping test, distinct from TestLongFormLive's so the
@@ -420,7 +488,7 @@ func TestMoversLongGameScopingLive(t *testing.T) {
 		}
 	}
 
-	magicBan, err := c.ResolveMagicBanID(ctx, MagicVariant{MtgjsonUUID: scopeSentinelUUID})
+	magicBan, err := c.ResolveMagicBanID(ctx, scopeSentinelUUID, MagicVariant{MtgjsonUUID: scopeSentinelUUID})
 	if err != nil {
 		t.Fatalf("ResolveMagicBanID: %v", err)
 	}

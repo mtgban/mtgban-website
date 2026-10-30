@@ -36,30 +36,15 @@ const longMaxBatch = pgMaxParams / longColsPerRow
 // hgetAllLongQuery is the hottest read the site makes. NewClient keeps it
 // prepared, and the text stays here for the fallback path (see Client.query).
 const hgetAllLongQuery = `
-		WITH canon AS (
-			SELECT ban_id FROM variants
-			 WHERE mtgjson_uuid=$1 AND is_foil=$2 AND is_etched=$3 AND is_alt=$4
-			 ORDER BY (language='') DESC, ban_id ASC
-			 LIMIT 1
-		)
 		SELECT date, provider, price FROM prices
-		 WHERE ban_id = (SELECT ban_id FROM canon) AND date >= $5`
+		 WHERE ban_id = (SELECT ban_id FROM variants WHERE mtgban_id = $1) AND date >= $2`
 
-// HGetAllLong returns a single card's price history over the lookback window,
-// pivoted to date -> (provider -> price). The read identity (uuid, foil, etched,
-// alt) is coarser than a ban_id, so a CTE resolves the canonical printing first:
-// preferring language=”, falling back to the smallest matching ban_id (e.g. a
-// Japanese-only promo). Deterministic, unlike the wide table's
-// last-wins over an unordered scan (plan 17.2).
-//
-// Resolution and fetch are one statement (a scalar subquery over the CTE), so the
-// common chart read stays a single round-trip; splitting it doubled latency
-// against a remote DB. An unresolved card yields NULL, which matches no prices
-// and returns an empty map.
-func (c *Client) HGetAllLong(ctx context.Context, uuid string, isFoil, isEtched, isAlt bool, lb Lookback) (map[string]ProviderPrices, error) {
-	uuid = NormalizeUUID(uuid)
+// HGetAllLong returns a printing's prices over the lookback, as date ->
+// provider -> price, by its mtgban_id. The id resolves in a subquery, one
+// round-trip; an unknown id returns an empty map.
+func (c *Client) HGetAllLong(ctx context.Context, mtgbanID string, lb Lookback) (map[string]ProviderPrices, error) {
 	result := make(map[string]ProviderPrices)
-	rows, err := c.query(ctx, c.stmtHGetAllLong, hgetAllLongQuery, uuid, isFoil, isEtched, isAlt, lb.Since())
+	rows, err := c.query(ctx, c.stmtHGetAllLong, hgetAllLongQuery, mtgbanID, lb.Since())
 	if err != nil {
 		return nil, err
 	}
@@ -116,19 +101,17 @@ func (c *Client) HGetAllByBanID(ctx context.Context, banID int64, lb Lookback) (
 	return result, rows.Err()
 }
 
-// GetEarliestDateLong returns the oldest on-record date for a card, bounded by
-// the lookback window, across every ban_id that shares (uuid, foil, etched,
-// alt) — language-agnostic, matching the wide table's MIN (plan 17.2).
-func (c *Client) GetEarliestDateLong(ctx context.Context, uuid string, isFoil, isEtched, isAlt bool, lb Lookback) (time.Time, error) {
-	uuid = NormalizeUUID(uuid)
+// GetEarliestDateLong returns the oldest on-record date for one printing, by
+// its mtgban_id, bounded by the lookback window.
+func (c *Client) GetEarliestDateLong(ctx context.Context, mtgbanID string, lb Lookback) (time.Time, error) {
 	boundary := lb.Since()
 	var earliest sql.NullTime
 	err := c.db.QueryRowContext(ctx, `
 		SELECT MIN(p.date)
 		  FROM prices p
 		  JOIN variants v ON v.ban_id = p.ban_id
-		 WHERE v.mtgjson_uuid=$1 AND v.is_foil=$2 AND v.is_etched=$3 AND v.is_alt=$4 AND p.date >= $5`,
-		uuid, isFoil, isEtched, isAlt, boundary).Scan(&earliest)
+		 WHERE v.mtgban_id = $1 AND p.date >= $2`,
+		mtgbanID, boundary).Scan(&earliest)
 	if err != nil || !earliest.Valid || earliest.Time.IsZero() {
 		return boundary, err
 	}
@@ -148,16 +131,6 @@ func (c *Client) GetEarliestDateByBanID(ctx context.Context, banID int64, lb Loo
 	return earliest.Time, nil
 }
 
-// AggregatePriceKey identifies a card variant in an aggregate result map.
-// Language is intentionally omitted: we aggregate across it. IsAlt is kept,
-// since the Alternate Fourth Edition copy shares its original's uuid.
-type AggregatePriceKey struct {
-	MtgjsonUUID string
-	IsFoil      bool
-	IsEtched    bool
-	IsAlt       bool
-}
-
 // AggregatePriceStats holds per-card summary statistics of one price column
 // over a date window: max, min, discrete 90th percentile, and the count of
 // rows that contributed to them. Computed from rows where the column is
@@ -172,16 +145,12 @@ type AggregatePriceStats struct {
 	PriorMax float64
 }
 
-// GetAggregatePriceStatsLong returns per-card max/min/p90/count of one provider
-// over rows with date >= since, and PriorMax over those before cutoff, keyed by
-// (uuid, foil, etched, alt) so callers do O(1)
-// lookups while iterating a buylist/inventory. Scoped to Magic variants
-// (mtgjson_uuid IS NOT NULL) so a shared provider (3/4) doesn't pull other games'
-// rows (plan 17.3). price > 0 is redundant with the zero-omitting backfill but
-// kept defensive.
-func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16, since, cutoff time.Time) (map[AggregatePriceKey]AggregatePriceStats, error) {
+// GetAggregatePriceStatsLong returns one provider's per-printing stats since
+// since, with PriorMax over the days before cutoff, keyed by mtgban_id. Only
+// rows with an id count, so a provider shared with other games reads none of theirs.
+func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16, since, cutoff time.Time) (map[string]AggregatePriceStats, error) {
 	rows, err := c.db.QueryContext(ctx, `
-		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched, v.is_alt,
+		SELECT v.mtgban_id,
 		       MAX(p.price)                                          AS max_price,
 		       MIN(p.price)                                          AS min_price,
 		       percentile_disc(0.9) WITHIN GROUP (ORDER BY p.price)  AS p90_price,
@@ -190,19 +159,18 @@ func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16,
 		  FROM prices p
 		  JOIN variants v ON v.ban_id = p.ban_id
 		 WHERE p.provider = $1 AND p.date >= $2 AND p.price > 0
-		   AND v.mtgjson_uuid IS NOT NULL
-		 GROUP BY v.mtgjson_uuid, v.is_foil, v.is_etched, v.is_alt`, provider, since, cutoff)
+		   AND v.mtgban_id IS NOT NULL
+		 GROUP BY v.mtgban_id`, provider, since, cutoff)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	result := make(map[AggregatePriceKey]AggregatePriceStats)
+	result := make(map[string]AggregatePriceStats)
 	for rows.Next() {
-		var key AggregatePriceKey
+		var key string
 		var stats AggregatePriceStats
-		err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched, &key.IsAlt,
-			&stats.Max, &stats.Min, &stats.P90, &stats.Count, &stats.PriorMax)
+		err := rows.Scan(&key, &stats.Max, &stats.Min, &stats.P90, &stats.Count, &stats.PriorMax)
 		if err != nil {
 			return nil, err
 		}

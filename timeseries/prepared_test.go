@@ -25,7 +25,7 @@ func TestQueryFallsBackWithoutAStatement(t *testing.T) {
 	// Reaches the server (and fails there, since there is none) rather than
 	// returning early on the nil statement.
 	_, err = c.query(context.Background(), c.stmtHGetAllLong, hgetAllLongQuery,
-		"7c3ea479-e463-58e7-b1b0-b217c77dae79", false, false, Lookback(365).Since())
+		"7c3ea479-e463-58e7-b1b0-b217c77dae79", Lookback(365).Since())
 	if err == nil {
 		t.Error("query against a dead server did not error")
 	}

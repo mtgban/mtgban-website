@@ -1018,13 +1018,7 @@ func buylistMetrics(b *matcher.Backend, store string, reducers map[string]buylis
 			continue
 		}
 
-		v := magicVariant(co)
-		stats, ok := statsByCard[timeseries.AggregatePriceKey{
-			MtgjsonUUID: v.MtgjsonUUID,
-			IsFoil:      v.IsFoil,
-			IsEtched:    v.IsEtched,
-			IsAlt:       v.IsAlt,
-		}]
+		stats, ok := statsByCard[magicID(co)]
 		if !ok {
 			continue
 		}

@@ -223,20 +223,17 @@ func fetchChartPrices(ctx context.Context, target *chartTarget, lb timeseries.Lo
 		return results, nil
 	}
 
-	// No ban_id and no uuid to fall back on means this printing has no identity
-	// the archive can be asked about - a non-Magic finish the product carries no
-	// sub-type for, most often. Asking anyway would fail as a type error and
-	// read as an outage, where there is simply nothing to chart.
-	if !hasCanonicalIdentity(target) {
-		log.Printf("chart: %q (%s) resolved to no ban_id and is not an mtgjson uuid, so the archive has no identity to look it up by",
-			target.UUID, target.Name)
+	// No ban_id and no Magic id means the archive has nothing to look this
+	// printing up by: most often a non-Magic finish its product has no sub-type for.
+	if !hasMagicID(target) {
+		log.Printf("chart: %s resolved to no ban_id and has no Magic id, so the archive has no identity to look it up by",
+			target.Name)
 		return nil, nil
 	}
 
-	results, err := PricesArchiveDB.HGetAllLong(ctx, target.UUID, target.Foil, target.Etched, target.Alt, lb)
+	results, err := PricesArchiveDB.HGetAllLong(ctx, target.MtgbanID, lb)
 	if err != nil {
-		log.Printf("chart: uuid %s foil=%t etched=%t alt=%t (%s): %v",
-			target.UUID, target.Foil, target.Etched, target.Alt, target.Name, err)
+		log.Printf("chart: mtgban_id %s (%s): %v", target.MtgbanID, target.Name, err)
 		return nil, err
 	}
 	return results, nil
@@ -539,10 +536,10 @@ func snapshotDate(ts time.Time, now time.Time) string {
 	return tsDay
 }
 
-// magicVariant is the variant a Magic card's prices are filed under. The uuid
+// magicAlias is the lookup alias a Magic card's variant row carries. The uuid
 // column holds mtgjson's 36 characters, so is_alt is what tells the
 // Alternate Fourth Edition copy ("<uuid>_alt") from the printing it copies.
-func magicVariant(co *matcher.CardObject) timeseries.MagicVariant {
+func magicAlias(co *matcher.CardObject) timeseries.MagicVariant {
 	return timeseries.MagicVariant{
 		MtgjsonUUID: timeseries.NormalizeUUID(co.UUID),
 		IsFoil:      co.Foil,
@@ -550,6 +547,14 @@ func magicVariant(co *matcher.CardObject) timeseries.MagicVariant {
 		IsAlt:       strings.Contains(co.UUID, "_alt"),
 		Language:    co.Language,
 	}
+}
+
+// magicID is the id a Magic card's prices are filed under, "" for another game's.
+func magicID(co *matcher.CardObject) string {
+	if maybeUUIDString(timeseries.NormalizeUUID(co.UUID)) {
+		return co.UUID
+	}
+	return ""
 }
 
 // stashingInProgress gates concurrent invocations of stashInTimeseries
@@ -647,7 +652,7 @@ func walkSnapshotPrices(b *matcher.Backend, start time.Time, visit snapshotPrice
 }
 
 // stashMagicTimeseries takes a Magic deployment's snapshot into the long prices
-// table, under the ban_id of each card's magicVariant. A printing with no
+// table, under the ban_id of each card's magicID. A printing with no
 // variant row yet gets one from ResolveMagicBanID.
 func stashMagicTimeseries(ctx context.Context, b *matcher.Backend, start time.Time) {
 	// A miss costs a round-trip to file the variant, so warm the cache first.
@@ -658,41 +663,57 @@ func stashMagicTimeseries(ctx context.Context, b *matcher.Backend, start time.Ti
 	}
 
 	// A variant that failed to file is not retried for each dataset pricing it,
-	// so an outage logs once per variant.
-	failed := map[timeseries.MagicVariant]error{}
-	snapshot := collectMagicSnapshot(b, start, func(v timeseries.MagicVariant) (int64, error) {
-		err, seen := failed[v]
+	// so an outage logs once per variant. An id the cache missed and the
+	// resolver then filed counts as new, whether minted or adopted.
+	failed := map[string]error{}
+	var minted int
+	snapshot := collectMagicSnapshot(b, start, func(id string, alias timeseries.MagicVariant) (int64, error) {
+		err, seen := failed[id]
 		if seen {
 			return 0, err
 		}
-		banID, err := PricesArchiveDB.ResolveMagicBanID(ctx, v)
+		_, cached := PricesArchiveDB.CachedMagicBanID(id)
+		banID, err := PricesArchiveDB.ResolveMagicBanID(ctx, id, alias)
 		if err != nil {
 			log.Println("snapshot: resolve ban_id:", err)
-			failed[v] = err
+			failed[id] = err
+		} else if !cached {
+			minted++
 		}
 		return banID, err
 	})
+	snapshot.NewVariants = minted
+	if snapshot.Respelled > 0 {
+		ServerNotify("timeseries", fmt.Sprintf("snapshot: %d variants are filed under another id, prices skipped: %s",
+			snapshot.Respelled, strings.Join(snapshot.RespelledPairs, ", ")))
+	}
 	writeSnapshot(ctx, start, snapshot)
 }
 
 // collectMagicSnapshot walks the served scrapers into long price rows, keyed on
-// the ban_id banIDFor gives each card's variant. A Magic snapshot keeps its
+// the ban_id banIDFor gives each card's id. A Magic snapshot keeps its
 // TCGplayer series, since the tcgcsv ingest covers only other games.
-func collectMagicSnapshot(b *matcher.Backend, start time.Time, banIDFor func(timeseries.MagicVariant) (int64, error)) longSnapshot {
-	var snapshot longSnapshot
-	walkSnapshotPrices(b, start, func(card *matcher.CardObject, config DatasetConfig, date string, price float64) {
+func collectMagicSnapshot(b *matcher.Backend, start time.Time, banIDFor func(id string, alias timeseries.MagicVariant) (int64, error)) longSnapshot {
+	snapshot := longSnapshot{magic: true}
+	walkSnapshotPrices(b, start, snapshot.magicVisitor(banIDFor))
+	return snapshot
+}
+
+// magicVisitor files each price under its card's magicID. A card with none
+// is counted as NoVariant, never handed to banIDFor.
+func (s *longSnapshot) magicVisitor(banIDFor func(id string, alias timeseries.MagicVariant) (int64, error)) snapshotPriceFunc {
+	return func(card *matcher.CardObject, config DatasetConfig, date string, price float64) {
 		var banID int64
-		if snapshot.stores(config) {
-			id, err := banIDFor(magicVariant(card))
+		if id := magicID(card); id != "" && s.stores(config) {
+			filed, err := banIDFor(id, magicAlias(card))
 			if err != nil {
-				snapshot.ResolveErrors++
+				s.resolveFailed(err)
 				return
 			}
-			banID = id
+			banID = filed
 		}
-		snapshot.add(banID, config, date, price)
-	})
-	return snapshot
+		s.add(banID, config, date, price)
+	}
 }
 
 // stashNonMagicTimeseries takes a non-Magic deployment's snapshot into the long
@@ -766,14 +787,17 @@ func writeSnapshot(ctx context.Context, start time.Time, snapshot longSnapshot) 
 	SetLastStashUpdate(time.Now())
 	ServerNotify("timeseries", fmt.Sprintf("Snapshot completed in %s: %d prices collected, %d new or changed%s",
 		time.Since(start), len(snapshot.Rows), upserted, snapshot.skipped()))
-	var problem string
-	switch {
-	case len(snapshot.Rows) == 0:
-		problem = "found no prices to stash"
-	case snapshot.ResolveErrors > 0:
-		problem = fmt.Sprintf("could not file a variant for %d prices", snapshot.ResolveErrors)
+	var problems []string
+	if len(snapshot.Rows) == 0 {
+		problems = append(problems, "found no prices to stash")
 	}
-	backgroundJobs.Report(jobStash, fmt.Sprintf("%d prices collected, %d new or changed", len(snapshot.Rows), upserted), problem)
+	if snapshot.ResolveErrors > 0 {
+		problems = append(problems, fmt.Sprintf("could not file a variant for %d prices", snapshot.ResolveErrors))
+	}
+	if snapshot.Respelled > 0 {
+		problems = append(problems, fmt.Sprintf("%d variants are filed under another id", snapshot.Respelled))
+	}
+	backgroundJobs.Report(jobStash, fmt.Sprintf("%d prices collected, %d new or changed", len(snapshot.Rows), upserted), strings.Join(problems, "; "))
 }
 
 // tcgcsvOwnedProviders are the provider ids the tcgcsv ingest writes from
@@ -886,9 +910,17 @@ type longSnapshot struct {
 	// file, a fault of its own: the card is known, the write was not.
 	ResolveErrors int
 
+	// Respelled counts the Magic variants whose alias is filed under another
+	// id, their prices skipped; RespelledPairs keeps the first few "old -> new".
+	Respelled      int
+	RespelledPairs []string
+	respelledIDs   map[string]bool
+	// magic makes the completion notice name the respelled count, even zero.
+	magic bool
+
 	// NewVariants counts the cache misses that came back under their derived
-	// id: the printings this snapshot filed, give or take one another writer
-	// filed since the warm.
+	// id (for Magic, that resolved): the printings this snapshot filed, give or
+	// take one another writer filed since the warm.
 	NewVariants int
 }
 
@@ -916,6 +948,30 @@ func (s *longSnapshot) refile(derived, filed map[timeseries.TCGVariant]int64) {
 		rows = append(rows, row)
 	}
 	s.Rows = rows
+}
+
+// maxRespelledPairs caps the respellings a snapshot's notice lists.
+const maxRespelledPairs = 10
+
+// resolveFailed counts a price whose variant did not resolve: a respelling
+// once per variant, any other failure per price.
+func (s *longSnapshot) resolveFailed(err error) {
+	var respelled *timeseries.ErrVariantRespelled
+	if !errors.As(err, &respelled) {
+		s.ResolveErrors++
+		return
+	}
+	if s.respelledIDs[respelled.MtgbanID] {
+		return
+	}
+	if s.respelledIDs == nil {
+		s.respelledIDs = map[string]bool{}
+	}
+	s.respelledIDs[respelled.MtgbanID] = true
+	s.Respelled++
+	if len(s.RespelledPairs) < maxRespelledPairs {
+		s.RespelledPairs = append(s.RespelledPairs, respelled.Stored+" -> "+respelled.MtgbanID)
+	}
 }
 
 // stores reports whether a price from this dataset becomes a row, the
@@ -963,6 +1019,9 @@ func (s *longSnapshot) skipped() string {
 	}
 	if s.ResolveErrors > 0 {
 		out += fmt.Sprintf(", %d whose variant could not be filed", s.ResolveErrors)
+	}
+	if s.magic || s.Respelled > 0 {
+		out += fmt.Sprintf(", %d respelled", s.Respelled)
 	}
 	return out
 }

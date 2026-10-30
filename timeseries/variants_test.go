@@ -1,9 +1,19 @@
 package timeseries
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 )
+
+// An empty id is refused before any query, so a nil-db client can ask.
+func TestResolveMagicBanIDRefusesAnEmptyID(t *testing.T) {
+	var c Client
+	if _, err := c.ResolveMagicBanID(context.Background(), "", MagicVariant{MtgjsonUUID: "ffffffff-0000-0000-0000-000000000001"}); !errors.Is(err, ErrEmptyMagicID) {
+		t.Errorf("err = %v, want ErrEmptyMagicID", err)
+	}
+}
 
 func TestMagicVariantNormalized(t *testing.T) {
 	cases := []struct {
@@ -179,9 +189,9 @@ func TestTCGSubTypeCodesStayPut(t *testing.T) {
 // did not, so a mint that landed mid-warm is not minted twice.
 func TestVariantCacheMintsBetweenWarms(t *testing.T) {
 	var vc variantCache
-	warmed := MagicVariant{MtgjsonUUID: "7c3ea479-e463-58e7-b1b0-b217c77dae79"}
-	minted := MagicVariant{MtgjsonUUID: "7c3ea479-e463-58e7-b1b0-b217c77dae79", IsFoil: true}
-	unread := MagicVariant{MtgjsonUUID: "7c3ea479-e463-58e7-b1b0-b217c77dae79", IsEtched: true}
+	warmed := "7c3ea479-e463-58e7-b1b0-b217c77dae79"
+	minted := warmed + "_f"
+	unread := warmed + "_e"
 
 	if _, ok := vc.magicBanID(minted); ok {
 		t.Fatal("an empty cache answered")
@@ -191,7 +201,7 @@ func TestVariantCacheMintsBetweenWarms(t *testing.T) {
 		t.Fatalf("minted before any warm = %d/%v, want 2", id, ok)
 	}
 
-	vc.publish(&variantIndex{magic: map[MagicVariant]int64{warmed: 1}})
+	vc.publish(&variantIndex{magic: map[string]int64{warmed: 1}})
 	if id, ok := vc.magicBanID(warmed); !ok || id != 1 {
 		t.Fatalf("warmed = %d/%v, want 1", id, ok)
 	}
@@ -204,7 +214,7 @@ func TestVariantCacheMintsBetweenWarms(t *testing.T) {
 		t.Fatalf("minted after the warm = %d/%v, want 2", id, ok)
 	}
 	vc.setMagicBanID(unread, 3)
-	vc.publish(&variantIndex{magic: map[MagicVariant]int64{warmed: 1, minted: 2}})
+	vc.publish(&variantIndex{magic: map[string]int64{warmed: 1, minted: 2}})
 	if id, ok := vc.magicBanID(minted); !ok || id != 2 {
 		t.Fatalf("re-warmed mint = %d/%v, want 2", id, ok)
 	}

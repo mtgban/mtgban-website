@@ -3,6 +3,7 @@ package timeseries
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -108,10 +109,11 @@ type Client struct {
 	variants variantCache
 
 	// The chart reads are kept prepared, which is what stops their
-	// hundred-partition plan from being rebuilt on every request. Set once by
-	// NewClient, before the client is handed out, and never written again -
-	// so reading them needs no synchronisation. Nil when preparing failed, or
-	// on a client built without one, and the read falls back to Query.
+	// hundred-partition plan from being rebuilt on every request. Set by
+	// NewClient and PrepareStatements, before the client is handed out, and
+	// never written again - so reading them needs no synchronisation. Nil when
+	// preparing failed, or on a client built without one, and the read falls
+	// back to Query.
 	stmtHGetAllLong    *sql.Stmt
 	stmtHGetAllByBanID *sql.Stmt
 }
@@ -200,9 +202,33 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 	}
 	// Best effort: a read whose statement did not prepare still runs, it just
 	// pays for its plan every time.
-	c.stmtHGetAllLong, _ = db.Prepare(hgetAllLongQuery)
-	c.stmtHGetAllByBanID, _ = db.Prepare(hgetAllByBanIDQuery)
+	_ = c.PrepareStatements(context.Background())
 	return c, nil
+}
+
+// PrepareStatements prepares each chart read not yet prepared, such as one
+// whose column did not exist at NewClient. Call it only before the client is
+// shared; a read left unprepared still runs, as a plain query.
+func (c *Client) PrepareStatements(ctx context.Context) error {
+	var errs []error
+	for _, s := range []struct {
+		stmt **sql.Stmt
+		text string
+	}{
+		{&c.stmtHGetAllLong, hgetAllLongQuery},
+		{&c.stmtHGetAllByBanID, hgetAllByBanIDQuery},
+	} {
+		if *s.stmt != nil {
+			continue
+		}
+		stmt, err := c.db.PrepareContext(ctx, s.text)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		*s.stmt = stmt
+	}
+	return errors.Join(errs...)
 }
 
 // ReadOnly reports whether the client was opened against a read-only database.

@@ -553,7 +553,7 @@ func TestFetchRosterPricesSurvivesAPanickingRead(t *testing.T) {
 		roster[i] = chartSeries{CardID: fmt.Sprintf("ban:%d", banID), target: &chartTarget{BanID: banID}}
 	}
 	// No identity to read by, so it answers without asking the archive.
-	roster = append(roster, chartSeries{CardID: "none", target: &chartTarget{UUID: "none"}})
+	roster = append(roster, chartSeries{CardID: "none", target: &chartTarget{Name: "none"}})
 
 	done := make(chan []chartSeries, 1)
 	go func() { done <- fetchRosterPrices(context.Background(), roster, timeseries.Lookback(30)) }()
@@ -595,8 +595,8 @@ func TestCollectMagicSnapshotCountsResolveErrors(t *testing.T) {
 	now := time.Now()
 	serve([]mtgban.Seller{serveSellerN("ZZMKM", map[string]float64{filed: 1, failing: 2}, now)}, nil)
 
-	snapshot := collectMagicSnapshot(backend(), now, func(v timeseries.MagicVariant) (int64, error) {
-		if v.MtgjsonUUID == timeseries.NormalizeUUID(failing) {
+	snapshot := collectMagicSnapshot(backend(), now, func(id string, _ timeseries.MagicVariant) (int64, error) {
+		if id == failing {
 			return 0, errors.New("connection reset")
 		}
 		return 7, nil
@@ -610,10 +610,64 @@ func TestCollectMagicSnapshotCountsResolveErrors(t *testing.T) {
 	}
 }
 
-// TestMagicVariantAltCopy pins that the Alternate Fourth Edition copy and the
+// A respelled variant is counted once and named, and its price dropped; the
+// notice names the count even when it is zero.
+func TestCollectMagicSnapshotCountsRespellings(t *testing.T) {
+	ids := nRealUUIDs(t, 2)
+	filed, respelled := ids[0], ids[1]
+
+	keepScrapers(t)
+	withDatasets(t, []DatasetConfig{
+		{Retail: []string{"ZZMKM"}, PublicName: "Cardmarket Trend", Provider: timeseries.ProviderMKMTrend},
+		{Retail: []string{"ZZMKM"}, PublicName: "Cardmarket Low", Provider: timeseries.ProviderMKMLow},
+	})
+	now := time.Now()
+	serve([]mtgban.Seller{serveSellerN("ZZMKM", map[string]float64{filed: 1, respelled: 2}, now)}, nil)
+
+	snapshot := collectMagicSnapshot(backend(), now, func(id string, alias timeseries.MagicVariant) (int64, error) {
+		if id == respelled {
+			return 0, &timeseries.ErrVariantRespelled{MtgbanID: id, Stored: "old-id", Alias: alias}
+		}
+		return 7, nil
+	})
+	if snapshot.Respelled != 1 || snapshot.ResolveErrors != 0 {
+		t.Errorf("Respelled = %d, ResolveErrors = %d, want 1 and 0", snapshot.Respelled, snapshot.ResolveErrors)
+	}
+	if want := []string{"old-id -> " + respelled}; !slices.Equal(snapshot.RespelledPairs, want) {
+		t.Errorf("pairs = %q, want %q", snapshot.RespelledPairs, want)
+	}
+	for _, row := range snapshot.Rows {
+		if row.BanID != 7 {
+			t.Errorf("row %+v kept for the respelled variant", row)
+		}
+	}
+	if len(snapshot.Rows) != 2 {
+		t.Errorf("rows = %+v, want the filed card's two", snapshot.Rows)
+	}
+	if got := (&longSnapshot{magic: true}).skipped(); got != ", 0 respelled" {
+		t.Errorf("clean Magic skipped() = %q, want the zero named", got)
+	}
+}
+
+// The walk never reaches a non-uuid id on a Magic datastore, so the guard is
+// driven through the visitor directly.
+func TestCollectMagicSnapshotSkipsANonMagicID(t *testing.T) {
+	var s longSnapshot
+	visit := s.magicVisitor(func(id string, _ timeseries.MagicVariant) (int64, error) {
+		t.Errorf("resolver called for %q", id)
+		return 7, nil
+	})
+	visit(&matcher.CardObject{Card: matcher.Card{UUID: "492703"}},
+		DatasetConfig{PublicName: "Cardmarket Trend", Provider: timeseries.ProviderMKMTrend}, "2026-10-30", 1)
+	if s.NoVariant != 1 || len(s.Rows) != 0 {
+		t.Errorf("NoVariant = %d, rows = %+v; want 1 and none", s.NoVariant, s.Rows)
+	}
+}
+
+// TestMagicIDAltCopy pins that the Alternate Fourth Edition copy and the
 // printing it copies file under two variants, and that mtgjson's own
 // isAlternative flag, which every flagged card's uuid already carries, does not.
-func TestMagicVariantAltCopy(t *testing.T) {
+func TestMagicIDAltCopy(t *testing.T) {
 	original, err := backend().GetUUID("1b3a28ad-41ca-587a-9feb-5f40154976da")
 	if err != nil {
 		t.Skip("matcher data not loaded; skipping")
@@ -630,14 +684,21 @@ func TestMagicVariantAltCopy(t *testing.T) {
 	now := time.Now()
 	serve([]mtgban.Seller{serveSellerN("ZZMKM", map[string]float64{original.UUID: 4.34, copied.UUID: 285.01}, now)}, nil)
 
-	snapshot := collectMagicSnapshot(backend(), now, func(v timeseries.MagicVariant) (int64, error) {
-		if v.MtgjsonUUID != original.UUID {
-			t.Errorf("variant uuid = %s, want %s", v.MtgjsonUUID, original.UUID)
-		}
-		if v.IsAlt {
+	snapshot := collectMagicSnapshot(backend(), now, func(id string, alias timeseries.MagicVariant) (int64, error) {
+		switch id {
+		case original.UUID:
+			if alias.IsAlt {
+				t.Errorf("alias of %s is alt", id)
+			}
+			return 1, nil
+		case original.UUID + "_alt":
+			if !alias.IsAlt {
+				t.Errorf("alias of %s is not alt", id)
+			}
 			return 2, nil
 		}
-		return 1, nil
+		t.Errorf("unexpected id %s", id)
+		return 0, errors.New("unexpected id")
 	})
 	slices.SortFunc(snapshot.Rows, func(a, b timeseries.LongPrice) int { return int(a.BanID - b.BanID) })
 	date := now.Format("2006-01-02")
@@ -654,10 +715,23 @@ func TestMagicVariantAltCopy(t *testing.T) {
 		if err != nil || !co.IsAlternative || strings.Contains(uuid, "_alt") {
 			continue
 		}
-		if magicVariant(co).IsAlt {
+		if magicAlias(co).IsAlt {
 			t.Errorf("%s is filed as an _alt copy for mtgjson's isAlternative", uuid)
 		}
 		return
 	}
 	t.Error("no card carries mtgjson's isAlternative")
+}
+
+func TestMagicIDOnlyForMagicShapedIDs(t *testing.T) {
+	if got := magicID(&matcher.CardObject{Card: matcher.Card{UUID: "492703"}}); got != "" {
+		t.Errorf("magicID(non-Magic) = %q", got)
+	}
+	co, err := backend().GetUUID("1b3a28ad-41ca-587a-9feb-5f40154976da")
+	if err != nil {
+		t.Skip("matcher data not loaded")
+	}
+	if got := magicID(co); got != co.UUID {
+		t.Errorf("magicID = %q, want %q", got, co.UUID)
+	}
 }
