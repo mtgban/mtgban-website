@@ -70,11 +70,21 @@ func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 	vendors := append(slices.Clip(GetVendors()),
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "TCGDirectNet", Name: "TCG Direct (net)"}),
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "CKBLLast", Name: "Card Kingdom (last)"}),
-		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "ABUCredit", Name: "ABU Games (credit)"}))
+		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "ABUCredit", Name: "ABU Games (credit)"}),
+		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "MKMBL", Name: "Cardmarket", CountryFlag: "EU"}))
 	vendorsPtr.Store(&vendors)
 	for _, s := range alertStorePrices("card-1", false, alerts.SideBuylist, nil) {
-		if s.PickedOnly != slices.Contains([]string{"TCGDirectNet", "CKBLLast", "ABUCredit"}, s.Shorthand) {
+		if s.PickedOnly != slices.Contains([]string{"TCGDirectNet", "CKBLLast", "ABUCredit", "MKMBL"}, s.Shorthand) {
 			t.Fatalf("%s PickedOnly = %v", s.Shorthand, s.PickedOnly)
+		}
+	}
+	sellers := append(slices.Clip(GetSellers()),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"card-1": {{Conditions: "NM", Price: 18}}},
+			mtgban.ScraperInfo{Shorthand: "MKMLow", Name: "Cardmarket", CountryFlag: "EU"}))
+	sellersPtr.Store(&sellers)
+	for _, s := range alertStorePrices("card-1", false, alerts.SideRetail, nil) {
+		if s.PickedOnly {
+			t.Fatalf("retail %s PickedOnly, want every seller watched", s.Shorthand)
 		}
 	}
 }
