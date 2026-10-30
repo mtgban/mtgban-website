@@ -92,34 +92,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS variants_tcg_uk ON public.variants
     WHERE tcgp_product_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
--- prices: long fact table, monthly RANGE partitions (D2). Zeros omitted (D3).
--- Created WITHOUT PK / secondary index / FKs — added after the bulk load.
+-- prices: long fact table, RANGE partitions on ban_id. Zeros omitted (D3).
+-- Created WITHOUT indexes / FKs: 05_indexes.sql adds them after the bulk load.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.prices (
     ban_id   bigint        NOT NULL,
     date     date          NOT NULL,
     provider smallint      NOT NULL,
     price    numeric(10,2) NOT NULL
-) PARTITION BY RANGE (date);
+) PARTITION BY RANGE (ban_id);
 
--- Monthly partitions covering both source ranges (Magic 2020-09 →, non-Magic
--- 2024-02 →) up to next month; the writers create later ones (UpsertLongPrices).
--- IF NOT EXISTS makes this re-runnable.
-DO $$
-DECLARE
-    m date;
-    part_name text;
-BEGIN
-    FOR m IN
-        SELECT generate_series('2020-09-01'::date, (date_trunc('month', current_date) + interval '1 month')::date, interval '1 month')::date
-    LOOP
-        part_name := 'prices_' || to_char(m, 'YYYY_MM');
-        EXECUTE format(
-            'CREATE TABLE IF NOT EXISTS public.%I PARTITION OF public.prices FOR VALUES FROM (%L) TO (%L)',
-            part_name, m, (m + interval '1 month')::date
-        );
-    END LOOP;
-END $$;
-
--- Catch-all so a stray date never errors a write.
-CREATE TABLE IF NOT EXISTS public.prices_default PARTITION OF public.prices DEFAULT;
+-- One block for the sequence ids. Production's block is cut by the census
+-- (db_migration/repartition/); the writers create prices_cat_<n> for each
+-- non-Magic category's block [n<<40, (n+1)<<40) on its first write. No default.
+CREATE TABLE IF NOT EXISTS public.prices_seq PARTITION OF public.prices
+    FOR VALUES FROM (1) TO (1099511627776);

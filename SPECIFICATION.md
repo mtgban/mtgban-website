@@ -745,8 +745,13 @@ built separately, by `newEditionsSnapshot()` as part of a datastore load
 filed under `mtgban_id`, the matcher's id, with the alias columns
 `(mtgjson_uuid, is_foil, is_etched, is_alt, language)` kept for lookups, where
 `is_alt` marks the Alternate Fourth Edition copies, and non-Magic by TCGplayer
-product + sub-type, with no `mtgban_id`), and a date-partitioned
-`prices(ban_id, date, provider, price)` table with one row per provider.
+product + sub-type, with no `mtgban_id`), and a
+`prices(ban_id, date, provider, price)` table with one row per provider. It
+is partitioned by month until the repartition's swap
+(`db_migration/repartition/`) and by `ban_id` range after it: the sequence
+block cut by a census, and one partition per non-Magic category, created by
+the writer. The client reads which column `prices` is partitioned on and
+serves both layouts.
 Charts, buylist metrics and the screener read only these. The wide Magic table
 `product_prices` is still in the database, but nothing reads or writes it. The
 non-Magic wide table
