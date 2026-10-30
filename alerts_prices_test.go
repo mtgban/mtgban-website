@@ -69,10 +69,11 @@ func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 	net := mtgban.BuylistRecord{"card-1": {{Conditions: "NM", BuyPrice: 15}}}
 	vendors := append(slices.Clip(GetVendors()),
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "TCGDirectNet", Name: "TCG Direct (net)"}),
-		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "CKBLLast", Name: "Card Kingdom (last)"}))
+		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "CKBLLast", Name: "Card Kingdom (last)"}),
+		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "ABUCredit", Name: "ABU Games (credit)"}))
 	vendorsPtr.Store(&vendors)
 	for _, s := range alertStorePrices("card-1", false, alerts.SideBuylist, nil) {
-		if s.PickedOnly != (s.Shorthand == "TCGDirectNet" || s.Shorthand == "CKBLLast") {
+		if s.PickedOnly != slices.Contains([]string{"TCGDirectNet", "CKBLLast", "ABUCredit"}, s.Shorthand) {
 			t.Fatalf("%s PickedOnly = %v", s.Shorthand, s.PickedOnly)
 		}
 	}
