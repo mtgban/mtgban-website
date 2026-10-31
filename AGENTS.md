@@ -84,7 +84,7 @@ output, not a claim written here.
   for the current line, it moves): scraper config (`icons`, `name_override`
   and `stores`), the `stores` section (which stores show where, by
   shorthand, `api_only_stores` among them: stores only the price API
-  serves), `timeseries_config`, Discord, API secrets. Settings kept in
+  serves), Discord, API secrets. Settings kept in
   files of their own, which deployments may share, are named by path:
   `infrastructure_path`
   (bucket keys, Google and Patreon credentials, the Patreon session

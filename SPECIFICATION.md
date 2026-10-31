@@ -326,8 +326,8 @@ read, or its workflow state's names.
   bucket paths out-of-band.
 - **Checkpoints** (`checkpoints.go`): curated chart annotations (bans,
   releases, reprints) that a game other than Magic loads from
-  `timeseries_config.checkpoints_path` (B2 or file) into
-  `checkpointsStore`, editable as JSON in the admin panel, rendered as
+  `checkpoints.json` beside its config file (B2 or file; none, no markers)
+  into `checkpointsStore`, editable as JSON in the admin panel, rendered as
   markers on price charts. Magic draws its markers from the published ban
   list instead (`banlist.go`).
 
@@ -336,7 +336,7 @@ read, or its workflow state's names.
 One JSON file per deployment, from a local path or `b2://` (§2.1), decoded
 into `ConfigType` and published whole through `liveConfig` (§2.2). Beside
 its own keys (`game`, `port`, `datastore_path`, `scraper_config`,
-`timeseries_config`, `stores`, `discord`, `api_user_secrets`,
+`stores`, `discord`, `api_user_secrets`,
 `tcgcsv_config`, `api_gateway` and the rest), it names by path the files
 kept beside it, which deployments may share. `loadCommonConfig()` (common.go) reads each at
 startup and again on a config reload (`?tool=config`) or a config-editor
@@ -370,7 +370,7 @@ sharing the price database re-read it (access_notify.go). The same listener
 hears `patreon_poke`, whose payload is the email hash of a reader to poke
 (§3.2) rather than a file to re-read, and which no instance name skips.
 
-`timeseries_config` holds `checkpoints_path` (§2.3). The `stores` section
+The `stores` section
 (`StoresConfig`) says which stores show where, by shorthand: `api_demo_stores`
 (what an unsigned API request gets, §5.7), `search_block_list`,
 `search_buylist_block_list`, `sleepers_block_list`,
