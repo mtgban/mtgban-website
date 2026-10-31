@@ -42,7 +42,6 @@ var keyOverridesStore = &bucketstore.Store[KeyOverrides]{
 	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
 		return ConfigBucket, configSibling(keyOverridesFile), nil
 	},
-	MissingOK: true,
 }
 
 // GetKeyOverrides returns the currently loaded overrides, or nil when none are

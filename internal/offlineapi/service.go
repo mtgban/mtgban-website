@@ -105,14 +105,8 @@ type Service struct {
 // NewService constructs a Service wired to the given Deps.
 func NewService(deps Deps) *Service {
 	s := &Service{deps: deps}
-	s.manifestStore = &bucketstore.Store[manifestFile]{
-		MissingOK: true,
-		Bucket:    deps.ManifestBucket,
-	}
-	s.imagesStore = &bucketstore.Store[ImagesManifest]{
-		MissingOK: true,
-		Bucket:    deps.ImagesManifestBucket,
-	}
+	s.manifestStore = &bucketstore.Store[manifestFile]{Bucket: deps.ManifestBucket}
+	s.imagesStore = &bucketstore.Store[ImagesManifest]{Bucket: deps.ImagesManifestBucket}
 	s.refreshSignal = make(chan struct{}, 1)
 	return s
 }
