@@ -27,13 +27,14 @@ import (
 //
 // The page is public, so the work is bounded: a query with more than
 // maxRekeyFilters filters is not rekeyed, nor a filter of more than
-// maxRekeyValues values, and the cards walked come to one card pool at
-// most, plus a walk of the datastore for each filter a key stands in for.
+// maxRekeyValues values. The query is searched once, without the filters
+// tried, and the cards it finds are walked once: what the rest of the
+// query finds for a filter is the cards every other filter tried keeps.
+// A walk of the datastore follows for each filter a key stands in for.
 func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, sealed bool) ([]string, bool) {
 	if len(filters) > maxRekeyFilters {
 		return filters, false
 	}
-	budget := len(ds.backend.UUIDs)
 
 	keys := slices.Collect(maps.Keys(FilterOperations))
 	slices.SortFunc(keys, func(a, b string) int {
@@ -43,17 +44,19 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 		return strings.Compare(b, a)
 	})
 
-	out := slices.Clone(filters)
-	var rekeyed bool
+	others := slices.Clone(name)
+	var tries []rekeyTry
 	for i, filter := range filters {
 		index := strings.IndexAny(filter, ":<>")
 		if index == -1 {
+			others = append(others, filter)
 			continue
 		}
 		key, op, value := strings.ToLower(filter[:index]), filter[index:index+1], filter[index+1:]
 		negate := strings.HasPrefix(key, "-")
 		key = strings.TrimPrefix(key, "-")
 		if FilterOperations[key] == nil || op != ":" || strings.Count(value, ",") >= maxRekeyValues {
+			others = append(others, filter)
 			continue
 		}
 		// A filter that is no card filter reads its value its own way,
@@ -62,38 +65,23 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 		elem, ok := cardFilterOf(ds, filter, sealed)
 		store := key == "store" || key == "seller" || key == "vendor"
 		if !ok && (!store || namesStores(value)) {
+			others = append(others, filter)
 			continue
 		}
-
-		others := append(slices.Clone(name), slices.Delete(slices.Clone(filters), i, i+1)...)
-		config := parseSearchPage(ds, strings.Join(others, " "), sealed, nil, nil, nil)
-		applySearchScope(&config, pinned)
-		if sealed {
-			config.SearchMode = "sealed"
-		}
-		rest, err := searchAndFilter(ds, config)
-		if err != nil || len(rest) == 0 {
-			continue
-		}
-		if len(rest) > budget {
-			break
-		}
-		budget -= len(rest)
 
 		// not: is a negated is:, so the sign is read off what the
 		// filter parses into rather than off its spelling.
+		t := rekeyTry{index: i, key: filter[:index+1]}
 		var tried []FilterElem
-		var typed *rekeyPart
 		if ok {
 			tried = append(tried, elem)
 			negate = elem.Negate
-			typed = newRekeyPart(ds, elem, filter[:index+1], sealed)
+			t.typed = newRekeyPart(ds, elem, t.key, sealed)
 		}
 		prefix := ""
 		if negate {
 			prefix = "-"
 		}
-		var candidates []rekeyCandidate
 		for _, key := range keys {
 			if !slices.Contains(FilterOperations[key], op) {
 				continue
@@ -107,44 +95,90 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 			candidate, ok := newRekeyCandidate(ds, prefix+key+op, value, sealed)
 			if ok {
 				candidate.token = token
-				candidates = append(candidates, candidate)
+				t.candidates = append(t.candidates, candidate)
 			}
 		}
+		tries = append(tries, t)
+	}
+	if len(tries) == 0 {
+		return filters, false
+	}
 
-		for _, cardID := range rest {
-			co, err := ds.backend.GetUUID(cardID)
-			if err != nil {
-				continue
-			}
-			if typed != nil {
-				typed.try(ds.backend, co)
-				if !typed.failed() {
-					break
-				}
-			}
-			for j := range candidates {
-				for k := range candidates[j].parts {
-					candidates[j].parts[k].try(ds.backend, co)
-				}
-			}
-		}
-		if typed != nil && !typed.failed() {
+	config := parseSearchPage(ds, strings.Join(others, " "), sealed, nil, nil, nil)
+	applySearchScope(&config, pinned)
+	if sealed {
+		config.SearchMode = "sealed"
+	}
+	found, err := searchAndFilter(ds, config)
+	if err != nil {
+		return filters, false
+	}
+	for _, cardID := range found {
+		co, err := ds.backend.GetUUID(cardID)
+		if err != nil {
 			continue
 		}
-		for _, c := range candidates {
+		// A card is in a filter's rest when no other filter tried drops
+		// it; a store filter drops no card.
+		dropped, by := 0, 0
+		for j, t := range tries {
+			if t.typed != nil && shouldSkipCard(ds.backend, co, t.typed.filter) {
+				dropped, by = dropped+1, j
+			}
+		}
+		for j := range tries {
+			if dropped == 0 || (dropped == 1 && by == j) {
+				tries[j].try(ds.backend, co)
+			}
+		}
+	}
+
+	out := slices.Clone(filters)
+	var rekeyed bool
+	for _, t := range tries {
+		if t.typed != nil && !t.typed.failed() {
+			continue
+		}
+		for _, c := range t.candidates {
 			if slices.ContainsFunc(c.parts, rekeyPart.failed) {
 				continue
 			}
 			// Asked only of a filter some key would stand in for: the
 			// walk covers the whole datastore when the value names nothing.
-			if typed == nil || !readsAnywhere(ds, typed.filter[0], filter[:index+1], sealed) {
-				out[i] = c.token
+			if t.typed == nil || !readsAnywhere(ds, t.typed.filter[0], t.key, sealed) {
+				out[t.index] = c.token
 				rekeyed = true
 			}
 			break
 		}
 	}
 	return out, rekeyed
+}
+
+// rekeyTry is one filter rekeyFilters reads anew: where it sits in the
+// query, its key as typed, what it parses into if it is a card filter,
+// and the keys its value is tried under.
+type rekeyTry struct {
+	index      int
+	key        string
+	typed      *rekeyPart
+	candidates []rekeyCandidate
+}
+
+// try reads a card the rest of the query finds, past the filter as typed
+// once that reads its value.
+func (t *rekeyTry) try(b *matcher.Backend, co *matcher.CardObject) {
+	if t.typed != nil {
+		t.typed.try(b, co)
+		if !t.typed.failed() {
+			return
+		}
+	}
+	for j := range t.candidates {
+		for k := range t.candidates[j].parts {
+			t.candidates[j].parts[k].try(b, co)
+		}
+	}
 }
 
 // readsAnywhere reports whether a filter keeps a card somewhere in the
