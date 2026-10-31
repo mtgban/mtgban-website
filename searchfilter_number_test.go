@@ -207,7 +207,7 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 	typed := func(query, scope string) []string {
 		t.Helper()
 		config := parseSearchQuery(ds, query, nil, nil, nil)
-		applySearchScope(&config, scopeFilters(ds, scope, false))
+		applySearchScope(&config, scopeFilters(ds, scope, false, false))
 		return search(config)
 	}
 
@@ -235,7 +235,7 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 	if len(ds.numbers.loose["99999"]) != 0 {
 		t.Fatal("a card carries 99999")
 	}
-	if pinned := scopeFilters(ds, "99999", false); pinned != nil {
+	if pinned := scopeFilters(ds, "99999", false, false); pinned != nil {
 		t.Errorf("pinned 99999 is %+v, want no filter", pinned)
 	}
 
@@ -291,12 +291,12 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 	if word == "" {
 		t.Fatal("no sealed product names a number a card carries")
 	}
-	sealed := parseSearchPage(ds, word, true, nil, nil, nil)
+	sealed := parseSearchPage(ds, word, true, false, nil, nil, nil)
 	sealed.SearchMode = "sealed"
 	if keys, err := searchAndFilter(ds, sealed); err != nil || len(keys) == 0 {
 		t.Errorf("sealed %q reaches no product: %v", word, err)
 	}
-	if pinned := scopeFilters(ds, word, true); pinned != nil {
+	if pinned := scopeFilters(ds, word, true, false); pinned != nil {
 		t.Errorf("sealed pinned %q is %+v, want no filter", word, pinned)
 	}
 

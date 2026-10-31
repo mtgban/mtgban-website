@@ -801,3 +801,57 @@ func TestSearchAPIReadsANumberAsAnID(t *testing.T) {
 		t.Errorf("export %s lists %v, want the cards numbered %s", tcgID, rows, tcgID)
 	}
 }
+
+// A number after a name is the collector number on the price API as on the
+// page: only a number searched alone stays the id it names.
+func TestSearchAPIReadsANumberAfterAName(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+	printings, err := searchAndFilter(ds, parseSearchQuery(ds, "command tower", nil, nil, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := searchAndFilter(ds, parseSearchQuery(ds, "command tower cn:7029", nil, nil, nil))
+	if err != nil || len(want) == 0 || len(want) == len(printings) {
+		t.Fatalf("command tower cn:7029 finds %v of %d printings: %v", want, len(printings), err)
+	}
+	inventory := mtgban.InventoryRecord{}
+	for _, id := range printings {
+		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1})
+	}
+	publishStores(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"}),
+	}, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "CKBL", Name: "Card Kingdom Buylist"}),
+	})
+	signingEnabled(t, false)
+	withAPIUserSecret(t, "plan@example.com", "plan-secret")
+
+	key := apisig.Mint([]byte("plan-secret"), signatureLink(), apisig.Claims{
+		API:     "ALL_ACCESS",
+		Fields:  url.Values{"APImode": {"all"}, "UserEmail": {"plan@example.com"}},
+		Expires: time.Now().Add(time.Hour).Unix(),
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/search/retail/"+url.PathEscape("command tower 7029")+".json?id=mtgjson&sig="+url.QueryEscape(key), nil)
+	// The API limiter is shared and keyed on the address.
+	req.RemoteAddr = "192.0.2.91:1234"
+	rec := httptest.NewRecorder()
+	enforceAPISigning(http.HandlerFunc(testSite.SearchAPI)).ServeHTTP(rec, req)
+	var out PriceAPIOutputV2
+	err = json.Unmarshal(rec.Body.Bytes(), &out)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, rec.Body.String())
+	}
+	ids := map[string]bool{}
+	for _, u := range want {
+		co, err := ds.backend.GetUUID(u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids[getIDFromMode(ds.backend, "mtgjson", co)] = true
+	}
+	got := slices.Sorted(maps.Keys(out.Retail))
+	if !slices.Equal(got, slices.Sorted(maps.Keys(ids))) {
+		t.Errorf("API command tower 7029 reaches %v, want %v", got, slices.Sorted(maps.Keys(ids)))
+	}
+}

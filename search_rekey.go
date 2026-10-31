@@ -104,7 +104,7 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 		return filters, false
 	}
 
-	config := parseSearchPage(ds, strings.Join(others, " "), sealed, nil, nil, nil)
+	config := parseSearchPage(ds, strings.Join(others, " "), sealed, false, nil, nil, nil)
 	applySearchScope(&config, pinned)
 	if sealed {
 		config.SearchMode = "sealed"
@@ -289,8 +289,8 @@ const nonsenseValue = "zzqxzzqx"
 // cardFilterOf is the one card filter a filter token parses into, if that
 // is all it parses into.
 func cardFilterOf(ds *datastore, token string, sealed bool) (FilterElem, bool) {
-	config := parseSearchPage(ds, token, sealed, nil, nil, nil)
-	plain := parseSearchPage(ds, "", sealed, nil, nil, nil)
+	config := parseSearchPage(ds, token, sealed, false, nil, nil, nil)
+	plain := parseSearchPage(ds, "", sealed, false, nil, nil, nil)
 	if len(config.CardFilters) != 1 || config.CleanQuery != "" || config.SearchMode != plain.SearchMode {
 		return FilterElem{}, false
 	}

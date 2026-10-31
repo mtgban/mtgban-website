@@ -1169,7 +1169,7 @@ func isLetter(r rune) bool {
 // collector number a card carries.
 func parseSearchQuery(ds *datastore, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
 	budget := maxPools
-	return parseSearchOptionsDepth(ds.backend, ds.numbers, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
+	return parseSearchOptionsDepth(ds.backend, ds.numbers, false, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
 }
 
 // parseSearchOptionsNG reads a query into a SearchConfig without the numbers
@@ -1178,7 +1178,7 @@ func parseSearchQuery(ds *datastore, query string, blocklistRetail, blocklistBuy
 // in: pools nested in it.
 func parseSearchOptionsNG(b *matcher.Backend, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
 	budget := maxPools
-	return parseSearchOptionsDepth(b, nil, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
+	return parseSearchOptionsDepth(b, nil, false, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
 }
 
 // maxPoolDepth is how deep in: pools nest. A pool found at depth
@@ -1193,7 +1193,14 @@ const maxPools = 8
 // reach restoreProtected and the pool loop.
 var stripMarks = strings.NewReplacer(protectedMark, "", poolMark, "")
 
-func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string, depth int, budget *int) (config SearchConfig) {
+// parseSearchOptionsDepth reads a query with the numbers snapshot given;
+// with bareIDs a number searched alone stays an id or a name's words even
+// so, while a number after a name is still a collector number.
+func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareIDs bool, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string, depth int, budget *int) (config SearchConfig) {
+	alone := numbers
+	if bareIDs {
+		alone = nil
+	}
 	query = stripMarks.Replace(query)
 	rawQuery := query
 	var filters []FilterElem
@@ -1227,7 +1234,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, query
 	// a card carries is that collector number, though it can be a TCGplayer
 	// product id too; id: asks for the id.
 	noOptions := !strings.Contains(query, ":") && !strings.Contains(query, "|")
-	if noOptions && bareNumberFilters(b, numbers, query) == nil {
+	if noOptions && bareNumberFilters(b, alone, query) == nil {
 		// XXX should use the idlookup filter
 		uuids := fixupIDs(b, query)
 		for _, uuid := range uuids {
@@ -1890,7 +1897,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, query
 				sub = `contents:"` + pool.Value + `"`
 			}
 		}
-		subConfig := parseSearchOptionsDepth(b, numbers, sub, nil, nil, nil, depth+1, budget)
+		subConfig := parseSearchOptionsDepth(b, numbers, bareIDs, sub, nil, nil, nil, depth+1, budget)
 		filters = append(filters, FilterElem{
 			Name:   "pool",
 			Negate: pool.Negate,
@@ -1954,7 +1961,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, query
 			}
 		}
 		if len(tokens) == 1 {
-			numbered := bareNumberFilters(b, numbers, tokens[0])
+			numbered := bareNumberFilters(b, alone, tokens[0])
 			if numbered != nil {
 				filters = append(filters, numbered...)
 				config.NumberTerms = numberTerm(b, tokens[0])

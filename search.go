@@ -205,22 +205,24 @@ var AllConditions = []mtgban.Condition{"INDEX", mtgban.NM, mtgban.SP, mtgban.MP,
 // dropped, because pinning a name is what the main bar is for. A bar
 // that yields nothing at all is a bar the search will ignore, which is
 // the one thing the reader has to be told.
-func scopeFilters(ds *datastore, scope string, bareIDs bool) []FilterElem {
+func scopeFilters(ds *datastore, scope string, sealed, bareIDs bool) []FilterElem {
 	if scope == "" {
 		return nil
 	}
-	return parseSearchPage(ds, scope, bareIDs, nil, nil, nil).CardFilters
+	return parseSearchPage(ds, scope, sealed, bareIDs, nil, nil, nil).CardFilters
 }
 
-// parseSearchPage parses what a reader typed into a search's bars. With
-// bareIDs it parses without the numbers snapshot, so a number alone stays an
-// id or a name's words: sealed products carry no collector numbers, and the
-// price API's callers ask by TCGplayer product id.
-func parseSearchPage(ds *datastore, query string, bareIDs bool, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
-	if bareIDs {
+// parseSearchPage parses what a reader typed into a search's bars. A sealed
+// search parses without the numbers snapshot: sealed products carry no
+// collector numbers, so a number there stays an id or a name's words. With
+// bareIDs a number searched alone stays one too, as the price API's callers
+// ask by TCGplayer product id; a number after a name is a collector number.
+func parseSearchPage(ds *datastore, query string, sealed, bareIDs bool, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
+	if sealed {
 		return parseSearchOptionsNG(ds.backend, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	}
-	return parseSearchQuery(ds, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	budget := maxPools
+	return parseSearchOptionsDepth(ds.backend, ds.numbers, bareIDs, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
 }
 
 // applySearchScope folds the pinned bar's filters into the search the
@@ -586,7 +588,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// starts with nothing pinned.
 	pageVars.IsSealed = r.URL.Path == "/sealed"
 	scope := strings.TrimSpace(r.FormValue("scope"))
-	pinned := scopeFilters(ds, scope, pageVars.IsSealed)
+	pinned := scopeFilters(ds, scope, pageVars.IsSealed, false)
 	pageVars.SearchScope = scope
 	pageVars.CanScope = true
 	// Something is pinned, and none of it is a filter: the search will pass
@@ -673,7 +675,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CondKeys = AllConditions
 	pageVars.ShowUpsell = !miscSearchOpts.has("noUpsell")
 
-	config := parseSearchPage(ds, query, pageVars.IsSealed, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	config := parseSearchPage(ds, query, pageVars.IsSealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
@@ -827,8 +829,8 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	miscSearchOpts := append(readSearchMiscOpts(page), "oembed")
 
 	sealed := page.URL.Path == "/sealed"
-	config := parseSearchPage(ds, query, sealed, blocklistRetail, blocklistBuylist, miscSearchOpts)
-	applySearchScope(&config, scopeFilters(ds, strings.TrimSpace(page.FormValue("scope")), sealed))
+	config := parseSearchPage(ds, query, sealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	applySearchScope(&config, scopeFilters(ds, strings.TrimSpace(page.FormValue("scope")), sealed, false))
 	if sealed {
 		config.SearchMode = "sealed"
 	}
