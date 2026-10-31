@@ -7,13 +7,16 @@
 --
 -- since and swap (YYYY-MM-DD) are required: the day the first catch-up
 -- started from, and the day of the swap. Writers reach only prices after
--- the swap, so the days are read in two bands. Before the swap (since <=
--- date < swap) both tables must hold the same rows and latest day per
--- provider. From the swap on, prices must hold at least what prices_old
--- holds. Before since (date < since), per month and provider, prices must
--- hold at least the rows of prices_old: a row dated there but written after
--- its month was copied is missing otherwise, and only the rows where that
--- fails are listed, with one line for all whose prices_covers is the pass.
+-- the swap, so the days are read in three bands. Before the swap (since <=
+-- date < swap) prices must hold every row of prices_old, matched by key, and
+-- may hold more: a writer resumed after the hold can still file a day before
+-- the swap (tcgcsv's last refresh, a stale scrape's own date). From the swap
+-- on, prices must hold at least the rows and as late a day as prices_old per
+-- provider. Before since (date < since), per month and provider, prices
+-- must hold at least the rows of prices_old: a row dated there but written
+-- after its month was copied is missing otherwise, and only the rows where
+-- that fails are listed, with one line for all whose prices_covers is the
+-- pass.
 -- Then each whole table's count, prices's at least prices_old's;
 -- then prices's partitions with their size, and whether its two parent
 -- indexes are valid. One REPEATABLE READ READ ONLY transaction, so every
@@ -63,16 +66,23 @@ DO $$ BEGIN RAISE EXCEPTION 'prices or prices_old does not exist, nothing read';
 
 BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
 
-\echo === before the swap: since <= date < swap, equal per provider
+\echo === before the swap: since <= date < swap, every row of prices_old in prices, per provider
+-- By key, not by count: the rows writers add here could offset one missing.
 SELECT coalesce(a.provider, b.provider) AS provider,
        a.n AS prices_rows, b.n AS prices_old_rows,
        a.last_date AS prices_last, b.last_date AS prices_old_last,
-       a.n IS NOT DISTINCT FROM b.n AND a.last_date IS NOT DISTINCT FROM b.last_date AS same
+       coalesce(m.n, 0) AS missing, m.n IS NULL AS prices_covers
 FROM (SELECT provider, count(*) AS n, max(date) AS last_date FROM public.prices
       WHERE date >= :'since'::date AND date < :'swap'::date GROUP BY provider) a
 FULL JOIN (SELECT provider, count(*) AS n, max(date) AS last_date FROM public.prices_old
            WHERE date >= :'since'::date AND date < :'swap'::date GROUP BY provider) b
   ON a.provider = b.provider
+LEFT JOIN (SELECT o.provider, count(*) AS n FROM public.prices_old o
+           WHERE o.date >= :'since'::date AND o.date < :'swap'::date
+             AND NOT EXISTS (SELECT 1 FROM public.prices p
+                             WHERE (p.ban_id, p.date, p.provider) = (o.ban_id, o.date, o.provider))
+           GROUP BY o.provider) m
+  ON m.provider = coalesce(a.provider, b.provider)
 ORDER BY 1;
 
 \echo === from the swap on: date >= swap, prices covers prices_old per provider
