@@ -109,25 +109,48 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 	if sealed {
 		config.SearchMode = "sealed"
 	}
+	// The default mode answers a name's exact cards where the filters keep
+	// one and every name it begins otherwise, so the search runs by prefix
+	// and a filter's rest holds the exact cards alone where one survives.
+	exact := map[string]bool{}
+	if config.SearchMode == "" && config.CleanQuery != "" {
+		uuids, err := ds.backend.SearchEquals(config.CleanQuery)
+		if err == nil {
+			config.SearchMode = "prefix"
+			for _, uuid := range uuids {
+				exact[uuid] = true
+			}
+		}
+	}
 	found, err := searchAndFilter(ds, config)
 	if err != nil {
 		return filters, false
+	}
+	exactRest := make([]bool, len(tries))
+	for _, cardID := range found {
+		if !exact[cardID] {
+			continue
+		}
+		co, err := ds.backend.GetUUID(cardID)
+		if err != nil {
+			continue
+		}
+		dropped, by := droppedBy(ds.backend, tries, co)
+		for j := range tries {
+			if dropped == 0 || (dropped == 1 && by == j) {
+				exactRest[j] = true
+			}
+		}
 	}
 	for _, cardID := range found {
 		co, err := ds.backend.GetUUID(cardID)
 		if err != nil {
 			continue
 		}
-		// A card is in a filter's rest when no other filter tried drops
-		// it; a store filter drops no card.
-		dropped, by := 0, 0
-		for j, t := range tries {
-			if t.typed != nil && shouldSkipCard(ds.backend, co, t.typed.filter) {
-				dropped, by = dropped+1, j
-			}
-		}
+		// A card is in a filter's rest when no other filter tried drops it.
+		dropped, by := droppedBy(ds.backend, tries, co)
 		for j := range tries {
-			if dropped == 0 || (dropped == 1 && by == j) {
+			if (dropped == 0 || (dropped == 1 && by == j)) && (exact[cardID] || !exactRest[j]) {
 				tries[j].try(ds.backend, co)
 			}
 		}
@@ -153,6 +176,17 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 		}
 	}
 	return out, rekeyed
+}
+
+// droppedBy counts the filters tried that drop a card, and names the last
+// of them; a store filter drops no card.
+func droppedBy(b *matcher.Backend, tries []rekeyTry, co *matcher.CardObject) (dropped, by int) {
+	for j, t := range tries {
+		if t.typed != nil && shouldSkipCard(b, co, t.typed.filter) {
+			dropped, by = dropped+1, j
+		}
+	}
+	return dropped, by
 }
 
 // rekeyTry is one filter rekeyFilters reads anew: where it sits in the
