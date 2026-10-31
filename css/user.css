@@ -189,12 +189,6 @@
 }
 
 /* ── The tiers side by side ── */
-.user-compare > summary {
-    width: fit-content;
-    color: var(--ainfo);
-    font-size: var(--text-md);
-    cursor: pointer;
-}
 .user-compare-table {
     width: 100%;
     margin-top: 0.75em;
@@ -281,7 +275,7 @@
     }
     /* Too narrow for five tiers: the table scrolls sideways under a fixed
        first column, and gives up its sticky header to do so */
-    .user-compare-wrap {
+    .user-compare {
         overflow-x: auto;
     }
     .user-compare-table {

@@ -106,41 +106,39 @@
         {{end}}
     </div>
     {{if .Compare}}
-    <details class="user-compare">
-        <summary>Compare tiers</summary>
-        <div class="user-compare-wrap">
-            <table class="user-compare-table">
-                <colgroup><col>{{range .Tiers}}<col{{if .Current}} class="is-current"{{end}}>{{end}}</colgroup>
-                <thead>
-                    <tr>
-                        <td></td>
-                        {{range .Tiers}}
-                        <th scope="col"{{if .Current}} class="is-current" aria-current="true" title="Your tier"{{end}}><span class="user-tier"{{if .Key}} data-tier="{{.Key}}"{{end}}>{{.Name}}</span></th>
-                        {{end}}
-                    </tr>
-                </thead>
-                {{range .Compare}}
-                <tbody>
-                    <tr class="user-compare-page">
-                        <th scope="row" title="{{.Description}}">{{.Name}}</th>
-                        {{range .Granted}}<td>{{if .}}✓{{else}}<span class="user-compare-none" aria-hidden="true">–</span><span class="user-hidden">Not included</span>{{end}}</td>{{end}}
-                    </tr>
-                    {{range .Rows}}
-                    <tr>
-                        <th scope="row">{{.Name}}</th>
-                        {{range .Cells}}<td>{{if .}}{{.}}{{else}}<span class="user-compare-none" aria-hidden="true">–</span><span class="user-hidden">Not included</span>{{end}}</td>{{end}}
-                    </tr>
+    <div class="user-compare">
+        <table class="user-compare-table">
+            <caption class="user-hidden">Compare tiers</caption>
+            <colgroup><col>{{range .Tiers}}<col{{if .Current}} class="is-current"{{end}}>{{end}}</colgroup>
+            <thead>
+                <tr>
+                    <td></td>
+                    {{range .Tiers}}
+                    <th scope="col"{{if .Current}} class="is-current" aria-current="true" title="Your tier"{{end}}><span class="user-tier"{{if .Key}} data-tier="{{.Key}}"{{end}}>{{.Name}}</span></th>
                     {{end}}
-                </tbody>
+                </tr>
+            </thead>
+            {{range .Compare}}
+            <tbody>
+                <tr class="user-compare-page">
+                    <th scope="row" title="{{.Description}}">{{.Name}}</th>
+                    {{range .Granted}}<td>{{if .}}✓{{else}}<span class="user-compare-none" aria-hidden="true">–</span><span class="user-hidden">Not included</span>{{end}}</td>{{end}}
+                </tr>
+                {{range .Rows}}
+                <tr>
+                    <th scope="row">{{.Name}}</th>
+                    {{range .Cells}}<td>{{if .}}{{.}}{{else}}<span class="user-compare-none" aria-hidden="true">–</span><span class="user-hidden">Not included</span>{{end}}</td>{{end}}
+                </tr>
                 {{end}}
-            </table>
-        </div>
-    </details>
+            </tbody>
+            {{end}}
+        </table>
+    </div>
     {{end}}
     {{else}}
     <p class="user-note">Tier details are unavailable right now.</p>
     {{end}}
-    <p class="user-note">Tiers are Patreon memberships; <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">subscribe or change yours there</a>.</p>
+    <p class="user-note">Each tier is a Patreon membership: <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">join or switch tiers on Patreon</a>.</p>
 </div>
 {{end}}
 {{end}}
