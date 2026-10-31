@@ -2754,6 +2754,11 @@ func filterUUIDs(b *matcher.Backend, uuids []string, filters []FilterElem) []str
 		if shouldSkipCardNG(b, uuid, filters) {
 			continue
 		}
+		// Doubled when full: append grows a long slice by a quarter, which
+		// on a pool the size of the datastore allocates five times its ids.
+		if len(selected) == cap(selected) {
+			selected = slices.Grow(selected, len(selected)+1)
+		}
 		selected = append(selected, uuid)
 	}
 	return selected
