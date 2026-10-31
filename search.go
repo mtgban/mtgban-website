@@ -2169,7 +2169,7 @@ func readCustomBuylistRule(r *http.Request) customBuylistRule {
 // "NaN" and "Inf" too, which no price can be taken at.
 func customBuylistSetting(s string) float64 {
 	v, _ := strconv.ParseFloat(s, 64)
-	if !(v > 0) || math.IsInf(v, 0) {
+	if !(v > 0) || math.IsInf(v, 1) {
 		return 0
 	}
 	return v
