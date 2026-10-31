@@ -258,8 +258,9 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 // searchSuggestions adapts a parsed search that found nothing into the
 // suggest package's inputs. The did-you-mean is a whole query: the closest
 // name, the collector number read off the words, and the filters typed,
-// each read under the key that finds cards (see rekeyFilters).
-func searchSuggestions(ds *datastore, rawQuery string, config SearchConfig, pinned []FilterElem, sealed bool) (string, []suggest.AltSearch) {
+// each read under the key that finds cards (see rekeyFilters). packs holds
+// the reader's backpacks, by on: value.
+func searchSuggestions(ds *datastore, rawQuery string, config SearchConfig, pinned []FilterElem, packs map[string]map[string]bool, sealed bool) (string, []suggest.AltSearch) {
 	if config.SearchMode == "hashing" {
 		return "", nil
 	}
@@ -285,7 +286,7 @@ func searchSuggestions(ds *datastore, rawQuery string, config SearchConfig, pinn
 	if config.NumberTerms != "" {
 		query = append(query, config.NumberTerms)
 	}
-	filters, rekeyed := rekeyFilters(ds, query, config.AppliedFilters, pinned, sealed)
+	filters, rekeyed := rekeyFilters(ds, query, config.AppliedFilters, pinned, packs, sealed)
 	if !corrected && !rekeyed {
 		return "", alts
 	}
@@ -680,7 +681,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
 	}
-	resolveBackpacks(r.Context(), sig, b, &config)
+	packs := resolveBackpacks(r.Context(), sig, b, &config)
 
 	// Only a reader whose signature was checked gets the custom buylist
 	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
@@ -698,7 +699,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(result.keys) == 0 {
 		pageVars.PopularSearches = getPopularSearches(ds)
-		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(ds, query, config, pinned, pageVars.IsSealed)
+		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(ds, query, config, pinned, packs, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}

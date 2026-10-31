@@ -23,7 +23,9 @@ import (
 // Neither is a comparison, nor a filter that parses into no card filter,
 // region:jp or sort:chrono, unless it is a store filter naming no store.
 // name is what the query searches by name and pinned the scope bar's
-// filters; the cards are looked up once for every key.
+// filters; the cards are looked up once for every key. An on: naming one
+// of the reader's backpacks, packs, stays as typed and the rest of the
+// query is measured inside it.
 //
 // The page is public, so the work is bounded: a query with more than
 // maxRekeyFilters filters is not rekeyed, nor a filter of more than
@@ -31,7 +33,7 @@ import (
 // tried, and the cards it finds are walked once: what the rest of the
 // query finds for a filter is the cards every other filter tried keeps.
 // A walk of the datastore follows for each filter a key stands in for.
-func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, sealed bool) ([]string, bool) {
+func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, packs map[string]map[string]bool, sealed bool) ([]string, bool) {
 	if len(filters) > maxRekeyFilters {
 		return filters, false
 	}
@@ -56,6 +58,10 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 		negate := strings.HasPrefix(key, "-")
 		key = strings.TrimPrefix(key, "-")
 		if FilterOperations[key] == nil || op != ":" || strings.Count(value, ",") >= maxRekeyValues {
+			others = append(others, filter)
+			continue
+		}
+		if key == "on" && slices.ContainsFunc(fixupOnNG(value), func(v string) bool { return packs[v] != nil }) {
 			others = append(others, filter)
 			continue
 		}
@@ -109,6 +115,7 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 	if sealed {
 		config.SearchMode = "sealed"
 	}
+	applyBackpacks(ds.backend, &config, packs)
 	// The default mode answers a name's exact cards where the filters keep
 	// one and every name it begins otherwise, so the search runs by prefix
 	// and a filter's rest holds the exact cards alone where one survives.

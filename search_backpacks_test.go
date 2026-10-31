@@ -107,3 +107,33 @@ func TestBackpackNamedBackpack(t *testing.T) {
 		t.Errorf("on:backpack = %v, want the backpack called that", packs["backpack"])
 	}
 }
+
+// The did-you-mean keeps an on: naming one of the reader's backpacks, and
+// reads the rest of the query inside it.
+func TestDidYouMeanKeepsABackpack(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+	var bolt string
+	uuids, _ := ds.backend.SearchEquals("Lightning Bolt")
+	for _, uuid := range uuids {
+		co, err := ds.backend.GetUUID(uuid)
+		if err == nil && co.SetCode == "LEA" {
+			bolt = uuid
+		}
+	}
+	packs := backpackMembers([]userstate.Backpack{{Name: "Commander", Cards: []string{bolt}}, {Name: "Modern"}})
+
+	tests := []struct{ query, want string }{
+		{"on:commander t:goblin", ""},
+		{"on:commander is:lea", "on:commander s:lea"},
+		{"on:modern", ""},
+	}
+	for _, tt := range tests {
+		config := parseSearchPage(ds, tt.query, false, false, nil, nil, nil)
+		applyBackpacks(ds.backend, &config, packs)
+		got, _ := searchSuggestions(ds, tt.query, config, nil, packs, false)
+		if got != tt.want {
+			t.Errorf("%q: did-you-mean %q, want %q", tt.query, got, tt.want)
+		}
+	}
+}

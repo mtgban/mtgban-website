@@ -400,7 +400,7 @@ func TestShowAllAndSuggestionsQuoteFilterLikeName(t *testing.T) {
 	if got := quoteIfFilter(config.CleanQuery); got != `"S:P Little Knight"` {
 		t.Errorf("show-all query = %q", got)
 	}
-	didYouMean, alts := searchSuggestions(testSite.datastore(), query, config, nil, false)
+	didYouMean, alts := searchSuggestions(testSite.datastore(), query, config, nil, nil, false)
 	if !slices.ContainsFunc(alts, func(alt suggest.AltSearch) bool {
 		return alt.Query == `"S:P Little Knight"`
 	}) {
