@@ -546,7 +546,7 @@
         Object.keys(localPrefs).forEach(function(k) { out[k] = localPrefs[k]; });
         if (PRESETS_KEY in out) out[PRESETS_KEY] = mergePresets(localPrefs[PRESETS_KEY], serverPrefs[PRESETS_KEY]);
         if (ARBIT_PRESETS_KEY in out) out[ARBIT_PRESETS_KEY] = mergeArbitPresets(localPrefs[ARBIT_PRESETS_KEY], serverPrefs[ARBIT_PRESETS_KEY]);
-        if (ARBIT_KEY in out) out[ARBIT_KEY] = mergeArbitFilters(localPrefs[ARBIT_KEY], serverPrefs[ARBIT_KEY]);
+        if (ARBIT_KEY in out) out[ARBIT_KEY] = mergeSavedStates(localPrefs[ARBIT_KEY], serverPrefs[ARBIT_KEY]);
         if (TABS_KEY in out) out[TABS_KEY] = mergeBackpackTabs(localPrefs[TABS_KEY], serverPrefs[TABS_KEY]);
         return out;
     }
@@ -585,11 +585,11 @@
         }));
     }
 
-    // Merge two copies of the saved arbitrage filters, one state per page
-    // group (arbit, global): the one applied later (t, by later) wins, ties
-    // keep the local copy, and a winner ahead of the server's clock comes
-    // back to it, which a sync then sends on so the server stops holding it.
-    function mergeArbitFilters(local, server) {
+    // Merge two copies of saved filters, one state per page group: the one
+    // applied later (t, by later) wins, ties keep the local copy, and a
+    // winner ahead of the server's clock comes back to it, which a sync then
+    // sends on so the server stops holding it.
+    function mergeSavedStates(local, server) {
         function parse(s) {
             try { var o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }
         }
