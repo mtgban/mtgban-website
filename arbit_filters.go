@@ -403,8 +403,9 @@ func (st arbitState) applied(m arbitMode) map[string]bool {
 // say for the columns the table shows. The engine's own MinPrice and
 // MinBuyPrice read other prices: Mismatch applies MinPrice to both sides,
 // and Arbit drops a whole card on its NM buy price before picking the
-// condition a row shows. Its MinProfitability cuts on the raw score, where
-// the table shows it rounded.
+// condition a row shows. Its spread, difference and profitability cut on
+// raw values where the table shows them rounded, so the engine gets the
+// spread and difference a step loose and the rows are cut on the shown ones.
 type arbitRowFilter struct {
 	limits arbitLimits
 	global bool
@@ -412,30 +413,29 @@ type arbitRowFilter struct {
 
 // keep reports whether a row is within the limits. A seller publishing no
 // quantities, as Mana Pool does, has none to hold to a minimum: the engine
-// exempts it too. Profit is held at the two decimals the table shows.
+// exempts it too. Spread, difference and profit are held at the two
+// decimals the table shows.
 func (f arbitRowFilter) keep(e mtgban.ArbitEntry, noQuantity bool) bool {
 	buy := e.BuylistEntry.BuyPrice
 	if f.global {
 		buy = e.ReferenceEntry.Price
 	}
 	l := f.limits
+	spread := asShown(e.Spread)
 	return e.InventoryEntry.Price >= l.MinSell && e.InventoryEntry.Price <= l.MaxSell &&
-		buy >= l.MinBuy && buy <= l.MaxBuy && e.Spread <= l.MaxSpread &&
+		buy >= l.MinBuy && buy <= l.MaxBuy && spread >= l.MinSpread && spread <= l.MaxSpread &&
+		asShown(e.Difference) >= l.MinDiff &&
 		(noQuantity || float64(e.Quantity) >= l.MinQty) && asShown(e.Profitability) >= l.MinProf
 }
+
+// shownStep is the least a spread or difference moves by in the table.
+const shownStep = 0.01
 
 // asShown is a value rounded as the table prints it, through the same
 // formatter, which rounds a half to even.
 func asShown(x float64) float64 {
 	v, _ := strconv.ParseFloat(strconv.FormatFloat(x, 'f', 2, 64), 64)
 	return v
-}
-
-// within reports whether a row is within the limits, the ones the engine
-// applies included, for rows drawn without the reader's.
-func (f arbitRowFilter) within(e mtgban.ArbitEntry, noQuantity bool) bool {
-	l := f.limits
-	return f.keep(e, noQuantity) && e.Spread >= l.MinSpread && e.Difference >= l.MinDiff
 }
 
 // unbounded is the state with the reader's limits dropped, picks and
@@ -455,7 +455,7 @@ func previewSample(entries []mtgban.ArbitEntry, limits arbitRowFilter, noQuantit
 		entries = entries[:MaxResultsGlobalLimit]
 	}
 	return slices.DeleteFunc(entries, func(e mtgban.ArbitEntry) bool {
-		return !limits.within(e, noQuantity)
+		return !limits.keep(e, noQuantity)
 	})
 }
 
@@ -464,8 +464,8 @@ func previewSample(entries []mtgban.ArbitEntry, limits arbitRowFilter, noQuantit
 func (st arbitState) apply(b *matcher.Backend, m arbitMode) (*mtgban.ArbitOpts, arbitRowFilter) {
 	l := st.limits(m)
 	opts := &mtgban.ArbitOpts{
-		MinSpread:             l.MinSpread,
-		MinDiff:               l.MinDiff,
+		MinSpread:             l.MinSpread - shownStep,
+		MinDiff:               l.MinDiff - shownStep,
 		ProfitabilityConstant: ProfConst,
 	}
 	switch {
