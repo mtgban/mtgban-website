@@ -1,6 +1,7 @@
 package userstate
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -49,5 +50,46 @@ func TestBackpacksKeepsTheFirstTabForAPack(t *testing.T) {
 	got := Backpacks(State{Backpack: json.RawMessage(`[]`), Preferences: prefs})
 	if len(got) != 1 || got[0].Name != "First" || !slices.Equal(got[0].Cards, nil) {
 		t.Errorf("Backpacks = %+v, want one backpack named First", got)
+	}
+}
+
+// GetBackpacks reads the backpacks Get's full row holds, and backpack 1
+// alone for a reader with no row.
+func TestGetBackpacksReadsTheRowsBackpacks(t *testing.T) {
+	c := testClient(t)
+	h := freshHash(t, c)
+	ctx := context.Background()
+
+	missing, err := c.GetBackpacks(ctx, h)
+	if err != nil {
+		t.Fatalf("GetBackpacks missing: %v", err)
+	}
+	if fmt.Sprint(missing) != "[{Backpack 1 []}]" {
+		t.Errorf("GetBackpacks missing = %v, want backpack 1, empty", missing)
+	}
+
+	prefs, _ := json.Marshal(map[string]string{"theme": "dark", backpackTabsKey: `[{"pack":2,"name":"Deck"},{"pack":1,"name":"Trade"}]`})
+	_, _, err = c.Put(ctx, h, State{
+		Favorites:   json.RawMessage(`[{"id":"f"}]`),
+		Recents:     json.RawMessage(`[{"q":"bolt"}]`),
+		Preferences: prefs,
+		Backpack:    json.RawMessage(`[{"id":"a"},{"id":"b","pack":2},{"id":"c","pack":3}]`),
+	}, 0)
+	if err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	got, err := c.GetBackpacks(ctx, h)
+	if err != nil {
+		t.Fatalf("GetBackpacks: %v", err)
+	}
+	if fmt.Sprint(got) != "[{Deck [b]} {Trade [a]} {Backpack 3 [c]}]" {
+		t.Errorf("GetBackpacks = %v", got)
+	}
+	st, err := c.Get(ctx, h)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if fmt.Sprint(Backpacks(st)) != fmt.Sprint(got) {
+		t.Errorf("GetBackpacks = %v, Backpacks(Get) = %v", got, Backpacks(st))
 	}
 }
