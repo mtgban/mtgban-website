@@ -184,6 +184,9 @@
     gap: 0.35em;
     margin-top: 0.3em;
 }
+.user-perks:empty {
+    display: none;
+}
 
 /* ── The tiers side by side ── */
 .user-compare > summary {
