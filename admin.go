@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/apiproductlist"
 	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/diskusage"
@@ -107,6 +108,12 @@ type AdminVars struct {
 
 	SelectableField bool
 	SelectableLabel string
+
+	// DemoKeyPackages are the price list's packages the demo key tool mints
+	// for, and DemoKeyStores the families an explicit one picks from.
+	DemoKeyPackages []apiproductlist.Package
+	DemoKeyStores   []StoreFamily
+	DemoKeyImplied  string
 }
 
 func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
@@ -200,6 +207,9 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	pageVars.Tiers = tiers
+	pageVars.DemoKeyPackages = apiProducts.Packages
+	_, pageVars.DemoKeyStores = storeFamilies()
+	pageVars.DemoKeyImplied = apiProducts.Implied.Name
 	pageVars.Uptime = uptime()
 	pageVars.DiskStatus = disk()
 	pageVars.MemoryStatus = mem()
@@ -449,7 +459,17 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 			duration = 30
 		}
 
-		key, err := generateAPIKey(r.Context(), user, time.Duration(duration)*24*time.Hour)
+		scope, modes := "ALL_ACCESS", "all"
+		if tool == "demokey" && r.PostFormValue("package") != "" {
+			var err error
+			scope, modes, err = demoKeyScope(r.PostFormValue("package"), r.PostFormValue("store"))
+			if err != nil {
+				pageVars.InfoMessage = "error: " + err.Error()
+				break
+			}
+		}
+
+		key, err := generateAPIKey(r.Context(), user, scope, modes, time.Duration(duration)*24*time.Hour)
 		if err != nil {
 			pageVars.InfoMessage = "error: " + err.Error()
 			break
@@ -1347,7 +1367,39 @@ func saveConfig(ctx context.Context, config ConfigType) error {
 	return nil
 }
 
-func generateAPIKey(ctx context.Context, user string, duration time.Duration) (string, error) {
+// demoKeyScope is the store scope and modes the price list's package sells,
+// as the gateway signs them: an explicit package's stores are the implied
+// family's shorthands plus those of the store family picked.
+func demoKeyScope(pkgKey, family string) (scope, modes string, err error) {
+	pkg, found := apiProducts.Package(pkgKey)
+	if !found {
+		return "", "", fmt.Errorf("unknown package %q", pkgKey)
+	}
+	modes = strings.Join(pkg.Modes, ",")
+	if pkg.StoreScope != apiproductlist.StoreScopeExplicit {
+		return pkg.StoreScope, modes, nil
+	}
+
+	implied, stores := storeFamilies()
+	if len(implied) == 0 {
+		return "", "", fmt.Errorf("implied store %q not served", apiProducts.Implied.Name)
+	}
+	i := slices.IndexFunc(stores, func(f StoreFamily) bool { return f.Key == family })
+	if i < 0 {
+		return "", "", fmt.Errorf("unknown store %q", family)
+	}
+	var shorthands []string
+	for _, f := range implied {
+		shorthands = append(shorthands, f.Shorthands...)
+	}
+	shorthands = append(shorthands, stores[i].Shorthands...)
+	slices.Sort(shorthands)
+	return strings.Join(slices.Compact(shorthands), ","), modes, nil
+}
+
+// generateAPIKey mints a key for user under the scope and modes given,
+// creating the user's API secret when there is none yet.
+func generateAPIKey(ctx context.Context, user, scope, modes string, duration time.Duration) (string, error) {
 	if user == "" {
 		return "", errors.New("missing user")
 	}
@@ -1388,8 +1440,8 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 	}
 
 	claims := apisig.Claims{
-		API:    "ALL_ACCESS",
-		Fields: url.Values{apisig.APIFields[0]: {"all"}, apisig.APIFields[1]: {user}},
+		API:    scope,
+		Fields: url.Values{apisig.APIFields[0]: {modes}, apisig.APIFields[1]: {user}},
 	}
 	if duration != 0 {
 		claims.Expires = time.Now().Add(duration).Unix()
