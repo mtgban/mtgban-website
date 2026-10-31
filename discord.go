@@ -807,7 +807,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 		// Read per message, so a config reload reaches the bot, and clipped,
 		// so the bot's own additions never land in the config's slices.
 		blocklistRetail := Config().siteRetailBlockList()
-		blocklistBuylist := append(Config().siteBuylistBlockList(), "ABUCredit", "CKBLLast")
+		blocklistBuylist := append(Config().siteBuylistBlockList(), "ABUCredit", "ABUCreditSealed", "CKBLLast")
 		config := parseSearchOptionsNG(b, searchRes.CardID, blocklistRetail, blocklistBuylist, nil)
 
 		// Keep the bot to stores a reader can actually buy from. That is a
