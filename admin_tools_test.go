@@ -66,6 +66,91 @@ func TestAdminDemoKeyExpiresForTheDemoUser(t *testing.T) {
 	}
 }
 
+// Each package's demo key signs the scope and modes the gateway would: an
+// explicit package's picked family joins TCGplayer's.
+func TestAdminDemoKeyPerPackage(t *testing.T) {
+	withSigMode(t, true, false)
+	withAPIUserSecret(t, DefaultAPIDemoUser, goldenSecret)
+	stubScrapers(t, magicStub)
+
+	cases := []struct {
+		pkg, store, scope, modes string
+	}{
+		{"all_data", "", "ALL_ACCESS", "retail,buylist,sealed"},
+		{"all_stores", "", "BASE_ACCESS", "retail,buylist"},
+		{"starter", "cardkingdom", "CK,CKBLLast,CKGraded,SYP,TCGLow,TCGMarket", "retail,buylist"},
+	}
+	for _, c := range cases {
+		form := url.Values{"tool": {"demokey"}, "package": {c.pkg}, "store": {c.store}}
+		rec := httptest.NewRecorder()
+		testSite.Admin(rec, adminRequest(http.MethodPost, form))
+		blob, err := base64.StdEncoding.DecodeString(mintedKey(t, rec))
+		if err != nil {
+			t.Fatalf("%s: %v", c.pkg, err)
+		}
+		claims, err := url.ParseQuery(string(blob))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if claims.Get("API") != c.scope || claims.Get("APImode") != c.modes || claims.Get("UserEmail") != DefaultAPIDemoUser || claims.Get("Expires") == "" {
+			t.Errorf("%s: claims %v, want %s %s", c.pkg, claims, c.scope, c.modes)
+		}
+	}
+
+	// A store the package cannot pick, the implied family among them, mints nothing.
+	for _, form := range []url.Values{
+		{"tool": {"demokey"}, "package": {"starter"}, "store": {"tcg"}},
+		{"tool": {"demokey"}, "package": {"starter"}},
+		{"tool": {"demokey"}, "package": {"patreon"}},
+	} {
+		rec := httptest.NewRecorder()
+		testSite.Admin(rec, adminRequest(http.MethodPost, form))
+		if strings.Contains(rec.Body.String(), "New key: <input") || !strings.Contains(rec.Body.String(), "error: unknown") {
+			t.Errorf("%v: minted a key or said nothing", form)
+		}
+	}
+}
+
+// With TCGplayer not served, an explicit package's key would sign the picked
+// store alone, so none is minted.
+func TestAdminDemoKeyNeedsTheImpliedFamily(t *testing.T) {
+	withSigMode(t, true, false)
+	withAPIUserSecret(t, DefaultAPIDemoUser, goldenSecret)
+	stub := magicStub
+	stub.retailBlock = []string{"TCGLow", "TCGDirectLow", "TCGMarket"}
+	stub.buylistBlock = []string{"SYP"}
+	stubScrapers(t, stub)
+
+	rec := httptest.NewRecorder()
+	testSite.Admin(rec, adminRequest(http.MethodPost, url.Values{"tool": {"demokey"}, "package": {"starter"}, "store": {"cardkingdom"}}))
+	if strings.Contains(rec.Body.String(), "New key: <input") || !strings.Contains(rec.Body.String(), "not served") {
+		t.Error("minted a key without TCGplayer, or said nothing")
+	}
+}
+
+// The tools tab offers a button per preset package and the explicit one's store picker.
+func TestAdminDemoKeyButtonsFollowThePriceList(t *testing.T) {
+	withSigMode(t, true, false)
+	stubScrapers(t, magicStub)
+
+	rec := httptest.NewRecorder()
+	testSite.Admin(rec, adminRequest(http.MethodGet, url.Values{"page": {"tools"}}))
+	body := rec.Body.String()
+	for _, want := range []string{
+		`name="package" value="all_data"`,
+		`name="package" value="all_stores"`,
+		`name="package" value="starter"`,
+		`<option value="cardkingdom">Card Kingdom</option>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("tools tab lacks %s", want)
+		}
+	}
+	if strings.Contains(body, `<option value="tcg">`) {
+		t.Error("the implied family is offered as a pick")
+	}
+}
+
 func TestAdminNewKeyDefaultsABlankDuration(t *testing.T) {
 	withSigMode(t, true, false)
 

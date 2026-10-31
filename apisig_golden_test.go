@@ -89,7 +89,7 @@ func TestGenerateAPIKeyMatchesApisig(t *testing.T) {
 	withAPIUserSecret(t, "golden@example.com", goldenSecret)
 
 	// Duration 0 means no Expires, so the output is deterministic.
-	got, err := generateAPIKey(context.Background(), "golden@example.com", 0)
+	got, err := generateAPIKey(context.Background(), "golden@example.com", "ALL_ACCESS", "all", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestGenerateAPIKeyMatchesApisig(t *testing.T) {
 }
 
 func TestGenerateAPIKeyRejectsUnexpiredDemoKey(t *testing.T) {
-	if _, err := generateAPIKey(context.Background(), DefaultAPIDemoUser, 0); err == nil {
+	if _, err := generateAPIKey(context.Background(), DefaultAPIDemoUser, "ALL_ACCESS", "all", 0); err == nil {
 		t.Fatal("generateAPIKey accepted a no-expiration demo key")
 	}
 }

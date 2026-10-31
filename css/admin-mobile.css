@@ -293,6 +293,11 @@
     min-height: 40px;
 }
 
+.m-admin-tool-btn + .m-admin-tool-btn,
+.m-admin-tool form + form {
+    margin-top: 0.3em;
+}
+
 .m-admin-tool-note {
     margin: 0 0 0.4em;
     font-size: 0.75rem;

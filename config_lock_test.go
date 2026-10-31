@@ -164,7 +164,7 @@ func savedSecrets(t *testing.T, path string) map[string]string {
 func TestNewKeySurvivesAConfigReloadOrSave(t *testing.T) {
 	const user = "new@example.com"
 	newKey := func() error {
-		_, err := generateAPIKey(context.Background(), user, 0)
+		_, err := generateAPIKey(context.Background(), user, "ALL_ACCESS", "all", 0)
 		return err
 	}
 	save := func() error {
@@ -245,7 +245,7 @@ func TestNewKeysAtOnceDoNotRace(t *testing.T) {
 	for i := range 2 {
 		admins.Go(func() {
 			for j := range 20 {
-				_, err := generateAPIKey(context.Background(), fmt.Sprintf("admin%d-%d@example.com", i, j), 0)
+				_, err := generateAPIKey(context.Background(), fmt.Sprintf("admin%d-%d@example.com", i, j), "ALL_ACCESS", "all", 0)
 				if err != nil {
 					t.Error(err)
 					return
@@ -285,7 +285,7 @@ func TestNewKeyWhoseSaveFailsIsNotKept(t *testing.T) {
 				err = fmt.Errorf("panic: %v", r)
 			}
 		}()
-		return generateAPIKey(context.Background(), "new@example.com", 0)
+		return generateAPIKey(context.Background(), "new@example.com", "ALL_ACCESS", "all", 0)
 	}
 	for _, c := range []struct {
 		name   string
@@ -343,7 +343,7 @@ func TestAdminPageDoesNotRaceNewKeys(t *testing.T) {
 			case <-stop:
 				return
 			default:
-				_, err := generateAPIKey(context.Background(), fmt.Sprintf("user%d@example.com", i), 0)
+				_, err := generateAPIKey(context.Background(), fmt.Sprintf("user%d@example.com", i), "ALL_ACCESS", "all", 0)
 				if err != nil {
 					t.Error(err)
 					return
