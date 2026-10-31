@@ -132,13 +132,18 @@ func chartRangeParam(r *http.Request) int {
 }
 
 // chartLookback returns the chart history window, in days, as encoded in
-// the signature under SearchChartLoopback. Absent or invalid values fall
-// back to 30 days.
+// the signature under SearchChartLoopback.
 func chartLookback(sig string) timeseries.Lookback {
 	if DevMode && !SigCheck {
 		return timeseries.Lookback(3650)
 	}
-	days, err := strconv.Atoi(GetParamFromSig(sig, "SearchChartLoopback"))
+	return lookbackFromValue(GetParamFromSig(sig, "SearchChartLoopback"))
+}
+
+// lookbackFromValue reads a signed SearchChartLoopback value. Absent or
+// invalid values fall back to 30 days.
+func lookbackFromValue(value string) timeseries.Lookback {
+	days, err := strconv.Atoi(value)
 	if err != nil || days <= 0 {
 		days = 30
 	}
