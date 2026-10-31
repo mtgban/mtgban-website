@@ -866,14 +866,8 @@ func processEntry[T mtgban.GenericEntry](b *matcher.Backend, out map[string]map[
 		if len(rule.Finish) > 0 && applyCardFilter(b, "finish", rule.Finish, co) {
 			return
 		}
-		if !co.Sealed && slices.Contains(rule.SkipSets, co.SetCode) {
+		if rule.skips(b, co) {
 			return
-		}
-		if !rule.ReleasedBy.IsZero() {
-			released, err := b.CardReleaseDate(cardID)
-			if err != nil || released.IsZero() || released.After(rule.ReleasedBy) {
-				return
-			}
 		}
 		if entries[base].Pricing() < rule.MinPrice {
 			return
@@ -966,6 +960,19 @@ func processEntry[T mtgban.GenericEntry](b *matcher.Backend, out map[string]map[
 			}
 		}
 	}
+}
+
+// skips reports whether the rule leaves co unpriced: a card of SkipSets,
+// or, with ReleasedBy set, anything not known to be out by then.
+func (rule EntryRule) skips(b *matcher.Backend, co *matcher.CardObject) bool {
+	if !co.Sealed && slices.Contains(rule.SkipSets, co.SetCode) {
+		return true
+	}
+	if rule.ReleasedBy.IsZero() {
+		return false
+	}
+	released, err := b.CardReleaseDate(co.UUID)
+	return err != nil || released.IsZero() || released.After(rule.ReleasedBy)
 }
 
 // betterPrice reports whether value beats current, which is unset at zero:
