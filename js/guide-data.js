@@ -871,9 +871,9 @@ window.__BAN_GUIDE = {
             category: 'Search Syntax',
             title: 'Special Lists',
             icon: 'list-checks',
-            summary: 'Filter cards on curated lists: on:hotlist, on:newhigh, on:cksell, on:ckwait, on:tcgsyp, on:newspaper.',
-            snippets: ['on:hotlist', 'on:newhigh', 'on:cksell', 'on:ckwait', 'on:tcgsyp', 'on:newspaper', 'on:mtgstocks'],
-            keywords: ['list', 'on:', 'hotlist', 'newhigh', 'new high', 'cksell', 'ckwait', 'wait', 'sell now', 'card kingdom', 'tcgsyp', 'syp', 'newspaper', 'mtgstocks', 'stocks', 'spike', 'hot', 'curated', 'special', 'TCGplayer'],
+            summary: 'Filter cards on curated lists: on:hotlist, on:newhigh, on:cksell, on:ckwait, on:tcgsyp, on:newspaper, or your own backpacks.',
+            snippets: ['on:hotlist', 'on:newhigh', 'on:cksell', 'on:ckwait', 'on:tcgsyp', 'on:newspaper', 'on:mtgstocks', 'on:backpack'],
+            keywords: ['list', 'on:', 'backpack', 'hotlist', 'newhigh', 'new high', 'cksell', 'ckwait', 'wait', 'sell now', 'card kingdom', 'tcgsyp', 'syp', 'newspaper', 'mtgstocks', 'stocks', 'spike', 'hot', 'curated', 'special', 'TCGplayer'],
             content: {
                 table: [
                     { value: 'hotlist', short: 'Highest buylist prices over 3 months (the 90d high and New high pills)' },
@@ -882,7 +882,8 @@ window.__BAN_GUIDE = {
                     { value: 'ckwait', short: 'Card Kingdom is likely to pay more soon: its stock just sold, or TCG Market jumped' },
                     { value: 'tcgsyp / syp', short: 'Present on the TCGplayer SYP list' },
                     { value: 'newspaper', short: 'Found in a Newspaper Spike score' },
-                    { value: 'mtgstocks', short: 'Tracked by MTGStocks' }
+                    { value: 'mtgstocks', short: 'Tracked by MTGStocks' },
+                    { value: 'backpack', short: 'In your backpacks, as last synced; name one to search just it (signed in)' }
                 ],
                 examples: [
                     { query: 'on:hotlist', desc: 'Cards on the buylist hot list' },
@@ -890,7 +891,8 @@ window.__BAN_GUIDE = {
                     { query: 'on:cksell', desc: "Cards where CK's offer is worth taking now (green)" },
                     { query: 'on:ckwait', desc: 'Cards to hold: CK is likely to pay more soon (↑)' },
                     { query: 'on:tcgsyp', desc: 'Cards available on TCGplayer SYP' },
-                    { query: 'on:newspaper r:mythic', desc: 'Newspaper spike mythics' }
+                    { query: 'on:newspaper r:mythic', desc: 'Newspaper spike mythics' },
+                    { query: 'on:"Trade binder" f:foil', desc: 'The foils in your backpack named Trade binder' }
                 ]
             }
         },
