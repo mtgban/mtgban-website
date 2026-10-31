@@ -55,7 +55,7 @@
             hidden.value = name;
             if (clearBtn) clearBtn.hidden = !name;
             const form = combobox.closest('form');
-            if (form) form.submit();
+            if (form) form.requestSubmit ? form.requestSubmit() : form.submit();
         }
 
         function clearSelection() {
@@ -63,7 +63,7 @@
             hidden.value = '';
             if (clearBtn) clearBtn.hidden = true;
             const form = combobox.closest('form');
-            if (form) form.submit();
+            if (form) form.requestSubmit ? form.requestSubmit() : form.submit();
         }
 
         display.addEventListener('focus', () => { filter(); open(); });
