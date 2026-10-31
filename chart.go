@@ -21,12 +21,6 @@ import (
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
-type TimeseriesConfig struct {
-	// CheckpointsPath is the curated checkpoints document a game other than
-	// Magic draws its chart markers from.
-	CheckpointsPath string `json:"checkpoints_path"`
-}
-
 type DatasetConfig struct {
 	Retail     []string `json:"retail,omitempty"`
 	Buylist    []string `json:"buylist,omitempty"`

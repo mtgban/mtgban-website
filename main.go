@@ -105,7 +105,6 @@ type ConfigType struct {
 	// from the ban list document or the set registry.
 	FormatEvents        []FormatEvent      `json:"format_events,omitempty"`
 	ScraperConfig       ScraperConfig      `json:"scraper_config"`
-	TimeseriesConfig    TimeseriesConfig   `json:"timeseries_config"`
 	Discord             DiscordConfig      `json:"discord"`
 	API                 map[string]string  `json:"api"`
 	Stores              StoresConfig       `json:"stores"`

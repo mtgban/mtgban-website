@@ -222,7 +222,6 @@ func withInertAdminTools(t *testing.T) (*site, *atomic.Int32) {
 	Config().Game = "lorcana"
 	Config().sourcePath = filepath.Join(dir, "config.json")
 	Config().DatastorePath = filepath.Join(dir, "datastore.json.xz")
-	Config().TimeseriesConfig.CheckpointsPath = filepath.Join(dir, "checkpoints.json")
 
 	savedConfigBucket, savedDataBucket, savedTCGCSV := ConfigBucket, DataBucket, TCGCSVService
 	savedStashing, savedRestart := stashingInProgress.Load(), restartServer
