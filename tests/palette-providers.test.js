@@ -176,3 +176,12 @@ test('in: offers no set once a paren or quote opens the value', async () => {
     expect(providers.getProvider('in:').getCandidates('"Comm')).toEqual([]);
     expect(providers.getProvider('in:').getCandidates('mst').length).toBe(1);
 });
+
+test('a negated filter finds its menu and keeps the minus', () => {
+    const { providers } = load({}, {}, false);
+    expect(providers.detectPrefix('-is:fo')).toEqual({ prefix: '-is:', query: 'fo' });
+    expect(providers.detectPrefix('-S:m')).toEqual({ prefix: '-s:', query: 'm' });
+    expect(providers.getProvider('-is:')).toBe(providers.getProvider('is:'));
+    expect(providers.detectPrefix('-')).toBeNull();
+    expect(providers.detectPrefix('--is:')).toBeNull();
+});

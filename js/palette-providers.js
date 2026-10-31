@@ -26,16 +26,20 @@
 
     // Given an input string, return { prefix, query } if it starts with a known
     // filter prefix, else null. Longer prefixes take precedence so "buy_price>"
-    // matches before "price>".
+    // matches before "price>". A negated filter keeps its "-" in the prefix, so
+    // "-is:" completes to "-is:foil".
     function detectPrefix(input) {
         if (!input) return null;
         var lower = input.toLowerCase();
+        var negate = lower.charAt(0) === '-' ? '-' : '';
+        lower = lower.substring(negate.length);
         var keys = Object.keys(providers).sort(function (a, b) {
             return b.length - a.length;
         });
         for (var i = 0; i < keys.length; i++) {
             if (lower.indexOf(keys[i]) === 0) {
-                return { prefix: keys[i], query: input.substring(keys[i].length) };
+                var prefix = negate + keys[i];
+                return { prefix: prefix, query: input.substring(prefix.length) };
             }
         }
         return null;
@@ -43,7 +47,7 @@
 
     function getProvider(prefix) {
         if (!prefix) return null;
-        return providers[prefix.toLowerCase()] || null;
+        return providers[prefix.toLowerCase().replace(/^-/, '')] || null;
     }
 
     // Shared filter: matches when the query is a prefix of the value (e.g. a set
