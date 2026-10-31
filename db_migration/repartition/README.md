@@ -40,10 +40,22 @@ partition after the swap, and its stash would fail.
 The copy needs the heap (about 93 GB) plus the indexes (about 190 GB) free.
 Either grow the volume to about 700 GB, for good, or attach a second
 volume of about 350 GB, create a tablespace on it as the `postgres`
-superuser over ssh (the archive role cannot), and pass its name to
-`02_create.sql` and `04_indexes.sql`. Re-read
-`df -h /mnt/postgres_database`, and the second volume's mount, the day the
-copy starts.
+superuser over ssh (the archive role cannot), grant the archive role
+`CREATE` on it, and pass its name to `02_create.sql` and
+`04_indexes.sql`:
+
+```sql
+CREATE TABLESPACE fast LOCATION '/mnt/<second volume>/pg';
+GRANT CREATE ON TABLESPACE fast TO <archive role>;
+```
+
+Without the grant those scripts, run as the archive role, fail with
+"permission denied for tablespace", and after the swap so does every
+writer's first write of a new category, whose partition takes the
+tablespace of `prices`.
+
+Re-read `df -h /mnt/postgres_database`, and the second volume's mount, the
+day the copy starts.
 
 Then the WAL, before the copy starts:
 
