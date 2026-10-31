@@ -20,6 +20,7 @@
     var BACKPACK_TABS = window.BAN_BACKPACK_TABS > 0 ? window.BAN_BACKPACK_TABS : 1;
     var PRESETS_KEY = 'mtgban_upload_presets';
     var ARBIT_KEY = 'mtgban_arbit_filters';
+    var NEWS_KEY = 'mtgban_news_filters';
     var ARBIT_PRESETS_KEY = 'mtgban_arbit_presets';
     var TABS_KEY = 'mtgban_backpack_tabs';
     // Keys bundled into the preferences object.
@@ -30,7 +31,7 @@
         'offline_mode', 'offline_stores', 'offline_editions', 'offline_img_editions',
         'mtgban_search_layout', 'mtgban_popular_collapsed', 'mtgban_store_factors',
         'mtgban_upload_presets', 'mtgban_arbit_filters', 'mtgban_arbit_presets',
-        'mtgban_backpack_tabs', 'mtgban_backpack_sort'
+        'mtgban_backpack_tabs', 'mtgban_backpack_sort', 'mtgban_news_filters'
     ];
 
     // The server renders whether the request carried the auth cookie; that is
@@ -231,7 +232,9 @@
                 // The saved filters merge in, should one have been applied
                 // signed out: on a synced device the server's are as new
                 var mine = {};
-                if (readLocal(ARBIT_KEY, null) != null) mine[ARBIT_KEY] = readLocal(ARBIT_KEY, null);
+                [ARBIT_KEY, NEWS_KEY].forEach(function(k) {
+                    if (readLocal(k, null) != null) mine[k] = readLocal(k, null);
+                });
                 var prefs = mergePrefs(mine, state.preferences);
                 Object.keys(prefs).forEach(function(k) {
                     if (PREF_KEYS.indexOf(k) >= 0) rawSetItem(k, String(prefs[k]));
@@ -259,6 +262,7 @@
         if (typeof window.renderBackpack === 'function') window.renderBackpack();
         if (window.UploadPresets && typeof window.UploadPresets.refresh === 'function') window.UploadPresets.refresh();
         if (window.ArbitFilters && typeof window.ArbitFilters.refresh === 'function') window.ArbitFilters.refresh();
+        if (window.NewsFilters && typeof window.NewsFilters.refresh === 'function') window.NewsFilters.refresh();
         if (window.ArbitPresets && typeof window.ArbitPresets.refresh === 'function') window.ArbitPresets.refresh();
         if (window.StoreFactors && typeof window.StoreFactors.mirror === 'function') window.StoreFactors.mirror();
         // Synced favorites arrive price-less; backfill (self-gating).
@@ -547,9 +551,9 @@
 
     // Preferences: last-write-wins per key (local wins on first merge), but
     // the upload and arbitrage presets, lists of their own, merge preset by
-    // preset, the saved arbitrage filters page group by page group, and the
-    // backpack tabs tab by tab. A list on one side only goes through its
-    // merge too, to be repaired.
+    // preset, the saved arbitrage filters page group by page group, the
+    // newspaper's report by report, and the backpack tabs tab by tab. A
+    // list on one side only goes through its merge too, to be repaired.
     function mergePrefs(localPrefs, serverPrefs) {
         localPrefs = localPrefs || {};
         serverPrefs = serverPrefs || {};
@@ -559,6 +563,7 @@
         if (PRESETS_KEY in out) out[PRESETS_KEY] = mergePresets(localPrefs[PRESETS_KEY], serverPrefs[PRESETS_KEY]);
         if (ARBIT_PRESETS_KEY in out) out[ARBIT_PRESETS_KEY] = mergeArbitPresets(localPrefs[ARBIT_PRESETS_KEY], serverPrefs[ARBIT_PRESETS_KEY]);
         if (ARBIT_KEY in out) out[ARBIT_KEY] = mergeSavedStates(localPrefs[ARBIT_KEY], serverPrefs[ARBIT_KEY]);
+        if (NEWS_KEY in out) out[NEWS_KEY] = mergeSavedStates(localPrefs[NEWS_KEY], serverPrefs[NEWS_KEY]);
         if (TABS_KEY in out) out[TABS_KEY] = mergeBackpackTabs(localPrefs[TABS_KEY], serverPrefs[TABS_KEY]);
         return out;
     }
@@ -597,10 +602,11 @@
         }));
     }
 
-    // Merge two copies of saved filters, one state per page group: the one
-    // applied later (t, by later) wins, ties keep the local copy, and a
-    // winner ahead of the server's clock comes back to it, which a sync then
-    // sends on so the server stops holding it.
+    // Merge two copies of saved filters, one state per arbitrage page group
+    // (arbit, global) or newspaper report: the one applied later (t, by
+    // later) wins, ties keep the local copy, and a winner ahead of the
+    // server's clock comes back to it, which a sync then sends on so the
+    // server stops holding it.
     function mergeSavedStates(local, server) {
         function parse(s) {
             try { var o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }

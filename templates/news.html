@@ -5,6 +5,13 @@
 
 {{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
 
+{{define "extra-head"}}
+{{if ne .Subtitle ""}}
+    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}" defer></script>
+{{end}}
+{{end}}
+
 {{define "content"}}
     {{if eq .Subtitle ""}}
         {{template "news-index" .}}
@@ -18,6 +25,7 @@
 <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
 <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
 <script type="text/javascript" src="/js/edition-combobox.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/news-filters.js?hash={{.Hash}}" defer></script>
 <script>
     var t = document.getElementById('newsTable');
     if (t) new Tablesort(t);
@@ -89,7 +97,7 @@
             </div>
         </div>
 
-        <form action="newspaper" method="GET">
+        <form id="newsFilters" action="newspaper" method="GET">
             <input type="hidden" name="page" value="{{$.Page}}">
             <input type="hidden" name="sort" value="{{$.SortOption}}">
             <input type="hidden" name="dir" value="{{$.SortDir}}">
@@ -112,7 +120,7 @@
                 <span class="toolbar-sep"></span>
                 {{end}}
 
-                <select name="finish" onchange="this.form.submit()" style="width:58px; text-align:center;">
+                <select name="finish" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()" style="width:58px; text-align:center;">
                     {{if eq "" $.FilterFinish}}
                         <option value="" disabled selected hidden>&#10024;</option>
                     {{end}}
@@ -132,7 +140,7 @@
                     </div>
                 </div>
 
-                <select name="rarity" onchange="this.form.submit()" style="width:52px; text-align:center;">
+                <select name="rarity" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()" style="width:52px; text-align:center;">
                     {{if eq "" $.FilterRarity}}
                         <option value="" disabled selected hidden>&#127808;</option>
                     {{end}}
@@ -142,7 +150,7 @@
                 </select>
 
                 {{if .Tiers}}
-                <select name="bucket" onchange="this.form.submit()" style="width:58px; text-align:center;">
+                <select name="bucket" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()" style="width:58px; text-align:center;">
                     {{if eq "" $.FilterBucket}}
                         <option value="" disabled selected hidden>&#128184;</option>
                     {{end}}

@@ -8,6 +8,13 @@
 
 {{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
 
+{{define "extra-head"}}
+{{if ne .Subtitle ""}}
+    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}" defer></script>
+{{end}}
+{{end}}
+
 {{define "content"}}
     {{if eq .Subtitle ""}}
         {{template "m-news-index" .}}
@@ -70,12 +77,12 @@
             Filters
             <span class="m-news-filter-arrow">&#9662;</span>
         </button>
-        <form action="newspaper" method="GET" class="m-news-filter-form">
+        <form id="newsFilters" action="newspaper" method="GET" class="m-news-filter-form">
             <input type="hidden" name="page" value="{{$.Page}}">
             <input type="hidden" name="sort" value="{{$.SortOption}}">
             <input type="hidden" name="dir" value="{{$.SortDir}}">
 
-            <select name="filter" onchange="this.form.submit()">
+            <select name="filter" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
                 {{if eq "" $.FilterSet}}
                     <option value="" disabled selected hidden>Edition...</option>
                 {{end}}
@@ -84,7 +91,7 @@
                 {{end}}
             </select>
 
-            <select name="rarity" onchange="this.form.submit()">
+            <select name="rarity" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
                 {{if eq "" $.FilterRarity}}
                     <option value="" disabled selected hidden>Rarity...</option>
                 {{end}}
@@ -93,7 +100,7 @@
                 {{end}}
             </select>
 
-            <select name="finish" onchange="this.form.submit()">
+            <select name="finish" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
                 {{if eq "" $.FilterFinish}}
                     <option value="" disabled selected hidden>Finish...</option>
                 {{end}}
@@ -103,7 +110,7 @@
             </select>
 
             {{if .Tiers}}
-            <select name="bucket" onchange="this.form.submit()">
+            <select name="bucket" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
                 {{if eq "" $.FilterBucket}}
                     <option value="" disabled selected hidden>Tier...</option>
                 {{end}}
@@ -204,5 +211,8 @@
 {{end}}
 
 {{define "extra-scripts"}}
+{{if ne .Subtitle ""}}
+<script type="text/javascript" src="/js/news-filters.js?hash={{.Hash}}" defer></script>
+{{end}}
 {{/* No tablesort on mobile - sorting is server-side via nav links */}}
 {{end}}

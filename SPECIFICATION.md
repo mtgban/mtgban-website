@@ -724,7 +724,10 @@ not by separate databases. The formerly separate MySQL-backed "old" pages
 (`Newspaper1dayDB`/`Newspaper3dayDB`, `mtgjson_portable` joins, ensemble
 forecast) are gone; only the PostgreSQL pages above remain. 25 rows/page
 (`DefaultPageSize`), filterable by edition/rarity/price bucket/finish/%
-change.
+change. `js/news-filters.js` saves each report's filters and sort when the
+reader applies them, in the synced preferences (`mtgban_news_filters`,
+merged report by report like the arbitrage filters), and a link naming
+only the report replaces itself with the saved query.
 
 ### 5.5 Sealed EV (`product.go`)
 
