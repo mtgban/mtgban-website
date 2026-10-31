@@ -13,20 +13,19 @@ type testDoc struct {
 	Events []string `json:"events"`
 }
 
-func fileStore(t *testing.T, name string, missingOK bool) *Store[testDoc] {
+func fileStore(t *testing.T, name string) *Store[testDoc] {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), name)
 	return &Store[testDoc]{
 		Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
 			return &simplecloud.FileBucket{}, path, nil
 		},
-		MissingOK: missingOK,
 	}
 }
 
 func TestStoreRoundTrip(t *testing.T) {
 	ctx := context.Background()
-	s := fileStore(t, "doc.json", false)
+	s := fileStore(t, "doc.json")
 
 	if got := s.Get(); got.Events != nil {
 		t.Errorf("unloaded Get = %v, want zero value", got)
@@ -53,22 +52,17 @@ func TestStoreRoundTrip(t *testing.T) {
 func TestStoreMissingDocument(t *testing.T) {
 	ctx := context.Background()
 
-	strict := fileStore(t, "absent.json", false)
-	if err := strict.Load(ctx); err == nil {
-		t.Error("Load of a missing document should fail without MissingOK")
+	s := fileStore(t, "absent.json")
+	if err := s.Load(ctx); err != nil {
+		t.Errorf("Load of a missing document: %v", err)
 	}
-
-	lax := fileStore(t, "absent.json", true)
-	if err := lax.Load(ctx); err != nil {
-		t.Errorf("Load with MissingOK: %v", err)
-	}
-	if got := lax.Get(); got.Events != nil {
+	if got := s.Get(); got.Events != nil {
 		t.Errorf("missing document should publish the zero value, got %v", got)
 	}
 }
 
 func TestStoreJSON(t *testing.T) {
-	s := fileStore(t, "doc.json", false)
+	s := fileStore(t, "doc.json")
 
 	// The zero snapshot still serializes to a valid document
 	out, err := s.JSON()

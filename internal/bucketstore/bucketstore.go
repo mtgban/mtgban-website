@@ -24,11 +24,6 @@ type Store[T any] struct {
 	// config are picked up without rebuilding the store.
 	Bucket func(ctx context.Context) (simplecloud.ReadWriter, string, error)
 
-	// MissingOK makes Load treat an unopenable document as the zero T
-	// instead of an error, for documents that are optional until first
-	// saved.
-	MissingOK bool
-
 	ptr atomic.Pointer[T]
 }
 
@@ -48,9 +43,9 @@ func (s *Store[T]) Set(value T) {
 	s.ptr.Store(&value)
 }
 
-// Load reads the document from the bucket and publishes it. With MissingOK
-// set, a document that cannot be opened publishes the zero T instead of
-// failing, mirroring how an absent optional file means "no data yet".
+// Load reads the document from the bucket and publishes it. A document that
+// cannot be opened publishes the zero T instead of failing: every document
+// here is optional until first saved.
 func (s *Store[T]) Load(ctx context.Context) error {
 	bucket, path, err := s.Bucket(ctx)
 	if err != nil {
@@ -58,13 +53,10 @@ func (s *Store[T]) Load(ctx context.Context) error {
 	}
 	reader, err := simplecloud.InitReader(ctx, bucket, path)
 	if err != nil {
-		if s.MissingOK {
-			log.Printf("bucketstore: %s unavailable, starting empty: %v", path, err)
-			var zero T
-			s.ptr.Store(&zero)
-			return nil
-		}
-		return err
+		log.Printf("bucketstore: %s unavailable, starting empty: %v", path, err)
+		var zero T
+		s.ptr.Store(&zero)
+		return nil
 	}
 	defer reader.Close()
 

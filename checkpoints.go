@@ -72,7 +72,6 @@ var checkpointsStore = &bucketstore.Store[checkpointsFile]{
 	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
 		return ConfigBucket, configSibling(checkpointsName), nil
 	},
-	MissingOK: true,
 }
 
 // reloadCheckpoints refreshes whatever this game draws its ban markers from.
