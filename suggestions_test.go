@@ -76,6 +76,10 @@ func TestDidYouMeanKeepsFilters(t *testing.T) {
 		{"lightnin bolt region:jp", "Lightning Bolt region:jp"},
 		{"lightning bolt is:m10 f:foil", "lightning bolt s:m10 f:foil"},
 		{"goblin guide is:zen t:creature", "goblin guide s:zen t:creature"},
+		{"serra is:lea t:creature", "serra s:lea t:creature"},
+		{"serra is:leb r:uncommon", "serra s:leb r:uncommon"},
+		{"serra r:uncommon is:leb", "serra r:uncommon s:leb"},
+		{"akroma is:ons t:creature", "Krosa s:ons t:creature"},
 	}
 	for _, tt := range tests {
 		config := parseSearchOptionsNG(ds.backend, tt.query, nil, nil, nil)
