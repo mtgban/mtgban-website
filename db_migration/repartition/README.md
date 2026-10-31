@@ -164,7 +164,10 @@ place. It raises, before the scan, when `prices` is already partitioned by
 "Repairing a stray row" in `../partitions/README.md` shows. The report
 lists rows per source month, rows per category, the bounds with
 `est_rows`, the totals and the time of the run. Run it again to refresh
-the cuts; it replaces both tables.
+the census, which it replaces. It replaces the bounds too until
+`02_create.sql` has created `prices_v2`, and keeps them after: they are
+what its partitions were cut by, and what a later run of `02_create.sql`
+checks them against.
 
 ## 02_create.sql
 
@@ -233,7 +236,8 @@ To start the copy over, `TRUNCATE public.prices_v2` and
 `DELETE FROM migration.progress WHERE phase = 'repartition'`; the table
 also holds the earlier backfill phases, so never truncate it. A static
 month that raises on a surplus received rows after the census: re-run
-`01_census.sql`, then `03_copy.sql`.
+`01_census.sql`, which counts them and keeps the bounds, then
+`03_copy.sql`.
 
 ## 06_gate.sql
 
