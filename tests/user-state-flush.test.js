@@ -268,3 +268,112 @@ test('UserStateSync.flush also waits for a write the debounce already sent', asy
     for (let i = 0; i < 10; i++) await turn();
     expect(settled).toBe(true);
 });
+
+test('UserStateSync.flush with nothing queued keeps dirty until the write in flight lands', async () => {
+    const m = {};
+    class Storage {
+        getItem(k) { return k in m ? m[k] : null; }
+        setItem(k, v) { m[k] = String(v); }
+        removeItem(k) { delete m[k]; }
+    }
+    const storage = new Storage();
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const window = { addEventListener() {}, Storage, localStorage: storage };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
+    let fail;
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PATCH') {
+            return new Promise((r) => { fail = () => r({ status: 500, ok: false, headers: { get: () => null }, json: () => Promise.resolve(null) }); });
+        }
+        return Promise.resolve({ status: 401, ok: false, headers: { get: () => null }, json: () => Promise.resolve(null) });
+    };
+    const timers = [];
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', 'console', source)(
+        window, document, storage, session, fetch, realListStorage(), (fn) => timers.push(fn), () => {}, { warn() {} });
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    storage.setItem('mtgban_backpack', JSON.stringify([{ id: 'a', qty: 1, t: 1, m: 1 }]));
+    expect(m.mtgban_userstate_dirty).toBe('1');
+    timers[timers.length - 1]();
+    for (let i = 0; i < 10; i++) await turn();
+    let settled = false;
+    window.UserStateSync.flush().then(() => { settled = true; });
+    for (let i = 0; i < 10; i++) await turn();
+    expect(settled).toBe(false);
+    expect(m.mtgban_userstate_dirty).toBe('1');
+    fail();
+    for (let i = 0; i < 10; i++) await turn();
+    expect(settled).toBe(true);
+    expect(m.mtgban_userstate_dirty).toBe('1');
+});
+
+test('a flush that throws does not stop the next one from sending', async () => {
+    const m = {};
+    class Storage {
+        getItem(k) { return k in m ? m[k] : null; }
+        setItem(k, v) { m[k] = String(v); }
+        removeItem(k) { delete m[k]; }
+    }
+    const storage = new Storage();
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const window = { addEventListener() {}, Storage, localStorage: storage };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
+    const sent = [];
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PATCH') {
+            sent.push(url);
+            return Promise.resolve({ status: 200, ok: true, headers: { get: () => null }, json: () => Promise.resolve({ version: 1 }) });
+        }
+        return Promise.resolve({ status: 401, ok: false, headers: { get: () => null }, json: () => Promise.resolve(null) });
+    };
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
+        window, document, storage, session, fetch, realListStorage(), () => 1, () => {});
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    // A null entry throws in trimBackpack, before the write's own catch.
+    storage.setItem('mtgban_backpack', '[null]');
+    await window.UserStateSync.flush().catch(() => {});
+    expect(sent).toEqual([]);
+    expect(m.mtgban_userstate_dirty).toBe('1');
+    storage.setItem('mtgban_favorites', JSON.stringify([{ id: 'x', name: 'X', query: 'q' }]));
+    await window.UserStateSync.flush();
+    expect(sent).toEqual(['/api/userstate/favorites']);
+    // The backpack that threw never landed, so the state stays dirty.
+    expect(m.mtgban_userstate_dirty).toBe('1');
+});
+
+test('a keepalive write that fails is sent again by the next flush', async () => {
+    const m = {};
+    class Storage {
+        getItem(k) { return k in m ? m[k] : null; }
+        setItem(k, v) { m[k] = String(v); }
+        removeItem(k) { delete m[k]; }
+    }
+    const storage = new Storage();
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const listeners = {};
+    const window = { addEventListener(type, fn) { listeners[type] = fn; }, Storage, localStorage: storage };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
+    const sent = [];
+    let failing = true;
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PATCH') {
+            sent.push(url);
+            const ok = !failing;
+            return Promise.resolve({ status: ok ? 200 : 500, ok, headers: { get: () => null }, json: () => Promise.resolve({ version: 1 }) });
+        }
+        return Promise.resolve({ status: 401, ok: false, headers: { get: () => null }, json: () => Promise.resolve(null) });
+    };
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
+        window, document, storage, session, fetch, realListStorage(), () => 1, () => {});
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    // The tab is hidden with a favorite queued, and its keepalive write fails.
+    storage.setItem('mtgban_favorites', JSON.stringify([{ id: 'x', name: 'X', query: 'q' }]));
+    listeners.pagehide();
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(sent).toEqual(['/api/userstate/favorites']);
+    failing = false;
+    // Back on the page, an edit elsewhere flushes the favorite again with it.
+    storage.setItem('mtgban_recent_searches', JSON.stringify([{ query: 'bolt' }]));
+    await window.UserStateSync.flush();
+    expect(sent.filter((u) => u.endsWith('/favorites')).length).toBe(2);
+    expect(m.mtgban_userstate_dirty).toBe('0');
+});
