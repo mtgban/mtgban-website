@@ -19,7 +19,9 @@
 -- match), and when a provider's latest day differs between the two (run
 -- 05_catchup.sql). The apply takes both tables ACCESS EXCLUSIVE with a 5s
 -- lock_timeout, checks the latest days again under the lock, renames and
--- commits. Restart the Magic site and cmd/tcgcsvd right after.
+-- commits. Restart the sites on the Magic, Pokemon and Yu-Gi-Oh droplets
+-- and cmd/tcgcsvd right after, the App Platform apps at their next deploy
+-- or by hand.
 -- A second run raises: prices is then partitioned by ban_id.
 
 \set ON_ERROR_STOP on
@@ -170,7 +172,7 @@ SELECT c.relname AS name, c.relkind, pg_get_partkeydef(c.oid) AS partition_key
 FROM pg_class c WHERE c.oid IN ('public.prices'::regclass, 'public.prices_old'::regclass)
 ORDER BY c.relname;
 \echo committed
-\echo restart the Magic site and cmd/tcgcsvd now, so their prepared chart reads are planned afresh on the new prices
+\echo restart the sites on the Magic, Pokemon and Yu-Gi-Oh droplets and cmd/tcgcsvd now, so their prepared chart reads are planned afresh on the new prices
 \else
 ROLLBACK;
 \echo dry run: rolled back, pass -v apply=1 to commit
