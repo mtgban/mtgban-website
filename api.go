@@ -14,6 +14,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"regexp"
@@ -648,9 +649,12 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	isBuylist := strings.Contains(r.URL.Path, "/buylist/")
 	isSealed := strings.Contains(r.URL.Path, "/sealed/")
 
-	query := path.Base(r.URL.Path)
+	// The query is the last segment of the path as sent, where a "/" in it
+	// arrives escaped
+	query := path.Base(r.URL.EscapedPath())
 	query = strings.TrimSuffix(query, ".json")
 	query = strings.TrimSuffix(query, ".csv")
+	query, _ = url.PathUnescape(query)
 
 	// Load some defaults
 	enabledModes := strings.Split(GetParamFromSig(sig, "APImode"), ",")

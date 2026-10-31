@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"maps"
@@ -653,6 +654,59 @@ func TestSearchCSVListsWhatThePageLists(t *testing.T) {
 	}
 	if got := exported("Counterspell skip:empty"); len(got) != len(priced) {
 		t.Errorf("Counterspell skip:empty: %d rows, want the %d with offers", len(got), len(priced))
+	}
+}
+
+// A query with a "/" in it, a split card's name or a backpack's, exports
+// whole: the page's link escapes it and the route reads it back in one piece.
+func TestSearchExportKeepsASlashInTheQuery(t *testing.T) {
+	uuids, err := backend().SearchEquals("Fire // Ice")
+	if err != nil || len(uuids) < 2 {
+		t.Skip("matcher data not loaded")
+	}
+	co, err := backend().GetUUID(uuids[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	inSet := 0
+	inventory := mtgban.InventoryRecord{}
+	for _, id := range uuids {
+		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1})
+		other, _ := backend().GetUUID(id)
+		if other.SetCode == co.SetCode {
+			inSet++
+		}
+	}
+	if inSet == len(uuids) {
+		t.Skip("every Fire // Ice printing is in one set")
+	}
+	signingEnabled(t, false)
+	publishStores(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}, []mtgban.Vendor{})
+
+	// The set comes first, so a query cut at its last "/" reads " Ice" and
+	// exports every printing.
+	query := "s:" + co.SetCode + " Fire // Ice"
+	page := renderSearch(t, "search.html", PageVars{
+		SearchVars: SearchVars{SearchRan: true, AllKeys: uuids[:1], SearchQuery: query, CanDownloadCSV: true},
+		CardHashes: []string{uuids[0]},
+	})
+	link := regexp.MustCompile(`href="(/search/export/retail/[^"]+)"`).FindStringSubmatch(page)
+	if link == nil {
+		t.Fatal("the page has no retail export link")
+	}
+	href := html.UnescapeString(link[1])
+
+	mux := http.NewServeMux()
+	mux.Handle("/search/export/", enforceSigning(testSite, http.HandlerFunc(testSite.SearchExport)))
+	req := httptest.NewRequest(http.MethodGet, href, nil)
+	req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))})
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("%s = %d, want 200", href, rec.Code)
+	}
+	if rows := strings.Count(rec.Body.String(), "\n") - 1; rows != inSet {
+		t.Errorf("%s exported %d rows, want the %d printings in %s", href, rows, inSet, co.SetCode)
 	}
 }
 
