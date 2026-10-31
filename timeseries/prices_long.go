@@ -101,36 +101,6 @@ func (c *Client) HGetAllByBanID(ctx context.Context, banID int64, lb Lookback) (
 	return result, rows.Err()
 }
 
-// GetEarliestDateLong returns the oldest on-record date for one printing, by
-// its mtgban_id, bounded by the lookback window.
-func (c *Client) GetEarliestDateLong(ctx context.Context, mtgbanID string, lb Lookback) (time.Time, error) {
-	boundary := lb.Since()
-	var earliest sql.NullTime
-	err := c.db.QueryRowContext(ctx, `
-		SELECT MIN(p.date)
-		  FROM prices p
-		  JOIN variants v ON v.ban_id = p.ban_id
-		 WHERE v.mtgban_id = $1 AND p.date >= $2`,
-		mtgbanID, boundary).Scan(&earliest)
-	if err != nil || !earliest.Valid || earliest.Time.IsZero() {
-		return boundary, err
-	}
-	return earliest.Time, nil
-}
-
-// GetEarliestDateByBanID returns the oldest on-record date for one exact variant,
-// bounded by the lookback window (the ban_id counterpart of GetEarliestDateLong).
-func (c *Client) GetEarliestDateByBanID(ctx context.Context, banID int64, lb Lookback) (time.Time, error) {
-	boundary := lb.Since()
-	var earliest sql.NullTime
-	err := c.db.QueryRowContext(ctx,
-		`SELECT MIN(date) FROM prices WHERE ban_id=$1 AND date >= $2`, banID, boundary).Scan(&earliest)
-	if err != nil || !earliest.Valid || earliest.Time.IsZero() {
-		return boundary, err
-	}
-	return earliest.Time, nil
-}
-
 // AggregatePriceStats holds per-card summary statistics of one price column
 // over a date window: max, min, discrete 90th percentile, and the count of
 // rows that contributed to them. Computed from rows where the column is
