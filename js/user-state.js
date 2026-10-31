@@ -328,13 +328,15 @@
         });
     }
 
+    // inflight is the last flush's writes, settled once they land.
+    var inflight = Promise.resolve();
     function flush() {
         timer = null;
         var sections = Object.keys(pending);
         pending = {};
         var allOk = true;
         // Chain sequentially so version stays consistent across sections.
-        sections.reduce(function(p, section) {
+        inflight = sections.reduce(function(p, section) {
             return p.then(function() {
                 return patchSection(section).then(function(ok) {
                     // Re-queue failures so the next flush retries them.
@@ -345,7 +347,17 @@
             // Clear dirty only if everything synced and no new writes were scheduled.
             if (allOk && !timer && Object.keys(pending).length === 0) markClean();
         });
+        return inflight;
     }
+
+    // UserStateSync.flush writes what is queued now and settles once it and
+    // any write already under way are saved, for a page about to ask the
+    // server for them.
+    window.UserStateSync.flush = function() {
+        if (timer) clearTimeout(timer);
+        var before = inflight;
+        return Promise.all([before, flush()]);
+    };
 
     // Flush queued writes now (page hidden/unloading), via keepalive.
     function flushPending() {

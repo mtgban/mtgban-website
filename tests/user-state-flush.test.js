@@ -195,3 +195,76 @@ test('a write refused as too large tells the backpack once until a backpack writ
     await write(7);
     expect(told).toBe(2);
 });
+
+test('UserStateSync.flush sends what is queued without waiting, and settles once it lands', async () => {
+    const m = {};
+    class Storage {
+        getItem(k) { return k in m ? m[k] : null; }
+        setItem(k, v) { m[k] = String(v); }
+        removeItem(k) { delete m[k]; }
+    }
+    const storage = new Storage();
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const window = { addEventListener() {}, Storage, localStorage: storage };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
+    let land;
+    const sent = [];
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PATCH') {
+            sent.push(url);
+            return new Promise((r) => { land = () => r({ status: 200, ok: true, headers: { get: () => null }, json: () => Promise.resolve({ version: 1 }) }); });
+        }
+        return Promise.resolve({ status: 401, ok: false, headers: { get: () => null }, json: () => Promise.resolve(null) });
+    };
+    const timers = [];
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
+        window, document, storage, session, fetch, realListStorage(), (fn) => timers.push(fn), () => {});
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    storage.setItem('mtgban_backpack', JSON.stringify([{ id: 'a', qty: 1, t: 1, m: 1 }]));
+    let settled = false;
+    window.UserStateSync.flush().then(() => { settled = true; });
+    for (let i = 0; i < 10; i++) await turn();
+    expect(sent).toEqual(['/api/userstate/backpack']);
+    expect(settled).toBe(false);
+    land();
+    for (let i = 0; i < 10; i++) await turn();
+    expect(settled).toBe(true);
+});
+
+test('UserStateSync.flush also waits for a write the debounce already sent', async () => {
+    const m = {};
+    class Storage {
+        getItem(k) { return k in m ? m[k] : null; }
+        setItem(k, v) { m[k] = String(v); }
+        removeItem(k) { delete m[k]; }
+    }
+    const storage = new Storage();
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const window = { addEventListener() {}, Storage, localStorage: storage };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
+    let land;
+    const sent = [];
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PATCH') {
+            sent.push(url);
+            return new Promise((r) => { land = () => r({ status: 200, ok: true, headers: { get: () => null }, json: () => Promise.resolve({ version: 1 }) }); });
+        }
+        return Promise.resolve({ status: 401, ok: false, headers: { get: () => null }, json: () => Promise.resolve(null) });
+    };
+    const timers = [];
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
+        window, document, storage, session, fetch, realListStorage(), (fn) => timers.push(fn), () => {});
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    storage.setItem('mtgban_backpack', JSON.stringify([{ id: 'a', qty: 1, t: 1, m: 1 }]));
+    timers[timers.length - 1]();
+    for (let i = 0; i < 10; i++) await turn();
+    expect(sent).toEqual(['/api/userstate/backpack']);
+    let settled = false;
+    window.UserStateSync.flush().then(() => { settled = true; });
+    for (let i = 0; i < 10; i++) await turn();
+    expect(sent.length).toBe(1);
+    expect(settled).toBe(false);
+    land();
+    for (let i = 0; i < 10; i++) await turn();
+    expect(settled).toBe(true);
+});
