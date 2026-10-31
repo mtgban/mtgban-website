@@ -1,9 +1,16 @@
 package moxfield
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 // A deck entry aggregates all copies of a card under one representative
@@ -105,5 +112,103 @@ func TestPrepareDecklistCapIsDeterministic(t *testing.T) {
 		if !slices.Equal(got, first) {
 			t.Fatalf("prepareDecklist kept %+v, then %+v", first, got)
 		}
+	}
+}
+
+func TestGetMoxDeckDecodes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(`{"name":"Breena"}`))
+	}))
+	defer srv.Close()
+
+	deck, err := getMoxDeck(context.Background(), srv.URL)
+	if err != nil || deck.Name != "Breena" {
+		t.Fatalf("got %+v, %v, want Breena", deck, err)
+	}
+}
+
+// A vendor that sends its headers and then stalls mid-body is cut off by
+// the client's timeout, not left holding the upload.
+func TestGetMoxDeckStalledBodyTimesOut(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"name":`))
+		err := http.NewResponseController(w).Flush()
+		if err != nil {
+			t.Error(err)
+		}
+		select {
+		case <-r.Context().Done():
+		case <-time.After(5 * time.Second):
+		}
+	}))
+	defer srv.Close()
+
+	saved := client
+	client = mtgban.NewHTTPClient(mtgban.WithHTTPTimeout(200*time.Millisecond), mtgban.WithHTTPRetries(0))
+	t.Cleanup(func() { client = saved })
+
+	start := time.Now()
+	_, err := getMoxDeck(context.Background(), srv.URL)
+	if err == nil {
+		t.Fatal("a stalled body decoded without error")
+	}
+	elapsed := time.Since(start)
+	if elapsed > 2*time.Second {
+		t.Fatalf("stalled body took %v to fail, want about the 200ms timeout", elapsed)
+	}
+}
+
+func TestGetMoxDeckOversizeBodyErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(`{"name":"` + strings.Repeat("a", maxBody) + `"}`))
+	}))
+	defer srv.Close()
+
+	_, err := getMoxDeck(context.Background(), srv.URL)
+	if err == nil {
+		t.Fatal("a body past maxBody decoded without error")
+	}
+}
+
+// A 5xx is answered at once, with its status, and not retried.
+func TestGetMoxDeckServerErrorIsNotRetried(t *testing.T) {
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+
+	_, err := getMoxDeck(context.Background(), srv.URL)
+	if err == nil || err.Error() != "status code: 502" || hits != 1 {
+		t.Fatalf("got %v after %d requests, want status code: 502 after 1", err, hits)
+	}
+}
+
+// A collection whose every page answers well inside the client's timeout
+// still stops at the one deadline the whole walk shares.
+func TestCollectionWalkSharesOneDeadline(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("pageNumber") == "0" {
+			w.Write([]byte(`{"totalResults":10000}`))
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+		w.Write([]byte(`{"data":[{"game":"arena"}]}`))
+	}))
+	defer srv.Close()
+
+	saved := collectionTimeout
+	collectionTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { collectionTimeout = saved })
+
+	start := time.Now()
+	_, err := getMoxCollection(context.Background(), srv.URL, 1000)
+	if err == nil {
+		t.Fatal("a 101-page walk finished inside a 300ms deadline")
+	}
+	elapsed := time.Since(start)
+	if elapsed > 2*time.Second {
+		t.Fatalf("walk took %v to fail, want about the 300ms deadline", elapsed)
 	}
 }
