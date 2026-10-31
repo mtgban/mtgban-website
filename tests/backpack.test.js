@@ -39,7 +39,7 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], navMenu = false, sort, fetch } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], navMenu = false, sort, fetch, signedIn = false } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
     if (active) m.mtgban_backpack_active = String(active);
@@ -95,6 +95,7 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     const docListeners = {};
     const document = {
         body, readyState: 'complete', addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); },
+        documentElement: { dataset: { signedIn: String(signedIn) } },
         getElementById: (id) => ids[id] || null,
         createElement: (tag) => el(tag),
         querySelectorAll: (sel) => body.querySelectorAll(sel),
@@ -1866,5 +1867,50 @@ describe('sorting the panel', () => {
         const p = page({ store: store.slice(0, 1) });
         p.nav.click();
         expect(ids['backpack-sort'].hidden).toBe(true);
+    });
+});
+
+describe('searching the backpack', () => {
+    function open(p) { p.nav.click(); return ids['backpack-search']; }
+    const one = [{ id: 'uuid-1', name: 'One', qty: 2, t: 1, m: 1 }];
+    // sync stands in for user-state.js, counting flushes and settling each
+    // when the test says.
+    function sync(p) {
+        const s = { flushes: 0, settle: null };
+        p.window.UserStateSync = { flush: () => { s.flushes++; return new Promise((r) => { s.settle = r; }); } };
+        return s;
+    }
+    const turn = () => new Promise((r) => setTimeout(r, 0));
+
+    test('a reader who is not signed in has no synced backpack to search', () => {
+        expect(open(page({ store: one })).hidden).toBe(true);
+    });
+
+    test('it searches the one backpack once the sync has saved it', async () => {
+        const p = page({ store: one, signedIn: true });
+        const btn = open(p);
+        expect(btn.hidden).toBe(false);
+        expect(btn.disabled).toBe(false);
+        const s = sync(p);
+        btn.click();
+        await turn();
+        expect(s.flushes).toBe(1);
+        expect(p.window.location.href).toBeUndefined();
+        s.settle();
+        await turn();
+        expect(p.window.location.href).toBe('/search?q=' + encodeURIComponent('on:backpack'));
+    });
+
+    test('with more than one backpack it names the open one, without quotes or commas, and goes at once without sync', async () => {
+        const p = page({ store: [...one, { id: 'uuid-2', name: 'Two', pack: 2, qty: 1, t: 2, m: 2 }], signedIn: true, tabs: 2, active: 2,
+            tabList: [{ pack: 1, name: 'Trade' }, { pack: 2, name: 'My "Deck", v2' }] });
+        const btn = open(p);
+        btn.click();
+        await turn();
+        expect(p.window.location.href).toBe('/search?q=' + encodeURIComponent('on:"My Deck v2"'));
+    });
+
+    test('an empty backpack has nothing to search', () => {
+        expect(open(page({ signedIn: true })).disabled).toBe(true);
     });
 });

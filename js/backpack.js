@@ -461,6 +461,26 @@
         return form;
     }
 
+    // searchQuery is the search for backpack p's cards: on:backpack for a
+    // reader keeping one, else its name without the quotes and commas a
+    // filter value cannot carry, as search_backpacks.go reads it.
+    function searchQuery(p) {
+        var list = tabs();
+        var t = list.filter(function (x) { return x.pack === p; })[0];
+        if (list.length < 2 || !t) return "on:backpack";
+        return 'on:"' + t.name.replace(/[",]/g, "").trim() + '"';
+    }
+
+    // searchBackpack opens the search for the open backpack once the sync
+    // has saved it, or after a few seconds of waiting on that.
+    function searchBackpack() {
+        var url = "/search?q=" + encodeURIComponent(searchQuery(active()));
+        var go = function () { window.location.href = url; };
+        var sync = window.UserStateSync && window.UserStateSync.flush;
+        var wait = new Promise(function (done) { setTimeout(done, 3000); });
+        Promise.race([sync ? window.UserStateSync.flush() : null, wait]).then(go, go);
+    }
+
     // Upload checks its own grant; a page without BAN_BACKPACK sends as before.
     function canUpload() { return !(window.BAN_BACKPACK && window.BAN_BACKPACK.canUpload === false); }
     // onUpload says whether this is Upload, the one page naming what it priced.
@@ -872,7 +892,7 @@
     // ---- the panel ----
 
     var panel = null, overlay = null, stripEl = null, listEl = null, countEl = null, emptyEl = null;
-    var sendRetail = null, sendBuylist = null, emptySwitch = null, undoBtn = null;
+    var sendRetail = null, sendBuylist = null, emptySwitch = null, undoBtn = null, searchBtn = null;
     var sortBar = null, sortSel = null, sortDirBtn = null, sortNote = null;
     // draggedTab is the backpack whose tab is being dragged along the strip.
     var draggedTab = 0;
@@ -915,7 +935,18 @@
         closeBtn.setAttribute("type", "button");
         closeBtn.setAttribute("aria-label", "Close");
         closeBtn.addEventListener("click", close);
-        header.append(title, countEl, closeBtn);
+        // Beside the close, as the footer row has no room left on a phone.
+        // The search reads the synced backpack, so a reader without sync
+        // has none to search.
+        searchBtn = text("button", "backpack-search");
+        searchBtn.setAttribute("id", "backpack-search");
+        searchBtn.setAttribute("aria-label", "Search the backpack");
+        searchBtn.setAttribute("title", "Search the backpack");
+        icon(searchBtn, "search");
+        searchBtn.setAttribute("type", "button");
+        searchBtn.hidden = document.documentElement.dataset.signedIn !== "true";
+        searchBtn.addEventListener("click", searchBackpack);
+        header.append(title, countEl, searchBtn, closeBtn);
 
         stripEl = text("div", "backpack-tabs");
         stripEl.setAttribute("id", "backpack-tabs");
@@ -1361,6 +1392,7 @@
         sendRetail.disabled = entries.length === 0 || !canUpload();
         sendBuylist.disabled = entries.length === 0 || !canUpload();
         undoBtn.disabled = undoSteps().length === 0;
+        searchBtn.disabled = entries.length === 0;
     }
 
     function render() {

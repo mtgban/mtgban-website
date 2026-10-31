@@ -173,6 +173,7 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 .backpack-count { flex: 1; font-size: 0.9em; opacity: 0.8; }
 
 .backpack-close,
+.backpack-search,
 .backpack-plus,
 .backpack-minus {
     border: 1px solid var(--border-moderate);
@@ -184,6 +185,12 @@ html:has(.backpack-panel.open) { overflow: hidden; }
     line-height: 1;
     padding: 0.25em 0.5em;
 }
+
+/* an icon on the text baseline, so it lines up with the close's × */
+.backpack-search { padding: 0.25em 0.4em; }
+.backpack-search svg { width: 1em; height: 1em; vertical-align: -0.15em; }
+.backpack-search[hidden] { display: none; }
+.backpack-search:disabled { opacity: 0.5; cursor: default; }
 
 .backpack-tabs {
     display: flex;
