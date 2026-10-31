@@ -111,11 +111,15 @@ type TierRow struct {
 
 // tierComparison lays the tier cards side by side: a group per page in nav
 // order, a row per perk from the most tiers to the fewest, then in flag
-// order, cells in the order of tiers.
+// order, cells in the order of tiers; a key the registry lacks is skipped.
 func tierComparison(tiers []TierSummary) []TierGroup {
 	var groups []TierGroup
 	for _, key := range OrderNav {
-		group := TierGroup{Name: ExtraNavs[key].Name, Granted: make([]bool, len(tiers))}
+		nav, known := ExtraNavs[key]
+		if !known {
+			continue
+		}
+		group := TierGroup{Name: nav.Name, Granted: make([]bool, len(tiers))}
 		rows := map[string]*TierRow{}
 		var flags []string
 		for i, tier := range tiers {

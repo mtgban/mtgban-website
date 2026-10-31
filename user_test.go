@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"maps"
 	"net/url"
 	"slices"
 	"strconv"
@@ -331,6 +332,27 @@ func TestTierComparisonLinesUpTheCards(t *testing.T) {
 	}
 	if tierComparison(nil) != nil {
 		t.Error("no tiers gave groups")
+	}
+}
+
+// A nav key the registry lacks, as in tests that swap in a smaller one,
+// leaves its group out rather than panicking.
+func TestTierComparisonSkipsUnknownNavs(t *testing.T) {
+	tiers := tierSummaries(newSite(), fixtureACL(), "")
+	saved := ExtraNavs
+	t.Cleanup(func() { ExtraNavs = saved })
+	ExtraNavs = maps.Clone(saved)
+	delete(ExtraNavs, "Upload")
+
+	var search bool
+	for _, g := range tierComparison(tiers) {
+		if g.Name == saved["Upload"].Name {
+			t.Fatal("unknown nav kept its group")
+		}
+		search = search || g.Name == saved["Search"].Name
+	}
+	if !search {
+		t.Error("the Search group went with the unknown nav")
 	}
 }
 
