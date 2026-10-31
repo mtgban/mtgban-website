@@ -832,6 +832,33 @@ func TestSigningRenewalStopsWhenItsOwnSessionIsGone(t *testing.T) {
 	}
 }
 
+// A logout that lands before the renewal leases the session is not undone
+// either: the request clears the session cookie and sets no signature.
+func TestSigningRenewalStopsWhenItsSessionIsGoneBeforeTheLease(t *testing.T) {
+	for _, edit := range []string{"none", "acl", "grant"} {
+		t.Run(edit, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			pokes := freshPokes(t)
+			switch edit {
+			case "acl":
+				pokes.StampACL(time.Now())
+			case "grant":
+				pokes.StampGrant(rig.hash, time.Now(), DefaultSignatureDuration)
+			}
+			session := rig.session("")
+			old := rig.sig("Legacy", 9*day)
+			logout := httptest.NewRecorder()
+			rig.site.Home(logout, rig.request(http.MethodGet, "/?errmsg=logout", browser(old, session)...))
+
+			req := rig.request(http.MethodGet, "/limited", browser(old, session)...)
+			rig.wantSessionDropped(rig.serve(req, false), req, old)
+			if rig.stub.calls() != 0 {
+				t.Errorf("%d refreshes for a session that is gone, want none", rig.stub.calls())
+			}
+		})
+	}
+}
+
 // A reader who navigates away while their signature renews does not cost the
 // session its token: Patreon rotated it, so the renewal finishes and stores it.
 func TestSigningRenewalFinishesWhenTheReaderLeaves(t *testing.T) {

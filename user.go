@@ -339,7 +339,7 @@ func (s *site) writeAccountAction(w http.ResponseWriter, r *http.Request) {
 				where = "/user"
 			case renewalRenewed:
 				where = "/user?refreshed=yes"
-			case renewalEnded:
+			case renewalEnded, renewalSessionGone:
 				where = "/user?refreshed=ended"
 			}
 		}
