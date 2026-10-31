@@ -91,9 +91,9 @@ func TestCustomBuylistKeepsItsOffersInCredit(t *testing.T) {
 	}
 }
 
-// On upload a rate or minimum price that is not a finite number is ignored,
-// as one of zero is: an infinite rate prices at the full listing rather than
-// at +Inf, and an infinite minimum hides no offer.
+// On upload a rate that is not a positive finite number leaves out the
+// custom buylist, as on search and arbit, and an infinite minimum price is
+// ignored, hiding no offer.
 func TestUploadCustomBuylistIgnoresABadSetting(t *testing.T) {
 	cards := closeVendors(t)
 	ref := mtgban.InventoryRecord{}
@@ -111,8 +111,10 @@ func TestUploadCustomBuylistIgnoresABadSetting(t *testing.T) {
 		rate, minPrice string
 		factor         float64
 	}{
-		{"Inf", "", 1},
-		{"0", "", 1},
+		{"Inf", "", 0},
+		{"0", "", 0},
+		{"abc", "", 0},
+		{"", "", 0},
 		{"0.5", "Inf", 0.5},
 	} {
 		form := url.Values{
@@ -130,6 +132,12 @@ func TestUploadCustomBuylistIgnoresABadSetting(t *testing.T) {
 		testSite.Upload(rec, req)
 		page := rec.Body.String()
 
+		if tt.factor == 0 {
+			if strings.Contains(page, "/go/b/CUSTOM/") {
+				t.Errorf("rate %q: the page has a custom buylist", tt.rate)
+			}
+			continue
+		}
 		for k, card := range cards {
 			offer := regexp.MustCompile(`/go/b/CUSTOM/` + regexp.QuoteMeta(card) + `" target="_blank">\$ ([^<]+)</a>`)
 			want := fmt.Sprintf("%.2f", (10+float64(k))*tt.factor)
