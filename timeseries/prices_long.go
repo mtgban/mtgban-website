@@ -488,15 +488,19 @@ func partitionMonths(rows []LongPrice) []time.Time {
 // StrayRowLimit bounds the stray-row count, so the hourly check stays cheap.
 const StrayRowLimit = 10000
 
-// StrayPriceRows counts the rows that reached prices_default, up to
-// StrayRowLimit. The ban_id layout has no default partition: 0, uncounted.
+// StrayPriceRows counts the rows that reached the default partition of
+// prices, up to StrayRowLimit. The ban_id layout has none: 0, uncounted.
 func (c *Client) StrayPriceRows(ctx context.Context) (int64, error) {
-	var has bool
-	if err := c.db.QueryRowContext(ctx, `SELECT to_regclass('public.prices_default') IS NOT NULL`).Scan(&has); err != nil || !has {
+	// Found by its parent, not its name: during the soak prices_default is prices_old's.
+	var def sql.NullString
+	err := c.db.QueryRowContext(ctx, `SELECT nullif(partdefid, 0)::regclass::text FROM pg_partitioned_table
+ WHERE partrelid = 'public.prices'::regclass`).Scan(&def)
+	if err != nil || !def.Valid {
 		return 0, err
 	}
 	var n int64
-	err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT 1 FROM prices_default LIMIT $1) s`, StrayRowLimit).Scan(&n)
+	// The name comes quoted from regclass.
+	err = c.db.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT 1 FROM `+def.String+` LIMIT $1) s`, StrayRowLimit).Scan(&n)
 	return n, err
 }
 
