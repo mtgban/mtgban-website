@@ -175,6 +175,42 @@ test('the backpack names sync as a preference', async () => {
     expect(prefs.mtgban_backpack_tabs).toBe(tabs);
 });
 
+// Runs user-state.js signed in on a device with unsynced writes holding the
+// local backpack tabs, and returns the tab list reconcile pushes.
+async function reconcileTabs(local, server) {
+    const m = { mtgban_userstate_dirty: '1', mtgban_backpack_tabs: JSON.stringify(local) };
+    const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
+    const state = { version: 3, favorites: [], recents: [], backpack: [], preferences: { mtgban_backpack_tabs: JSON.stringify(server) } };
+    const puts = [];
+    const fetch = async (url, opts) => {
+        if (opts && opts.method === 'PUT') puts.push(JSON.parse(opts.body));
+        return { status: 200, ok: true, json: () => Promise.resolve(state) };
+    };
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
+        { addEventListener() {} }, document, storage, session, fetch, realListStorage());
+    for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+    expect(puts.length).toBe(1);
+    return JSON.parse(puts[0].preferences.mtgban_backpack_tabs);
+}
+const shown = (list) => list.map((t) => t.pack + (t.del ? ' deleted' : ':' + t.name));
+
+test('a stale device keeps the backpacks another renamed, added and deleted', async () => {
+    const pushed = await reconcileTabs(
+        [{ pack: 1, name: 'Main' }, { pack: 2, name: 'Backpack 2' }, { pack: 3, name: 'Old' }],
+        [{ pack: 1, name: 'Main', m: 1 }, { pack: 2, name: 'Trades', m: 5 }, { pack: 4, name: 'Backpack 4', m: 6 }, { pack: 3, del: true, m: 7 }]);
+    expect(shown(pushed)).toEqual(['1:Main', '2:Trades', '3 deleted', '4:Backpack 4']);
+});
+
+test('the newer rename wins on either side, and so does the newer order', async () => {
+    const local = [{ pack: 2, name: 'Trades', m: 9, o: 8 }, { pack: 1, name: 'Main', m: 1, o: 8 }, { pack: 5, name: 'New', m: 9, o: 8 }];
+    const server = [{ pack: 1, name: 'Binder', m: 4, o: 3 }, { pack: 3, name: 'Cube', m: 4, o: 3 }, { pack: 2, name: 'B', m: 4, o: 3 }];
+    expect(shown(await reconcileTabs(local, server))).toEqual(['2:Trades', '1:Binder', '5:New', '3:Cube']);
+    server.forEach((t) => { t.o = 10; });
+    expect(shown(await reconcileTabs(local, server))).toEqual(['1:Binder', '3:Cube', '2:Trades', '5:New']);
+});
+
 test('a big backpack is pushed gzipped and a small one plain', async () => {
     const big = [];
     for (let i = 0; i < 300; i++) big.push(entry('b' + i, 1, 1000 + i, { img: 'https://cards.scryfall.io/normal/front/a/b/' + i + '.jpg' }));

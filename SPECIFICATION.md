@@ -593,11 +593,13 @@ override; phone UA detection via `mileusna/useragent`).
   `SearchBackpackTabs` backpacks, clamped so they hold 7000 together, the
   most a gzipped sync body carries under its 1 MB. The panel's tabs pick
   the active backpack, named in the synced `mtgban_backpack_tabs`
-  preference; a row dragged onto another tab, or its dropdown's "Move
-  to", moves every copy there. The optimizer's take button acts on the
-  backpack the send came from and matches rows by `data-opt-cond`, each
-  row's condition; a blank one, from an upload that ignored conditions,
-  takes the card's copies in any condition, best first.
+  preference, which merges tab by tab (a deleted one kept as a
+  tombstone) in the order reordered last; a row dragged onto another
+  tab, or its dropdown's "Move to", moves every copy there. The
+  optimizer's take button acts on the backpack the send came from and
+  matches rows by `data-opt-cond`, each row's condition; a blank one,
+  from an upload that ignored conditions, takes the card's copies in any
+  condition, best first.
 - **Results**: `map[cardUUID]map[condition][]SearchEntry`; INDEX
   pseudo-conditions merge TCG Low/Market and MKM Low/Trend pairs into
   single rows with a `Secondary` price. Without a signature, non-affiliate
