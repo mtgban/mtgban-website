@@ -129,24 +129,20 @@
                 <input type="hidden" name="tool" value="demokey"/>
                 <button type="submit" class="m-admin-tool-btn">Generate Demo Key</button>
                 {{range .DemoKeyPackages}}
-                    {{if ne .StoreScope "explicit"}}
-                        <button type="submit" name="package" value="{{.Key}}" class="m-admin-tool-btn">{{.Name}}</button>
-                    {{end}}
+                    <button type="submit" name="package" value="{{.Key}}" class="m-admin-tool-btn">{{.Name}}</button>
                 {{end}}
             </form>
-            {{range .DemoKeyPackages}}
-                {{if eq .StoreScope "explicit"}}
-                    <form action="admin" method="POST">
-                        <input type="hidden" name="tool" value="demokey"/>
-                        <input type="hidden" name="package" value="{{.Key}}"/>
-                        <select name="store" onchange="if (this.value) { this.form.submit() }">
-                            <option disabled selected value="">{{.Name}}: {{$.DemoKeyImplied}} + ...</option>
-                            {{range $.DemoKeyStores}}
-                                <option value="{{.Key}}">{{.Name}}</option>
-                            {{end}}
-                        </select>
-                    </form>
-                {{end}}
+            {{range .DemoKeyExplicit}}
+                <form action="admin" method="POST">
+                    <input type="hidden" name="tool" value="demokey"/>
+                    <input type="hidden" name="package" value="{{.Key}}"/>
+                    <select name="store" onchange="if (this.value) { this.form.submit() }">
+                        <option disabled selected value="">{{.Name}}: {{$.DemoKeyImplied}} + ...</option>
+                        {{range $.DemoKeyStores}}
+                            <option value="{{.Key}}">{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </form>
             {{end}}
         </div>
 

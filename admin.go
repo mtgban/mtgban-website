@@ -109,9 +109,11 @@ type AdminVars struct {
 	SelectableField bool
 	SelectableLabel string
 
-	// DemoKeyPackages are the price list's packages the demo key tool mints
-	// for, and DemoKeyStores the families an explicit one picks from.
+	// DemoKeyPackages are the price list's preset packages the demo key tool
+	// mints for, DemoKeyExplicit those whose store is picked from
+	// DemoKeyStores.
 	DemoKeyPackages []apiproductlist.Package
+	DemoKeyExplicit []apiproductlist.Package
 	DemoKeyStores   []StoreFamily
 	DemoKeyImplied  string
 }
@@ -207,7 +209,13 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	pageVars.Tiers = tiers
-	pageVars.DemoKeyPackages = apiProducts.Packages
+	for _, pkg := range apiProducts.Packages {
+		if pkg.StoreScope == apiproductlist.StoreScopeExplicit {
+			pageVars.DemoKeyExplicit = append(pageVars.DemoKeyExplicit, pkg)
+		} else {
+			pageVars.DemoKeyPackages = append(pageVars.DemoKeyPackages, pkg)
+		}
+	}
 	_, pageVars.DemoKeyStores = storeFamilies()
 	pageVars.DemoKeyImplied = apiProducts.Implied.Name
 	pageVars.Uptime = uptime()

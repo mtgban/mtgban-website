@@ -139,12 +139,15 @@ func TestAdminDemoKeyButtonsFollowThePriceList(t *testing.T) {
 	for _, want := range []string{
 		`name="package" value="all_data"`,
 		`name="package" value="all_stores"`,
-		`name="package" value="starter"`,
+		`<input type="hidden" name="package" value="starter"/>`,
 		`<option value="cardkingdom">Card Kingdom</option>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("tools tab lacks %s", want)
 		}
+	}
+	if strings.Contains(body, `<button type="submit" name="package" value="starter"`) {
+		t.Error("the explicit package is offered as a plain button")
 	}
 	if strings.Contains(body, `<option value="tcg">`) {
 		t.Error("the implied family is offered as a pick")
