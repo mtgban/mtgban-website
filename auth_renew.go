@@ -107,7 +107,8 @@ func graceSignature(r *http.Request, sig, querySig string) url.Values {
 // decideRenewal says it is due, or when it is young and stale in a way only
 // the site knows: its reader was poked, which renews it from Patreon as a due
 // one, or the access table or the reader's grant changed after it was issued,
-// which re-signs it here (remintSignature). An edit is re-signed here too
+// which re-signs it here (remintSignature) unless the session the browser
+// names is gone (sessionGone). An edit is re-signed here too
 // whenever Patreon does not renew the signature, however old it is. It reports
 // what the request goes on with: the new signature, or refused when the
 // reader's pledge is gone and they are logged out. values and signed are the
@@ -140,6 +141,10 @@ func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Value
 		}
 		cause = Pokes.Wants(userstate.HashEmail(email), values.Get("Signature"), ends.Add(-DefaultSignatureDuration), now, window)
 		if cause == "acl" || cause == "grant" {
+			// A logout racing this request would be undone by the re-sign
+			if sessionGone(w, r, email, cause) {
+				return "", false
+			}
 			return s.remintSignature(w, r, values, ends, cause), false
 		}
 		if cause == "" {
@@ -163,6 +168,31 @@ func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Value
 		return s.resignStale(w, r, values, ends, now), false
 	}
 	return sig, outcome == renewalRefused
+}
+
+// sessionGone says whether the browser's BAN_SESSION cookie names a session
+// that is gone, a logout among the ways, and clears the cookie when it does.
+// A request with no such cookie, or a database that cannot say, reads as the
+// session standing, as at the lease. cause is what asked, for the log.
+func sessionGone(w http.ResponseWriter, r *http.Request, email, cause string) bool {
+	session := readCookie(r, sessionCookie)
+	if session == "" || UserStateDB == nil {
+		return false
+	}
+	infra := Infrastructure()
+	ctx, cancel := context.WithTimeout(r.Context(), renewalDBTimeout)
+	defer cancel()
+	standing, _, err := UserStateDB.PatreonSessionStanding(ctx, session, userstate.HashEmail(email), infra.Patreon.Client[infra.Patreon.Source])
+	if err != nil {
+		LogPages["Admin"].Printf("renew: session=%.8s email=%q cause=%s verdict=unknown err=standing: %v", session, email, cause, err)
+		return false
+	}
+	if standing != userstate.SessionGone {
+		return false
+	}
+	clearSessionCookie(w, r)
+	LogPages["Admin"].Printf("renew: session=%.8s email=%q cause=%s verdict=session gone", session, email, cause)
+	return true
 }
 
 // resignStale re-signs the signature here (remintSignature) when the access

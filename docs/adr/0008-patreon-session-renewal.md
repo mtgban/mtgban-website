@@ -143,9 +143,13 @@ without the reader.
   nothing: it keeps the reader and the `Expires` the signature had,
   takes the flags of the table now and the overrides and any tier the
   grant names now, so an ACL save costs no Patreon call and extends no
-  session. A young signature is re-signed at once; an older one, or a
-  poked one, is renewed from Patreon, and re-signed whenever that
-  renewal does not come, for want of a session or an answer. A grant
+  session. A young signature is re-signed at once, after one read of
+  the row its `BAN_SESSION` names, if it has one: a row gone, as a
+  logout racing the request leaves it, clears that cookie and re-signs
+  nothing, and a database that cannot say re-signs as the lease would.
+  An older one, or a poked one, is renewed from Patreon, and re-signed
+  whenever that renewal does not come, for want of a session or an
+  answer. A grant
   that stops naming a tier keeps the one it gave until Patreon is
   asked, since only the pledge can say what follows it. Renewal off
   (`after_days` 0) re-signs nothing. A start or a deploy stamps nothing, and
