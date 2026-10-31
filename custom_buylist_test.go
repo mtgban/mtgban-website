@@ -90,6 +90,41 @@ func TestCustomBuylistSkipsSets(t *testing.T) {
 	}
 }
 
+// A rate cookie that is not a positive finite number turns the custom
+// buylist off, for search and arbit alike, rather than pricing at it; such
+// a minimum price is no minimum.
+func TestCustomBuylistRefusesABadRate(t *testing.T) {
+	for _, tt := range []struct {
+		value string
+		want  float64
+	}{
+		{"0.5", 0.5},
+		{"NaN", 0},
+		{"Inf", 0},
+		{"+Inf", 0},
+		{"-Inf", 0},
+		{"0", 0},
+		{"-0.5", 0},
+		{"half", 0},
+	} {
+		read := func(rate, minPrice string) customBuylistRule {
+			r := httptest.NewRequest(http.MethodGet, "/search", nil)
+			r.AddCookie(&http.Cookie{Name: "UploadCustomOpts", Value: "enabled"})
+			r.AddCookie(&http.Cookie{Name: "UploadCustomRate", Value: rate})
+			r.AddCookie(&http.Cookie{Name: "UploadCustomMinPrice", Value: minPrice})
+			return readCustomBuylistRule(r)
+		}
+		rate := read(tt.value, "").rate
+		if rate != tt.want {
+			t.Errorf("rate cookie %q reads as %v, want %v", tt.value, rate, tt.want)
+		}
+		minPrice := read("0.5", tt.value).minPrice
+		if minPrice != tt.want {
+			t.Errorf("minimum price cookie %q reads as %v, want %v", tt.value, minPrice, tt.want)
+		}
+	}
+}
+
 // The custom buylist prices a card or sealed product only once it has been
 // out by the rule's date, on upload and on search and arbit alike.
 func TestCustomBuylistSkipsUnreleased(t *testing.T) {
