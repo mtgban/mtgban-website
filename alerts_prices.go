@@ -12,10 +12,10 @@ import (
 // alertPickedOnlyStores are watched only by an alert that names them.
 // TCGDirectNet is what a card nets sold through TCGplayer Direct and
 // CKBLLast is the last price Card Kingdom bought at, neither an offer to
-// buy it now; ABUCredit is ABU Games' offer in store credit, beside its
-// cash one. An alert on every buylist leaves them out, and every buylist
-// outside the US with them.
-var alertPickedOnlyStores = []string{"TCGDirectNet", "CKBLLast", "ABUCredit"}
+// buy it now; ABUCredit and ABUCreditSealed are ABU Games' offers in
+// store credit, beside its cash ones. An alert on every buylist leaves
+// them out, and every buylist outside the US with them.
+var alertPickedOnlyStores = []string{"TCGDirectNet", "CKBLLast", "ABUCredit", "ABUCreditSealed"}
 
 // alertStorePrices lists every non-index store of the card's kind (sealed
 // or singles) outside the blocklist, so an alert can watch a store not
