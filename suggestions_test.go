@@ -72,6 +72,8 @@ func TestDidYouMeanKeepsFilters(t *testing.T) {
 		{"lightning bolt year>2030", ""},
 		{"lightning bolt price>200", ""},
 		{"black lotus store:ck", ""},
+		{"lightning bolt region:jp", ""},
+		{"lightnin bolt region:jp", "Lightning Bolt region:jp"},
 	}
 	for _, tt := range tests {
 		config := parseSearchOptionsNG(ds.backend, tt.query, nil, nil, nil)

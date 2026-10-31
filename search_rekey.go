@@ -20,9 +20,10 @@ import (
 // letters and never stands in, nor does a key matching by pattern, which
 // a short value matches by chance. A filter whose own key reads its value
 // somewhere is left as typed: c:r keeps no Counterspell, but it is no typo.
-// Neither is a comparison, or a store filter naming a store. name is what
-// the query searches by name and pinned the scope bar's filters; the cards
-// are looked up once for every key.
+// Neither is a comparison, nor a filter that parses into no card filter,
+// region:jp or sort:chrono, unless it is a store filter naming no store.
+// name is what the query searches by name and pinned the scope bar's
+// filters; the cards are looked up once for every key.
 //
 // The page is public, so the work is bounded: a query with more than
 // maxRekeyFilters filters is not rekeyed, nor a filter of more than
@@ -55,7 +56,12 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 		if FilterOperations[key] == nil || op != ":" || strings.Count(value, ",") >= maxRekeyValues {
 			continue
 		}
-		if (key == "store" || key == "seller" || key == "vendor") && namesStores(value) {
+		// A filter that is no card filter reads its value its own way,
+		// region:jp or sort:chrono, and stays as typed; a store filter
+		// naming no store is the one read under another key.
+		elem, ok := cardFilterOf(ds, filter, sealed)
+		store := key == "store" || key == "seller" || key == "vendor"
+		if !ok && (!store || namesStores(value)) {
 			continue
 		}
 
@@ -78,7 +84,6 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 		// filter parses into rather than off its spelling.
 		var tried []FilterElem
 		var typed *rekeyPart
-		elem, ok := cardFilterOf(ds, filter, sealed)
 		if ok {
 			tried = append(tried, elem)
 			negate = elem.Negate
