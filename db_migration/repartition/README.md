@@ -316,12 +316,11 @@ keep child foreign keys named `prices_v2_*_fk` while later ones get
 
 Right after the commit, restart the sites on the Magic, Pokemon and
 Yu-Gi-Oh droplets and `cmd/tcgcsvd`; the App Platform apps restart at
-their next deploy or by hand. Their chart reads
-are prepared statements (`stmtHGetAllLong`, `stmtHGetAllByBanID`,
-`stmtProviderLatestDate`), and the restart has them planned afresh on the
-new table. In the rehearsal a statement prepared before the swap re-planned
-onto the new `prices` by itself on its next run, so the restart is a
-precaution rather than a repair. Then step 10, the catch-up from
+their next deploy or by hand. Their chart reads are prepared statements
+(`stmtHGetAllLong`, `stmtHGetAllByBanID`), and the restart has them
+planned afresh on the new table. In the rehearsal a statement prepared
+before the swap re-planned onto the new `prices` by itself on its next
+run, so the restart is a precaution rather than a repair. Then step 10, the catch-up from
 `prices_old`, as a dry run:
 
 ```sh
