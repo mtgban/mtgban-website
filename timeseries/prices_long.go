@@ -253,22 +253,23 @@ func recordPriceDates(ctx context.Context, tx *sql.Tx, rows []LongPrice) error {
 	return nil
 }
 
-// LatestIngestDate returns the day every tcgcsv provider has reached for a
-// category, the least advanced provider's newest day; ok is false when it has
-// none. A site's stash files today under providers 3 and 4 twice a day, which
-// cannot advance 5 to 7. A provider that stops appearing for a category makes
-// it re-ingest nightly until that day expires, which is idempotent.
+// LatestIngestDate returns the newest day the tcgcsv ingest wrote for a
+// category, the newest price_dates day under TCGCSVIngestOnlyProviders; ok is
+// false when it has none. Only the ingest writes those, and it writes a
+// category's day in one transaction, so any of them on a day means the day is
+// in. A site's stash files today under providers 3 and 4 twice a day, which
+// must not count, and a provider that stops appearing must not hold the day
+// back. A category whose days only ever carry Low and Market has no day here,
+// and re-ingests on every run.
 func (c *Client) LatestIngestDate(ctx context.Context, categoryID int) (time.Time, bool, error) {
-	ids := make([]int64, len(TCGCSVProviders))
-	for i, p := range TCGCSVProviders {
+	ids := make([]int64, len(TCGCSVIngestOnlyProviders))
+	for i, p := range TCGCSVIngestOnlyProviders {
 		ids[i] = int64(p)
 	}
 	var newest sql.NullTime
 	err := c.db.QueryRowContext(ctx, `
-		SELECT min(m) FROM (
-			SELECT max(date) AS m FROM price_dates
-			 WHERE category = $1 AND provider = ANY($2)
-			 GROUP BY provider) x`,
+		SELECT max(date) FROM price_dates
+		 WHERE category = $1 AND provider = ANY($2)`,
 		categoryID, pq.Array(ids)).Scan(&newest)
 	if err != nil {
 		return time.Time{}, false, fmt.Errorf("timeseries: latest ingest date: %w", err)
