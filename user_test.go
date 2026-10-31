@@ -76,13 +76,13 @@ func TestTierSummariesFollowTheACL(t *testing.T) {
 		t.Fatalf("Everyone pages %v", got)
 	}
 	// A reader with no signature gets Search's defaults, never Any's flags
-	defaults := []string{"Backpack of 100 cards", "Price charts back 30 days"}
-	if !slices.Equal(everyone.Pages[0].Perks, defaults) {
-		t.Fatalf("Everyone Search perks %v, want %v", everyone.Pages[0].Perks, defaults)
+	defaults := []string{"Backpack of 100 cards", "Price charts back 1 month"}
+	if !slices.Equal(perkLabels(everyone.Pages[0].Perks), defaults) {
+		t.Fatalf("Everyone Search perks %v, want %v", perkLabels(everyone.Pages[0].Perks), defaults)
 	}
 	// Modern sets none of Search's flags and gets the same defaults
-	if !slices.Equal(tiers[2].Pages[0].Perks, defaults) {
-		t.Fatalf("Modern Search perks %v, want %v", tiers[2].Pages[0].Perks, defaults)
+	if !slices.Equal(perkLabels(tiers[2].Pages[0].Perks), defaults) {
+		t.Fatalf("Modern Search perks %v, want %v", perkLabels(tiers[2].Pages[0].Perks), defaults)
 	}
 
 	legacy := tiers[3]
@@ -98,15 +98,15 @@ func TestTierSummariesFollowTheACL(t *testing.T) {
 		t.Fatalf("Upload description %q", upload.Description)
 	}
 	// Sorted by flag name; the unknown flag adds nothing.
-	wantPerks := []string{"Buylist prices", "Choose which stores to price", "Sell-list optimizer"}
-	if !slices.Equal(upload.Perks, wantPerks) {
-		t.Fatalf("Upload perks %v, want %v", upload.Perks, wantPerks)
+	wantPerks := []string{"Show Buylist prices", "Choose which stores to price", "Access the Optimizer"}
+	if !slices.Equal(perkLabels(upload.Perks), wantPerks) {
+		t.Fatalf("Upload perks %v, want %v", perkLabels(upload.Perks), wantPerks)
 	}
-	wantSearch := []string{"Backpack of 250 cards", "Up to 3 backpacks", "Price charts back 3650 days"}
-	if !slices.Equal(legacy.Pages[0].Perks, wantSearch) {
-		t.Fatalf("Legacy Search perks %v, want %v", legacy.Pages[0].Perks, wantSearch)
+	wantSearch := []string{"Backpack of 250 cards", "Up to 3 backpacks", "Price charts back 10 years"}
+	if !slices.Equal(perkLabels(legacy.Pages[0].Perks), wantSearch) {
+		t.Fatalf("Legacy Search perks %v, want %v", perkLabels(legacy.Pages[0].Perks), wantSearch)
 	}
-	if got := legacy.Pages[1].Perks; !slices.Equal(got, []string{"Data one day behind"}) {
+	if got := perkLabels(legacy.Pages[1].Perks); !slices.Equal(got, []string{"Data one day behind"}) {
 		t.Fatalf("Newspaper perks %v", got)
 	}
 
@@ -115,6 +115,17 @@ func TestTierSummariesFollowTheACL(t *testing.T) {
 			t.Fatalf("%s marked current", tier.Name)
 		}
 	}
+}
+
+// perkLabels is the pills a card shows for perks.
+func perkLabels(perks []TierPerk) []string {
+	var labels []string
+	for _, p := range perks {
+		if p.Label != "" {
+			labels = append(labels, p.Label)
+		}
+	}
+	return labels
 }
 
 func pageNames(pages []TierPage) []string {
@@ -158,7 +169,7 @@ func TestTierSummariesSkipHiddenPages(t *testing.T) {
 	if got := pageNames(vintage.Pages); !slices.Equal(got, []string{"Search", "Alerts"}) {
 		t.Fatalf("with Alerts shown: %v", got)
 	}
-	if got := vintage.Pages[1].Perks; !slices.Equal(got, []string{"Up to 5 alerts"}) {
+	if got := perkLabels(vintage.Pages[1].Perks); !slices.Equal(got, []string{"Up to 5 alerts"}) {
 		t.Fatalf("Alerts perks %v", got)
 	}
 }
@@ -168,21 +179,21 @@ func TestACLFlagLabels(t *testing.T) {
 		flag, value, want string
 		ok                bool
 	}{
-		{"UploadBuylistEnabled", "true", "Buylist prices", true},
+		{"UploadBuylistEnabled", "true", "Show Buylist prices", true},
 		{"UploadBuylistEnabled", "false", "", false},
 		{"UploadBuylistEnabled", "", "", false},
 		{"UploadChangeStoresEnabled", "true", "Choose which stores to price", true},
-		{"UploadOptimizer", "true", "Sell-list optimizer", true},
-		{"UploadNoLimit", "true", "No limit on list size", true},
+		{"UploadOptimizer", "true", "Access the Optimizer", true},
+		{"UploadNoLimit", "true", "Unlimited list size", true},
 		{"UploadCustom", "true", "Import custom searches", true},
 		{"UploadPublish", "true", "Publish an upload as a store", true},
 		{"NewsEnabled", "0day", "Same-day data", true},
 		{"NewsEnabled", "1day", "Data one day behind", true},
 		{"NewsEnabled", "3day", "Data three days behind", true},
 		{"NewsEnabled", "7day", "", false},
-		{"NewsLarge", "true", "50 rows per page", true},
+		{"NewsLarge", "true", "Double the rows per page", true},
 		{"SearchDownloadCSV", "true", "CSV download of results", true},
-		{"SearchChartLoopback", "90", "Price charts back 90 days", true},
+		{"SearchChartLoopback", "90", "Price charts back 3 months", true},
 		{"SearchChartLoopback", "0", "", false},
 		{"SearchChartLoopback", "lots", "", false},
 		{"SearchOfflineMode", "true", "Offline mode", true},
@@ -197,12 +208,14 @@ func TestACLFlagLabels(t *testing.T) {
 		{"ArbitEnabled", "", "", false},
 		{"ArbitDisabledVendors", "CK", "Some vendors excluded", true},
 		{"ArbitDisabledVendors", "", "", false},
-		{"AnyEnabled", "true", "Compare the full store list", true},
+		{"AnyEnabled", "true", "Expanded store selection", true},
 		{"AnyExperimentsEnabled", "true", "Experimental stores included", true},
-		{"AnySpread", "true", "Spread view", true},
+		{"AnySpread", "true", "Spreads down to 50%", true},
+		{"AnySpread", "", "", true},
 		{"SleepersCYOA", "true", "Pick your own store pairing", true},
 		{"SearchBackpackTabs", "3", "Up to 3 backpacks", true},
-		{"SearchBackpackTabs", "1", "", false},
+		{"SearchBackpackTabs", "1", "", true},
+		{"SearchBackpackTabs", "0", "", false},
 		{"AlertsMax", "5", "Up to 5 alerts", true},
 		{"AlertsMax", "1", "Up to 1 alert", true},
 		{"AlertsMax", "0", "", false},
@@ -216,10 +229,108 @@ func TestACLFlagLabels(t *testing.T) {
 		{"NeverHeardOfIt", "true", "", false},
 	}
 	for _, c := range cases {
-		got, ok := aclFlagLabel(c.flag, c.value)
-		if got != c.want || ok != c.ok {
-			t.Errorf("aclFlagLabel(%q, %q) = %q, %v; want %q, %v", c.flag, c.value, got, ok, c.want, c.ok)
+		got, ok := aclFlagPerk(c.flag, c.value)
+		if got.Label != c.want || ok != c.ok {
+			t.Errorf("aclFlagPerk(%q, %q) = %q, %v; want %q, %v", c.flag, c.value, got.Label, ok, c.want, c.ok)
 		}
+	}
+}
+
+// A flag's row and cell name it in the comparison: a check for one that is
+// on or off, the value for one that counts or chooses.
+func TestACLFlagRowsAndCells(t *testing.T) {
+	cases := []struct{ flag, value, row, cell string }{
+		{"UploadBuylistEnabled", "true", "Show Buylist prices", "✓"},
+		{"NewsEnabled", "0day", "Data delay", "Same day"},
+		{"NewsEnabled", "3day", "Data delay", "3 days"},
+		{"SearchChartLoopback", "1", "Price chart history", "1 day"},
+		{"SearchChartLoopback", "30", "Price chart history", "1 month"},
+		{"SearchChartLoopback", "500", "Price chart history", "16 months"},
+		{"SearchChartLoopback", "355", "Price chart history", "1 year"},
+		{"SearchChartLoopback", "745", "Price chart history", "2 years"},
+		{"SearchChartLoopback", "1800", "Price chart history", "5 years"},
+		{"SearchChartLoopback", "720", "Price chart history", "2 years"},
+		{"SearchBackpackMax", "250", "Backpack size", "250 cards"},
+		{"SearchBackpackTabs", "3", "Number of available backpacks", "3"},
+		{"SearchBackpackTabs", "1", "Number of available backpacks", "1"},
+		{"SearchDisabled", "NONE", "Retail stores", "All"},
+		{"SearchBuylistDisabled", "CK", "Buylists", "Some hidden"},
+		{"ArbitEnabled", "ALL", "Stores", "All"},
+		{"ArbitEnabled", "CK,SCG", "Stores", "2"},
+		{"ArbitDisabledVendors", "CK", "Vendors", "Some excluded"},
+		{"AnySpread", "true", "Lowest spread", "50%"},
+		{"AnySpread", "false", "Lowest spread", "200%"},
+		{"AlertsMax", "5", "Alerts", "5"},
+		{"AlertChannels", "discord,email", "Delivery", "Discord and email"},
+		{"APImode", "retail,buylist", "Price API modes", "retail, buylist"},
+	}
+	for _, c := range cases {
+		got, ok := aclFlagPerk(c.flag, c.value)
+		if !ok || got.Row != c.row || got.Cell != c.cell {
+			t.Errorf("aclFlagPerk(%q, %q) = %q / %q, %v; want %q / %q", c.flag, c.value, got.Row, got.Cell, ok, c.row, c.cell)
+		}
+	}
+}
+
+// The comparison is the cards side by side: a group per page some tier
+// grants, in nav order, and each perk one row whose cells line up with
+// the tiers.
+func TestTierComparisonLinesUpTheCards(t *testing.T) {
+	showNavs(t, "Newspaper", "Alerts")
+	tiers := tierSummaries(newSite(), fixtureACL(), "")
+	groups := tierComparison(tiers)
+
+	var names []string
+	for _, g := range groups {
+		names = append(names, g.Name)
+	}
+	if want := []string{"Search", "Newspaper", "Sleepers", "Upload", "Global", "Alerts", "API"}; !slices.Equal(names, want) {
+		t.Fatalf("groups %v, want %v", names, want)
+	}
+
+	// Everyone, Pioneer, Modern, Legacy, Vintage
+	upload := groups[3]
+	if want := []bool{false, true, true, true, true}; !slices.Equal(upload.Granted, want) {
+		t.Errorf("Upload granted %v, want %v", upload.Granted, want)
+	}
+	if upload.Description != ExtraNavs["Upload"].Description {
+		t.Errorf("Upload description %q", upload.Description)
+	}
+	rows := map[string][]string{}
+	var order []string
+	for _, r := range upload.Rows {
+		rows[r.Name] = r.Cells
+		order = append(order, r.Name)
+	}
+	// From the most tiers to the fewest, then in flag order
+	if want := []string{"Choose which stores to price", "Show Buylist prices", "Unlimited list size", "Access the Optimizer"}; !slices.Equal(order, want) {
+		t.Errorf("Upload rows %v, want %v", order, want)
+	}
+	if want := []string{"", "", "✓", "✓", ""}; !slices.Equal(rows["Choose which stores to price"], want) {
+		t.Errorf("store choice cells %v, want %v", rows["Choose which stores to price"], want)
+	}
+
+	// Every tier has a backpack, and keeps one where its card says nothing
+	search := map[string][]string{}
+	for _, r := range groups[0].Rows {
+		search[r.Name] = r.Cells
+	}
+	if want := []string{"100 cards", "100 cards", "100 cards", "250 cards", "100 cards"}; !slices.Equal(search["Backpack size"], want) {
+		t.Errorf("backpack cells %v, want %v", search["Backpack size"], want)
+	}
+	if want := []string{"1", "1", "1", "3", "1"}; !slices.Equal(search["Number of available backpacks"], want) {
+		t.Errorf("backpacks cells %v, want %v", search["Number of available backpacks"], want)
+	}
+	// Every tier with Global shows its spread floor, the grant's lower one
+	global := groups[4]
+	if global.Name != "Global" || global.Rows[0].Name != "Lowest spread" {
+		t.Fatalf("Global rows %+v", global.Rows)
+	}
+	if want := []string{"", "", "200%", "200%", "50%"}; !slices.Equal(global.Rows[0].Cells, want) {
+		t.Errorf("spread floor cells %v, want %v", global.Rows[0].Cells, want)
+	}
+	if tierComparison(nil) != nil {
+		t.Error("no tiers gave groups")
 	}
 }
 
@@ -569,12 +680,13 @@ func pageVarsFor(user *UserVars) PageVars {
 
 func TestUserPageRendersSignedOut(t *testing.T) {
 	showNavs(t, "Newspaper", "Alerts")
-	vars := pageVarsFor(&UserVars{Tiers: tierSummaries(newSite(), fixtureACL(), "")})
+	tiers := tierSummaries(newSite(), fixtureACL(), "")
+	vars := pageVarsFor(&UserVars{Tiers: tiers, Compare: tierComparison(tiers)})
 	vars.PatreonLogin = true
 	vars.PatreonIDs = map[string]string{"magic": "cid"}
 	vars.PatreonURL = "http://localhost/auth"
 	out := renderUserPage(t, vars)
-	for _, want := range []string{"Log in with Patreon", "What each tier unlocks", "Everyone", "Pioneer", "Vintage", "Data one day behind", "Up to 5 alerts"} {
+	for _, want := range []string{"Log in with Patreon", "What each tier unlocks", "Everyone", "Pioneer", "Vintage", "Data one day behind", "Up to 5 alerts", "Compare tiers", "<th scope=\"row\">Data delay</th>", "<td>3 days</td>", `<span class="user-compare-none" aria-hidden="true">–</span><span class="user-hidden">Not included</span>`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("signed-out page lacks %q", want)
 		}
@@ -594,8 +706,9 @@ func TestUserPageRendersSignedIn(t *testing.T) {
 		Features: []UserFeature{{Name: "Price alerts", Description: "Cards you watch", Link: "/alerts"}},
 		Tiers:    tierSummaries(newSite(), fixtureACL(), "Legacy"),
 	}
+	user.Compare = tierComparison(user.Tiers)
 	out := renderUserPage(t, pageVarsFor(user))
-	for _, want := range []string{"a@b.com", "Unverified", "@elmo", `href="/alerts"`, "Your tier", "Log out", `data-tier="legacy"`, "https://www.patreon.com/settings/apps"} {
+	for _, want := range []string{"a@b.com", "Unverified", "@elmo", `href="/alerts"`, "Your tier", "Log out", `data-tier="legacy"`, "https://www.patreon.com/settings/apps", `aria-current="true"`, `<col class="is-current">`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("signed-in page lacks %q", want)
 		}
@@ -670,15 +783,15 @@ func TestTierPagesClampTheBackpacks(t *testing.T) {
 	if len(pages) != 1 {
 		t.Fatalf("pages %+v", pages)
 	}
-	want := []string{"Backpack of 1000 cards", "Up to 7 backpacks", "Price charts back 30 days"}
-	if !slices.Equal(pages[0].Perks, want) {
-		t.Errorf("perks %v, want %v", pages[0].Perks, want)
+	want := []string{"Backpack of 1000 cards", "Up to 7 backpacks", "Price charts back 1 month"}
+	if !slices.Equal(perkLabels(pages[0].Perks), want) {
+		t.Errorf("perks %v, want %v", perkLabels(pages[0].Perks), want)
 	}
 	one := tierPages(newSite(), map[string]map[string]string{
 		"Search": {"SearchBackpackMax": "5000", "SearchBackpackTabs": "1"},
 	})
-	want = []string{"Backpack of 1000 cards", "Price charts back 30 days"}
-	if !slices.Equal(one[0].Perks, want) {
-		t.Errorf("one backpack: perks %v, want %v", one[0].Perks, want)
+	want = []string{"Backpack of 1000 cards", "Price charts back 1 month"}
+	if !slices.Equal(perkLabels(one[0].Perks), want) {
+		t.Errorf("one backpack: perks %v, want %v", perkLabels(one[0].Perks), want)
 	}
 }

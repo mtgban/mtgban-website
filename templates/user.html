@@ -98,13 +98,45 @@
                 <span class="user-tier-page-name">{{.Name}}</span>
                 <span class="user-tier-page-desc">{{.Description}}</span>
                 {{if .Perks}}
-                <span class="user-perks">{{range .Perks}}<span class="user-pill">{{.}}</span>{{end}}</span>
+                <span class="user-perks">{{range .Perks}}{{with .Label}}<span class="user-pill">{{.}}</span>{{end}}{{end}}</span>
                 {{end}}
             </div>
             {{end}}
         </section>
         {{end}}
     </div>
+    {{if .Compare}}
+    <details class="user-compare">
+        <summary>Compare tiers</summary>
+        <div class="user-compare-wrap">
+            <table class="user-compare-table">
+                <colgroup><col>{{range .Tiers}}<col{{if .Current}} class="is-current"{{end}}>{{end}}</colgroup>
+                <thead>
+                    <tr>
+                        <td></td>
+                        {{range .Tiers}}
+                        <th scope="col"{{if .Current}} class="is-current" aria-current="true" title="Your tier"{{end}}><span class="user-tier"{{if .Key}} data-tier="{{.Key}}"{{end}}>{{.Name}}</span></th>
+                        {{end}}
+                    </tr>
+                </thead>
+                {{range .Compare}}
+                <tbody>
+                    <tr class="user-compare-page">
+                        <th scope="row" title="{{.Description}}">{{.Name}}</th>
+                        {{range .Granted}}<td>{{if .}}✓{{else}}<span class="user-compare-none" aria-hidden="true">–</span><span class="user-hidden">Not included</span>{{end}}</td>{{end}}
+                    </tr>
+                    {{range .Rows}}
+                    <tr>
+                        <th scope="row">{{.Name}}</th>
+                        {{range .Cells}}<td>{{if .}}{{.}}{{else}}<span class="user-compare-none" aria-hidden="true">–</span><span class="user-hidden">Not included</span>{{end}}</td>{{end}}
+                    </tr>
+                    {{end}}
+                </tbody>
+                {{end}}
+            </table>
+        </div>
+    </details>
+    {{end}}
     {{else}}
     <p class="user-note">Tier details are unavailable right now.</p>
     {{end}}
