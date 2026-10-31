@@ -99,7 +99,7 @@ func TestDidYouMeanKeepsANumber(t *testing.T) {
 		{"m10 146 r:foil", "s:M10 cn:146 f:foil"},
 	}
 	for _, tt := range tests {
-		config := parseSearchPage(ds, tt.query, false, nil, nil, nil)
+		config := parseSearchPage(ds, tt.query, false, false, nil, nil, nil)
 		got, _ := searchSuggestions(ds, tt.query, config, nil, false)
 		if got != tt.want {
 			t.Errorf("%q: did-you-mean %q, want %q", tt.query, got, tt.want)
