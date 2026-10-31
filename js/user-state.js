@@ -21,6 +21,7 @@
     var PRESETS_KEY = 'mtgban_upload_presets';
     var ARBIT_KEY = 'mtgban_arbit_filters';
     var ARBIT_PRESETS_KEY = 'mtgban_arbit_presets';
+    var TABS_KEY = 'mtgban_backpack_tabs';
     // Keys bundled into the preferences object.
     var PREF_KEYS = [
         'mtgban_fav_sort', 'mtgban_fav_sort_dir',
@@ -534,8 +535,9 @@
 
     // Preferences: last-write-wins per key (local wins on first merge), but
     // the upload and arbitrage presets, lists of their own, merge preset by
-    // preset, and the saved arbitrage filters page group by page group. A
-    // list on one side only goes through its merge too, to be repaired.
+    // preset, the saved arbitrage filters page group by page group, and the
+    // backpack tabs tab by tab. A list on one side only goes through its
+    // merge too, to be repaired.
     function mergePrefs(localPrefs, serverPrefs) {
         localPrefs = localPrefs || {};
         serverPrefs = serverPrefs || {};
@@ -545,7 +547,42 @@
         if (PRESETS_KEY in out) out[PRESETS_KEY] = mergePresets(localPrefs[PRESETS_KEY], serverPrefs[PRESETS_KEY]);
         if (ARBIT_PRESETS_KEY in out) out[ARBIT_PRESETS_KEY] = mergeArbitPresets(localPrefs[ARBIT_PRESETS_KEY], serverPrefs[ARBIT_PRESETS_KEY]);
         if (ARBIT_KEY in out) out[ARBIT_KEY] = mergeArbitFilters(localPrefs[ARBIT_KEY], serverPrefs[ARBIT_KEY]);
+        if (TABS_KEY in out) out[TABS_KEY] = mergeBackpackTabs(localPrefs[TABS_KEY], serverPrefs[TABS_KEY]);
         return out;
+    }
+
+    // Merge two backpack tab lists by pack: the newer add, rename or delete
+    // (m, by later) wins, ties keep the local copy, and a delete stays as
+    // {pack, del, m} so a stale list cannot bring the backpack back. The
+    // order is that of the list reordered later (o), with the other's own
+    // tabs after it; live stamps come back to the server's clock.
+    function mergeBackpackTabs(local, server) {
+        function parse(s) {
+            try { var l = JSON.parse(s); return Array.isArray(l) ? l : []; } catch (e) { return []; }
+        }
+        function byPack(list) {
+            var m = {};
+            list.forEach(function(t) {
+                var p = t && ListStorage.backpackPack(t);
+                if (p && !m[p]) m[p] = t;
+            });
+            return m;
+        }
+        function reordered(list) { return list.reduce(function(o, t) { return Math.max(o, (t && t.o) || 0); }, 0); }
+        var l = parse(local), sv = parse(server), mine = byPack(l), theirs = byPack(sv);
+        var first = later(reordered(sv), reordered(l)) ? sv : l;
+        var order = [];
+        first.concat(first === l ? sv : l).forEach(function(t) {
+            var p = t && ListStorage.backpackPack(t);
+            if (p && order.indexOf(p) < 0) order.push(p);
+        });
+        var now = serverNow();
+        return JSON.stringify(order.map(function(p) {
+            var t = !mine[p] || (theirs[p] && later(theirs[p].m, mine[p].m)) ? theirs[p] : mine[p];
+            if (!t.del && typeof t.m === 'number') t.m = onClock(t.m, now);
+            if (!t.del && typeof t.o === 'number') t.o = onClock(t.o, now);
+            return t;
+        }));
     }
 
     // Merge two copies of the saved arbitrage filters, one state per page

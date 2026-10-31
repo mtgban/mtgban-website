@@ -55,9 +55,8 @@
     // list, backpack 1 alone when there is none, then any backpack holding
     // cards the list does not name, so no card is out of reach.
     function tabs() {
-        var saved;
-        try { saved = JSON.parse(localStorage.getItem(TABS_KEY) || "[]"); } catch (e) { saved = []; }
-        if (!Array.isArray(saved) || !saved.length) saved = [{ pack: 1 }];
+        var saved = storedTabs().filter(function (t) { return t && !t.del; });
+        if (!saved.length) saved = [{ pack: 1 }];
         var out = [], seen = {};
         saved.forEach(function (t) {
             var p = t && ListStorage.backpackPack(t);
@@ -72,7 +71,41 @@
         });
         return out;
     }
-    function saveTabs(list) { try { localStorage.setItem(TABS_KEY, JSON.stringify(list)); } catch (e) {} }
+    function storedTabs() {
+        try {
+            var saved = JSON.parse(localStorage.getItem(TABS_KEY) || "[]");
+            return Array.isArray(saved) ? saved : [];
+        } catch (e) { return []; }
+    }
+    // saveTabs stores the strip's list stamped for the sync merge: a tab
+    // added or renamed takes now as m, one dropped from the strip stays as
+    // {pack, del, m}, and o, on every tab, is when it was last reordered.
+    function saveTabs(list) {
+        var t = now(), was = {}, before = [], o = 0;
+        var shown = tabs().map(function (x) { return x.pack; });
+        storedTabs().forEach(function (x) {
+            var p = x && ListStorage.backpackPack(x);
+            if (!p || was[p]) return;
+            was[p] = x;
+            if (!x.del) before.push(p);
+            o = Math.max(o, x.o || 0);
+        });
+        var packs = list.map(function (x) { return x.pack; });
+        var kept = packs.filter(function (p) { return before.indexOf(p) >= 0; });
+        if (kept.join() !== before.filter(function (p) { return packs.indexOf(p) >= 0; }).join()) o = t;
+        var out = list.map(function (x) {
+            var cur = was[x.pack];
+            var m = cur && !cur.del && cur.name === x.name ? cur.m : t;
+            return { pack: x.pack, name: x.name, m: m, o: o };
+        });
+        shown.forEach(function (p) {
+            if (packs.indexOf(p) < 0) out.push({ pack: p, del: true, m: t });
+        });
+        Object.keys(was).forEach(function (p) {
+            if (was[p].del && packs.indexOf(+p) < 0 && shown.indexOf(+p) < 0) out.push(was[p]);
+        });
+        try { localStorage.setItem(TABS_KEY, JSON.stringify(out)); } catch (e) {}
+    }
 
     // active is the backpack the search buttons and the panel act on, the
     // first tab when the one last picked is gone.
@@ -232,9 +265,10 @@
         var t = now();
         var gone = list.filter(function (e) { return !e.del && e.pack === p; });
         remember(list, gone.map(key), before);
+        // Before the cards go, while the strip still shows p
+        saveTabs(before.filter(function (x) { return x.pack !== p; }));
         gone.forEach(function (e) { e.del = t; e.m = t; });
         save(list);
-        saveTabs(before.filter(function (x) { return x.pack !== p; }));
     }
 
     function toastCeiling() { toast(MAX_QTY + " copies is the most for one product"); }

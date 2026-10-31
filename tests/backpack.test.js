@@ -615,7 +615,7 @@ describe('the backpack tabs', () => {
         field.value = '  Trade binder  ';
         keydown(field, 'Enter');
         expect(labels()[0]).toBe('Trade binder:2*');
-        expect(JSON.parse(p.m.mtgban_backpack_tabs)).toEqual([{ pack: 1, name: 'Trade binder' }, { pack: 2, name: 'Backpack 2' }]);
+        expect(JSON.parse(p.m.mtgban_backpack_tabs).map((t) => t.pack + ':' + t.name)).toEqual(['1:Trade binder', '2:Backpack 2']);
         expect(p.document.activeElement).toBe(tabsOf()[0]);
         tabsOf()[0].click();
         field = strip().children[0];
@@ -671,6 +671,38 @@ describe('the backpack tabs', () => {
         expect(names()).toEqual(['One']);
         ids['backpack-undo'].click();
         expect(labels()).toEqual(['Backpack 1:2', 'Backpack 2:3*']);
+    });
+
+    test('a saved tab list carries stamps for the sync merge', () => {
+        const p = page({ store: two.slice(0, 1), tabs: 3, tabList: [{ pack: 1, name: 'Main', m: 5 }, { pack: 2, name: 'Old', m: 5 }, { pack: 3, name: 'Gone', del: true, m: 6 }] });
+        p.window.UserState = { now: () => 100 };
+        const saved = () => JSON.parse(p.m.mtgban_backpack_tabs);
+        open(p);
+        expect(labels()).toEqual(['Main:2*', 'Old:0']);
+        p.window.Backpack.renameTab(2, 'Trades');
+        expect(saved()).toEqual([{ pack: 1, name: 'Main', m: 5, o: 0 }, { pack: 2, name: 'Trades', m: 100, o: 0 }, { pack: 3, name: 'Gone', del: true, m: 6 }]);
+        p.window.UserState.now = () => 200;
+        p.window.Backpack.deleteTab(2);
+        expect(saved()).toEqual([{ pack: 1, name: 'Main', m: 5, o: 0 }, { pack: 2, del: true, m: 200 }, { pack: 3, name: 'Gone', del: true, m: 6 }]);
+        p.window.renderBackpack();
+        expect(labels()).toEqual(['Main:2*']);
+        p.window.UserState.now = () => 300;
+        ids['backpack-undo'].click();
+        expect(saved().map((t) => [t.pack, t.name, t.m, t.del])).toEqual([[1, 'Main', 5, undefined], [2, 'Trades', 300, undefined], [3, 'Gone', 6, true]]);
+        p.window.Backpack.addTab();
+        expect(saved().map((t) => [t.pack, t.name, t.m, t.del])).toEqual([[1, 'Main', 5, undefined], [2, 'Trades', 300, undefined], [3, 'Backpack 3', 300, undefined]]);
+    });
+
+    test('deleting a backpack the list had deleted, or never named, stamps its delete now', () => {
+        const p = page({ store: two, tabs: 3, tabList: [{ pack: 1, name: 'Main', m: 5 }, { pack: 2, name: 'Old', del: true, m: 6 }] });
+        p.window.UserState = { now: () => 100 };
+        expect(p.window.Backpack.tabs().map((t) => t.pack)).toEqual([1, 2]);
+        p.window.Backpack.deleteTab(2);
+        expect(JSON.parse(p.m.mtgban_backpack_tabs).filter((t) => t.del)).toEqual([{ pack: 2, del: true, m: 100 }]);
+        const q = page({ store: two, tabs: 3, tabList: [{ pack: 1, name: 'Main', m: 5 }] });
+        q.window.UserState = { now: () => 100 };
+        q.window.Backpack.deleteTab(2);
+        expect(JSON.parse(q.m.mtgban_backpack_tabs).filter((t) => t.del)).toEqual([{ pack: 2, del: true, m: 100 }]);
     });
 
     test('another window changing the tabs re-renders', () => {
@@ -812,6 +844,7 @@ describe('moving cards between backpacks', () => {
         expect(tabsOf()[1].classes.has('drop-after')).toBe(true);
         fire(tabsOf()[1], 'drop', dragEvent(dt));
         expect(order()).toEqual(['1', '3', '2']);
+        expect(JSON.parse(p.m.mtgban_backpack_tabs).every((t) => t.o > 0)).toBe(true);
         expect(p.m.mtgban_backpack).toBe(cards);
     });
 
