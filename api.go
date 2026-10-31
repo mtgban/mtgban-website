@@ -687,6 +687,11 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 			idOpt = "mtgjson"
 		}
 	}
+	// The site's export holds what the page showed, the reader's backpacks
+	// included; a key's caller has none.
+	if !isAPI {
+		resolveBackpacks(r.Context(), sig, b, &config)
+	}
 
 	// A key sold without sealed reads no sealed product, whatever the path:
 	// a sealed UUID or a contents: query reaches them from /retail/ too

@@ -418,6 +418,16 @@ func restoreProtected(query string, protected []string, verbatim bool) string {
 	return query
 }
 
+// fixupOnNG splits an on: value into the lists it names, each lowered and
+// unquoted, as backpackNameKey reads a backpack's name.
+func fixupOnNG(code string) []string {
+	var out []string
+	for _, field := range strings.Split(code, ",") {
+		out = append(out, backpackNameKey(field))
+	}
+	return out
+}
+
 // Return a list of shorthands representing the selected stores
 func fixupStoreCodeNG(code string) []string {
 	code = strings.TrimSpace(code)
@@ -1531,7 +1541,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareI
 			filters = append(filters, FilterElem{
 				Name:   "on",
 				Negate: negate,
-				Values: strings.Split(strings.ToLower(code), ","),
+				Values: fixupOnNG(code),
 			})
 		case "format", "legal":
 			filters = append(filters, FilterElem{
@@ -3096,6 +3106,9 @@ func shouldSkipCard(b *matcher.Backend, co *matcher.CardObject, filters []Filter
 			res = cardFilterRegexp(filters[i].Name, filters[i].Regexp, co)
 		case "pool":
 			res = cardFilterPool(filters[i].Members, co)
+		case "on":
+			// Members holds the cards of the backpacks it names.
+			res = cardFilterOn(filters[i].Values, co) && !filters[i].Members[co.UUID]
 		default:
 			res = applyCardFilter(b, filters[i].Name, filters[i].Values, co)
 		}

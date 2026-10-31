@@ -680,6 +680,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
 	}
+	resolveBackpacks(r.Context(), sig, b, &config)
 
 	// Only a reader whose signature was checked gets the custom buylist
 	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
