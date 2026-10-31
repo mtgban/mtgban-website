@@ -15,11 +15,12 @@ function fakeStorage(initial = {}) {
 
 // A form submitting pairs, one of them the report as the newspaper's
 // hidden page field; FormData below reads them back.
-function fakeForm(pairs) {
+function fakeForm(pairs, dataset = {}) {
     const listeners = {};
     const page = pairs.find(([k]) => k === 'page');
     return {
         pairs,
+        dataset,
         elements: page ? { page: { value: page[1] } } : {},
         addEventListener: (ev, fn) => { listeners[ev] = fn; },
         listeners,
@@ -81,6 +82,15 @@ test('a link naming only the report opens it with its saved choices', () => {
     const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ top: { q: 'sort=spike&rarity=M', t: 1 }, vendors: { q: 'rarity=C', t: 1 } }) });
     const { replaced } = load({ form: fakeForm([['page', 'top']]), search: '?page=top', local });
     expect(replaced).toEqual(['/newspaper?page=top&sort=spike&rarity=M']);
+});
+
+test('the mobile page, with no sort control, opens a report without its saved sort', () => {
+    const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ top: { q: 'sort=spike&dir=asc&rarity=M', t: 1 }, vendors: { q: 'sort=spike', t: 1 } }) });
+    const mobile = (page) => load({ form: fakeForm([['page', page]], { sortless: 'true' }), search: '?page=' + page, local }).replaced;
+    expect(mobile('top')).toEqual(['/newspaper?page=top&rarity=M']);
+    expect(mobile('vendors')).toEqual([]);
+    const html = readFileSync(new URL('../templates/mobile/news.html', import.meta.url), 'utf8');
+    expect(html).toContain('data-sortless="true"');
 });
 
 test('a saved state cannot move the reader to another report or page of results', () => {

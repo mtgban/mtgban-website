@@ -77,7 +77,7 @@
             Filters
             <span class="m-news-filter-arrow">&#9662;</span>
         </button>
-        <form id="newsFilters" action="newspaper" method="GET" class="m-news-filter-form">
+        <form id="newsFilters" action="newspaper" method="GET" class="m-news-filter-form" data-sortless="true">
             <input type="hidden" name="page" value="{{$.Page}}">
             <input type="hidden" name="sort" value="{{$.SortOption}}">
             <input type="hidden" name="dir" value="{{$.SortDir}}">
@@ -214,5 +214,5 @@
 {{if ne .Subtitle ""}}
 <script type="text/javascript" src="/js/news-filters.js?hash={{.Hash}}" defer></script>
 {{end}}
-{{/* No tablesort on mobile - sorting is server-side via nav links */}}
+{{/* No tablesort on mobile, and no sort control: a report keeps the sort its link names */}}
 {{end}}

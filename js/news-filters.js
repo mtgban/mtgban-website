@@ -8,6 +8,9 @@
 
     var form = document.getElementById('newsFilters');
     var report = form && form.elements.page ? form.elements.page.value : '';
+    // The mobile page has no sort control, so it applies no saved sort: a
+    // sort saved on another device would leave no way back to the default.
+    var sortless = form && form.dataset.sortless === 'true';
 
     function readSaved() {
         try {
@@ -54,7 +57,12 @@
         here.forEach(function (v, k) { if (k !== 'page') bare = false; });
         var mine = readSaved()[report];
         if (!bare || !mine || typeof mine.q !== 'string') return;
-        var q = choices(new URLSearchParams(mine.q));
+        var params = new URLSearchParams(mine.q);
+        if (sortless) {
+            params.delete('sort');
+            params.delete('dir');
+        }
+        var q = choices(params);
         if (!q) return;
         window.location.replace(window.location.pathname + '?page=' + encodeURIComponent(report) + '&' + q);
     }
