@@ -39,7 +39,13 @@ var patreonTiers = []string{"Pioneer", "Modern", "Legacy", "Vintage"}
 // without case.
 func tierSummaries(s *site, table access.Table, current string) []TierSummary {
 	var out []TierSummary
-	if pages := tierPages(s, table["Any"]); len(pages) > 0 {
+	// Any opens its pages to readers with no signature, so its flags reach
+	// nobody: they get each page's defaults.
+	open := map[string]map[string]string{}
+	for page := range table["Any"] {
+		open[page] = nil
+	}
+	if pages := tierPages(s, open); len(pages) > 0 {
 		out = append(out, TierSummary{Name: "Everyone", Pages: pages})
 	}
 	for _, tier := range patreonTiers {
@@ -58,7 +64,8 @@ func tierSummaries(s *site, table access.Table, current string) []TierSummary {
 }
 
 // tierPages lists a tier entry's pages in nav order, each with the labels
-// of the flags it sets; a key the registry lacks or s hides is skipped.
+// of the flags it sets, or that Search defaults; a key the registry lacks
+// or s hides is skipped.
 func tierPages(s *site, entry map[string]map[string]string) []TierPage {
 	var pages []TierPage
 	for _, key := range OrderNav {
@@ -70,22 +77,36 @@ func tierPages(s *site, entry map[string]map[string]string) []TierPage {
 		if !known || nav.hiddenOn(s) {
 			continue
 		}
+		if key == "Search" {
+			flags = searchFlags(flags)
+		}
 		page := TierPage{Name: nav.Name, Description: nav.Description}
 		for _, flag := range slices.Sorted(maps.Keys(flags)) {
-			value := flags[flag]
-			if flag == "SearchBackpackTabs" {
-				// The tabs a reader gets are clamped by the backpack's size
-				value = strconv.Itoa(backpackTabsFromValues(url.Values{
-					flag: {value}, "SearchBackpackMax": {flags["SearchBackpackMax"]},
-				}))
-			}
-			if label, ok := aclFlagLabel(flag, value); ok {
+			if label, ok := aclFlagLabel(flag, flags[flag]); ok {
 				page.Perks = append(page.Perks, label)
 			}
 		}
 		pages = append(pages, page)
 	}
 	return pages
+}
+
+// searchFlags is a tier's Search flags as the page reads them: the
+// backpacks and the chart history take their defaults where unset, and
+// the backpacks are clamped by the backpack's size.
+func searchFlags(flags map[string]string) map[string]string {
+	v := url.Values{}
+	for flag, value := range flags {
+		v.Set(flag, value)
+	}
+	out := maps.Clone(flags)
+	if out == nil {
+		out = map[string]string{}
+	}
+	out["SearchBackpackMax"] = strconv.Itoa(backpackMaxFromValues(v))
+	out["SearchBackpackTabs"] = strconv.Itoa(backpackTabsFromValues(v))
+	out["SearchChartLoopback"] = strconv.Itoa(lookbackFromValue(v.Get("SearchChartLoopback")).Days())
+	return out
 }
 
 // aclFlagLabel says what a signed ACL value gives the reader, in the

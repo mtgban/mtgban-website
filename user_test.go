@@ -22,8 +22,8 @@ import (
 // a staff one, with the flags the pages read.
 func fixtureACL() access.Table {
 	return access.Table{
-		"Any":     {"Search": {}, "API": {}},
-		"Pioneer": {"Search": {}, "Upload": {}},
+		"Any":     {"Search": {"SearchBackpackMax": "10"}, "API": {}},
+		"Pioneer": {"Search": {"SearchBackpackMax": "100", "SearchChartLoopback": "720"}, "Upload": {}},
 		"Modern": {
 			"Search":    {},
 			"Upload":    {"UploadChangeStoresEnabled": "true"},
@@ -31,7 +31,7 @@ func fixtureACL() access.Table {
 			"Global":    {},
 		},
 		"Legacy": {
-			"Search":    {},
+			"Search":    {"SearchBackpackMax": "250", "SearchBackpackTabs": "3", "SearchChartLoopback": "3650"},
 			"Upload":    {"UploadOptimizer": "true", "UploadBuylistEnabled": "true", "UploadChangeStoresEnabled": "true", "SomethingNew": "true"},
 			"Newspaper": {"NewsEnabled": "1day"},
 			"Sleepers":  {},
@@ -75,6 +75,15 @@ func TestTierSummariesFollowTheACL(t *testing.T) {
 	if got := pageNames(everyone.Pages); !slices.Equal(got, []string{"Search", "API"}) {
 		t.Fatalf("Everyone pages %v", got)
 	}
+	// A reader with no signature gets Search's defaults, never Any's flags
+	defaults := []string{"Backpack of 100 cards", "Price charts back 30 days"}
+	if !slices.Equal(everyone.Pages[0].Perks, defaults) {
+		t.Fatalf("Everyone Search perks %v, want %v", everyone.Pages[0].Perks, defaults)
+	}
+	// Modern sets none of Search's flags and gets the same defaults
+	if !slices.Equal(tiers[2].Pages[0].Perks, defaults) {
+		t.Fatalf("Modern Search perks %v, want %v", tiers[2].Pages[0].Perks, defaults)
+	}
 
 	legacy := tiers[3]
 	if !legacy.Current || legacy.Key != "legacy" {
@@ -92,6 +101,10 @@ func TestTierSummariesFollowTheACL(t *testing.T) {
 	wantPerks := []string{"Buylist prices", "Choose which stores to price", "Sell-list optimizer"}
 	if !slices.Equal(upload.Perks, wantPerks) {
 		t.Fatalf("Upload perks %v, want %v", upload.Perks, wantPerks)
+	}
+	wantSearch := []string{"Backpack of 250 cards", "Up to 3 backpacks", "Price charts back 3650 days"}
+	if !slices.Equal(legacy.Pages[0].Perks, wantSearch) {
+		t.Fatalf("Legacy Search perks %v, want %v", legacy.Pages[0].Perks, wantSearch)
 	}
 	if got := legacy.Pages[1].Perks; !slices.Equal(got, []string{"Data one day behind"}) {
 		t.Fatalf("Newspaper perks %v", got)
@@ -648,7 +661,8 @@ func TestNavbarLinksAccountFromTheNav(t *testing.T) {
 }
 
 // The Account page shows the backpacks a tier gets once the backpack's
-// size has clamped them, not the number the ACL asked for.
+// size has clamped them, not the number the ACL asked for, and a size
+// held to the most a backpack takes.
 func TestTierPagesClampTheBackpacks(t *testing.T) {
 	pages := tierPages(newSite(), map[string]map[string]string{
 		"Search": {"SearchBackpackMax": "1000", "SearchBackpackTabs": "9"},
@@ -656,14 +670,14 @@ func TestTierPagesClampTheBackpacks(t *testing.T) {
 	if len(pages) != 1 {
 		t.Fatalf("pages %+v", pages)
 	}
-	want := []string{"Backpack of 1000 cards", "Up to 7 backpacks"}
+	want := []string{"Backpack of 1000 cards", "Up to 7 backpacks", "Price charts back 30 days"}
 	if !slices.Equal(pages[0].Perks, want) {
 		t.Errorf("perks %v, want %v", pages[0].Perks, want)
 	}
 	one := tierPages(newSite(), map[string]map[string]string{
-		"Search": {"SearchBackpackMax": "1000", "SearchBackpackTabs": "1"},
+		"Search": {"SearchBackpackMax": "5000", "SearchBackpackTabs": "1"},
 	})
-	want = []string{"Backpack of 1000 cards"}
+	want = []string{"Backpack of 1000 cards", "Price charts back 30 days"}
 	if !slices.Equal(one[0].Perks, want) {
 		t.Errorf("one backpack: perks %v, want %v", one[0].Perks, want)
 	}
