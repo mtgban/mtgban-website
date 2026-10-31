@@ -43,7 +43,7 @@ func LoadMailTemplates(dir string) (MailTemplates, error) {
 type mailRow struct {
 	Card, Set, Number, Finish, Condition, Side string
 	Store, Change, Threshold                   string
-	Link, Image                                string
+	CardURL, Link, Image                       string
 }
 
 // mailView is what both templates render.
@@ -130,7 +130,8 @@ func firingRows(f Firing, label func(string) string) []mailRow {
 		}
 		hit := hits[0]
 		return mailRow{
-			Card: a.Card.Name, Set: a.Card.Set, Number: a.Card.Number, Finish: a.Card.Finish,
+			Card: a.Card.Name, CardURL: cardURL(f.Origin, a.CardID),
+			Set: a.Card.Set, Number: a.Card.Number, Finish: a.Card.Finish,
 			Condition: a.Condition, Side: string(a.Side),
 			Store:     label(hit.Store),
 			Change:    changeText(a.ReferencePrice, hit.Price),
@@ -150,6 +151,12 @@ func firingRows(f Firing, label func(string) string) []mailRow {
 		}
 	}
 	return rows
+}
+
+// cardURL is the card's search on the site at origin, where an alert's
+// title links, as the alerts page links it.
+func cardURL(origin, cardID string) string {
+	return origin + "/search?q=" + url.QueryEscape(cardID)
 }
 
 // changeText is "$<reference> to $<hit> (<signed whole percent>%)", or

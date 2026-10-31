@@ -348,11 +348,11 @@ func evalDeps(store *fakeEvalStore, discord *fakeDeliverer, price float64) EvalD
 func activeAlert() ActiveAlert {
 	return ActiveAlert{
 		Alert: Alert{
-			ID: 7, UserHash: "u", Game: "magic", CardID: "card-1", Side: SideBuylist, Condition: "NM",
+			ID: 7, UserHash: "u", Game: "magic", CardID: "c65fcd18-dc47-50d4-bdb1-518bbf0ef820", Side: SideBuylist, Condition: "NM",
 			Card:           Card{Name: "Bolt", Set: "LEA", Number: "161", Finish: "nonfoil"},
 			ReferencePrice: 10, Above: Threshold{Kind: KindAbs, Value: 12},
 			Status: StatusActive, AboveArmed: true, BelowArmed: true, Delivery: DeliveryDiscord,
-			UpdatedAt: time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC), Origin: "https://lorcana.mtgban.com",
+			UpdatedAt: time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC), Origin: "https://mtgban.com",
 		},
 		Contact: Contact{UserHash: "u", DiscordUserID: "d1", Tier: "Legacy", UpdatedAt: evalNow.Add(-24 * time.Hour)},
 	}
@@ -370,7 +370,7 @@ func TestRunAlertEvaluationFiresAndRecords(t *testing.T) {
 	}
 	// The firing carries the site the alert was saved on, for its links.
 	f := dd.sent[0]
-	if f.Origin != "https://lorcana.mtgban.com" || !f.Decision.FireAbove || f.Contact.UserHash != "u" {
+	if f.Origin != "https://mtgban.com" || !f.Decision.FireAbove || f.Contact.UserHash != "u" {
 		t.Fatalf("firing = %+v", f)
 	}
 	if !slices.Equal(store.claims, []int64{7}) || store.armed[7] != [2]bool{false, true} || !store.fired[7].Equal(evalNow) {
@@ -570,7 +570,7 @@ func TestRunAlertEvaluationParksBeyondAllowance(t *testing.T) {
 	}
 	notice := dd.notices[0]
 	if notice.Title != "Price alerts parked" || !strings.Contains(notice.Description, "Your tier allows 1 alert.") ||
-		!strings.Contains(notice.Description, "Bolt LEA #161, nonfoil, NM buylist\n") || notice.URL != "https://lorcana.mtgban.com/alerts" {
+		!strings.Contains(notice.Description, "Bolt LEA #161, nonfoil, NM buylist\n") || notice.URL != "https://mtgban.com/alerts" {
 		t.Fatalf("notice: title=%q url=%q\n%s", notice.Title, notice.URL, notice.Description)
 	}
 	if store.status[7] != StatusOverAllowance {
@@ -652,7 +652,7 @@ func TestRunAlertEvaluationUsesEachUsersValues(t *testing.T) {
 	if store.marked["v"] != 0 {
 		t.Fatalf("marked[v] = %d, want 0", store.marked["v"])
 	}
-	got, ok := received["card-1"]
+	got, ok := received["c65fcd18-dc47-50d4-bdb1-518bbf0ef820"]
 	if !ok || got.Get("Alerts") != "true" || got.Get("AlertsMax") != "1" {
 		t.Fatalf("prices not called with u's own values: %v ok=%v", got, ok)
 	}
@@ -1216,7 +1216,7 @@ func TestRunDiscordDelivererSendsNoticeAndFiring(t *testing.T) {
 		t.Fatalf("first DM = %q, want the notice", sender.embeds[0].Title)
 	}
 	e := sender.embeds[1]
-	if e.URL != "https://lorcana.mtgban.com/alerts" || !strings.Contains(e.Description, "https://lorcana.mtgban.com/go/b/CK/card-1") {
+	if e.URL != "https://mtgban.com/search?q=c65fcd18-dc47-50d4-bdb1-518bbf0ef820" || !strings.Contains(e.Description, "https://mtgban.com/go/b/CK/c65fcd18-dc47-50d4-bdb1-518bbf0ef820") {
 		t.Fatalf("links: url=%q\n%s", e.URL, e.Description)
 	}
 }

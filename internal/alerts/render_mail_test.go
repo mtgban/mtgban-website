@@ -55,7 +55,7 @@ func compareGolden(t *testing.T, path, got string) {
 // of the Third Path, reference 0.80, armed above an absolute 1.05.
 func feldonAlert(id int64) Alert {
 	return Alert{
-		ID: id, UserHash: "u1", Game: "magic", CardID: "c19-141-nonfoil",
+		ID: id, UserHash: "u1", Game: "magic", CardID: "8fbb2d90-4917-56c1-aeb1-69b104d52ee9",
 		Side: SideBuylist, Condition: "NM",
 		Card:           Card{Name: "Feldon of the Third Path", Set: "C19", Number: "141", Finish: "nonfoil"},
 		ReferencePrice: 0.80,
@@ -68,9 +68,9 @@ func feldonAlert(id int64) Alert {
 // moxOpalAlert is digestFixture's second firing: a retail alert.
 func moxOpalAlert(id int64) Alert {
 	return Alert{
-		ID: id, UserHash: "u1", Game: "magic", CardID: "mh3-232-foil",
+		ID: id, UserHash: "u1", Game: "magic", CardID: "766bf6fd-1dbc-5892-89c6-b98c69641451_f",
 		Side: SideRetail, Condition: "NM",
-		Card:           Card{Name: "Mox Opal", Set: "MH3", Number: "232", Finish: "foil"},
+		Card:           Card{Name: "Mox Opal", Set: "SOM", Number: "179", Finish: "foil"},
 		ReferencePrice: 150.00,
 		Above:          Threshold{Kind: KindAbs, Value: 180.00},
 		Status:         StatusActive, Delivery: DeliveryEmail,
@@ -81,9 +81,9 @@ func moxOpalAlert(id int64) Alert {
 // wastelandAlert is digestFixture's third firing: a buylist alert.
 func wastelandAlert(id int64) Alert {
 	return Alert{
-		ID: id, UserHash: "u1", Game: "magic", CardID: "exo-93-nonfoil",
+		ID: id, UserHash: "u1", Game: "magic", CardID: "2392456a-7a4a-5554-884f-b7ccaef08651",
 		Side: SideBuylist, Condition: "NM",
-		Card:           Card{Name: "Wasteland", Set: "EXO", Number: "93", Finish: "nonfoil"},
+		Card:           Card{Name: "Wasteland", Set: "TMP", Number: "330", Finish: "nonfoil"},
 		ReferencePrice: 20.00,
 		Above:          Threshold{Kind: KindAbs, Value: 25.00},
 		Status:         StatusActive, Delivery: DeliveryEmail,
