@@ -52,9 +52,9 @@ func TestArbitDefaultsMatchToday(t *testing.T) {
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
 			opts, rows := arbitState{}.apply(backend(), tt.mode)
-			if opts.MinSpread != tt.minSpread || opts.MaxSpread != tt.maxSpread || opts.MinDiff != tt.minDiff {
+			if rows.limits.MinSpread != tt.minSpread || opts.MaxSpread != tt.maxSpread || rows.limits.MinDiff != tt.minDiff {
 				t.Errorf("spread %v..%v diff %v, want %v..%v diff %v",
-					opts.MinSpread, opts.MaxSpread, opts.MinDiff, tt.minSpread, tt.maxSpread, tt.minDiff)
+					rows.limits.MinSpread, opts.MaxSpread, rows.limits.MinDiff, tt.minSpread, tt.maxSpread, tt.minDiff)
 			}
 			if opts.ProfitabilityConstant != tt.profConst {
 				t.Errorf("profitability constant %v, want %v", opts.ProfitabilityConstant, tt.profConst)
@@ -99,10 +99,10 @@ func TestArbitFloors(t *testing.T) {
 		{"a value above the floor stands", arbitMode{Global: true}, "minspread=350&mindiff=12", 350, 12, 1000},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
-			opts, _ := parseArbitQuery(t, tt.query).apply(backend(), tt.mode)
-			if opts.MinSpread != tt.spread || opts.MinDiff != tt.diff || opts.MaxSpread != tt.engineMaxSpread {
+			opts, rows := parseArbitQuery(t, tt.query).apply(backend(), tt.mode)
+			if rows.limits.MinSpread != tt.spread || rows.limits.MinDiff != tt.diff || opts.MaxSpread != tt.engineMaxSpread {
 				t.Errorf("spread %v diff %v cap %v, want %v %v %v",
-					opts.MinSpread, opts.MinDiff, opts.MaxSpread, tt.spread, tt.diff, tt.engineMaxSpread)
+					rows.limits.MinSpread, rows.limits.MinDiff, opts.MaxSpread, tt.spread, tt.diff, tt.engineMaxSpread)
 			}
 		})
 	}
@@ -243,6 +243,7 @@ func TestArbitRowFilter(t *testing.T) {
 		BuylistEntry:   mtgban.BuylistEntry{BuyPrice: 25},
 		ReferenceEntry: mtgban.InventoryEntry{Price: 4},
 		Spread:         150,
+		Difference:     15,
 		Quantity:       2,
 	}
 	for _, tt := range []struct {
@@ -311,6 +312,46 @@ func TestArbitMinProfitAsShown(t *testing.T) {
 		got := fmt.Sprintf("%.2f", asShown(p))
 		if got != fmt.Sprintf("%.2f", p) {
 			t.Errorf("%v is held at %s, want the %.2f the table prints", p, got, p)
+		}
+	}
+}
+
+// TestArbitMinDiffAndSpreadAsShown holds the difference and spread bounds
+// to the values the table prints: buying at 3.35 and selling at 4.35
+// differs by 0.9999999999999996, shown as 1.00, and spreads 29.8507%,
+// shown as 29.85.
+func TestArbitMinDiffAndSpreadAsShown(t *testing.T) {
+	b := &matcher.Backend{UUIDs: map[string]*matcher.CardObject{
+		"card": {Card: matcher.Card{Name: "Plain Card", Rarity: "rare", SetCode: "AAA", Number: "10"}, Edition: "Alpha Set"},
+	}}
+	vendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{
+		"card": {{Conditions: "NM", BuyPrice: 4.35, Quantity: 5}},
+	}, mtgban.ScraperInfo{Name: "vendor"})
+	seller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		"card": {{Conditions: "NM", Price: 3.35, Quantity: 3}},
+	}, mtgban.ScraperInfo{Name: "seller"})
+	for _, tt := range []struct {
+		query string
+		keep  bool
+	}{
+		{"mindiff=1", true},
+		{"mindiff=1.01", false},
+		{"minspread=29.85", true},
+		{"minspread=29.86", false},
+		{"maxspread=29.85", true},
+		{"maxspread=29.84", false},
+	} {
+		opts, rows := parseArbitQuery(t, tt.query).apply(b, arbitMode{})
+		arbit := slices.DeleteFunc(mtgban.Arbit(b, opts, vendor, seller), func(e mtgban.ArbitEntry) bool {
+			return !rows.keep(e, false)
+		})
+		if (len(arbit) == 1) != tt.keep {
+			t.Errorf("%q keeps %d rows, want the trade kept: %v", tt.query, len(arbit), tt.keep)
+		}
+		for _, e := range arbit {
+			if e.Difference >= 1 || fmt.Sprintf("%.2f %.2f", e.Difference, e.Spread) != "1.00 29.85" {
+				t.Errorf("the trade differs by %v and spreads %v, want just under the 1.00 it shows", e.Difference, e.Spread)
+			}
 		}
 	}
 }
