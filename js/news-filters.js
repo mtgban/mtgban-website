@@ -43,6 +43,17 @@
         if (!report) return;
         try {
             var saved = readSaved();
+            // The mobile page sorts by nothing the reader chose, so it keeps
+            // the sort saved for the report, from another device or none.
+            if (sortless) {
+                var params = new URLSearchParams(query);
+                var mine = new URLSearchParams(saved[report] && typeof saved[report].q === 'string' ? saved[report].q : '');
+                ['sort', 'dir'].forEach(function (k) {
+                    params.delete(k);
+                    if (mine.get(k)) params.set(k, mine.get(k));
+                });
+                query = params.toString();
+            }
             saved[report] = { q: query, t: now() };
             localStorage.setItem(STORE_KEY, JSON.stringify(saved));
         } catch (e) {}

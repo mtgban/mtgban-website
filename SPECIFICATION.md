@@ -728,7 +728,8 @@ change. `js/news-filters.js` saves each report's filters and sort when the
 reader applies them, in the synced preferences (`mtgban_news_filters`,
 merged report by report like the arbitrage filters), and a link naming
 only the report replaces itself with the saved query (less the sort on
-the mobile page, which has no sort control).
+the mobile page, which has no sort control and saves the report's
+filters beside the sort already saved).
 
 ### 5.5 Sealed EV (`product.go`)
 

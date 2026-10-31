@@ -93,6 +93,21 @@ test('the mobile page, with no sort control, opens a report without its saved so
     expect(html).toContain('data-sortless="true"');
 });
 
+test('a filter changed on mobile keeps the sort saved on desktop, and saves none of its own', () => {
+    const local = fakeStorage();
+    const desktop = fakeForm([['page', 'top'], ['sort', 'spike'], ['dir', 'asc'], ['rarity', 'M']]);
+    load({ form: desktop, search: '?page=top', local });
+    desktop.listeners.submit();
+    const mobile = fakeForm([['page', 'top'], ['sort', 'ranking'], ['dir', ''], ['rarity', 'R']], { sortless: 'true' });
+    load({ form: mobile, search: '?page=top&rarity=M', local });
+    mobile.listeners.submit();
+    expect(saved(local).top.q).toBe('rarity=R&sort=spike&dir=asc');
+    const fresh = fakeForm([['page', 'vendors'], ['sort', 'ranking'], ['rarity', 'U']], { sortless: 'true' });
+    load({ form: fresh, search: '?page=vendors&rarity=C', local });
+    fresh.listeners.submit();
+    expect(saved(local).vendors.q).toBe('rarity=U');
+});
+
 test('a saved state cannot move the reader to another report or page of results', () => {
     const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ top: { q: 'page=vendors&index=4&rarity=M', t: 1 } }) });
     const { replaced } = load({ form: fakeForm([['page', 'top']]), search: '?page=top', local });
