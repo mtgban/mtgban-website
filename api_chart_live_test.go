@@ -27,11 +27,10 @@ func TestChartDataAPILive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}
-	// The fixture carries the datasets inline, beside the timeseries settings.
+	// The fixture carries the datasets inline, under timeseries_config.
 	var cfg struct {
 		SQLConfig        *timeseries.SQLConfig `json:"sql_config"`
 		TimeseriesConfig struct {
-			TimeseriesConfig
 			Datasets []DatasetConfig `json:"datasets"`
 		} `json:"timeseries_config"`
 	}
@@ -45,15 +44,14 @@ func TestChartDataAPILive(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = client.Close() })
 
-	defer func(db *timeseries.Client, ts TimeseriesConfig, reg []providerDisplay, dev, sig bool) {
-		PricesArchiveDB, Config().TimeseriesConfig = db, ts
+	defer func(db *timeseries.Client, reg []providerDisplay, dev, sig bool) {
+		PricesArchiveDB = db
 		providerRegistry.Store(&reg)
 		DevMode, SigCheck = dev, sig
-	}(PricesArchiveDB, Config().TimeseriesConfig, chartProviders(), DevMode, SigCheck)
+	}(PricesArchiveDB, chartProviders(), DevMode, SigCheck)
 
 	PricesArchiveDB = client
 	withDatasets(t, cfg.TimeseriesConfig.Datasets)
-	Config().TimeseriesConfig = cfg.TimeseriesConfig.TimeseriesConfig
 	buildProviderRegistry()
 	// Without this the lookback is unbounded in dev, and the point here is
 	// that the range bounds what gets read.

@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/simplecloud"
 )
 
 // A card reprinted on one day in sets of different categories gets a marker
@@ -54,22 +55,52 @@ func TestSameDayCheckpointsKeepOneOrder(t *testing.T) {
 	}
 }
 
-// timeseries_config.checkpoints_path is the path the checkpoints document is
-// read from and saved to.
-func TestCheckpointsPathFromTimeseriesConfig(t *testing.T) {
+// The checkpoints document is read from and saved to the config's own
+// bucket, beside the config file.
+func TestCheckpointsBesideTheConfig(t *testing.T) {
 	withConfigCopy(t)
-	var config ConfigType
-	err := json.Unmarshal([]byte(`{"timeseries_config": {"checkpoints_path": "checkpoints.json"}}`), &config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	Config().TimeseriesConfig = config.TimeseriesConfig
+	Config().sourcePath = "b2://mtgban-config/lorcana/config.json"
 
 	_, path, err := checkpointsStore.Bucket(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path != "checkpoints.json" {
-		t.Errorf("checkpoints read from %q, want checkpoints.json", path)
+	if path != "b2://mtgban-config/lorcana/checkpoints.json" {
+		t.Errorf("checkpoints read from %q, want beside the config", path)
+	}
+}
+
+// A game with no checkpoints.json reloads to no markers without an error, so
+// the cron has nothing to report, and a save is what the next reload reads.
+func TestCheckpointsMissingThenSaved(t *testing.T) {
+	withConfigCopy(t)
+	dir := t.TempDir()
+	Config().Game = "lorcana"
+	Config().sourcePath = filepath.Join(dir, "config.json")
+	savedBucket, savedDoc := ConfigBucket, checkpointsStore.Get()
+	ConfigBucket = &simplecloud.FileBucket{}
+	t.Cleanup(func() {
+		ConfigBucket = savedBucket
+		checkpointsStore.Set(savedDoc)
+	})
+
+	err := reloadCheckpoints()
+	if err != nil || len(checkpointsStore.Get().Events) != 0 {
+		t.Fatalf("no document reloads to %d events, err %v; want none and no error", len(checkpointsStore.Get().Events), err)
+	}
+
+	event := CheckpointEvent{ID: "launch", Type: "format", Date: "2026-10-01", Title: "Launch"}
+	err = saveCheckpoints(context.Background(), []CheckpointEvent{event})
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkpointsStore.Set(checkpointsFile{})
+	err = reloadCheckpoints()
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := checkpointsStore.Get().Events
+	if len(events) != 1 || events[0].ID != "launch" {
+		t.Errorf("reloaded %+v from %s, want the saved event", events, filepath.Join(dir, checkpointsName))
 	}
 }

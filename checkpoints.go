@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -64,34 +62,17 @@ type ChartCheckpoint struct {
 	KeyruneCode string `json:"keyruneCode,omitempty"`
 }
 
-// errNoCheckpointsPath is the reload error of a game that has no curated
-// document configured.
-var errNoCheckpointsPath = errors.New("timeseries_config.checkpoints_path not configured")
+// checkpointsName is the name of the checkpoints document, stored as a
+// sibling of the main config file in the same bucket.
+const checkpointsName = "checkpoints.json"
 
-// checkpointsStore holds the checkpoints document. The bucket is built per
-// operation, with the key pair held for the bucket the path names; reload and
-// save are infrequent enough that the extra B2 auth round-trip is not worth a
-// long-lived client.
+// checkpointsStore holds the checkpoints document. A game with none has no
+// curated markers, so a document that cannot be read loads as empty.
 var checkpointsStore = &bucketstore.Store[checkpointsFile]{
 	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-		cpPath := Config().TimeseriesConfig.CheckpointsPath
-		if cpPath == "" {
-			return nil, "", errNoCheckpointsPath
-		}
-		u, err := url.Parse(cpPath)
-		if err != nil {
-			return nil, "", err
-		}
-		switch u.Scheme {
-		case "":
-			return &simplecloud.FileBucket{}, cpPath, nil
-		case "b2":
-			bucket, err := newB2ClientFor(ctx, u.Host)
-			return bucket, cpPath, err
-		default:
-			return nil, "", fmt.Errorf("unsupported checkpoints path scheme: %s", u.Scheme)
-		}
+		return ConfigBucket, configSibling(checkpointsName), nil
 	},
+	MissingOK: true,
 }
 
 // reloadCheckpoints refreshes whatever this game draws its ban markers from.
@@ -105,12 +86,7 @@ func reloadCheckpoints() error {
 	if err := checkpointsStore.Load(context.Background()); err != nil {
 		return err
 	}
-	cpPath := Config().TimeseriesConfig.CheckpointsPath
-	source := "disk"
-	if strings.HasPrefix(cpPath, "b2://") {
-		source = "B2"
-	}
-	log.Printf("checkpoints: loaded %d events from %s (%s)", len(checkpointsStore.Get().Events), cpPath, source)
+	log.Printf("checkpoints: loaded %d events from %s", len(checkpointsStore.Get().Events), configSibling(checkpointsName))
 	return nil
 }
 
@@ -465,15 +441,10 @@ func containsFold(list []string, target string) bool {
 // fails leaves the markers as they are -- an empty index when the boot-time
 // load failed too -- so it is worth reporting rather than only logging: for
 // Magic the source is a document on someone else's server, and a chart quietly
-// missing every ban marker looks like a chart with nothing to mark. A game
-// with no checkpoints_path has nothing to reload, so that is only logged.
+// missing every ban marker looks like a chart with nothing to mark.
 func refreshCheckpoints() {
 	err := reloadCheckpoints()
 	if err == nil {
-		return
-	}
-	if errors.Is(err, errNoCheckpointsPath) {
-		log.Println("checkpoints: reload skipped:", err)
 		return
 	}
 	ServerNotify("checkpoints", "reload failed: "+err.Error(), true)

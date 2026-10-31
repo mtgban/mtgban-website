@@ -12,8 +12,7 @@ not run again (see `retired/README.md`).
 ## 1. Config and datasets file additions (NOT in git)
 
 Add a `provider` id to every entry of the datasets file the config names in
-`datasets_path` (the admin page's Datasets tab edits it), and the flag on
-`timeseries_config`. Nothing is derived or defaulted in code: a dataset
+`datasets_path` (the admin page's Datasets tab edits it). Nothing is derived or defaulted in code: a dataset
 without a `provider` is dropped from the chart registry, skipped by the long-form
 dual-write, and unresolvable for buylist metrics and the screener (issue #282: a
 config missing the field charted only TCGplayer Low and Market, because those
@@ -36,11 +35,6 @@ The wide column each `provider` id stands for (plan 17.5):
 | coolstuffinc_buylist_price | 12 |
 
 ```jsonc
-// config.json
-"timeseries_config": {
-    "long_form_writes": false   // gone: a config may still carry it, and it is ignored
-}
-
 // the datasets file
 [
     { "public_name": "TCGplayer Low", "provider": 3, ... },
@@ -72,8 +66,7 @@ and every daily tcgcsv ingest writes only the long tables (variants + prices)
 and files the days it wrote in `price_dates`, in the same transaction. Each
 write first ensures the partitions of the months it writes and the month after
 (`UpsertLongPrices`); startup ensures the current and next month as a courtesy
-and warms the variant to ban_id cache. The `long_form_writes` flag is gone; a
-config that still carries it is ignored.
+and warms the variant to ban_id cache.
 
 A write failure is reported through the job's notices and that run's rows are
 not stored: there is no legacy write behind them any more.
