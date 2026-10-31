@@ -156,7 +156,7 @@ func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Value
 		return s.resignStale(w, r, values, ends, now), false
 	}
 	sig, outcome := s.renewSignature(w, r, values, 0, cause)
-	if outcome == renewalGone {
+	if outcome == renewalGone || outcome == renewalSessionGone {
 		return "", false
 	}
 	if outcome == renewalNotRenewed || outcome == renewalEnded {
@@ -198,6 +198,10 @@ const (
 	// renewalGone found at the commit that the browser's session had ended
 	// or the lease been taken over: it sets no cookie, not even a re-sign.
 	renewalGone
+	// renewalSessionGone found at the lease that the browser's session had
+	// ended, a logout among the ways, and cleared its cookie: like
+	// renewalGone it sets no signature.
+	renewalSessionGone
 )
 
 // remintSignature re-signs a reader's signature, as values describe it,
@@ -344,8 +348,8 @@ func (rn *renewal) log(verdict string, cause error) {
 // client's or is past its cap, or the database cannot say. A session that is
 // gone has its cookie cleared, and one that rests or is filed elsewhere is not
 // asked again until the rest or the backoff is over, so none costs the
-// database a statement per request. ended says the session was gone.
-func (rn *renewal) lease(base context.Context, w http.ResponseWriter, r *http.Request) (token string, leased, ended bool) {
+// database a statement per request. gone says the session was gone.
+func (rn *renewal) lease(base context.Context, w http.ResponseWriter, r *http.Request) (token string, leased, gone bool) {
 	if restingSessions.resting(rn.session, rn.started) {
 		return "", false, false
 	}
@@ -458,12 +462,13 @@ func (rn *renewal) commit(base context.Context, refreshToken string, user *pledg
 // when another request holds the sessions, the session is not the
 // signature's, or Patreon's answer settled nothing, in which case the
 // sessions rest for an hour and the signature runs out on its own;
-// renewalGone when its session went between the lease and the commit;
-// renewalEnded when the lease finds the browser's session gone or Patreon no
-// longer honours its refresh token, and its cookie is cleared; renewalRefused
-// when Patreon says nothing is pledged and clear_on_negative logged the reader
-// out. A renewed signature is issued after its reader's poke and is left
-// alone; the reader's other devices renew at their own next request.
+// renewalSessionGone when the lease finds the browser's session gone, and
+// its cookie is cleared; renewalGone when it went between the lease and the
+// commit; renewalEnded when Patreon no longer honours its refresh token, and
+// its cookie is cleared; renewalRefused when Patreon says nothing is pledged
+// and clear_on_negative logged the reader out. A renewed signature is issued
+// after its reader's poke and is left alone; the reader's other devices renew
+// at their own next request.
 //
 // The calls to Patreon run with no database connection held: the refresh
 // under renewalRefreshTimeout, the lookups after it under
@@ -502,9 +507,9 @@ func (s *site) renewSignature(w http.ResponseWriter, r *http.Request, values url
 		return renewed, renewalRenewed
 	}
 
-	token, leased, ended := rn.lease(base, w, r)
-	if ended {
-		return "", renewalEnded
+	token, leased, gone := rn.lease(base, w, r)
+	if gone {
+		return "", renewalSessionGone
 	}
 	if !leased {
 		return "", renewalNotRenewed
