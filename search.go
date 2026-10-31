@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"maps"
+	"math"
 	"net/http"
 	"net/url"
 	"slices"
@@ -2142,18 +2143,28 @@ func readCustomBuylistRule(r *http.Request) customBuylistRule {
 		return customBuylistRule{}
 	}
 
-	rate, _ := strconv.ParseFloat(readCookie(r, "UploadCustomRate"), 64)
-	if rate <= 0 {
+	rate := customBuylistSetting(readCookie(r, "UploadCustomRate"))
+	if rate == 0 {
 		return customBuylistRule{}
 	}
-	minPrice, _ := strconv.ParseFloat(readCookie(r, "UploadCustomMinPrice"), 64)
 
 	return customBuylistRule{
 		rate:         rate,
-		minPrice:     minPrice,
+		minPrice:     customBuylistSetting(readCookie(r, "UploadCustomMinPrice")),
 		seller:       readCookie(r, "UploadCustomBuyer"),
 		sealedSeller: readCookie(r, "UploadCustomSealedBuyer"),
 	}
+}
+
+// customBuylistSetting reads a custom buylist rate or minimum price, 0 for
+// one that is unset or not a positive finite number: ParseFloat reads
+// "NaN" and "Inf" too, which no price can be taken at.
+func customBuylistSetting(s string) float64 {
+	v, _ := strconv.ParseFloat(s, 64)
+	if !(v > 0) || math.IsInf(v, 0) {
+		return 0
+	}
+	return v
 }
 
 // Append a virtual buylist to search results, priced off the reference

@@ -90,3 +90,55 @@ func TestCustomBuylistKeepsItsOffersInCredit(t *testing.T) {
 		}
 	}
 }
+
+// On upload a rate or minimum price that is not a finite number is ignored,
+// as one of zero is: an infinite rate prices at the full listing rather than
+// at +Inf, and an infinite minimum hides no offer.
+func TestUploadCustomBuylistIgnoresABadSetting(t *testing.T) {
+	cards := closeVendors(t)
+	ref := mtgban.InventoryRecord{}
+	for k, card := range cards {
+		ref[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 10 + float64(k)}}
+	}
+	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(ref, sessionInfo("ZZA"))}
+	sellersPtr.Store(&sellers)
+
+	var rows strings.Builder
+	for _, card := range cards {
+		fmt.Fprintf(&rows, "%s\t1\t\t0\t\n", card)
+	}
+	for _, tt := range []struct {
+		rate, minPrice string
+		factor         float64
+	}{
+		{"Inf", "", 1},
+		{"0", "", 1},
+		{"0.5", "Inf", 0.5},
+	} {
+		form := url.Values{
+			"mode":           {"true"},
+			"stores":         {"ZZV", "ZZW"},
+			"rows":           {rows.String()},
+			"custombuylist":  {"true"},
+			"customseller":   {"ZZA"},
+			"customrate":     {tt.rate},
+			"customminprice": {tt.minPrice},
+		}
+		req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		testSite.Upload(rec, req)
+		page := rec.Body.String()
+
+		for k, card := range cards {
+			offer := regexp.MustCompile(`/go/b/CUSTOM/` + regexp.QuoteMeta(card) + `" target="_blank">\$ ([^<]+)</a>`)
+			want := fmt.Sprintf("%.2f", (10+float64(k))*tt.factor)
+			m := offer.FindStringSubmatch(page)
+			if m == nil {
+				t.Errorf("rate %q, minimum %q: no custom offer for %s, want $%s", tt.rate, tt.minPrice, card, want)
+			} else if m[1] != want {
+				t.Errorf("rate %q, minimum %q: custom offer for %s is $%s, want $%s", tt.rate, tt.minPrice, card, m[1], want)
+			}
+		}
+	}
+}

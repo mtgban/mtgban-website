@@ -2104,12 +2104,8 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, blMode bool, st uplo
 		}
 		if st.canUploadCustom && customBuylist {
 			rule := EntryRule{SkipSets: customBuylistSkipSets, ReleasedBy: time.Now().Add(-customBuylistMinAge)}
-			if v := uploadFloatSetting(r, "customminprice", "UploadCustomMinPrice"); v > 0 {
-				rule.MinPrice = v
-			}
-			if v := uploadFloatSetting(r, "customrate", "UploadCustomRate"); v > 0 {
-				rule.Rate = v
-			}
+			rule.MinPrice = customBuylistSetting(getUploadSetting(r, "customminprice", "UploadCustomMinPrice"))
+			rule.Rate = customBuylistSetting(getUploadSetting(r, "customrate", "UploadCustomRate"))
 
 			customSeller := getUploadSetting(r, "customseller", "UploadCustomBuyer")
 			if customSeller != "" {
