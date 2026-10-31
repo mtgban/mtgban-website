@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
-	"github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
@@ -62,12 +64,24 @@ type Deck struct {
 	} `json:"boards"`
 }
 
+// client gives up on a stalled Moxfield rather than holding the upload, and
+// retries nothing, so one that is down fails at once.
+var client = mtgban.NewHTTPClient(
+	mtgban.WithHTTPTimeout(30*time.Second),
+	mtgban.WithHTTPRetries(0),
+	// Hand back a 5xx as it came, for the status check to report
+	mtgban.WithHTTPErrorHandler(retryablehttp.PassthroughErrorHandler),
+)
+
+// maxBody is the cap the ManaBox, Archidekt and CubeCobra importers use.
+const maxBody = 32 << 20
+
 func getMoxDeck(ctx context.Context, deckURL string) (*Deck, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, deckURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := cleanhttp.DefaultClient().Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +92,7 @@ func getMoxDeck(ctx context.Context, deckURL string) (*Deck, error) {
 	}
 
 	var deck Deck
-	err = json.NewDecoder(resp.Body).Decode(&deck)
+	err = json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&deck)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +179,7 @@ func getMoxCollectionPage(ctx context.Context, collectionURL string, page int) (
 	if err != nil {
 		return nil, err
 	}
-	resp, err := cleanhttp.DefaultClient().Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +190,7 @@ func getMoxCollectionPage(ctx context.Context, collectionURL string, page int) (
 	}
 
 	var collection Collection
-	err = json.NewDecoder(resp.Body).Decode(&collection)
+	err = json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&collection)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +206,16 @@ var conditionMap = map[string]mtgban.Condition{
 	"damaged":          mtgban.PO,
 }
 
+// collectionTimeout bounds a whole collection walk, one fetch per page of
+// 100: a 15,000-row collection is 151 pages, about 75 s at the half second
+// a deck or cube takes to arrive.
+var collectionTimeout = 2 * time.Minute
+
 func getMoxCollection(ctx context.Context, collectionURL string, maxRows int) ([]Item, error) {
+	// One deadline for every page, since Moxfield says how many there are
+	ctx, cancel := context.WithTimeout(ctx, collectionTimeout)
+	defer cancel()
+
 	pagination, err := getMoxCollectionPage(ctx, collectionURL, 0)
 	if err != nil {
 		return nil, err

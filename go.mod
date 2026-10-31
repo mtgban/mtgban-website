@@ -10,6 +10,7 @@ require (
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/danielgtaylor/unistyle v0.0.0-20190218054314-fff153823f5f
 	github.com/hashicorp/go-cleanhttp v0.5.2
+	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
 	github.com/lib/pq v1.12.3
 	github.com/mackerelio/go-osstat v0.2.8
@@ -77,7 +78,6 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.22 // indirect
 	github.com/googleapis/gax-go/v2 v2.26.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
 	github.com/mroth/weightedrand/v2 v2.1.0 // indirect
 	github.com/mtgban/go-tcgplayer v0.2.0 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect

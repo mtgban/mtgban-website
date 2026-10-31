@@ -6,15 +6,31 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 const apiBase = "https://archidekt.com/api/decks/"
+
+// client gives up on a stalled Archidekt rather than holding the upload, and
+// retries nothing, so one that is down fails at once.
+var client = mtgban.NewHTTPClient(
+	mtgban.WithHTTPTimeout(30*time.Second),
+	mtgban.WithHTTPRetries(0),
+	// Hand back a 5xx as it came, for the status check to report
+	mtgban.WithHTTPErrorHandler(retryablehttp.PassthroughErrorHandler),
+)
+
+// maxBody holds about 10,000 rows at the 3.2 KB an Archidekt row
+// takes.
+const maxBody = 32 << 20
 
 // Item is one card row from a public Archidekt deck.
 type Item struct {
@@ -84,7 +100,7 @@ func Load(ctx context.Context, link string, maxRows int) ([]Item, string, error)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "mtgban-website/archidekt")
 
-	resp, err := cleanhttp.DefaultClient().Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", err
 	}
@@ -95,7 +111,7 @@ func Load(ctx context.Context, link string, maxRows int) ([]Item, string, error)
 	}
 
 	var deck deckPayload
-	err = json.NewDecoder(resp.Body).Decode(&deck)
+	err = json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&deck)
 	if err != nil {
 		return nil, "", fmt.Errorf("decode Archidekt deck: %w", err)
 	}

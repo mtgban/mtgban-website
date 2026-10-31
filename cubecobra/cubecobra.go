@@ -6,14 +6,30 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
-	"github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 const apiBase = "https://cubecobra.com/cube/api/cubeJSON/"
+
+// client gives up on a stalled CubeCobra rather than holding the upload, and
+// retries nothing, so one that is down fails at once.
+var client = mtgban.NewHTTPClient(
+	mtgban.WithHTTPTimeout(30*time.Second),
+	mtgban.WithHTTPRetries(0),
+	// Hand back a 5xx as it came, for the status check to report
+	mtgban.WithHTTPErrorHandler(retryablehttp.PassthroughErrorHandler),
+)
+
+// maxBody holds about 11,000 cards at the 2.8 KB a CubeCobra card
+// takes, more than any cube it serves.
+const maxBody = 32 << 20
 
 // Item is one card row from a public CubeCobra cube.
 type Item struct {
@@ -82,7 +98,7 @@ func Load(ctx context.Context, link string, maxRows int) ([]Item, string, error)
 	}
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := cleanhttp.DefaultClient().Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", err
 	}
@@ -93,7 +109,7 @@ func Load(ctx context.Context, link string, maxRows int) ([]Item, string, error)
 	}
 
 	var cube cubePayload
-	err = json.NewDecoder(resp.Body).Decode(&cube)
+	err = json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&cube)
 	if err != nil {
 		return nil, "", fmt.Errorf("decode CubeCobra cube: %w", err)
 	}

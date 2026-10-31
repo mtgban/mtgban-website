@@ -6,15 +6,31 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
-	"github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 const apiBase = "https://cloud.manabox.app"
+
+// client gives up on a stalled ManaBox rather than holding the upload, and
+// retries nothing, so one that is down fails at once.
+var client = mtgban.NewHTTPClient(
+	mtgban.WithHTTPTimeout(30*time.Second),
+	mtgban.WithHTTPRetries(0),
+	// Hand back a 5xx as it came, for the status check to report
+	mtgban.WithHTTPErrorHandler(retryablehttp.PassthroughErrorHandler),
+)
+
+// maxBody holds about 19,000 rows at the 1.7 KB a ManaBox row
+// takes.
+const maxBody = 32 << 20
 
 // ManaBox card finish (variant field on each card).
 const (
@@ -90,7 +106,7 @@ func Load(ctx context.Context, shareOrURL string, maxRows int) ([]Item, string, 
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "mtgban-website/manabox")
 
-	resp, err := cleanhttp.DefaultClient().Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", err
 	}
@@ -101,7 +117,8 @@ func Load(ctx context.Context, shareOrURL string, maxRows int) ([]Item, string, 
 	}
 
 	var deck deckPayload
-	if err := json.NewDecoder(resp.Body).Decode(&deck); err != nil {
+	err = json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&deck)
+	if err != nil {
 		return nil, "", fmt.Errorf("decode ManaBox deck: %w", err)
 	}
 
