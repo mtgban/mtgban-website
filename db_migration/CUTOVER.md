@@ -20,20 +20,20 @@ config missing the field charted only TCGplayer Low and Market, because those
 were the ids code still filled in). Startup logs one line per dataset it has to
 skip — grep the boot log for `has no "provider" id` before flipping any flag.
 
-The index→provider mapping (plan 17.5):
+The wide column each `provider` id stands for (plan 17.5):
 
-| dataset `index` | column | `provider` |
-|---|---|---|
-| 0 | cardkingdom_retail_price | 1 |
-| 1 | cardkingdom_buylist_price | 2 |
-| 2 | tcgplayer_low_price | 3 |
-| 3 | tcgplayer_market_price | 4 |
-| 4 | cardmarket_low_price | 8 |
-| 5 | cardmarket_trend_price | 9 |
-| 6 | starcitygames_buylist_price | 10 |
-| 7 | abu_buylist_price | 11 |
-| 8 | tcgplayer_low_sealed_expected_value | 13 |
-| 9 | coolstuffinc_buylist_price | 12 |
+| column | `provider` |
+|---|---|
+| cardkingdom_retail_price | 1 |
+| cardkingdom_buylist_price | 2 |
+| tcgplayer_low_price | 3 |
+| tcgplayer_market_price | 4 |
+| cardmarket_low_price | 8 |
+| cardmarket_trend_price | 9 |
+| starcitygames_buylist_price | 10 |
+| abu_buylist_price | 11 |
+| tcgplayer_low_sealed_expected_value | 13 |
+| coolstuffinc_buylist_price | 12 |
 
 ```jsonc
 // config.json
@@ -43,8 +43,8 @@ The index→provider mapping (plan 17.5):
 
 // the datasets file
 [
-    { "public_name": "TCGplayer Low", "index": 2, "provider": 3, ... },
-    { "public_name": "TCGplayer Market", "index": 3, "provider": 4, ... },
+    { "public_name": "TCGplayer Low", "provider": 3, ... },
+    { "public_name": "TCGplayer Market", "provider": 4, ... },
     // ... provider on every dataset ...
 ]
 ```
@@ -56,14 +56,13 @@ every provider it skipped, which `retired/08_catchup.sql.txt` filled from
 The tcgcsv (non-Magic) ingest writes providers 3/4/5/6/7 — columns low/market/
 mid/high/direct_low — and the chart renders whichever of those the datasets file
 names. Mid, High, and Direct Low have no Magic dataset behind them, so a
-deployment that charts non-Magic products needs an entry for each; `index` goes
-unused on that path (pick ids past the wide columns), while `provider`,
-`public_name`, and `color` are what the chart reads:
+deployment that charts non-Magic products needs an entry for each, and
+`provider`, `public_name`, and `color` are what the chart reads:
 
 ```jsonc
-{ "public_name": "TCGplayer Mid",        "index": 20, "provider": 5, "color": "rgb(255, 206, 86)" },
-{ "public_name": "TCGplayer High",       "index": 21, "provider": 6, "color": "rgb(75, 192, 192)" },
-{ "public_name": "TCGplayer Direct Low", "index": 22, "provider": 7, "color": "rgb(153, 102, 255)" },
+{ "public_name": "TCGplayer Mid",        "provider": 5, "color": "rgb(255, 206, 86)" },
+{ "public_name": "TCGplayer High",       "provider": 6, "color": "rgb(75, 192, 192)" },
+{ "public_name": "TCGplayer Direct Low", "provider": 7, "color": "rgb(153, 102, 255)" },
 ```
 
 ## 2. Deploy the dual-write
@@ -81,33 +80,16 @@ not stored: there is no legacy write behind them any more.
 
 ## 3. Verify live-write parity
 
-After a stash and a tcgcsv run have both fired under dual-write, confirm the new
-rows match the legacy ones for the latest date:
-
-```sql
--- Magic: legacy non-null,>0 cells vs long rows for the latest date, per provider.
--- (Same shape as retired/07_verify.sql.txt, scoped to the newest date.)
-```
-
-Re-run `retired/07_verify.sql.txt` (full history) as the primary gate; it
-already compares per-provider counts across the whole table. Spot-check a handful
-of cards' charts.
-
-**Closing backfill drift.** The initial backfill runs alongside the live crons, so
-the long tables lag behind by the rows product_prices gained since the variants
-snapshot (verification shows this as a small negative per-provider diff — e.g. new
-printings minted on the backfill's start day). Once dual-write is on this stops
-growing; to close the one-time gap, run `retired/08_catchup.sql.txt` (re-mints
-new variants + re-inserts the recent window with ON CONFLICT DO NOTHING). Re-run
-`retired/07_verify.sql.txt` after; the diffs should go to 0.
+Done, before reads flipped: `retired/07_verify.sql.txt` compared the long
+tables with the wide ones per provider, and `retired/08_catchup.sql.txt` closed
+the drift the backfill left behind the live crons. Neither runs again; against
+the tables as they are now both would do harm (`retired/README.md`).
 
 ## 4. Flip reads (`long_form_reads: true`), deploy
 
-Charts (`HGetAllLong`), earliest-date, buylist metrics (`GetAggregatePriceStatsLong`),
-and the screener (`GetMoversLong`) now serve from the long tables. Legacy writes
-continue (safety net). Watch charts / screener / buylist metrics for a day.
-
-Done everywhere: the flag and the legacy read path are gone, and the site reads
+Done everywhere: charts (`HGetAllLong`), earliest-date, buylist metrics
+(`GetAggregatePriceStatsLong`) and the screener (`GetMoversLong`) serve from the
+long tables. The flag and the legacy read path are gone, and the site reads
 only the long tables whatever the config says. A config may still carry
 `long_form_reads`; it is ignored, and can be dropped once no deployment runs a
 build that still reads it.
