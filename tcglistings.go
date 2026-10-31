@@ -415,7 +415,7 @@ func rankDirectAsOneCopy(arbit []mtgban.ArbitEntry, minProfitability float64) []
 		if res.Quantity > 1 {
 			res.Profitability /= math.Pow(float64(res.Quantity), 0.25)
 		}
-		if shownProfit(res.Profitability) < minProfitability {
+		if asShown(res.Profitability) < minProfitability {
 			continue
 		}
 		out = append(out, res)
