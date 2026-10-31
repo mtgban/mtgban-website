@@ -55,12 +55,12 @@ func resolveBackpacks(ctx context.Context, sig string, b *matcher.Backend, confi
 	if email == "" {
 		return nil
 	}
-	st, err := UserStateDB.Get(ctx, userstate.HashEmail(userStateIdentity(email)))
+	backpacks, err := UserStateDB.GetBackpacks(ctx, userstate.HashEmail(userStateIdentity(email)))
 	if err != nil {
 		log.Printf("search: reading the backpacks failed: %v", err)
 		return nil
 	}
-	packs := backpackMembers(userstate.Backpacks(st))
+	packs := backpackMembers(backpacks)
 	applyBackpacks(b, config, packs)
 	return packs
 }

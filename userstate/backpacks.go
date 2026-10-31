@@ -1,7 +1,10 @@
 package userstate
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -83,6 +86,23 @@ func Backpacks(st State) []Backpack {
 		}
 	}
 	return out
+}
+
+// GetBackpacks returns the backpacks of the row for emailHash, as
+// Backpacks reads them, selecting only the two columns they come from.
+func (c *Client) GetBackpacks(ctx context.Context, emailHash string) ([]Backpack, error) {
+	var pref, pack []byte
+	err := c.db.QueryRowContext(ctx,
+		`SELECT preferences, backpack FROM user_state WHERE email_hash = $1`,
+		emailHash,
+	).Scan(&pref, &pack)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Backpacks(State{}), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return Backpacks(State{Preferences: pref, Backpack: pack}), nil
 }
 
 // isLive says an entry's del stamp is unset, as js/list-storage.js reads a
