@@ -10,7 +10,8 @@
 -- leaves the previous census and bounds in place.
 -- Raises when prices is already partitioned by ban_id, and when
 -- prices_default holds a row (repair it first, ../partitions/README.md).
--- Re-running is safe: it replaces the census and rewrites the bounds.
+-- Re-running is safe: it replaces the census, and the bounds too until
+-- prices_v2 exists; after that it keeps the bounds 02_create.sql cut it by.
 
 \set ON_ERROR_STOP on
 -- Command tags stay out of the output; the report SELECTs still print.
@@ -61,7 +62,7 @@ BEGIN
     END IF;
 END $$;
 
-TRUNCATE migration.census, migration.repartition_bounds;
+TRUNCATE migration.census;
 
 -- Ids below 2^40 come from the sequence, above it are category<<40 | product<<8 | subtype.
 INSERT INTO migration.census (source, bucket, category, rows)
@@ -72,6 +73,10 @@ SELECT tableoid::regclass::text,
 FROM public.prices
 GROUP BY 1, 2, 3;
 
+-- prices_v2 is cut by the bounds there, so 02_create.sql must keep reading them.
+SELECT to_regclass('public.prices_v2') IS NULL AS cut_bounds \gset
+\if :cut_bounds
+TRUNCATE migration.repartition_bounds;
 -- A bucket joins the partition numbered by the rows before it over target_rows.
 INSERT INTO migration.repartition_bounds (ord, name, lo, hi, est_rows)
 WITH b AS (
@@ -99,6 +104,9 @@ SELECT ord, 'prices_seq_' || to_char(ord, 'FM00'), lo, hi, est_rows FROM cuts
 UNION ALL
 SELECT (SELECT coalesce(max(ord), 0) FROM cuts) + 1, 'prices_seq_tail',
        coalesce((SELECT max(hi) FROM cuts), 1), 1::bigint << 40, 0;
+\else
+\echo prices_v2 exists: the census is replaced, the bounds it was created from are kept
+\endif
 
 COMMIT;
 
