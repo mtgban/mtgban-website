@@ -859,6 +859,50 @@ func TestSigningRenewalStopsWhenItsSessionIsGoneBeforeTheLease(t *testing.T) {
 	}
 }
 
+// A logout is not undone by the re-sign a young signature gets for an edit
+// either: a request still holding the session it ended clears that cookie and
+// sets no signature.
+func TestSigningReSignStopsWhenItsSessionIsGone(t *testing.T) {
+	for _, edit := range []string{"acl", "grant"} {
+		t.Run(edit, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			pokes := freshPokes(t)
+			session := rig.session("")
+			young := rig.sig("Legacy", 1*day)
+			switch edit {
+			case "acl":
+				pokes.StampACL(time.Now())
+			case "grant":
+				pokes.StampGrant(rig.hash, time.Now(), DefaultSignatureDuration)
+			}
+			logout := httptest.NewRecorder()
+			rig.site.Home(logout, rig.request(http.MethodGet, "/?errmsg=logout", browser(young, session)...))
+
+			req := rig.request(http.MethodGet, "/limited", browser(young, session)...)
+			rig.wantSessionDropped(rig.serve(req, false), req, young)
+			if !strings.Contains(rig.logged.String(), "cause="+edit+" verdict=session gone") {
+				t.Errorf("admin log %q does not say the session was gone", rig.logged.String())
+			}
+		})
+	}
+}
+
+// A database that cannot say whether the session stands costs the reader the
+// edit no more than at the lease: the young signature is re-signed.
+func TestSigningReSignsWithTheDatabaseDown(t *testing.T) {
+	rig := newRenewalRig(t, renewalBlock)
+	pokes := freshPokes(t)
+	session := rig.session("")
+	young := rig.sig("Legacy", 1*day)
+	pokes.StampACL(time.Now())
+	rig.db.Close()
+
+	rig.wantReminted(rig.page(browser(young, session)...), young)
+	if !strings.Contains(rig.logged.String(), "standing") {
+		t.Errorf("admin log %q does not name the failure", rig.logged.String())
+	}
+}
+
 // A reader who navigates away while their signature renews does not cost the
 // session its token: Patreon rotated it, so the renewal finishes and stores it.
 func TestSigningRenewalFinishesWhenTheReaderLeaves(t *testing.T) {
