@@ -34,6 +34,10 @@ const (
 // TCGCSVProviders are the provider ids the tcgcsv ingest writes.
 var TCGCSVProviders = []int16{ProviderTCGLow, ProviderTCGMarket, ProviderTCGMid, ProviderTCGHigh, ProviderTCGDirectLow}
 
+// TCGCSVIngestOnlyProviders are the TCGCSVProviders no site's stash writes,
+// so a day under any of them is a day the ingest wrote (LatestIngestDate).
+var TCGCSVIngestOnlyProviders = []int16{ProviderTCGMid, ProviderTCGHigh, ProviderTCGDirectLow}
+
 // MagicVariant is a Magic printing's alias, the lookup columns beside its
 // mtgban_id key: taken from the card, never parsed from the id.
 type MagicVariant struct {

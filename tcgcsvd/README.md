@@ -156,10 +156,10 @@ of the server's config is ignored, so the deployed file works unchanged:
 - `discord.server_webhook_url` — optional, for job-level success and failure notices
 
 The ingest always writes the long `prices` table, and gates each category on
-the least advanced TCGplayer provider (3 to 7): the oldest of their newest
-`price_dates` days. A site's own stash files 3 and 4 and cannot advance 5 to 7.
-A provider that stops appearing for a category makes it re-ingest nightly,
-which is idempotent.
+the newest `price_dates` day under TCGplayer Mid, High or Direct Low (5 to 7),
+which only the ingest writes, each category's day in one transaction. A site's
+own stash files 3 and 4, so it cannot advance the gate, and a provider that
+stops appearing for a category does not hold it back.
 
 ## Running it as its own service
 

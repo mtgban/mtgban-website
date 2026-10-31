@@ -388,9 +388,11 @@ func TestLongFormLive(t *testing.T) {
 		t.Fatalf("tcg resolve not idempotent: %d vs %d err=%v", tcgBan, tcgBan2, err)
 	}
 
-	// The ingest gate counts only the TCGplayer providers, not another provider's day.
+	// The ingest gate counts only the providers the ingest alone writes, not
+	// a stash's provider 3 or another provider's day.
 	if _, err := c.UpsertLongPrices(ctx, []LongPrice{
-		{BanID: tcgBan, Date: "2024-03-01", Provider: ProviderTCGLow, Price: 1},
+		{BanID: tcgBan, Date: "2024-03-01", Provider: ProviderTCGDirectLow, Price: 1},
+		{BanID: tcgBan, Date: "2024-03-02", Provider: ProviderTCGLow, Price: 1},
 		{BanID: tcgBan, Date: "2024-03-09", Provider: liveSentinelProvider, Price: 1},
 	}, 0); err != nil {
 		t.Fatalf("UpsertLongPrices (gate): %v", err)
@@ -398,7 +400,8 @@ func TestLongFormLive(t *testing.T) {
 	if d, ok, err := c.LatestIngestDate(ctx, liveSentinelCatLong); err != nil || !ok || d.Format("2006-01-02") != "2024-03-01" {
 		t.Errorf("LatestIngestDate = %v ok=%v err=%v, want 2024-03-01", d, ok, err)
 	}
-	// A stash's provider 3 and 4 rows after the ingest's provider 5 day do not advance it.
+	// A later ingest day without Direct Low advances it, and a stash's
+	// provider 3 and 4 rows after it do not.
 	if _, err := c.UpsertLongPrices(ctx, []LongPrice{
 		{BanID: tcgBan, Date: "2024-03-05", Provider: ProviderTCGMid, Price: 1},
 		{BanID: tcgBan, Date: "2024-03-08", Provider: ProviderTCGLow, Price: 1},
