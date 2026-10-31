@@ -208,6 +208,23 @@ func TestLongFormLive(t *testing.T) {
 		if n, err := c.StrayPriceRows(ctx); err != nil || n != 0 {
 			t.Fatalf("StrayPriceRows = %d, %v; want 0", n, err)
 		}
+		// During the soak prices_default is prices_old's, and no partition of prices.
+		var haveDefault bool
+		if err := c.db.QueryRowContext(ctx, `SELECT to_regclass('public.prices_default') IS NOT NULL`).Scan(&haveDefault); err != nil {
+			t.Fatalf("look for prices_default: %v", err)
+		}
+		if !haveDefault {
+			if _, err := c.db.ExecContext(ctx, `CREATE TABLE prices_default (LIKE prices)`); err != nil {
+				t.Fatalf("create a detached prices_default: %v", err)
+			}
+			t.Cleanup(func() { _, _ = c.db.ExecContext(ctx, `DROP TABLE IF EXISTS prices_default`) })
+			if _, err := c.db.ExecContext(ctx, `INSERT INTO prices_default VALUES ($1, '2024-02-08', $2, 1)`, catBan, liveSentinelProvider); err != nil {
+				t.Fatalf("fill the detached prices_default: %v", err)
+			}
+			if n, err := c.StrayPriceRows(ctx); err != nil || n != 0 {
+				t.Fatalf("StrayPriceRows beside prices_old's default = %d, %v; want 0", n, err)
+			}
+		}
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE ban_id=$1`, catBan)
 	} else if scratch {
 		t.Log("ban_id cases skipped: prices is still partitioned by month")
@@ -219,6 +236,9 @@ func TestLongFormLive(t *testing.T) {
 		var inDefault int
 		if err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM prices_default WHERE provider=$1`, liveSentinelProvider).Scan(&inDefault); err != nil || inDefault != 1 {
 			t.Fatalf("stray rows in prices_default = %d, %v; want 1", inDefault, err)
+		}
+		if n, err := c.StrayPriceRows(ctx); err != nil || n < 1 {
+			t.Fatalf("StrayPriceRows = %d, %v; want the stray row", n, err)
 		}
 		if _, err := c.UpsertLongPrices(ctx, []LongPrice{{BanID: banBase, Date: monthDay, Provider: liveSentinelProvider, Price: 1}}, 0); err != nil {
 			t.Fatalf("upsert beside a stray row: %v", err)
