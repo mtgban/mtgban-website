@@ -490,13 +490,14 @@ func stockedInventory(base mtgban.InventoryRecord, snap *tcgListingsSnapshot) mt
 	return out
 }
 
-// plural spells a count with its noun, "1 seller" or "14 copies".
+// plural spells a count with its noun, "1 seller", "14 copies" or "30 days".
 func plural(n int, noun string) string {
 	if n == 1 {
 		return "1 " + noun
 	}
-	if strings.HasSuffix(noun, "y") {
-		noun = strings.TrimSuffix(noun, "y") + "ie"
+	stem, isY := strings.CutSuffix(noun, "y")
+	if isY && stem != "" && !strings.ContainsAny(stem[len(stem)-1:], "aeiou") {
+		noun = stem + "ie"
 	}
 	return strconv.Itoa(n) + " " + noun + "s"
 }
