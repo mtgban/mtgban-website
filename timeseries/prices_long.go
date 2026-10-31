@@ -441,7 +441,8 @@ func (c *Client) UpsertLongPrices(ctx context.Context, rows []LongPrice, batchSi
 	}
 	if layout == "ban_id" {
 		for _, cat := range partitionCategories(rows) {
-			if err := c.EnsureCategoryPartition(ctx, cat); err != nil {
+			err := c.ensureCategoryPartition(ctx, cat)
+			if err != nil {
 				return 0, fmt.Errorf("partitions: %w", err)
 			}
 		}
@@ -626,20 +627,10 @@ func partitionCategories(rows []LongPrice) []int {
 	return slices.Sorted(maps.Keys(seen))
 }
 
-// EnsureCategoryPartition creates the ban_id partition holding one non-Magic
-// category's block, if missing. No-op on the monthly layout and on a
-// read-only client.
-func (c *Client) EnsureCategoryPartition(ctx context.Context, category int) error {
-	if c.readOnly {
-		return nil
-	}
-	layout, err := c.priceLayout(ctx)
-	if err != nil {
-		return err
-	}
-	if layout != "ban_id" {
-		return nil
-	}
+// ensureCategoryPartition creates the ban_id partition holding one non-Magic
+// category's block, if missing. The caller has read that prices is
+// partitioned by ban_id.
+func (c *Client) ensureCategoryPartition(ctx context.Context, category int) error {
 	// Name and bounds are integers, safe to interpolate.
 	q := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS prices_cat_%d PARTITION OF prices FOR VALUES FROM (%d) TO (%d)`,
 		category, int64(category)<<tcgBanIDCategoryShift, int64(category+1)<<tcgBanIDCategoryShift)
