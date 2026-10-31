@@ -206,7 +206,7 @@ func buildProviderRegistry() {
 }
 
 // fetchChartPrices reads one resolved target's series: by exact ban_id when the
-// target has one, else the Magic canonical (uuid, foil, etched) path.
+// target has one, else by the Magic printing's mtgban_id.
 //
 // An empty series is the archive answering that it holds nothing in the
 // window. An error is a read that got no answer, which is not an empty chart.
