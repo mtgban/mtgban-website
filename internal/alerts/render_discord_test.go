@@ -262,7 +262,7 @@ func TestDiscordDelivererSendsOneDMPerFiring(t *testing.T) {
 		t.Fatalf("sent = %v", sender.sent)
 	}
 	e := sender.embeds[0]
-	if e.URL != "https://lorcana.mtgban.com/alerts" || !strings.Contains(e.Description, "https://lorcana.mtgban.com/go/b/CK/card-1") {
+	if e.URL != "https://mtgban.com/search?q=c65fcd18-dc47-50d4-bdb1-518bbf0ef820" || !strings.Contains(e.Description, "https://mtgban.com/go/b/CK/c65fcd18-dc47-50d4-bdb1-518bbf0ef820") {
 		t.Fatalf("links: url=%q\n%s", e.URL, e.Description)
 	}
 

@@ -172,7 +172,7 @@ func renderDiscord(f Firing, label func(shorthand string) string) *discordgo.Mes
 	embedURL := ""
 	if siteURL != "" {
 		manageLink = fmt.Sprintf("[Manage alerts](%s/alerts)", siteURL)
-		embedURL = siteURL + "/alerts"
+		embedURL = cardURL(siteURL, a.CardID)
 		fmt.Fprintf(&b, "\n%s", manageLink)
 	}
 
