@@ -191,8 +191,7 @@ func globalFlags(flags map[string]string) map[string]string {
 	if out == nil {
 		out = map[string]string{}
 	}
-	set, _ := strconv.ParseBool(flags["AnySpread"])
-	out["AnySpread"] = strconv.FormatBool(set)
+	out["AnySpread"] = flags["AnySpread"]
 	return out
 }
 
