@@ -27,7 +27,7 @@ type TierSummary struct {
 // TierPage is one page a tier grants, with the perks its flags add.
 type TierPage struct {
 	Name, Description string
-	Perks             []string
+	Perks             []TierPerk
 }
 
 // patreonTiers are the tiers a Patreon membership maps to, in order of
@@ -77,18 +77,89 @@ func tierPages(s *site, entry map[string]map[string]string) []TierPage {
 		if !known || nav.hiddenOn(s) {
 			continue
 		}
-		if key == "Search" {
+		switch key {
+		case "Search":
 			flags = searchFlags(flags)
+		case "Global":
+			flags = globalFlags(flags)
 		}
 		page := TierPage{Name: nav.Name, Description: nav.Description}
 		for _, flag := range slices.Sorted(maps.Keys(flags)) {
-			if label, ok := aclFlagLabel(flag, flags[flag]); ok {
-				page.Perks = append(page.Perks, label)
+			if perk, ok := aclFlagPerk(flag, flags[flag]); ok {
+				page.Perks = append(page.Perks, perk)
 			}
 		}
 		pages = append(pages, page)
 	}
 	return pages
+}
+
+// TierGroup is one page across the tier cards: which tiers grant it, and a
+// row per perk any of them gives.
+type TierGroup struct {
+	Name, Description string
+	Granted           []bool
+	Rows              []TierRow
+}
+
+// TierRow is one perk across the tier cards, with a cell per tier, empty
+// where the tier lacks it.
+type TierRow struct {
+	Name  string
+	Cells []string
+}
+
+// tierComparison lays the tier cards side by side: a group per page in nav
+// order, a row per perk from the most tiers to the fewest, then in flag
+// order, cells in the order of tiers.
+func tierComparison(tiers []TierSummary) []TierGroup {
+	var groups []TierGroup
+	for _, key := range OrderNav {
+		group := TierGroup{Name: ExtraNavs[key].Name, Granted: make([]bool, len(tiers))}
+		rows := map[string]*TierRow{}
+		var flags []string
+		for i, tier := range tiers {
+			for _, page := range tier.Pages {
+				if page.Name != group.Name {
+					continue
+				}
+				group.Description = page.Description
+				group.Granted[i] = true
+				for _, perk := range page.Perks {
+					row, found := rows[perk.flag]
+					if !found {
+						row = &TierRow{Name: perk.Row, Cells: make([]string, len(tiers))}
+						rows[perk.flag] = row
+						flags = append(flags, perk.flag)
+					}
+					row.Cells[i] = perk.Cell
+				}
+			}
+		}
+		if !slices.Contains(group.Granted, true) {
+			continue
+		}
+		slices.Sort(flags)
+		slices.SortStableFunc(flags, func(a, b string) int {
+			return granted(rows[b].Cells) - granted(rows[a].Cells)
+		})
+		for _, flag := range flags {
+			group.Rows = append(group.Rows, *rows[flag])
+		}
+		groups = append(groups, group)
+	}
+	return groups
+}
+
+// granted counts the tiers a row's cells give the perk to.
+func granted(cells []string) int {
+	n := 0
+	for _, cell := range cells {
+		if cell != "" {
+			n++
+		}
+	}
+	return n
 }
 
 // searchFlags is a tier's Search flags as the page reads them: the
@@ -109,34 +180,50 @@ func searchFlags(flags map[string]string) map[string]string {
 	return out
 }
 
-// aclFlagLabel says what a signed ACL value gives the reader, in the
-// words the pages use; false for a flag or value the page does not name.
-func aclFlagLabel(flag, value string) (string, bool) {
-	on := func(label string) (string, bool) {
-		if set, _ := strconv.ParseBool(value); !set {
-			return "", false
-		}
-		return label, true
+// globalFlags is a tier's Global flags with AnySpread always set, so every
+// tier shows the spread floor it gets.
+func globalFlags(flags map[string]string) map[string]string {
+	out := maps.Clone(flags)
+	if out == nil {
+		out = map[string]string{}
 	}
-	count := func(singular, plural string) (string, bool) {
-		n, err := strconv.Atoi(value)
-		if err != nil || n < 1 {
-			return "", false
+	set, _ := strconv.ParseBool(flags["AnySpread"])
+	out["AnySpread"] = strconv.FormatBool(set)
+	return out
+}
+
+// TierPerk is what one of a tier's flags gives: the pill its card shows,
+// if any, and the row and cell it takes when the tiers are compared.
+type TierPerk struct {
+	Label, Row, Cell string
+	flag             string // orders the rows
+}
+
+// aclFlagPerk says what a signed ACL value gives the reader, in the words
+// the pages use; false for a flag or value the page does not name.
+func aclFlagPerk(flag, value string) (TierPerk, bool) {
+	perk := func(label, row, cell string) (TierPerk, bool) {
+		return TierPerk{Label: label, Row: row, Cell: cell, flag: flag}, true
+	}
+	on := func(label string) (TierPerk, bool) {
+		if set, _ := strconv.ParseBool(value); !set {
+			return TierPerk{}, false
 		}
-		if n == 1 {
-			return fmt.Sprintf(singular, n), true
-		}
-		return fmt.Sprintf(plural, n), true
+		return perk(label, label, "✓")
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		n = 0
 	}
 	switch flag {
 	case "UploadBuylistEnabled":
-		return on("Buylist prices")
+		return on("Show Buylist prices")
 	case "UploadChangeStoresEnabled":
 		return on("Choose which stores to price")
 	case "UploadOptimizer":
-		return on("Sell-list optimizer")
+		return on("Access the Optimizer")
 	case "UploadNoLimit":
-		return on("No limit on list size")
+		return on("Unlimited list size")
 	case "UploadCustom":
 		return on("Import custom searches")
 	case "UploadPublish":
@@ -144,61 +231,68 @@ func aclFlagLabel(flag, value string) (string, bool) {
 	case "NewsEnabled":
 		switch value {
 		case "0day":
-			return "Same-day data", true
+			return perk("Same-day data", "Data delay", "Same day")
 		case "1day":
-			return "Data one day behind", true
+			return perk("Data one day behind", "Data delay", "1 day")
 		case "3day":
-			return "Data three days behind", true
+			return perk("Data three days behind", "Data delay", "3 days")
 		}
-		return "", false
 	case "NewsLarge":
-		return on("50 rows per page")
+		return on("Double the rows per page")
 	case "SearchDownloadCSV":
 		return on("CSV download of results")
 	case "SearchChartLoopback":
-		return count("Price charts back %d day", "Price charts back %d days")
+		if n > 0 {
+			return perk("Price charts back "+historySpan(n), "Price chart history", historySpan(n))
+		}
 	case "SearchOfflineMode":
 		return on("Offline mode")
 	case "SearchBackpackMax":
-		return count("Backpack of %d card", "Backpack of %d cards")
+		if n > 0 {
+			return perk("Backpack of "+plural(n, "card"), "Backpack size", plural(n, "card"))
+		}
 	case "SearchBackpackTabs":
-		// Every tier keeps one backpack
-		n, _ := strconv.Atoi(value)
-		if n <= 1 {
-			return "", false
-		}
-		return count("Up to %d backpack", "Up to %d backpacks")
-	case "SearchDisabled":
-		return listLabel(value, "Every retail store shown", "Some retail stores hidden")
-	case "SearchBuylistDisabled":
-		return listLabel(value, "Every buylist shown", "Some buylists hidden")
-	case "ArbitEnabled":
-		if value == "ALL" {
-			return "Every store", true
-		}
-		if value == "" {
-			return "", false
-		}
-		n := len(strings.Split(value, ","))
+		// Every tier keeps one backpack, which its card does not mention
 		if n == 1 {
-			return "1 store", true
+			return perk("", "Number of available backpacks", "1")
 		}
-		return fmt.Sprintf("%d stores", n), true
+		if n > 1 {
+			return perk(fmt.Sprintf("Up to %d backpacks", n), "Number of available backpacks", strconv.Itoa(n))
+		}
+	case "SearchDisabled":
+		return listPerk(flag, value, "Retail stores", "Every retail store shown", "Some retail stores hidden")
+	case "SearchBuylistDisabled":
+		return listPerk(flag, value, "Buylists", "Every buylist shown", "Some buylists hidden")
+	case "ArbitEnabled":
+		switch {
+		case value == "ALL":
+			return perk("Every store", "Stores", "All")
+		case value != "":
+			count := len(strings.Split(value, ","))
+			return perk(plural(count, "store"), "Stores", strconv.Itoa(count))
+		}
 	case "ArbitDisabledVendors":
-		if value == "" {
-			return "", false
+		if value != "" {
+			return perk("Some vendors excluded", "Vendors", "Some excluded")
 		}
-		return "Some vendors excluded", true
 	case "AnyEnabled":
-		return on("Compare the full store list")
+		return on("Expanded store selection")
 	case "AnyExperimentsEnabled":
 		return on("Experimental stores included")
 	case "AnySpread":
-		return on("Spread view")
+		// The lowest spread Global lists singles at; the grant lowers it
+		set, _ := strconv.ParseBool(value)
+		if set {
+			floor := fmt.Sprintf("%g%%", float64(MinSpreadGlobalPro))
+			return perk("Spreads down to "+floor, "Lowest spread", floor)
+		}
+		return perk("", "Lowest spread", fmt.Sprintf("%g%%", float64(MinSpreadGlobal)))
 	case "SleepersCYOA":
 		return on("Pick your own store pairing")
 	case "AlertsMax":
-		return count("Up to %d alert", "Up to %d alerts")
+		if n > 0 {
+			return perk("Up to "+plural(n, "alert"), "Alerts", strconv.Itoa(n))
+		}
 	case "AlertChannels":
 		var names []string
 		for _, kind := range strings.Split(value, ",") {
@@ -209,28 +303,52 @@ func aclFlagLabel(flag, value string) (string, bool) {
 				names = append(names, "email")
 			}
 		}
-		if len(names) == 0 {
-			return "", false
+		if len(names) > 0 {
+			channels := strings.Join(names, " and ")
+			return perk("Delivered by "+channels, "Delivery", channels)
 		}
-		return "Delivered by " + strings.Join(names, " and "), true
 	case "APImode":
-		if value == "" {
-			return "", false
+		if value != "" {
+			modes := strings.Join(strings.Split(value, ","), ", ")
+			return perk("Price API modes: "+modes, "Price API modes", modes)
 		}
-		return "Price API modes: " + strings.Join(strings.Split(value, ","), ", "), true
 	}
-	return "", false
+	return TierPerk{}, false
 }
 
-// listLabel reads a blocklist value: NONE clears it, a list hides some.
-func listLabel(value, none, some string) (string, bool) {
+// historySpan spells a chart history of days in years when it is within a
+// week a year of whole ones (720 days is 2 years) or rounds to whole ones in
+// months, else in months, and in days under half a month.
+func historySpan(days int) string {
+	years := (days + 182) / 365
+	off := days - years*365
+	if off < 0 {
+		off = -off
+	}
+	if years > 0 && off <= 7*years {
+		return plural(years, "year")
+	}
+	// Rounded to months of 30.44 days, a year's average
+	months := (days*100 + 1522) / 3044
+	if months > 0 && months%12 == 0 {
+		return plural(months/12, "year")
+	}
+	if months > 0 {
+		return plural(months, "month")
+	}
+	return plural(days, "day")
+}
+
+// listPerk reads a blocklist flag's value: NONE clears it, a list hides
+// some.
+func listPerk(flag, value, row, none, some string) (TierPerk, bool) {
 	switch value {
 	case "":
-		return "", false
+		return TierPerk{}, false
 	case "NONE":
-		return none, true
+		return TierPerk{Label: none, Row: row, Cell: "All", flag: flag}, true
 	}
-	return some, true
+	return TierPerk{Label: some, Row: row, Cell: "Some hidden", flag: flag}, true
 }
 
 // DiscordStatus is the Discord account Patreon reports as linked.
@@ -281,6 +399,7 @@ type UserVars struct {
 	Discord    DiscordStatus
 	Features   []UserFeature
 	Tiers      []TierSummary
+	Compare    []TierGroup // Tiers side by side
 	// CanRefresh is whether the page offers Refresh now: the site renews
 	// signatures and this browser holds the session to renew from.
 	CanRefresh bool
@@ -399,6 +518,7 @@ func (s *site) userVars(ctx context.Context, sigParams url.Values, isMobile bool
 		}
 	}
 	v.Tiers = tierSummaries(s, ACL(), v.Tier)
+	v.Compare = tierComparison(v.Tiers)
 	if !v.SignedIn {
 		return v
 	}

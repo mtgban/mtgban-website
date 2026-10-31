@@ -185,6 +185,71 @@
     margin-top: 0.3em;
 }
 
+/* ── The tiers side by side ── */
+.user-compare > summary {
+    width: fit-content;
+    color: var(--ainfo);
+    font-size: var(--text-md);
+    cursor: pointer;
+}
+.user-compare-table {
+    width: 100%;
+    margin-top: 0.75em;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--text-md);
+}
+/* No zebra rows or hover: they would paint over the current tier's column */
+.user-compare-table tr,
+.user-compare-table tr:hover {
+    background: transparent;
+}
+.user-compare-table col.is-current {
+    background: var(--accent-muted);
+}
+.user-compare-table th,
+.user-compare-table td {
+    padding: 0.45em 0.6em;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--normal);
+    text-align: center;
+}
+.user-compare-table thead th {
+    position: sticky;
+    top: var(--nav-height);
+    z-index: 1;
+    background: var(--surface-0);
+}
+.user-compare-table thead th.is-current {
+    background: linear-gradient(var(--accent-muted), var(--accent-muted)), var(--surface-0);
+}
+.user-compare-table th[scope="row"] {
+    padding-left: 1.4em;
+    font-weight: 400;
+    text-align: left;
+}
+/* Translucent, so the current tier's column shows through */
+.user-compare-page > * {
+    background: color-mix(in srgb, var(--surface-3) 50%, transparent);
+}
+.user-compare-page th[scope="row"] {
+    padding-left: 0.6em;
+    color: var(--activetext);
+    font-weight: 600;
+}
+.user-compare-none {
+    color: var(--text-dim);
+}
+/* Read by screen readers, not shown */
+.user-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
 .user-note {
     margin: 1em 0 0;
     color: var(--text-dim);
@@ -210,5 +275,27 @@
     .user-tiers {
         column-width: auto;
         column-count: 1;
+    }
+    /* Too narrow for five tiers: the table scrolls sideways under a fixed
+       first column, and gives up its sticky header to do so */
+    .user-compare-wrap {
+        overflow-x: auto;
+    }
+    .user-compare-table {
+        width: max-content;
+    }
+    .user-compare-table thead th {
+        position: static;
+    }
+    .user-compare-table thead td,
+    .user-compare-table th[scope="row"] {
+        position: sticky;
+        left: 0;
+        max-width: 9em;
+        background: var(--surface-0);
+        white-space: normal;
+    }
+    .user-compare-page th[scope="row"] {
+        background: linear-gradient(color-mix(in srgb, var(--surface-3) 50%, transparent), color-mix(in srgb, var(--surface-3) 50%, transparent)), var(--surface-0);
     }
 }
