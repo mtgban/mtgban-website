@@ -708,7 +708,7 @@ func TestUserPageRendersSignedOut(t *testing.T) {
 	vars.PatreonIDs = map[string]string{"magic": "cid"}
 	vars.PatreonURL = "http://localhost/auth"
 	out := renderUserPage(t, vars)
-	for _, want := range []string{"Log in with Patreon", "What each tier unlocks", "Everyone", "Pioneer", "Vintage", "Data one day behind", "Up to 5 alerts", "Compare tiers", "<th scope=\"row\">Data delay</th>", "<td>3 days</td>", `<span class="user-compare-none" aria-hidden="true">–</span><span class="user-hidden">Not included</span>`} {
+	for _, want := range []string{"Log in with Patreon", "What each tier unlocks", "Everyone", "Pioneer", "Vintage", "Data one day behind", "Up to 5 alerts", `<div class="user-compare">`, `<caption class="user-hidden">Compare tiers</caption>`, "<th scope=\"row\">Data delay</th>", "<td>3 days</td>", `<span class="user-compare-none" aria-hidden="true">–</span><span class="user-hidden">Not included</span>`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("signed-out page lacks %q", want)
 		}
