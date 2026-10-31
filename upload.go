@@ -2102,10 +2102,13 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, blMode bool, st uplo
 			customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
 			customBuylist = slices.Contains(customOpts, "enabled")
 		}
-		if st.canUploadCustom && customBuylist {
+		// A rate that is not a positive number means no custom buylist, as
+		// on search and arbit
+		rate := customBuylistSetting(getUploadSetting(r, "customrate", "UploadCustomRate"))
+		if st.canUploadCustom && customBuylist && rate != 0 {
 			rule := EntryRule{SkipSets: customBuylistSkipSets, ReleasedBy: time.Now().Add(-customBuylistMinAge)}
 			rule.MinPrice = customBuylistSetting(getUploadSetting(r, "customminprice", "UploadCustomMinPrice"))
-			rule.Rate = customBuylistSetting(getUploadSetting(r, "customrate", "UploadCustomRate"))
+			rule.Rate = rate
 
 			customSeller := getUploadSetting(r, "customseller", "UploadCustomBuyer")
 			if customSeller != "" {
