@@ -162,11 +162,16 @@ func renderDiscord(f Firing, label func(shorthand string) string) *discordgo.Mes
 	if d.FireBelow {
 		lines("Crossed below "+thresholdLabel(a.Below, a.ReferencePrice, false), d.BelowHits)
 	}
-	if a.ReferencePrice > 0 {
-		fmt.Fprintf(&b, "\nreference %s", money(a.ReferencePrice))
-		if a.CreatedPrice != nil {
-			fmt.Fprintf(&b, ", %s when the alert was set", money(*a.CreatedPrice))
-		}
+	// The reference is named unless it is the price the alert was set at
+	var prices []string
+	if a.ReferencePrice > 0 && (a.CreatedPrice == nil || money(*a.CreatedPrice) != money(a.ReferencePrice)) {
+		prices = append(prices, "reference "+money(a.ReferencePrice))
+	}
+	if a.CreatedPrice != nil {
+		prices = append(prices, money(*a.CreatedPrice)+" when the alert was set")
+	}
+	if len(prices) > 0 {
+		fmt.Fprintf(&b, "\n%s", strings.Join(prices, ", "))
 	}
 	manageLink := ""
 	embedURL := ""
