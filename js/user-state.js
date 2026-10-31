@@ -339,15 +339,18 @@
         var sections = Object.keys(pending);
         pending = {};
         var allOk = true;
-        // Chain sequentially so version stays consistent across sections.
+        // Chain sequentially, after the writes already in flight, so version
+        // stays consistent and dirty clears only once those have landed too.
         inflight = sections.reduce(function(p, section) {
             return p.then(function() {
-                return patchSection(section).then(function(ok) {
-                    // Re-queue failures so the next flush retries them.
-                    if (!ok) { allOk = false; pending[section] = true; }
-                });
+                return patchSection(section);
+            }).catch(function() {
+                return false;
+            }).then(function(ok) {
+                // Re-queue failures, a write that threw too, so the next flush retries them.
+                if (!ok) { allOk = false; pending[section] = true; }
             });
-        }, Promise.resolve()).then(function() {
+        }, inflight).then(function() {
             // Clear dirty only if everything synced and no new writes were scheduled.
             if (allOk && !timer && Object.keys(pending).length === 0) markClean();
         });
@@ -359,8 +362,7 @@
     // server for them.
     window.UserStateSync.flush = function() {
         if (timer) clearTimeout(timer);
-        var before = inflight;
-        return Promise.all([before, flush()]);
+        return flush();
     };
 
     // Flush queued writes now (page hidden/unloading), via keepalive.
@@ -369,7 +371,14 @@
         var sections = Object.keys(pending);
         if (!sections.length) return;
         pending = {};
-        sections.forEach(function(section) { patchSection(section, true); });
+        // Joined to inflight, so the next flush waits for them and a failed
+        // one is queued again, keeping dirty set until it lands.
+        var writes = sections.map(function(section) {
+            return patchSection(section, true).then(function(ok) {
+                if (!ok) pending[section] = true;
+            });
+        });
+        inflight = Promise.all([inflight].concat(writes));
     }
 
     function schedule(section) {
