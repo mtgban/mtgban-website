@@ -231,6 +231,8 @@ func TestPlural(t *testing.T) {
 		{1204, "copy", "1204 copies"},
 		{2374, "total listing", "2374 total listings"},
 		{1, "total listing", "1 total listing"},
+		{30, "day", "30 days"},
+		{1, "day", "1 day"},
 	} {
 		got := plural(tc.n, tc.noun)
 		if got != tc.want {
