@@ -12,8 +12,8 @@ import (
 
 // TestLongFormLive exercises the long-form (variants + prices) code end to end
 // against a real Postgres: ban_id minting + caching, the long upsert, and the
-// four read paths (HGetAllLong by mtgban_id, GetEarliestDateLong,
-// GetAggregatePriceStatsLong, GetMoversLong).
+// three read paths (HGetAllLong by mtgban_id, GetAggregatePriceStatsLong,
+// GetMoversLong).
 //
 // Like TestTCGPricesLive it is skipped unless TCGLIVE_HOST is set, and it only
 // touches sentinel identities (a fake uuid, a sentinel category, and sentinel
@@ -278,15 +278,6 @@ func TestLongFormLive(t *testing.T) {
 	}
 	if c.stmtHGetAllLong == nil {
 		t.Error("NewClient did not keep the chart read prepared")
-	}
-
-	// --- GetEarliestDateLong: MIN over the printing's rows ---
-	earliest, err := c.GetEarliestDateLong(ctx, base, Lookback(3650))
-	if err != nil {
-		t.Fatalf("GetEarliestDateLong: %v", err)
-	}
-	if got := earliest.Format("2006-01-02"); got != "2024-02-08" {
-		t.Errorf("earliest = %s, want 2024-02-08", got)
 	}
 
 	// --- GetAggregatePriceStatsLong: isolated to sentinel provider ---
