@@ -82,6 +82,14 @@ func TestAlertEmbedPctThresholdBelowAndCreatedPrice(t *testing.T) {
 			t.Errorf("description lacks %q:\n%s", want, e.Description)
 		}
 	}
+	if !strings.Contains(e.Description, "reference $10.00, $9.00 when the alert was set") {
+		t.Errorf("a reference apart from the price when set is not named:\n%s", e.Description)
+	}
+	createdPrice = 10
+	e = renderDiscord(Firing{Alert: a, Decision: d, Origin: "https://mtgban.com"}, shorthandLabel)
+	if strings.Contains(e.Description, "reference $10.00") || !strings.Contains(e.Description, "\n$10.00 when the alert was set") {
+		t.Errorf("a reference equal to the price when set is stated twice:\n%s", e.Description)
+	}
 }
 
 func TestAlertEmbedLimitsStoreLines(t *testing.T) {
