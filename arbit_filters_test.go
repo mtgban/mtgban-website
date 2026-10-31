@@ -308,7 +308,7 @@ func TestArbitMinProfitAsShown(t *testing.T) {
 		}
 	}
 	for _, p := range []float64{0.125, 0.135, 0.18994} {
-		got := fmt.Sprintf("%.2f", shownProfit(p))
+		got := fmt.Sprintf("%.2f", asShown(p))
 		if got != fmt.Sprintf("%.2f", p) {
 			t.Errorf("%v is held at %s, want the %.2f the table prints", p, got, p)
 		}
