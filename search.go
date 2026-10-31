@@ -2124,8 +2124,7 @@ const customBuylistMinAge = 14 * 24 * time.Hour
 // a card of customBuylistSkipSets, or anything not known to be out by
 // releasedBy.
 func customBuylistSkips(b *matcher.Backend, co *matcher.CardObject, releasedBy time.Time) bool {
-	released, err := b.CardReleaseDate(co.UUID)
-	return err != nil || released.IsZero() || released.After(releasedBy) || (!co.Sealed && slices.Contains(customBuylistSkipSets, co.SetCode))
+	return EntryRule{SkipSets: customBuylistSkipSets, ReleasedBy: releasedBy}.skips(b, co)
 }
 
 // customBuylistRule is the reader's custom buylist as the upload settings
