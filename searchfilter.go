@@ -42,6 +42,11 @@ type SearchConfig struct {
 	// used to suggest broader searches when nothing is found
 	AppliedFilters []string
 
+	// The terms a collector number read off the words stands for,
+	// "cn:7029" after a name or "s:NEO cn:234", which neither CleanQuery
+	// nor AppliedFilters holds
+	NumberTerms string
+
 	// The sealed product a contents:/decklist:/variable: query asked about,
 	// and which of the three readings it asked for. Set so the page can offer
 	// the other two.
@@ -1941,6 +1946,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, query
 					Name:   "number_strict",
 					Values: fixupNumberNG(b, tokens[0], "number_strict"),
 				})
+				config.NumberTerms = tokens[0]
 				query = ""
 				tokens = nil
 			} else if printed {
@@ -1951,6 +1957,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, query
 			numbered := bareNumberFilters(b, numbers, tokens[0])
 			if numbered != nil {
 				filters = append(filters, numbered...)
+				config.NumberTerms = numberTerm(b, tokens[0])
 				query = ""
 			}
 		}
@@ -1959,7 +1966,8 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, query
 			if term != "" {
 				set, err := b.GetSet(tokens[0])
 				if err == nil {
-					extraConfig := parseSearchOptionsNG(b, "s:"+set.Code+" "+term, nil, nil, nil)
+					config.NumberTerms = "s:" + set.Code + " " + term
+					extraConfig := parseSearchOptionsNG(b, config.NumberTerms, nil, nil, nil)
 					filters = append(filters, extraConfig.CardFilters...)
 					query = ""
 				}
@@ -1968,6 +1976,8 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, query
 		named, numbered := trailingNumberFilters(b, numbers, query)
 		if numbered != nil {
 			filters = append(filters, numbered...)
+			words := strings.Fields(query)
+			config.NumberTerms = numberTerm(b, words[len(words)-1])
 			query = named
 		}
 	}
@@ -1980,6 +1990,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, query
 		if len(tokens) > 0 {
 			last := tokens[len(tokens)-1]
 			if typesSetTotal(last) {
+				config.NumberTerms = "cn:" + last
 				extraConfig := parseSearchOptionsNG(b, "cn:"+last, nil, nil, nil)
 				filters = append(filters, extraConfig.CardFilters...)
 				query = strings.Join(tokens[:len(tokens)-1], " ")

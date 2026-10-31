@@ -254,8 +254,8 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 
 // searchSuggestions adapts a parsed search that found nothing into the
 // suggest package's inputs. The did-you-mean is a whole query: the closest
-// name with the filters typed, each read under the key that finds cards
-// (see rekeyFilters).
+// name, the collector number read off the words, and the filters typed,
+// each read under the key that finds cards (see rekeyFilters).
 func searchSuggestions(ds *datastore, rawQuery string, config SearchConfig, pinned []FilterElem, sealed bool) (string, []suggest.AltSearch) {
 	if config.SearchMode == "hashing" {
 		return "", nil
@@ -278,6 +278,9 @@ func searchSuggestions(ds *datastore, rawQuery string, config SearchConfig, pinn
 	var query []string
 	if name != "" {
 		query = append(query, quoteIfFilter(name))
+	}
+	if config.NumberTerms != "" {
+		query = append(query, config.NumberTerms)
 	}
 	filters, rekeyed := rekeyFilters(ds, query, config.AppliedFilters, pinned, sealed)
 	if !corrected && !rekeyed {

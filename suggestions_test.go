@@ -84,6 +84,27 @@ func TestDidYouMeanKeepsFilters(t *testing.T) {
 	}
 }
 
+// The did-you-mean keeps a collector number the parser read off the
+// words, after a name, alone or after a set code.
+func TestDidYouMeanKeepsANumber(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+
+	tests := []struct{ query, want string }{
+		{"lightning bolt 146 is:m10", "lightning bolt cn:146 s:m10"},
+		{"lightning bolt 141 is:m10", ""},
+		{"146 is:m10", "cn:146 s:m10"},
+		{"m10 146 r:foil", "s:M10 cn:146 f:foil"},
+	}
+	for _, tt := range tests {
+		config := parseSearchPage(ds, tt.query, false, nil, nil, nil)
+		got, _ := searchSuggestions(ds, tt.query, config, nil, false)
+		if got != tt.want {
+			t.Errorf("%q: did-you-mean %q, want %q", tt.query, got, tt.want)
+		}
+	}
+}
+
 // The rekey keeps to the pinned bar, and leaves a query of more filters,
 // or a filter of more values, than it walks alone.
 func TestDidYouMeanRekeyBounds(t *testing.T) {
