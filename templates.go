@@ -271,6 +271,9 @@ var funcMap = template.FuncMap{
 	"inc": func(i, j int) int {
 		return i + j
 	},
+	// A query as one path segment, its "/" escaped, for the export links
+	// that carry it in the path
+	"path_escape": url.PathEscape,
 	"csv_without": csvWithout,
 	"first_csv":   firstCSV,
 	// Which of the three readings a sealed product's link opens, given what
