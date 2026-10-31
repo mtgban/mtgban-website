@@ -78,6 +78,14 @@ func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 			t.Fatalf("%s PickedOnly = %v", s.Shorthand, s.PickedOnly)
 		}
 	}
+	vendors = append(vendors,
+		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "ABUCreditSealed", Name: "ABU Games (credit)", SealedMode: true}))
+	vendorsPtr.Store(&vendors)
+	for _, s := range alertStorePrices("card-1", true, alerts.SideBuylist, nil) {
+		if s.PickedOnly != (s.Shorthand == "ABUCreditSealed") {
+			t.Fatalf("sealed %s PickedOnly = %v", s.Shorthand, s.PickedOnly)
+		}
+	}
 	sellers := append(slices.Clip(GetSellers()),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"card-1": {{Conditions: "NM", Price: 18}}},
 			mtgban.ScraperInfo{Shorthand: "MKMLow", Name: "Cardmarket", CountryFlag: "EU"}))
