@@ -116,7 +116,7 @@ about 34 times as many.
 | 8 | `05_catchup.sql -v src=prices -v dst=prices_v2`, apply only | the hold starts; `since` two days back | 0.3 s | a small count, `dst_covers_src` on every provider |
 | 9 | `07_swap.sql`, then the restart | inside the hold | 0.3 s | the partition keys it reports; the restart done |
 | 10 | `05_catchup.sql -v src=prices_old -v dst=prices`, dry only | right after the restart, inside the hold; `since` the day before the swap | 0.3 s | `rows_inserted_or_changed` 0 and `dst_covers_src` on every provider; then the hold ends |
-| 11 | `08_verify.sql` | after the hold, off-peak; `since` step 6's, `swap` the day of the swap | 1.7 s | `same` before the swap, `prices_covers` from it on, before `since` and for the totals, both indexes valid |
+| 11 | `08_verify.sql` | after the hold, off-peak; `since` step 6's, `swap` the day of the swap | 1.7 s | `prices_covers` in every band and for the totals, both indexes valid |
 | 12 | `VALIDATE CONSTRAINT prices_ban_id_fk` | off-peak, during the soak | | `convalidated` true |
 | 13 | `VALIDATE CONSTRAINT prices_provider_fk` | off-peak, during the soak | | `convalidated` true |
 | 14 | a volume snapshot, by the user | after the week's soak | | that it completed |
@@ -336,9 +336,14 @@ on the first day of a month and not across the 21:00 UTC ingest). After
 the swap the writers reach only `prices`, so it reads in three bands:
 
 - `since <= date < swap`: per provider, the rows and the latest day in
-  `prices` and `prices_old`. `same` must be true on every provider; a
-  false means a row missing from one side, so look before the drop, and
-  consider the rollback.
+  `prices` and `prices_old`, and `missing`, the rows of `prices_old` whose
+  key `prices` lacks. `prices_covers` must be true on every provider:
+  none is missing. More rows in `prices` is normal: a writer resumed
+  after the hold can still file a day before the swap (the 21:00 UTC
+  ingest files the day of tcgcsv's last refresh, the day before when it
+  is late; a stale store's stash its own scrape date), and the check goes
+  by key so those rows cannot hide a missing one. A false means a row the
+  catch-ups missed, so look before the drop, and consider the rollback.
 - `date >= swap`: `prices_covers` must be true on every provider: `prices`
   holds at least the rows of `prices_old` and as late a day. More is
   normal: the writers resumed after step 10 and write `prices` only. A
@@ -388,12 +393,13 @@ readers of both up to those 5 s while it waits.
   changed.
 - After the swap, before the drop: hold the writers, the reverse renames
   in one transaction, the restart, then `05_catchup.sql -v src=prices_v2
-  -v dst=prices` since the day of the swap, for what the writers put in
-  the new table in between. The writers stay held from the rename until
-  that catch-up is done: apply it, then run it again, and the second run
-  must report 0 rows inserted or changed (anything else is a writer inside
-  the hold, whose prices the apply has just overwritten); then let them
-  resume:
+  -v dst=prices` since the day of the swap minus 7, for what the writers
+  put in the new table in between: they file days before the swap too, as
+  `08_verify.sql` says, and the margin is step 6's. The writers stay held
+  from the rename until that catch-up is done: apply it, then run it
+  again, and the second run must report 0 rows inserted or changed
+  (anything else is a writer inside the hold, whose prices the apply has
+  just overwritten); then let them resume:
 
   ```sql
   BEGIN;
