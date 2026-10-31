@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"html"
 	"html/template"
 	"log"
 	"math"
@@ -519,7 +520,7 @@ func pricedEntry[T mtgban.GenericEntry](entries []T, cond mtgban.Condition) int 
 // bar, read once and stripped (stripLoader), and the version stamped into
 // it: the start of the stripped code's hash, which every cart link carries
 // too, so a bookmark saved from other code can tell it is out of date.
-var cartLoader = sync.OnceValues(func() (template.URL, string) {
+var cartLoader = sync.OnceValues(func() (template.HTMLAttr, string) {
 	source, err := os.ReadFile("js/ban-to-cart.js")
 	if err != nil {
 		log.Println("cart bookmarklet:", err)
@@ -529,8 +530,14 @@ var cartLoader = sync.OnceValues(func() (template.URL, string) {
 	sum := sha256.Sum256([]byte(code))
 	version := hex.EncodeToString(sum[:4])
 	code = strings.Replace(code, cartVersionMark, version, 1)
-	// void keeps the browser from replacing the page with the script's result
-	return template.URL("javascript:void%20" + url.PathEscape(code)), version
+	// void keeps the browser from replacing the page with the script's
+	// result. A javascript: URL is decoded before it runs and keeps the
+	// spaces and quotes of its path, so only %, what would end the path
+	// (? and #) and what the URL parser drops are escaped.
+	link := "javascript:void " + strings.NewReplacer("%", "%25", "?", "%3F", "#", "%23", "\t", "%09", "\n", "%0A", "\r", "%0D").Replace(code)
+	// The whole attribute: html/template would percent-encode every space
+	// and quote of a URL it is handed
+	return template.HTMLAttr(`href="` + html.EscapeString(link) + `"`), version
 })
 
 // stripLoader is the loader's code without its indentation, blank lines and
@@ -552,7 +559,7 @@ func stripLoader(source string) string {
 // cartVersionMark is where js/ban-to-cart.js takes its version.
 const cartVersionMark = "__BAN_VERSION__"
 
-func cartBookmarklet() template.URL {
+func cartBookmarklet() template.HTMLAttr {
 	link, _ := cartLoader()
 	return link
 }

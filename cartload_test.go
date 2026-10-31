@@ -1,12 +1,14 @@
 package main
 
 import (
+	"html"
 	"net/url"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
@@ -322,7 +324,7 @@ func TestCartLoadButtons(t *testing.T) {
 		if !strings.Contains(out, `onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false"`) {
 			t.Errorf("%s: no way back to the panel", tc.key)
 		}
-		if !strings.Contains(out, `id="cart-overlay"`) || !strings.Contains(out, `href="javascript:void%20`) {
+		if !strings.Contains(out, `id="cart-overlay"`) || !strings.Contains(out, `href="javascript:void `) {
 			t.Errorf("%s: no panel with the loader to drag", tc.key)
 		}
 		// A box the browser restored unticked would leave its row in the list
@@ -736,10 +738,22 @@ func TestCartBookmarklet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	link := string(cartBookmarklet())
-	code, found := strings.CutPrefix(link, "javascript:void%20")
+	attr := string(cartBookmarklet())
+	value, found := strings.CutPrefix(attr, `href="`)
+	value, closed := strings.CutSuffix(value, `"`)
+	if !found || !closed {
+		t.Fatalf("bookmarklet is not an href: %.40q", attr)
+	}
+	// The link as the browser reads it from the attribute, and stores
+	link := html.UnescapeString(value)
+	code, found := strings.CutPrefix(link, "javascript:void ")
 	if !found {
 		t.Fatalf("bookmarklet does not discard its result: %.40q", link)
+	}
+	// A ? or # would end the URL's path, the parser drops a line break and
+	// percent-encodes a non-ASCII byte
+	if strings.ContainsAny(code, "?#\t\n\r") || utf8.RuneCountInString(code) != len(code) {
+		t.Error("bookmarklet leaves a character the URL parser rewrites")
 	}
 	decoded, err := url.PathUnescape(code)
 	if err != nil {

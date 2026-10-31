@@ -743,9 +743,16 @@ the section's, as `scraperCompare` picks its seller.
   `js/ban-to-cart.js` as a `javascript:` link (`cart_bookmarklet`),
   without its indentation, blank lines and whole-line comments
   (`stripLoader`), which keeps it under Firefox's limit of 65,536
-  characters on a bookmark's URL: about 63,900 with thirteen stores.
-  `TestCartBookmarklet` fails past 64,000, so the store that takes it
-  there is a decision about the loader's size rather than a surprise. It
+  characters on a bookmark's URL: about 42,900 with thirteen stores, the
+  length of the `href` Chromium stores. Firefox's stored length is
+  unverified.
+  Only `%`, `?`, `#` and line breaks are percent-encoded: a `javascript:`
+  URL keeps the spaces and quotes of its path, and a `?` would start a
+  query, whose spaces and quotes the URL parser does encode. The partial
+  takes the whole `href` attribute, since html/template would encode
+  them in a URL it is handed. `TestCartBookmarklet` fails past 64,000,
+  so the store that takes it there is a decision about the loader's size
+  rather than a surprise. It
   says to click the bookmark after the store's page loads, since nothing
   on that page can. Its Continue @ store button continues to the store, and
   "Don't show this again", kept in `localStorage`, lets later presses go
