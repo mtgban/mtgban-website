@@ -40,7 +40,7 @@ type KeyOverrides map[string]map[string]map[string]string
 // config falls back to safe defaults.
 var keyOverridesStore = &bucketstore.Store[KeyOverrides]{
 	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-		return ConfigBucket, keyOverridesPath(), nil
+		return ConfigBucket, configSibling(keyOverridesFile), nil
 	},
 	MissingOK: true,
 }
@@ -51,14 +51,14 @@ func GetKeyOverrides() KeyOverrides {
 	return keyOverridesStore.Get()
 }
 
-// keyOverridesPath returns the bucket path of the overrides file: a sibling of
-// the main config file, so it lives in the same place and bucket.
-func keyOverridesPath() string {
+// configSibling returns the path of the file named name beside the main
+// config file, so it lives in the same place and bucket.
+func configSibling(name string) string {
 	p := Config().sourcePath
 	if i := strings.LastIndex(p, "/"); i >= 0 {
-		return p[:i+1] + keyOverridesFile
+		return p[:i+1] + name
 	}
-	return keyOverridesFile
+	return name
 }
 
 // loadKeyOverrides (re)reads the overrides file from the config bucket.
