@@ -122,6 +122,9 @@ func withTCGCSVGames(t *testing.T, ownCategory int, ingested []int) {
 // and the category not named - it defers to the ingest rather than overwrite a
 // whole-category pass with the subset this process loaded.
 func TestTCGCSVOwnsTCGSeries(t *testing.T) {
+	savedArchive := PricesArchiveDB
+	PricesArchiveDB = nil
+	t.Cleanup(func() { PricesArchiveDB = savedArchive })
 	for _, tc := range []struct {
 		name        string
 		ownCategory int
@@ -129,7 +132,7 @@ func TestTCGCSVOwnsTCGSeries(t *testing.T) {
 		want        bool
 	}{
 		{"own game is ingested", 71, []int{1, 71, 85}, true},
-		{"another game is ingested", 71, []int{1, 85}, false},
+		{"another game is ingested, no archive to ask", 71, []int{1, 85}, false},
 		{"no tcgcsv_config at all", 71, nil, false},
 		{"config but no catalog yet", 0, []int{71}, true},
 		{"no tcgcsv_config and no catalog", 0, nil, false},
