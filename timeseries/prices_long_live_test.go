@@ -44,6 +44,11 @@ func TestLongFormLive(t *testing.T) {
 	if err := c.EnsureVariantsSchema(ctx); err != nil {
 		t.Fatalf("EnsureVariantsSchema: %v", err)
 	}
+	// As main.go does: a chart read over a column the ensure just added did not prepare in NewClient.
+	err = c.PrepareStatements(ctx)
+	if err != nil {
+		t.Fatalf("PrepareStatements: %v", err)
+	}
 	var haveCol int
 	var haveIdx bool
 	if err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_name='variants' AND column_name='mtgban_id'`).Scan(&haveCol); err != nil || haveCol != 1 {
