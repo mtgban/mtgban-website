@@ -813,11 +813,13 @@ func writeSnapshot(ctx context.Context, start time.Time, snapshot longSnapshot) 
 var tcgcsvOwnedProviders = timeseries.TCGCSVProviders
 
 // tcgcsvOwnsTCGSeries reports whether the tcgcsv ingest covers this
-// deployment's own game. The cron that runs it is registered off the same
-// config section, so a game listed there is one whose TCGplayer prices arrive
-// without the snapshot's help. A deployment carrying no tcgcsv_config at all
-// keeps writing them itself, since nothing else would. Those rows cannot
-// advance the ingest's gate (timeseries.LatestIngestDate).
+// deployment's own game: listed in its own tcgcsv_config, or ingested
+// lately by another site's, which the archive's ingest days tell. Either
+// way the game's TCGplayer prices arrive without the snapshot's help, and
+// a partial day written here would stand beside the ingest's full one. A
+// deployment carrying no tcgcsv_config at all keeps writing them itself,
+// since nothing else would. Those rows cannot advance the ingest's gate
+// (timeseries.LatestIngestDate).
 func tcgcsvOwnsTCGSeries() bool {
 	if Config().TCGCSVConfig == nil {
 		return false
@@ -838,7 +840,23 @@ func tcgcsvOwnsTCGSeries() bool {
 			return true
 		}
 	}
-	return false
+	return ingestedLately(id)
+}
+
+// ingestedLately reports whether a tcgcsv ingest filed the category within
+// the last three days, long enough to ride out a missed run.
+func ingestedLately(categoryID int) bool {
+	if PricesArchiveDB == nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	day, ok, err := PricesArchiveDB.LatestIngestDate(ctx, categoryID)
+	if err != nil {
+		log.Println("tcgcsv: latest ingest day:", err)
+		return false
+	}
+	return ok && time.Since(day) < 72*time.Hour
 }
 
 // collectNonMagicSnapshot walks the served scrapers and accumulates every price
