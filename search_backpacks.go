@@ -46,21 +46,23 @@ func backpackMembers(packs []userstate.Backpack) map[string]map[string]bool {
 // over a list of the site's own. A filter naming backpacks alone becomes a
 // pool, which seeds the search and answers no cards when the backpacks are
 // empty. The sealed tab never answers with a single. An in: sub-search
-// resolves the same way.
-func resolveBackpacks(ctx context.Context, sig string, b *matcher.Backend, config *SearchConfig) {
+// resolves the same way. It returns the backpacks it read, by on: value.
+func resolveBackpacks(ctx context.Context, sig string, b *matcher.Backend, config *SearchConfig) map[string]map[string]bool {
 	if UserStateDB == nil || !namesAList(config.CardFilters) {
-		return
+		return nil
 	}
 	email := GetParamFromSig(sig, "UserEmail")
 	if email == "" {
-		return
+		return nil
 	}
 	st, err := UserStateDB.Get(ctx, userstate.HashEmail(userStateIdentity(email)))
 	if err != nil {
 		log.Printf("search: reading the backpacks failed: %v", err)
-		return
+		return nil
 	}
-	applyBackpacks(b, config, backpackMembers(userstate.Backpacks(st)))
+	packs := backpackMembers(userstate.Backpacks(st))
+	applyBackpacks(b, config, packs)
+	return packs
 }
 
 // applyBackpacks is resolveBackpacks with the reader's backpacks read.

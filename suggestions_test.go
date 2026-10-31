@@ -83,7 +83,7 @@ func TestDidYouMeanKeepsFilters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		config := parseSearchOptionsNG(ds.backend, tt.query, nil, nil, nil)
-		got, _ := searchSuggestions(ds, tt.query, config, nil, false)
+		got, _ := searchSuggestions(ds, tt.query, config, nil, nil, false)
 		if got != tt.want {
 			t.Errorf("%q: did-you-mean %q, want %q", tt.query, got, tt.want)
 		}
@@ -104,7 +104,7 @@ func TestDidYouMeanKeepsANumber(t *testing.T) {
 	}
 	for _, tt := range tests {
 		config := parseSearchPage(ds, tt.query, false, false, nil, nil, nil)
-		got, _ := searchSuggestions(ds, tt.query, config, nil, false)
+		got, _ := searchSuggestions(ds, tt.query, config, nil, nil, false)
 		if got != tt.want {
 			t.Errorf("%q: did-you-mean %q, want %q", tt.query, got, tt.want)
 		}
@@ -120,19 +120,19 @@ func TestDidYouMeanRekeyBounds(t *testing.T) {
 	query := "mountain is:plst"
 	config := parseSearchOptionsNG(ds.backend, query, nil, nil, nil)
 	pinned := parseSearchOptionsNG(ds.backend, "s:lea", nil, nil, nil).CardFilters
-	if got, _ := searchSuggestions(ds, query, config, pinned, false); got != "" {
+	if got, _ := searchSuggestions(ds, query, config, pinned, nil, false); got != "" {
 		t.Errorf("%q pinned to s:lea: did-you-mean %q, want none", query, got)
 	}
 
 	query = "mountain is:plst t:land t:basic t:mountain"
 	config = parseSearchOptionsNG(ds.backend, query, nil, nil, nil)
-	if got, _ := searchSuggestions(ds, query, config, nil, false); got != "" {
+	if got, _ := searchSuggestions(ds, query, config, nil, nil, false); got != "" {
 		t.Errorf("%q: did-you-mean %q, want none past %d filters", query, got, maxRekeyFilters)
 	}
 
 	query = "mountain is:plst,lea,leb,2ed"
 	config = parseSearchOptionsNG(ds.backend, query, nil, nil, nil)
-	if got, _ := searchSuggestions(ds, query, config, nil, false); got != "" {
+	if got, _ := searchSuggestions(ds, query, config, nil, nil, false); got != "" {
 		t.Errorf("%q: did-you-mean %q, want none past %d values", query, got, maxRekeyValues)
 	}
 }
@@ -144,13 +144,13 @@ func TestDidYouMeanKeepsAStore(t *testing.T) {
 
 	query := "murder store:mkm"
 	config := parseSearchOptionsNG(ds.backend, query, nil, nil, nil)
-	if got, _ := searchSuggestions(ds, query, config, nil, false); got != "murder s:mkm" {
+	if got, _ := searchSuggestions(ds, query, config, nil, nil, false); got != "murder s:mkm" {
 		t.Fatalf("%q with no such store: did-you-mean %q, want murder s:mkm", query, got)
 	}
 	registerTestSeller(t, "MKM", somePlainCardUUIDs(t, 1))
 	for _, query := range []string{query, "murder store:empty:mkm"} {
 		config := parseSearchOptionsNG(ds.backend, query, nil, nil, nil)
-		if got, _ := searchSuggestions(ds, query, config, nil, false); got != "" {
+		if got, _ := searchSuggestions(ds, query, config, nil, nil, false); got != "" {
 			t.Errorf("%q with an MKM store: did-you-mean %q, want none", query, got)
 		}
 	}
