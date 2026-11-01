@@ -2829,6 +2829,12 @@ body.m-setpicker-lock {
     contain-intrinsic-size: auto 900px;
 }
 
+/* Containment makes the card the fixed actions menu's containing block and
+   clips it; the card holding an open menu is on screen anyway */
+.m-layout-expanded .m-card:has(.m-actions-menu.open) {
+    content-visibility: visible;
+}
+
 /* Buyers-first stacking, portrait only; landscape grid handles side by side */
 @media (orientation: portrait) {
     .m-layout-expanded .m-card.m-buyers-first {
