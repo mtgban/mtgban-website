@@ -51,6 +51,8 @@
     pointer-events: auto;
     transform: translate(-50%, -50%) scale(1);
 }
+/* The page behind an open modal (settings or alert) holds still. */
+html:has(.settings-modal.open) { overflow: hidden; }
 
 /* Semantic accents (amber = caution/cancel, green = confirm/save) */
 .settings-modal {
