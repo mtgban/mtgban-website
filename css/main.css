@@ -1506,6 +1506,8 @@ table.tiers td div {
     align-items: center;
     justify-content: center;
 }
+/* A full-screen confirm holds the page still; an anchored one covers only its element. */
+html:has(.ban-confirm-dialog-host:not([hidden]):not(.anchored)) { overflow: hidden; }
 /* Anchored mode: scope overlay to the parent element (passed as opts.anchor). */
 .ban-confirm-dialog-host.anchored {
     position: absolute;
