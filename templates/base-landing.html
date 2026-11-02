@@ -10,7 +10,6 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     {{block "extra-css" .}}{{end}}
-    <link rel="stylesheet" type="text/css" href="/css/command-palette.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css">
 
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
@@ -83,10 +82,10 @@ window.__BAN_PALETTE_TARGETS = {
 <script type="text/javascript" src="/js/icons.js?hash={{.Hash}}" defer></script>
 {{end}}
 <script type="text/javascript" src="/js/utils.js?hash={{.Hash}}"></script>
-<script type="text/javascript" src="/js/palette-chips.js?hash={{.Hash}}" defer></script>
+<!-- The search boxes read the providers for their filter completions; the
+     palette itself loads on the first Ctrl+K or "/", through the loader. -->
 <script type="text/javascript" src="/js/palette-providers.js?hash={{.Hash}}" defer></script>
-<script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}" defer></script>
-<script type="text/javascript" src="/js/command-palette.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/palette-loader.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/tooltips.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-type-focus.js?hash={{.Hash}}" defer></script>

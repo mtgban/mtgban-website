@@ -602,7 +602,13 @@ function copyBySelection(text) {
 
 function showCopied() {
     var toast = document.getElementById('cp-toast');
-    if (!toast) return;
+    if (!toast) {
+        // The palette makes one as it loads; until then the guide has its own
+        toast = document.createElement('div');
+        toast.className = 'cp-toast';
+        toast.id = 'cp-toast';
+        document.body.appendChild(toast);
+    }
     toast.textContent = 'Copied!';
     toast.classList.add('show');
     setTimeout(function() {
