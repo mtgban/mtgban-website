@@ -342,7 +342,6 @@ var funcMap = template.FuncMap{
 	"contains": func(s, p string) bool {
 		return strings.Contains(s, p)
 	},
-	"is_sealed_scraper": isSealedScraper,
 	"load_partner": func(s string) string {
 		return Affiliates().Codes[s]
 	},
@@ -440,17 +439,6 @@ var funcMap = template.FuncMap{
 		}
 		return fitCode(badge, code)
 	},
-	"uuid2ckid": func(s string) string {
-		bl, err := findVendorBuylist("CK")
-		if err != nil {
-			return ""
-		}
-		entries, found := bl[s]
-		if !found {
-			return ""
-		}
-		return entries[0].OriginalID
-	},
 	"cart_load":        cartLoadFor,
 	"cart_load_arbit":  cartLoadForArbit,
 	"cart_sends":       cartSendsFor,
@@ -469,9 +457,6 @@ var funcMap = template.FuncMap{
 			return "#111111"
 		}
 		return color
-	},
-	"tcg_market_price": func(s string) float64 {
-		return getTCGMarketPrice(s)
 	},
 	// buylist_badge renders a pill next to the store name when the store is the
 	// card's hotlist store: "New high" when Card Kingdom's price beats every

@@ -541,7 +541,7 @@
                                 {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM")) $ckNote $pauseNote}}
                                 {{$mState := buylist_state $entry.Shorthand $conditions $entry.IsOffer $entry.Price $card.GoodBuylist $card.CKSignal $card.CKPauseWait}}
                                 {{/* A price that looks off is never one to take. */}}
-                                {{if and (eq $entry.Shorthand "TCGDirectNet") (invalid_direct $cardId $entry.Price)}}{{$mState = ""}}{{end}}
+                                {{if and (eq $entry.Shorthand "TCGDirectNet") (invalid_direct $entry.Price (index $.TCGMarketPrices $cardId))}}{{$mState = ""}}{{end}}
                                 {{if $hasDetail}}
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
@@ -868,13 +868,13 @@
                     </div>
                     {{$keys := .SellerKeys}}
                     {{$hasSingles := false}}
-                    {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if not (index $.SealedStores $k)}}{{$hasSingles = true}}{{end}}{{end}}
                     {{$hasSealed := false}}
-                    {{range $k := $keys}}{{if (is_sealed_scraper $k)}}{{$hasSealed = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if (index $.SealedStores $k)}}{{$hasSealed = true}}{{end}}{{end}}
                     {{if $hasSingles}}
                     <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
+                        {{range $key := $keys}}{{if not (index $.SealedStores $key)}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
                         {{end}}{{end}}
                     </div>
@@ -882,7 +882,7 @@
                     {{if $hasSealed}}
                     <h5 class="m-settings-subgroup-label">Sealed</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if (is_sealed_scraper $key)}}
+                        {{range $key := $keys}}{{if (index $.SealedStores $key)}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
                         {{end}}{{end}}
                     </div>
@@ -903,13 +903,13 @@
                     </div>
                     {{$keys := .VendorKeys}}
                     {{$hasSingles := false}}
-                    {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if not (index $.SealedStores $k)}}{{$hasSingles = true}}{{end}}{{end}}
                     {{$hasSealed := false}}
-                    {{range $k := $keys}}{{if (is_sealed_scraper $k)}}{{$hasSealed = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if (index $.SealedStores $k)}}{{$hasSealed = true}}{{end}}{{end}}
                     {{if $hasSingles}}
                     <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
+                        {{range $key := $keys}}{{if not (index $.SealedStores $key)}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
                         {{end}}{{end}}
                     </div>
@@ -917,7 +917,7 @@
                     {{if $hasSealed}}
                     <h5 class="m-settings-subgroup-label">Sealed</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if (is_sealed_scraper $key)}}
+                        {{range $key := $keys}}{{if (index $.SealedStores $key)}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
                         {{end}}{{end}}
                     </div>

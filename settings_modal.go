@@ -185,8 +185,10 @@ type settingsModalVars struct {
 	TabPaths map[string]string
 
 	// search
-	SellerKeys    []string
-	VendorKeys    []string
+	SellerKeys []string
+	VendorKeys []string
+	// Which of SellerKeys and VendorKeys trade sealed product
+	SealedStores  map[string]bool
 	ListingLocked bool
 
 	// upload
@@ -250,6 +252,7 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 		EditionsByCategory: ds.editions.AllEditionsByCategory,
 	}
 	v.SellerKeys, v.VendorKeys = searchSettingsKeys()
+	v.SealedStores = sealedStores()
 
 	up := uploadSettingsKeys(sig)
 	v.UploadAltKeys = up.AltKeys

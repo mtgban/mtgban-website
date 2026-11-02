@@ -937,6 +937,23 @@ func tcgSKU2Condition(sku string) mtgban.Condition {
 	return entries[0].Conditions
 }
 
+// ckBuylistIDs is Card Kingdom's buylist id for each of cardIDs its buylist
+// carries, for a page's "load buylist" form.
+func ckBuylistIDs(cardIDs []string) map[string]string {
+	bl, err := findVendorBuylist("CK")
+	if err != nil {
+		return nil
+	}
+	ids := map[string]string{}
+	for _, id := range cardIDs {
+		entries, found := bl[id]
+		if found && len(entries) > 0 {
+			ids[id] = entries[0].OriginalID
+		}
+	}
+	return ids
+}
+
 // Look for the original id (product id) of a card in a given inventory
 func findOriginalID(sellerName, cardID string) string {
 	tcgplayer, _ := findSellerInventory(sellerName)
@@ -1784,13 +1801,21 @@ func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T
 	return slice[head:tail], page
 }
 
-// Retrieve the TCGplayer Market price of any given card
-func getTCGMarketPrice(cardID string) float64 {
+// tcgMarketPrices is TCG Market's price for each of cardIDs it prices, for
+// a page to judge other stores' prices by.
+func tcgMarketPrices(cardIDs []string) map[string]float64 {
 	inv, err := findSellerInventory("TCGMarket")
 	if err != nil {
-		return 0
+		return nil
 	}
-	return tcgMarketPriceIn(inv, cardID)
+	market := map[string]float64{}
+	for _, id := range cardIDs {
+		price := tcgMarketPriceIn(inv, id)
+		if price != 0 {
+			market[id] = price
+		}
+	}
+	return market
 }
 
 // tcgMarketPriceIn probes an already-resolved TCGMarket inventory, so
@@ -1858,6 +1883,23 @@ func isSealedScraper(shorthand string) bool {
 	return info.SealedMode
 }
 
+// sealedStores is isSealedScraper's answer for every loaded shorthand, for
+// a page listing stores.
+func sealedStores() map[string]bool {
+	idx := currentStoreIndex()
+	sealed := make(map[string]bool, len(idx.seller)+len(idx.vendor))
+	for shorthand, seller := range idx.seller {
+		sealed[shorthand] = seller.Info().SealedMode
+	}
+	for shorthand, vendor := range idx.vendor {
+		_, listed := sealed[shorthand]
+		if !listed {
+			sealed[shorthand] = vendor.Info().SealedMode
+		}
+	}
+	return sealed
+}
+
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
 // by their resolved display name (case-insensitive). Stable for equal names.
 func sortKeysByScraperName(keys []string) []string {
@@ -1869,13 +1911,10 @@ func sortKeysByScraperName(keys []string) []string {
 	return out
 }
 
-// Special function to detect if the input price is bigger than
-// twice as much the market price on TCGplayer - used to detect
-// invalid Direct prices. Ignored for anything lower than $1
-// since Direct minimum is $0.40.
-func invalidDirect(id string, price float64) bool {
-	inv, _ := findSellerInventory("TCGMarket")
-	return invalidDirectIn(inv, id, price)
+// invalidDirect flags a TCG Direct price over twice TCG Market's, market 0
+// for none. Anything under $1 passes, since Direct's minimum is $0.40.
+func invalidDirect(price, market float64) bool {
+	return price >= 1 && price > market*2
 }
 
 // directPriceWarning is the tooltip of a price invalidDirect flags: why it
@@ -1891,12 +1930,7 @@ func directPriceWarning(price, market float64) string {
 // invalidDirectIn is invalidDirect over an already-resolved TCGMarket
 // inventory; a nil inventory reads as no market price.
 func invalidDirectIn(inv mtgban.InventoryRecord, id string, price float64) bool {
-	if price < 1 {
-		return false
-	}
-
-	marketPrice := tcgMarketPriceIn(inv, id)
-	return price > marketPrice*2
+	return invalidDirect(price, tcgMarketPriceIn(inv, id))
 }
 
 // keyruneClass turns a set's keyrune code into the class the font wants, and

@@ -975,7 +975,7 @@
                                     {"contents": [
                                         {{range $entries}}
                                         {
-                                           "id": {{uuid2ckid .CardID}},
+                                           "id": {{index $.CKBuylistIDs .CardID}},
                                             "qty": {{.Quantity}}
                                         },
                                         {{end}}
@@ -1047,7 +1047,7 @@
                             {{$card := (index $.Metadata .CardID)}}
                             {{$scraperEntries := (index $.ResultPrices (print .CardID .Condition))}}
                             {{$price := (index $scraperEntries $scraperKey)}}
-                            <tr data-opt-id="{{.CardID}}" data-opt-cond="{{.Condition}}" data-opt-price="{{$price}}" data-load-idx="{{$n}}" data-load-qty="{{.Quantity}}" data-load-name="{{$card.Name}}" data-load-ckid="{{uuid2ckid .CardID}}" data-load-tcgid="{{$card.TCGId}}" data-load-set="{{$card.SetCode}}" data-load-number="{{$card.Number}}" data-opt-edition="{{$card.Edition}}" data-opt-img="{{$card.ImageURL}}" data-opt-finish-tag="{{$card.FinishTag}}" data-opt-finish-class="{{$card.FinishClass}}" data-opt-cw="{{$card.HasContentWarning}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});hw.toggleAttribute('data-sealed',{{$card.Sealed}});">
+                            <tr data-opt-id="{{.CardID}}" data-opt-cond="{{.Condition}}" data-opt-price="{{$price}}" data-load-idx="{{$n}}" data-load-qty="{{.Quantity}}" data-load-name="{{$card.Name}}" data-load-ckid="{{index $.CKBuylistIDs .CardID}}" data-load-tcgid="{{$card.TCGId}}" data-load-set="{{$card.SetCode}}" data-load-number="{{$card.Number}}" data-opt-edition="{{$card.Edition}}" data-opt-img="{{$card.ImageURL}}" data-opt-finish-tag="{{$card.FinishTag}}" data-opt-finish-class="{{$card.FinishClass}}" data-opt-cw="{{$card.HasContentWarning}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});hw.toggleAttribute('data-sealed',{{$card.Sealed}});">
                                 <td class="opt-name"><div class="opt-name-cell">
                                     <span class="emoji" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>
                                     <div class="opt-name-text"><a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}{{buylist_badge $scraperKey $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}

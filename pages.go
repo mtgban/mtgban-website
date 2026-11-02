@@ -386,6 +386,9 @@ type PageVars struct {
 	SealedContents string
 
 	ScraperShort string
+	// Card Kingdom's buylist id for each card in the arbitrage and optimizer
+	// tables, for their cart loaders
+	CKBuylistIDs map[string]string
 
 	Arb         []Arbitrage
 	SortOption  string

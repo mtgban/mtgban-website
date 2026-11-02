@@ -631,11 +631,11 @@
                                                         {{/* Judge the store's own price, not the discounted one */}}
                                                         {{$checkPrice := .Price}}{{if .OrigPrice}}{{$checkPrice = .OrigPrice}}{{end}}
                                                         {{if eq .Shorthand "TCGDirect"}}
-                                                            {{$priceWarn = invalid_direct $cardId $checkPrice}}
+                                                            {{$priceWarn = invalid_direct $checkPrice (index $.TCGMarketPrices $cardId)}}
                                                         {{end}}
                                                         {{$warnTip := ""}}
                                                         {{if $priceWarn}}
-                                                            {{$warnTip = price_warning_tip $checkPrice (tcg_market_price $cardId)}}
+                                                            {{$warnTip = price_warning_tip $checkPrice (index $.TCGMarketPrices $cardId)}}
                                                             {{if .Adjusted}}{{$warnTip = printf "%s\n%s" $warnTip .AdjustTip}}{{end}}
                                                         {{end}}
                                                         {{if .Secondary}}
@@ -712,7 +712,7 @@
                                                 {{if not .Locked}}
                                                 {{$blPriceWarn := false}}
                                                 {{if eq .Shorthand "TCGDirectNet"}}
-                                                    {{$blPriceWarn = invalid_direct $cardId .Price}}
+                                                    {{$blPriceWarn = invalid_direct .Price (index $.TCGMarketPrices $cardId)}}
                                                 {{end}}
                                                 {{$blState := buylist_state .Shorthand $conditions .IsOffer .Price $card.GoodBuylist $card.CKSignal $card.CKPauseWait}}
                                                 {{/* A price that looks off is never one to take. */}}
@@ -722,7 +722,7 @@
                                                      with no data for that column's script to write over it. */}}
                                                 {{$pausePill := buylist_pause .Shorthand $conditions $card.CKPause $card.CKPauseTip}}
                                                 <span class="price-right has-buylist-extra">
-                                                <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if eq $blState "best"}} price-best{{end}}{{if eq $blState "wait"}} price-wait{{end}}" {{if $blPriceWarn}}{{$warnTip := price_warning_tip .Price (tcg_market_price $cardId)}}title="{{plain_tip $warnTip}}" data-tip="{{$warnTip}}"{{else if $blTitle}}title="{{plain_tip $blTitle}}" data-tip="{{$blTitle}}"{{end}}>
+                                                <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if eq $blState "best"}} price-best{{end}}{{if eq $blState "wait"}} price-wait{{end}}" {{if $blPriceWarn}}{{$warnTip := price_warning_tip .Price (index $.TCGMarketPrices $cardId)}}title="{{plain_tip $warnTip}}" data-tip="{{$warnTip}}"{{else if $blTitle}}title="{{plain_tip $blTitle}}" data-tip="{{$blTitle}}"{{end}}>
                                                     {{if .PriceSymbol}}<span class="cur">{{.PriceSymbol}}</span>{{end}}<span class="amt">{{.PriceAmount}}</span>
                                                 </span>
                                                 {{if $pausePill}}

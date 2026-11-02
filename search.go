@@ -488,9 +488,14 @@ type SearchVars struct {
 	CondKeys       []mtgban.Condition
 	FoundSellers   map[string]map[mtgban.Condition][]SearchEntry
 	FoundVendors   map[string]map[mtgban.Condition][]SearchEntry
-	SetKeyrunes    map[string]string
-	NoSort         bool
-	HasAvailable   bool
+	// TCG Market's price for each card on the page it prices, which the
+	// TCG Direct rows are judged by
+	TCGMarketPrices map[string]float64
+	// Which of SellerKeys and VendorKeys trade sealed product
+	SealedStores map[string]bool
+	SetKeyrunes  map[string]string
+	NoSort       bool
+	HasAvailable bool
 
 	// A search ran for this request. Not the same as SearchQuery being set:
 	// a pinned filter searches on its own, and the page has results to draw
@@ -616,6 +621,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// desktop modal asks /api/settings/modal for them when it opens.
 	if pageVars.IsMobile {
 		pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys()
+		pageVars.SealedStores = sealedStores()
 	}
 
 	page := r.FormValue("page")
@@ -1192,6 +1198,7 @@ func fillSearchResults(pageVars *SearchVars, b *matcher.Backend, query string, c
 	pageVars.AllKeys = keys
 	pageVars.FoundSellers = result.sellers
 	pageVars.FoundVendors = result.vendors
+	pageVars.TCGMarketPrices = tcgMarketPrices(keys)
 }
 
 // searchPage is the page of results to show: its cards in the order asked

@@ -791,6 +791,13 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fillUploadResults(&pageVars.UploadVars, b, ds.editions.ReprintParents, st, ids, prices, rows, uploadedData)
+	var cardIDs []string
+	for _, entries := range pageVars.Optimized {
+		for _, entry := range entries {
+			cardIDs = append(cardIDs, entry.CardID)
+		}
+	}
+	pageVars.CKBuylistIDs = ckBuylistIDs(cardIDs)
 
 	// Logs
 	user := GetParamFromSig(sig, "UserEmail")

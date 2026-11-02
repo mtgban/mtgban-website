@@ -329,6 +329,9 @@ type ArbitVars struct {
 
 	// The cookie the page saves the reader's filters in
 	ArbitCookie string
+
+	// Whether the source trades sealed product
+	SealedSource bool
 }
 
 func (s *site) Arbit(w http.ResponseWriter, r *http.Request) {
@@ -742,6 +745,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 	}
 
 	pageVars.ScraperShort = source.Info().Shorthand
+	pageVars.SealedSource = isSealedScraper(source.Info().Shorthand)
 
 	pageVars.Arb = []Arbitrage{}
 	pageVars.Metadata = map[string]GenericCard{}
@@ -977,6 +981,13 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 	if len(pageVars.Arb) == 0 {
 		pageVars.InfoMessage = "No arbitrage available!"
 	}
+	var ids []string
+	for _, arb := range pageVars.Arb {
+		for _, entry := range arb.Arbit {
+			ids = append(ids, entry.CardID)
+		}
+	}
+	pageVars.CKBuylistIDs = ckBuylistIDs(ids)
 
 	if pageVars.GlobalMode {
 		pageVars.Title = "Market Imbalance in " + scraperName(source.Info().Shorthand)

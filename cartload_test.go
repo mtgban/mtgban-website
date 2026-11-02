@@ -707,7 +707,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 	} {
 		page := renderArbit(t, PageVars{
 			ScraperShort: tc.short,
-			ArbitVars:    ArbitVars{GlobalMode: true},
+			ArbitVars:    ArbitVars{GlobalMode: true, SealedSource: true},
 			UserNav:      &NavElem{Short: "beta"},
 			Arb:          []Arbitrage{{Name: "Store", Key: tc.key, Arbit: sealedRows}},
 		})
