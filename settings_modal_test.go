@@ -59,7 +59,7 @@ func TestSettingsKeysLeaveOutAPIOnlyStores(t *testing.T) {
 	store := func(shorthand string, sealed bool) mtgban.ScraperInfo {
 		return mtgban.ScraperInfo{Name: shorthand, Shorthand: shorthand, SealedMode: sealed}
 	}
-	publishStores(t, []mtgban.Seller{
+	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, store("SHOP", false)),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, store("APISHOP", false)),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, store("SHOPSEALED", true)),
@@ -92,7 +92,7 @@ func TestSettingsKeysLeaveOutAPIOnlyStores(t *testing.T) {
 // The Global grid lists the sellers the Global page compares against,
 // since those are what its cookie hides, and only the probe list's.
 func TestGlobalVendorKeysListTheProbeSellers(t *testing.T) {
-	publishStores(t, []mtgban.Seller{
+	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Probe", Shorthand: "PROBE"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Off Probe", Shorthand: "OFFPROBE"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "API Shop", Shorthand: "APISHOP"}),

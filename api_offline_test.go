@@ -92,9 +92,6 @@ func TestOfflinePricesBlockOneSide(t *testing.T) {
 	Config().Stores.SearchRetailBlockList = []string{"NORETAIL"}
 	Config().Stores.SearchBuylistBlockList = []string{"NOBUYLIST"}
 
-	s := newSite()
-	s.ds.Store(s.newDatastore(fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01",
-		[][2]string{{"Fixture Card Alpha", "1"}}), time.Now()))
 	const cardID = "FIXTUREA-1"
 	var sellers []mtgban.Seller
 	var vendors []mtgban.Vendor
@@ -106,7 +103,8 @@ func TestOfflinePricesBlockOneSide(t *testing.T) {
 		bl.Add(cardID, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 5, Quantity: 1, URL: "u"})
 		vendors = append(vendors, mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{Name: shorthand, Shorthand: shorthand}))
 	}
-	withPrices(t, sellers, vendors)
+	s := fixtureSite(t, fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01",
+		[][2]string{{"Fixture Card Alpha", "1"}}), sellers, vendors)
 
 	for _, tc := range []struct {
 		query           string

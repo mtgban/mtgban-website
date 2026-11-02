@@ -102,7 +102,7 @@ func TestNewCustomBuylistVendor(t *testing.T) {
 	}
 	singles := mtgban.NewSellerFromInventory(graded(cardID, skippedID), mtgban.ScraperInfo{Shorthand: "SRC"})
 	sealed := mtgban.NewSellerFromInventory(graded(sealedID), mtgban.ScraperInfo{Shorthand: "SRCSealed", SealedMode: true})
-	publishStores(t, []mtgban.Seller{
+	withPrices(t, []mtgban.Seller{
 		singles, sealed,
 		mtgban.NewSellerFromInventory(graded(cardID, skippedID), mtgban.ScraperInfo{Shorthand: "REF"}),
 		mtgban.NewSellerFromInventory(graded(cardID, skippedID), mtgban.ScraperInfo{Shorthand: "TCGLow", MetadataOnly: true}),

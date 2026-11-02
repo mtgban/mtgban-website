@@ -19,7 +19,7 @@ import (
 // the API-only stores apply whatever it says.
 func TestPaletteStoresFollowTheBlockLists(t *testing.T) {
 	signingEnabled(t, false)
-	publishStores(t, []mtgban.Seller{
+	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Open Shop", Shorthand: "OPENSHOP"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Blocked Shop", Shorthand: "BLOCKSHOP"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "API Shop", Shorthand: "APISHOP"}),
