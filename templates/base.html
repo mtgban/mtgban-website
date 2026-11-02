@@ -18,8 +18,6 @@
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/navbar.css?hash={{.Hash}}">
     {{block "extra-css" .}}{{end}}
-    <link rel="stylesheet" type="text/css" href="/css/settings-modal.css?hash={{.Hash}}">
-    <link rel="stylesheet" type="text/css" href="/css/editions-picker.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css">
 
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
@@ -112,14 +110,13 @@ window.__BAN_PALETTE_TARGETS = {
 <script type="text/javascript" src="/js/offline/offline-db.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/offline/offline-mode.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/offline/offline-watch.js?hash={{.Hash}}" defer></script>
-<script type="text/javascript" src="/js/editions-picker.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/offline/offline-images.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/offline/offline-images-ui.js?hash={{.Hash}}" defer></script>
 <script>window.BAN_SETTINGS = { tab: "{{.SettingsTab}}" };</script>
 <script>window.BAN_BACKPACK_MAX = {{.BackpackMax}}; window.BAN_BACKPACK_TABS = {{.BackpackTabs}};</script>
 <script type="text/javascript" src="/js/store-factors.js?hash={{.Hash}}" defer></script>
-<script type="text/javascript" src="/js/settings-shell.js?hash={{.Hash}}" defer></script>
-<script type="text/javascript" src="/js/settings.js?hash={{.Hash}}" defer></script>
+<!-- The modal's own scripts and sheets come with its first open, through the loader. -->
+<script type="text/javascript" src="/js/settings-loader.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/tooltips.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-type-focus.js?hash={{.Hash}}" defer></script>
 </body>

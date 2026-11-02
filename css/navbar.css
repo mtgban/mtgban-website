@@ -295,11 +295,37 @@ body.light-theme .navbar-v2[data-tier="modern"] {
     border: none;
     color: var(--normal);
 }
-/* Settings button uses the .ban-settings-btn class from settings-modal.css,
-   which adds padding: 7px AND a blue-accent (--ainfo) hover color. Inside
-   the navbar that padding blows the hit/hover box up to 50×50, and the
-   accent color makes the gear's hover state diverge from the other utility
-   icons. Override both so the gear matches the Guide ? icon exactly. */
+/* ── Navbar gear button (matches .ban-nav-ext / .ban-theme-toggle hover) ── */
+.ban-settings-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: var(--greytext);
+    text-decoration: none;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+.ban-settings-btn:hover {
+    background: var(--surface-3, var(--navbackground));
+    color: var(--ainfo);
+}
+.ban-settings-btn.is-disabled {
+    color: var(--text-dim);
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+.ban-settings-btn.is-disabled:hover {
+    background: transparent;
+    color: var(--text-dim);
+}
+/* Inside the navbar the 7px padding would blow the hit/hover box up to
+   50×50, and the accent hover colour would set the gear apart from the
+   other utility icons; both go, so the gear matches the Guide ? icon. */
 .nav2-utility .ban-settings-btn { padding: 0; }
 .nav2-utility .ban-settings-btn:hover { color: var(--normal); }
 
