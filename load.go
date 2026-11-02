@@ -20,6 +20,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/internal/mkmidparser"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
+	"github.com/mtgban/mtgban-website/internal/tcgskuparser"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -52,16 +53,17 @@ var DataBucket simplecloud.Reader
 
 // prices is one published snapshot of the loaded stores: the retail and
 // buylist sides, the by-shorthand index over them, the Cardmarket product
-// ids the retail side prices and the dumps the bucket listed. A writer
-// builds the next one whole and publishes it in a single Store, so a reader
-// sees sides and indexes from the same publish. Nothing in a published
-// value is changed in place: the slices GetSellers and GetVendors return
-// are shared and read-only.
+// ids and the TCGplayer SKUs the retail side prices and the dumps the
+// bucket listed. A writer builds the next one whole and publishes
+// it in a single Store, so a reader sees sides and indexes from the same
+// publish. Nothing in a published value is changed in place: the slices
+// GetSellers and GetVendors return are shared and read-only.
 type prices struct {
 	sellers  []mtgban.Seller
 	vendors  []mtgban.Vendor
 	index    storeIndex
 	mkmIDs   mkmidparser.Index
+	tcgSKUs  tcgskuparser.Index
 	scrapers scraperIndex
 }
 
@@ -71,7 +73,7 @@ var (
 
 	// emptyPrices is served until then, so currentPrices is never nil
 	// whatever reads first.
-	emptyPrices = newPrices(nil, nil, *newScraperIndex())
+	emptyPrices = newPrices(nil, nil, nil, *newScraperIndex())
 
 	// Serializes writers so concurrent publishes don't lose each other's
 	// changes during the read-build-publish cycle.
@@ -89,27 +91,51 @@ func currentPrices() *prices {
 }
 
 // newPrices builds the snapshot to publish from its parts, indexing the
-// stores by shorthand and the Cardmarket shelves by product id.
-func newPrices(sellers []mtgban.Seller, vendors []mtgban.Vendor, scrapers scraperIndex) *prices {
+// stores by shorthand. The Cardmarket id map and the TCGplayer SKU index
+// are prev's where the sellers each reads are the ones prev's was built
+// from, and built again otherwise; prev is the snapshot being replaced,
+// nil before the first publish.
+func newPrices(prev *prices, sellers []mtgban.Seller, vendors []mtgban.Vendor, scrapers scraperIndex) *prices {
 	return &prices{
 		sellers:  sellers,
 		vendors:  vendors,
 		index:    buildStoreIndex(sellers, vendors),
-		mkmIDs:   mkmidparser.Build(sellers),
+		mkmIDs:   mkmIDsFor(prev, sellers),
+		tcgSKUs:  tcgSKUsFor(prev, sellers),
 		scrapers: scrapers,
 	}
 }
 
+// mkmIDsFor returns the Cardmarket id map over sellers. A published seller
+// is never changed in place, so where the shelves are the ones prev's map
+// was built from, that map describes them still and is carried across; a
+// build walks every Cardmarket offer, so it is paid only when a shelf is
+// new. prev is nil before the first publish.
+func mkmIDsFor(prev *prices, sellers []mtgban.Seller) mkmidparser.Index {
+	if prev != nil && slices.Equal(mkmidparser.Sellers(prev.sellers), mkmidparser.Sellers(sellers)) {
+		return prev.mkmIDs
+	}
+	return mkmidparser.Build(sellers)
+}
+
+// tcgSKUsFor is mkmIDsFor for the TCGplayer SKU index.
+func tcgSKUsFor(prev *prices, sellers []mtgban.Seller) tcgskuparser.Index {
+	if prev != nil && slices.Equal(tcgskuparser.Sellers(prev.sellers), tcgskuparser.Sellers(sellers)) {
+		return prev.tcgSKUs
+	}
+	return tcgskuparser.Build(sellers)
+}
+
 // withVendors builds the snapshot to publish from p with vendors in place of
-// its buylist side. The sellers and the Cardmarket id map built from them
-// carry across as they are; only the store index is built again, over both
-// sides.
+// its buylist side. The sellers and the two indexes built from them carry
+// across as they are; only the store index is built again, over both sides.
 func withVendors(p *prices, vendors []mtgban.Vendor) *prices {
 	return &prices{
 		sellers:  p.sellers,
 		vendors:  vendors,
 		index:    buildStoreIndex(p.sellers, vendors),
 		mkmIDs:   p.mkmIDs,
+		tcgSKUs:  p.tcgSKUs,
 		scrapers: p.scrapers,
 	}
 }
@@ -661,7 +687,7 @@ func updateSellers(scraper mtgban.Scraper) error {
 	if err != nil {
 		return err
 	}
-	pricesPtr.Store(newPrices(next, p.vendors, p.scrapers))
+	pricesPtr.Store(newPrices(p, next, p.vendors, p.scrapers))
 
 	log.Printf("%s inventory updated at position %d", scraper.Info().Shorthand, sellerIndex)
 	return nil

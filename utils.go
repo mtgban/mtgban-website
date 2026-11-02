@@ -892,7 +892,7 @@ func findInstanceID(sellerName, cardID string, cond mtgban.Condition) string {
 	return ""
 }
 
-// uuid2TCGSKU is the reverse of tcgSKU2UUID: it returns the TCGplayer SKU of
+// uuid2TCGSKU is the reverse of tcgskuparser.Resolve: it returns the TCGplayer SKU of
 // a card in a given condition, picking the inventory the product lives in.
 // Sources that carry no condition are assumed to be NM, the same way the
 // TCGplayer CSV export does. Returns "" when the card has no SKU on file.
@@ -904,28 +904,6 @@ func uuid2TCGSKU(cardID string, sealed bool, cond mtgban.Condition) string {
 		return findInstanceID("TCGSealed", cardID, cond)
 	}
 	return findInstanceID("TCGPlayer", cardID, cond)
-}
-
-// tcgSKU2UUID resolves a TCGplayer SKU (instance id) to a card uuid using the
-// precomputed "tcgskuid" index from runSealedAnalysis (O(1)), where the uuid is
-// stored in each entry's OriginalID. Returns "" if the SKU is unknown.
-func tcgSKU2UUID(sku string) string {
-	entries := GetInfos()["tcgskuid"][sku]
-	if len(entries) == 0 {
-		return ""
-	}
-	return entries[0].OriginalID
-}
-
-// tcgSKU2Condition resolves a TCGplayer SKU (instance id) to the condition it
-// encodes (NM/SP/MP/HP/PO) via the same "tcgskuid" index as tcgSKU2UUID, where
-// each entry's Conditions is preserved. Returns "" if the SKU is unknown.
-func tcgSKU2Condition(sku string) mtgban.Condition {
-	entries := GetInfos()["tcgskuid"][sku]
-	if len(entries) == 0 {
-		return ""
-	}
-	return entries[0].Conditions
 }
 
 // Look for the original id (product id) of a card in a given inventory

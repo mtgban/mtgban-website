@@ -224,7 +224,7 @@ func takeStaleStores(now time.Time) []droppedStore {
 	}
 	sellers := withoutStores(p.sellers, oldSellers)
 	vendors := withoutStores(p.vendors, oldVendors)
-	pricesPtr.Store(newPrices(sellers, vendors, p.scrapers))
+	pricesPtr.Store(newPrices(p, sellers, vendors, p.scrapers))
 
 	record := map[string]droppedStore{}
 	prev := droppedStoresPtr.Load()

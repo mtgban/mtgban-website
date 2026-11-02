@@ -49,7 +49,8 @@ Every change is reviewed against seven rules:
    `*matcher.Backend` past a unit of work. State derived from a backend
    lives in the `datastore`, and state derived from the sellers in the
    `prices` snapshot (load.go), built with the sides it describes, as the
-   store index and the Cardmarket id map (`internal/mkmidparser`) are.
+   store index, the Cardmarket id map (`internal/mkmidparser`) and the
+   TCGplayer SKU index (`internal/tcgskuparser`) are.
 6. **Never nil.** Before the first load the site serves the empty
    datastore, so a function handed `b` or `ds` may assume it is not nil.
 7. **Templates read no datastore.** See below.

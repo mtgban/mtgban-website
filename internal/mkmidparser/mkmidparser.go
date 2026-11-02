@@ -7,8 +7,9 @@
 //
 // The Index is built wherever the sellers are published, beside the other
 // indexes over them, so it always describes the shelves published with it:
-// the site stores it on its prices snapshot the way the TCGplayer SKU index
-// sits on the set analysis.
+// the site stores it on its prices snapshot beside the TCGplayer SKU index,
+// and carries it across while the shelves Sellers picks are the ones it
+// was built from.
 package mkmidparser
 
 import (
@@ -33,8 +34,9 @@ type Index map[string]string
 // mixed page and none of the boxes.
 var shelfNames = []string{"MKMTrend", "MKMLow", "MKMSealed"}
 
-// shelvesOf picks the Cardmarket shelves out of a sellers snapshot.
-func shelvesOf(sellers []mtgban.Seller) []mtgban.Seller {
+// Sellers picks the Cardmarket shelves out of a sellers snapshot, in the
+// snapshot's order. Two snapshots whose Sellers are equal share an Index.
+func Sellers(sellers []mtgban.Seller) []mtgban.Seller {
 	var shelves []mtgban.Seller
 	for _, seller := range sellers {
 		if slices.ContainsFunc(shelfNames, func(shelf string) bool {
@@ -60,7 +62,7 @@ func shelvesOf(sellers []mtgban.Seller) []mtgban.Seller {
 // which shelf was read first. Only a disagreement about the card itself -
 // 1,525 ids, where the base uuids differ - names nothing.
 func Build(sellers []mtgban.Seller) Index {
-	shelves := shelvesOf(sellers)
+	shelves := Sellers(sellers)
 	if len(shelves) == 0 {
 		return nil
 	}
