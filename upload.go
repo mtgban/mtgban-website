@@ -128,10 +128,11 @@ var ErrReloadFirstRow = docparse.ErrReloadFirstRow
 type UploadEntry = docparse.Entry
 
 // newUploadParser builds a parser bound to b, wired to the site's logger,
-// the TCGplayer SKU index, and the set-recency ordering for alias
-// candidates. Built once per upload, so every row matches against the same
-// datastore.
+// the TCGplayer SKU and Cardmarket id indexes, and the set-recency ordering
+// for alias candidates. Built once per upload, so every row matches against
+// the same datastore and resolves its Cardmarket id from the same snapshot.
 func newUploadParser(b *matcher.Backend) *docparse.Parser {
+	mkmIDs := currentPrices().mkmIDs
 	return &docparse.Parser{
 		Backend: b,
 		Logf: func(format string, v ...any) {
