@@ -134,7 +134,7 @@ func TestAlphabeticalSortReadsOneNameInTwoSpellings(t *testing.T) {
 			"?reverse=true": {"2_nonfoil", "2_holofoil", "1_nonfoil", "1_holofoil"},
 		} {
 			sorted := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest(http.MethodGet, "/search"+query, nil), ds, sorted, nil, sortMode)
+			sortSearchKeys(httptest.NewRequest(http.MethodGet, "/search"+query, nil), ds, currentPrices(), sorted, nil, sortMode)
 			if !slices.Equal(sorted, want) {
 				t.Errorf("%s%s: sorted %v, want %v", sortMode, query, sorted, want)
 			}

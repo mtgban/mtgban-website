@@ -68,10 +68,10 @@ func TestSearchFallback(t *testing.T) {
 
 	t.Run("a treatment", func(t *testing.T) {
 		config := parseSearchOptionsNG(backend(), "confetti", nil, nil, nil)
-		if _, err := searchAndFilter(currentDatastore(), config); err == nil {
+		if _, err := searchAndFilter(currentDatastore(), currentPrices(), config); err == nil {
 			t.Skip("a card is named confetti here; the fallback would not run")
 		}
-		keys := searchFallback(currentDatastore(), config)
+		keys := searchFallback(currentDatastore(), currentPrices(), config)
 		if len(keys) == 0 {
 			t.Fatal("want the cards printed as confettifoil")
 		}
@@ -88,10 +88,10 @@ func TestSearchFallback(t *testing.T) {
 
 	t.Run("a set", func(t *testing.T) {
 		config := parseSearchOptionsNG(backend(), "kamigawa", nil, nil, nil)
-		if _, err := searchAndFilter(currentDatastore(), config); err == nil {
+		if _, err := searchAndFilter(currentDatastore(), currentPrices(), config); err == nil {
 			t.Skip("a card is named kamigawa here; the fallback would not run")
 		}
-		keys := searchFallback(currentDatastore(), config)
+		keys := searchFallback(currentDatastore(), currentPrices(), config)
 		if len(keys) == 0 {
 			t.Fatal("want the cards in the Kamigawa sets")
 		}
@@ -109,7 +109,7 @@ func TestSearchFallback(t *testing.T) {
 
 	t.Run("a name that means nothing", func(t *testing.T) {
 		config := parseSearchOptionsNG(backend(), "notathing", nil, nil, nil)
-		if keys := searchFallback(currentDatastore(), config); len(keys) != 0 {
+		if keys := searchFallback(currentDatastore(), currentPrices(), config); len(keys) != 0 {
 			t.Errorf("got %d results, want the search to give up", len(keys))
 		}
 	})
@@ -118,14 +118,14 @@ func TestSearchFallback(t *testing.T) {
 		// "s:LEA kamigawa" asked about LEA. Answering with every Kamigawa set
 		// would throw away the part the searcher did say.
 		config := parseSearchOptionsNG(backend(), "s:LEA kamigawa", nil, nil, nil)
-		if keys := searchFallback(currentDatastore(), config); len(keys) != 0 {
+		if keys := searchFallback(currentDatastore(), currentPrices(), config); len(keys) != 0 {
 			t.Errorf("got %d results, want the named set to stand", len(keys))
 		}
 	})
 
 	t.Run("a hashing search names its own cards", func(t *testing.T) {
 		config := SearchConfig{SearchMode: "hashing", CleanQuery: "kamigawa"}
-		if keys := searchFallback(currentDatastore(), config); len(keys) != 0 {
+		if keys := searchFallback(currentDatastore(), currentPrices(), config); len(keys) != 0 {
 			t.Errorf("got %d results, want the fallback to stand aside", len(keys))
 		}
 	})

@@ -54,7 +54,7 @@ func TestOrderSearchKeysPagesOneSliceEverywhere(t *testing.T) {
 			for i := range 400 {
 				result.keys = append(result.keys, fmt.Sprintf("k%03d", i))
 			}
-			shown := orderSearchKeys(r, ds, result, "chrono")
+			shown := orderSearchKeys(r, ds, currentPrices(), result, "chrono")
 			if !slices.Equal(shown.keys, result.keys[tc.start:tc.end]) {
 				t.Errorf("%q mobile=%v: shows %d cards, want %d-%d", tc.query, mobile, len(shown.keys), tc.start+1, tc.end)
 			}

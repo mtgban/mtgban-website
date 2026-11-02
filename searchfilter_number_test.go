@@ -64,7 +64,7 @@ func TestCollectorNumberPlainForm(t *testing.T) {
 
 			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
 			elem := findNumberFilter(t, config, "number")
-			skip := applyCardFilter(backend(), "number", elem.Values, co)
+			skip := applyCardFilter(backend(), currentPrices(), "number", elem.Values, co)
 			if skip == tt.want {
 				t.Errorf("%s against %q: matched=%v, want %v",
 					tt.query, tt.number, !skip, tt.want)
@@ -94,7 +94,7 @@ func TestCollectorNumberStrictIsVerbatim(t *testing.T) {
 
 			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
 			elem := findNumberFilter(t, config, "number_strict")
-			skip := applyCardFilter(backend(), "number_strict", elem.Values, co)
+			skip := applyCardFilter(backend(), currentPrices(), "number_strict", elem.Values, co)
 			if skip == tt.want {
 				t.Errorf("%s against %q: matched=%v, want %v",
 					tt.query, tt.number, !skip, tt.want)
@@ -131,7 +131,7 @@ func TestCollectorNumberWithTotal(t *testing.T) {
 
 			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
 			elem := findNumberFilter(t, config, "number_total")
-			skip := applyCardFilter(backend(), "number_total", elem.Values, co)
+			skip := applyCardFilter(backend(), currentPrices(), "number_total", elem.Values, co)
 			if skip == tt.want {
 				t.Errorf("%s against %s/%s: matched=%v, want %v",
 					tt.query, tt.number, tt.total, !skip, tt.want)
@@ -197,7 +197,7 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 	ds := testSite.datastore()
 	search := func(config SearchConfig) []string {
 		t.Helper()
-		keys, err := searchAndFilter(ds, config)
+		keys, err := searchAndFilter(ds, currentPrices(), config)
 		if err != nil {
 			t.Fatalf("%q: %v", config.CleanQuery, err)
 		}
@@ -293,7 +293,7 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 	}
 	sealed := parseSearchPage(ds, word, true, false, nil, nil, nil)
 	sealed.SearchMode = "sealed"
-	if keys, err := searchAndFilter(ds, sealed); err != nil || len(keys) == 0 {
+	if keys, err := searchAndFilter(ds, currentPrices(), sealed); err != nil || len(keys) == 0 {
 		t.Errorf("sealed %q reaches no product: %v", word, err)
 	}
 	if pinned := scopeFilters(ds, word, true, false); pinned != nil {
@@ -309,7 +309,7 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 	if config := parseSearchOptionsNG(ds.backend, "17a", nil, nil, nil); config.CleanQuery != "17a" || len(config.CardFilters) != 0 {
 		t.Errorf("17a without the snapshot is %q %+v, want a name", config.CleanQuery, config.CardFilters)
 	}
-	if res, msg := parseMessage(ds, carried, false); res == nil || res.Invalid || res.CardID != carriedUUID {
+	if res, msg := parseMessage(ds, currentPrices(), carried, false); res == nil || res.Invalid || res.CardID != carriedUUID {
 		t.Errorf("the bot reads %q as %+v %q, want its product %s", carried, res, msg, carriedUUID)
 	}
 }
@@ -326,11 +326,11 @@ func TestNameThenNumber(t *testing.T) {
 		{"lightning bolt 141*", "lightning bolt cn:141 f:foil"},
 		{"command tower 7029 s:sld", "command tower cn:7029 s:sld"},
 	} {
-		want, err := searchAndFilter(ds, parseSearchQuery(ds, tt.as, nil, nil, nil))
+		want, err := searchAndFilter(ds, currentPrices(), parseSearchQuery(ds, tt.as, nil, nil, nil))
 		if err != nil || len(want) == 0 {
 			t.Fatalf("%q reaches nothing: %v", tt.as, err)
 		}
-		got, err := searchAndFilter(ds, parseSearchQuery(ds, tt.query, nil, nil, nil))
+		got, err := searchAndFilter(ds, currentPrices(), parseSearchQuery(ds, tt.query, nil, nil, nil))
 		if err != nil {
 			t.Fatalf("%q: %v", tt.query, err)
 		}
@@ -347,7 +347,7 @@ func TestNameThenNumber(t *testing.T) {
 	if len(miss.CardFilters) == 0 {
 		t.Errorf("lightning bolt 7029 is not split: %q", miss.CleanQuery)
 	}
-	if keys, err := searchAndFilter(ds, miss); err != nil || len(keys) != 0 {
+	if keys, err := searchAndFilter(ds, currentPrices(), miss); err != nil || len(keys) != 0 {
 		t.Errorf("lightning bolt 7029 reaches %d cards: %v", len(keys), err)
 	}
 

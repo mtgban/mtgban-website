@@ -22,13 +22,13 @@ import (
 func TestUploadSettingsKeysReadTheGrant(t *testing.T) {
 	withSigMode(t, true, true)
 
-	if got := uploadSettingsKeys("").AltKeys; !slices.Equal(got, UploadIndexComparePriceList) {
+	if got := uploadSettingsKeys(currentPrices(), "").AltKeys; !slices.Equal(got, UploadIndexComparePriceList) {
 		t.Errorf("AltKeys = %v, want UploadIndexComparePriceList", got)
 	}
-	if uploadSettingsKeys(testSig(map[string]string{"Upload": "true"})).CanUploadCustom {
+	if uploadSettingsKeys(currentPrices(), testSig(map[string]string{"Upload": "true"})).CanUploadCustom {
 		t.Error("CanUploadCustom without the UploadCustom grant")
 	}
-	if !uploadSettingsKeys(testSig(map[string]string{"UploadCustom": "true"})).CanUploadCustom {
+	if !uploadSettingsKeys(currentPrices(), testSig(map[string]string{"UploadCustom": "true"})).CanUploadCustom {
 		t.Error("CanUploadCustom false with the UploadCustom grant")
 	}
 }
@@ -38,17 +38,17 @@ func TestUploadSettingsKeysReadTheGrant(t *testing.T) {
 // order, whatever is loaded.
 func TestSettingsKeysWithNoScrapers(t *testing.T) {
 	keepScrapers(t)
-	if sellers, vendors := searchSettingsKeys(); len(sellers) != 0 || len(vendors) != 0 {
+	if sellers, vendors := searchSettingsKeys(currentPrices()); len(sellers) != 0 || len(vendors) != 0 {
 		t.Errorf("search keys = %v %v, want none", sellers, vendors)
 	}
-	if got := arbitVendorKeys(arbitBlockedVendors(""), false); len(got) != 0 {
+	if got := arbitVendorKeys(currentPrices(), arbitBlockedVendors(""), false); len(got) != 0 {
 		t.Errorf("arbit keys = %v, want none", got)
 	}
-	if got := globalVendorKeys(globalProbeBlocklist()); len(got) != 0 {
+	if got := globalVendorKeys(currentPrices(), globalProbeBlocklist(currentPrices())); len(got) != 0 {
 		t.Errorf("global keys = %v, want none", got)
 	}
 	r, b := sleepBlocklists("")
-	if s, v := sleepModalKeys(r, b); len(s) != 0 || len(v) != 0 {
+	if s, v := sleepModalKeys(currentPrices(), r, b); len(s) != 0 || len(v) != 0 {
 		t.Errorf("sleep keys = %v %v, want none", s, v)
 	}
 }
@@ -73,8 +73,8 @@ func TestSettingsKeysLeaveOutAPIOnlyStores(t *testing.T) {
 	withConfigCopy(t)
 	Config().Stores.APIOnlyStores = []string{"APISHOP", "APISEALED", "APIBUY", "APIBUYSEALED"}
 
-	sellers, vendors := searchSettingsKeys()
-	singlesSellers, sealedSellers, singlesVendors, sealedVendors := uploadStoreLists("")
+	sellers, vendors := searchSettingsKeys(currentPrices())
+	singlesSellers, sealedSellers, singlesVendors, sealedVendors := uploadStoreLists(currentPrices(), "")
 	for name, c := range map[string]struct{ got, want []string }{
 		"search sellers":         {sellers, []string{"SHOP", "SHOPSEALED"}},
 		"search vendors":         {vendors, []string{"BUY", "BUYSEALED"}},
@@ -104,7 +104,7 @@ func TestGlobalVendorKeysListTheProbeSellers(t *testing.T) {
 	Config().Stores.APIOnlyStores = []string{"APISHOP"}
 	Config().Stores.GlobalProbeList = []string{"PROBE", "APISHOP", "INDEX", "BUY"}
 
-	got := globalVendorKeys(globalProbeBlocklist())
+	got := globalVendorKeys(currentPrices(), globalProbeBlocklist(currentPrices()))
 	if !slices.Equal(got, []string{"PROBE"}) {
 		t.Errorf("global grid = %v, want [PROBE]", got)
 	}

@@ -66,7 +66,7 @@ func withPostStores(t *testing.T, sellers []mtgban.Seller, vendors []mtgban.Vend
 	t.Helper()
 	withPrices(t, sellers, vendors)
 	req := httptest.NewRequest(http.MethodGet, "/search", nil)
-	return newPostStores(nil, req, nil, SearchConfig{PostFilters: filters})
+	return newPostStores(nil, currentPrices(), req, nil, SearchConfig{PostFilters: filters})
 }
 
 // The empty filter counts an INDEX quote as no offer: a card with nothing,
@@ -243,15 +243,15 @@ func TestPostStoresMatchCollectedOffers(t *testing.T) {
 			config.PostFilters = opts.PostFilters
 			config.CustomBuylist = tc.custom
 
-			stores := newPostStores(b, tc.req, keys, config)
-			foundSellers, foundVendors := collectOffers(b, tc.req, config, keys)
+			stores := newPostStores(b, currentPrices(), tc.req, keys, config)
+			foundSellers, foundVendors := collectOffers(b, currentPrices(), tc.req, config, keys)
 			got := PostSearchFilter(config, keys, stores)
 			want := keptByOffers(foundSellers, foundVendors, keys, config.PostFilters)
 			if !slices.Equal(got, want) {
 				t.Errorf("the stores keep %v, the offers keep %v", got, want)
 			}
 
-			result := runSearch(tc.req, ds, config)
+			result := runSearch(tc.req, ds, currentPrices(), config)
 			if result.message != "" && len(result.keys) == 0 && len(config.PostFilters) == 0 {
 				t.Fatalf("the search found nothing: %s", result.message)
 			}

@@ -51,7 +51,7 @@ func TestUploadResolvesTCGSKUFromThePublishedSnapshot(t *testing.T) {
 		t.Errorf("a buylist publish rebuilt the index: sentinel = %q", got)
 	}
 
-	parser := newUploadParser(b)
+	parser := newUploadParser(b, currentPrices())
 	if got := parser.TCGSkuToUUID("sentinel"); got != "kept" {
 		t.Errorf("the parser resolves from an index of its own, not the published one: %q", got)
 	}

@@ -28,7 +28,7 @@ func TestPriceFilterCacheConcurrent(t *testing.T) {
 		filters := []*FilterPriceElem{filter}
 		for c := range 500 {
 			cardID := "bench-card-" + strconv.Itoa(c)
-			shouldSkipPrice(cardID, mtgban.BuylistEntry{BuyPrice: 6.0, Conditions: "NM"}, filters, "SCR050")
+			shouldSkipPrice(currentPrices(), cardID, mtgban.BuylistEntry{BuyPrice: 6.0, Conditions: "NM"}, filters, "SCR050")
 		}
 	})
 	wg.Wait()
@@ -41,8 +41,8 @@ var benchStoreLookups atomic.Int64
 // benchPrice4Store stands in for price4seller: findSellerInventory linear-scans
 // every scraper with EqualFold before the map lookup, so model that cost with a
 // same-sized scan over fake shorthands.
-func benchPrice4Store(scrapers []string) func(string, string) float64 {
-	return func(cardId, shorthand string) float64 {
+func benchPrice4Store(scrapers []string) func(*prices, string, string) float64 {
+	return func(_ *prices, cardId, shorthand string) float64 {
 		benchStoreLookups.Add(1)
 		for _, code := range scrapers {
 			if strings.EqualFold(code, shorthand) {
@@ -67,7 +67,7 @@ func runPriceFilterRequest(nCards int, filter *FilterPriceElem) {
 	for c := range nCards {
 		cardID := "bench-card-" + strconv.Itoa(c)
 		for _, entry := range entries {
-			shouldSkipPrice(cardID, entry, filters, "SCR050")
+			shouldSkipPrice(currentPrices(), cardID, entry, filters, "SCR050")
 		}
 	}
 }

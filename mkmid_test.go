@@ -53,7 +53,7 @@ func TestUploadResolvesCardmarketIDFromThePublishedSnapshot(t *testing.T) {
 		t.Errorf("a buylist publish rebuilt the map: sentinel = %q", got)
 	}
 
-	parser := newUploadParser(b)
+	parser := newUploadParser(b, currentPrices())
 	if got := parser.MKMIDToUUID("sentinel"); got != "kept" {
 		t.Errorf("the parser resolves from a map of its own, not the published one: %q", got)
 	}

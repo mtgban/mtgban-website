@@ -30,6 +30,7 @@ type postVendor struct {
 // building the offers, which are built for the page shown.
 type postStores struct {
 	config          SearchConfig
+	prices          *prices
 	sellers         map[string]*postSeller
 	vendors         map[string]*postVendor
 	offeringSellers []*postSeller
@@ -40,15 +41,16 @@ type postStores struct {
 
 // newPostStores reads the stores the search's store filters keep, and the
 // custom buylist's offers for cardIDs when a filter asks about them.
-func newPostStores(b *matcher.Backend, r *http.Request, cardIDs []string, config SearchConfig) *postStores {
+func newPostStores(b *matcher.Backend, p *prices, r *http.Request, cardIDs []string, config SearchConfig) *postStores {
 	s := &postStores{
 		config:  config,
+		prices:  p,
 		sellers: map[string]*postSeller{},
 		vendors: map[string]*postVendor{},
 	}
 
 	if !config.SkipRetail {
-		for _, seller := range GetSellers() {
+		for _, seller := range p.sellers {
 			if shouldSkipStoreNG(seller, config.StoreFilters) {
 				continue
 			}
@@ -61,7 +63,7 @@ func newPostStores(b *matcher.Backend, r *http.Request, cardIDs []string, config
 		}
 	}
 	if !config.SkipBuylist {
-		for _, vendor := range GetVendors() {
+		for _, vendor := range p.vendors {
 			if shouldSkipStoreNG(vendor, config.StoreFilters) {
 				continue
 			}
@@ -82,7 +84,7 @@ func newPostStores(b *matcher.Backend, r *http.Request, cardIDs []string, config
 
 	if config.CustomBuylist && !config.SkipBuylist && asksCustom(config.PostFilters) {
 		s.custom = map[string][]mtgban.Condition{}
-		for _, offer := range customBuylistOffers(b, r, cardIDs) {
+		for _, offer := range customBuylistOffers(b, p, r, cardIDs) {
 			s.custom[offer.cardID] = append(s.custom[offer.cardID], offer.condition)
 		}
 	}
@@ -126,7 +128,7 @@ func (s *postStores) withoutSellerOffers(pending []string) []string {
 			break
 		}
 		pending = slices.DeleteFunc(pending, func(cardID string) bool {
-			return store.offers(cardID, &s.config)
+			return store.offers(cardID, s.prices, &s.config)
 		})
 	}
 	return pending
@@ -140,7 +142,7 @@ func (s *postStores) withoutVendorOffers(pending []string) []string {
 			break
 		}
 		pending = slices.DeleteFunc(pending, func(cardID string) bool {
-			return store.offers(cardID, &s.config)
+			return store.offers(cardID, s.prices, &s.config)
 		})
 	}
 	if s.custom != nil {
@@ -161,7 +163,7 @@ func (s *postStores) withoutSellerListings(pending []string, names []string) []s
 			continue
 		}
 		pending = slices.DeleteFunc(pending, func(cardID string) bool {
-			return store.lists(cardID, &s.config)
+			return store.lists(cardID, s.prices, &s.config)
 		})
 	}
 	return pending
@@ -174,7 +176,7 @@ func (s *postStores) withoutVendorListings(pending []string, names []string) []s
 		store, found := s.vendors[name]
 		if found && len(pending) > 0 {
 			pending = slices.DeleteFunc(pending, func(cardID string) bool {
-				return store.lists(cardID, &s.config)
+				return store.lists(cardID, s.prices, &s.config)
 			})
 		}
 		if name == "custom" && s.custom != nil {
@@ -188,9 +190,9 @@ func (s *postStores) withoutVendorListings(pending []string, names []string) []s
 
 // offers reports whether the seller offers the card under a condition other
 // than INDEX.
-func (store *postSeller) offers(cardID string, config *SearchConfig) bool {
+func (store *postSeller) offers(cardID string, p *prices, config *SearchConfig) bool {
 	for _, entry := range store.inventory[cardID] {
-		if sellerEntryFound(store.info, cardID, entry, *config) && offersUnder(sellerOfferCondition(store.info, entry)) {
+		if sellerEntryFound(p, store.info, cardID, entry, *config) && offersUnder(sellerOfferCondition(store.info, entry)) {
 			return true
 		}
 	}
@@ -198,9 +200,9 @@ func (store *postSeller) offers(cardID string, config *SearchConfig) bool {
 }
 
 // lists reports whether the seller lists the card under a known condition.
-func (store *postSeller) lists(cardID string, config *SearchConfig) bool {
+func (store *postSeller) lists(cardID string, p *prices, config *SearchConfig) bool {
 	for _, entry := range store.inventory[cardID] {
-		if sellerEntryFound(store.info, cardID, entry, *config) && listsUnder(sellerOfferCondition(store.info, entry)) {
+		if sellerEntryFound(p, store.info, cardID, entry, *config) && listsUnder(sellerOfferCondition(store.info, entry)) {
 			return true
 		}
 	}
@@ -209,9 +211,9 @@ func (store *postSeller) lists(cardID string, config *SearchConfig) bool {
 
 // offers reports whether the vendor buys the card under a condition other
 // than INDEX.
-func (store *postVendor) offers(cardID string, config *SearchConfig) bool {
+func (store *postVendor) offers(cardID string, p *prices, config *SearchConfig) bool {
 	for _, entry := range store.buylist[cardID] {
-		if vendorEntryFound(store.info, cardID, entry, *config) && offersUnder(vendorOfferCondition(store.info, entry)) {
+		if vendorEntryFound(p, store.info, cardID, entry, *config) && offersUnder(vendorOfferCondition(store.info, entry)) {
 			return true
 		}
 	}
@@ -219,9 +221,9 @@ func (store *postVendor) offers(cardID string, config *SearchConfig) bool {
 }
 
 // lists reports whether the vendor buys the card under a known condition.
-func (store *postVendor) lists(cardID string, config *SearchConfig) bool {
+func (store *postVendor) lists(cardID string, p *prices, config *SearchConfig) bool {
 	for _, entry := range store.buylist[cardID] {
-		if vendorEntryFound(store.info, cardID, entry, *config) && listsUnder(vendorOfferCondition(store.info, entry)) {
+		if vendorEntryFound(p, store.info, cardID, entry, *config) && listsUnder(vendorOfferCondition(store.info, entry)) {
 			return true
 		}
 	}

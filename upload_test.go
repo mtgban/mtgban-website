@@ -21,7 +21,7 @@ func TestUploadSealedCSV(t *testing.T) {
 		t.Skip("matcher data not loaded; skipping")
 	}
 
-	parser := newUploadParser(backend())
+	parser := newUploadParser(backend(), currentPrices())
 	header := []string{"Key", "Name", "Edition", "Finish", "Number", "Rarity", "Conditions", "Price", "Quantity", "URL", "Seller", "Bundle", "Original Id", "Instance Id"}
 	indexMap, err := parser.ParseHeader(header)
 	if err != nil {

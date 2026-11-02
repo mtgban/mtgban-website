@@ -51,7 +51,7 @@ func (s *site) PopularVoteAPI(w http.ResponseWriter, r *http.Request) {
 	if q == "" || len(q) > MaxSearchQueryLen {
 		return
 	}
-	key := resolvePopularKey(s.datastore(), q)
+	key := resolvePopularKey(s.datastore(), s.prices(), q)
 	if key == "" {
 		return
 	}
@@ -70,12 +70,12 @@ var popularSearchModes = map[string]bool{"": true, "any": true}
 // resolvePopularKey runs the query as the search page would and names what
 // it found; "" when the mode or shape can't yield a key, it found nothing,
 // or the results span more than one card's name.
-func resolvePopularKey(ds *datastore, q string) string {
+func resolvePopularKey(ds *datastore, p *prices, q string) string {
 	config := parseSearchQuery(ds, q, nil, nil, nil)
 	if !popularSearchModes[config.SearchMode] || !popularKeyShape(config) {
 		return ""
 	}
-	uuids, err := searchAndFilter(ds, config)
+	uuids, err := searchAndFilter(ds, p, config)
 	if err != nil || len(uuids) == 0 {
 		return ""
 	}

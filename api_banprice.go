@@ -63,7 +63,7 @@ type PriceAPIOutput struct {
 // region unless it is metadata-only. DEV_ACCESS sees everything, and an explicit
 // list is taken as-is for both sides: a sig's own store list bypasses the
 // blocklists by design.
-func apiEnabledStores(storesOpt string) (sellers, vendors []string) {
+func apiEnabledStores(p *prices, storesOpt string) (sellers, vendors []string) {
 	switch storesOpt {
 	case "ALL_ACCESS", "DEV_ACCESS", "BASE_ACCESS":
 		var blocklistRetail, blocklistBuylist []string
@@ -71,13 +71,13 @@ func apiEnabledStores(storesOpt string) (sellers, vendors []string) {
 			blocklistRetail = Config().Stores.SearchRetailBlockList
 			blocklistBuylist = Config().Stores.SearchBuylistBlockList
 		}
-		for _, seller := range GetSellers() {
+		for _, seller := range p.sellers {
 			info := seller.Info()
 			if presetServes(storesOpt, info, blocklistRetail) && !slices.Contains(sellers, info.Shorthand) {
 				sellers = append(sellers, info.Shorthand)
 			}
 		}
-		for _, vendor := range GetVendors() {
+		for _, vendor := range p.vendors {
 			info := vendor.Info()
 			if presetServes(storesOpt, info, blocklistBuylist) && !slices.Contains(vendors, info.Shorthand) {
 				vendors = append(vendors, info.Shorthand)
@@ -135,7 +135,7 @@ func baseAccessStoreEligible(info mtgban.ScraperInfo) bool {
 // writeV2Response writes a v2 response, as json.Encoder would encode its
 // meta and its retail and buylist maps: the sections are walked card by card
 // as they are written, and one with no card is left out.
-func writeV2Response(w io.Writer, b *matcher.Backend, meta PriceAPIMeta, retail, buylist *v2Section) error {
+func writeV2Response(w io.Writer, b *matcher.Backend, p *prices, meta PriceAPIMeta, retail, buylist *v2Section) error {
 	head, err := json.Marshal(meta)
 	if err != nil {
 		return err
@@ -157,7 +157,7 @@ func writeV2Response(w io.Writer, b *matcher.Backend, meta PriceAPIMeta, retail,
 			continue
 		}
 		cw := banprice.NewWriter(bw, `,"`+section.name+`":`)
-		err = section.v2.walk(b, cw.Card)
+		err = section.v2.walk(b, p, cw.Card)
 		if err != nil {
 			return err
 		}
@@ -190,6 +190,7 @@ func (s *site) PriceAPIv2(w http.ResponseWriter, r *http.Request) {
 
 func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version string) {
 	b := s.backend()
+	p := s.prices()
 	sig := r.FormValue("sig")
 	out := PriceAPIOutput{}
 	out.Meta.Date = time.Now()
@@ -276,11 +277,11 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		}
 	}
 
-	enabledSellers, enabledVendors := apiEnabledStores(storesOpt)
+	enabledSellers, enabledVendors := apiEnabledStores(p, storesOpt)
 
 	// Endpoint for retrieving the stores shorthands, and in v2 what each is
 	if version == APIVersionV2 && strings.HasPrefix(urlPath, "stores") {
-		stores := v2StoreList(enabledSellers, enabledVendors, r.FormValue("filter"))
+		stores := v2StoreList(p, enabledSellers, enabledVendors, r.FormValue("filter"))
 		if strings.HasSuffix(urlPath, ".json") {
 			json.NewEncoder(w).Encode(&stores)
 		} else {
@@ -293,7 +294,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		filter := r.FormValue("filter")
 		if filter == "singles" || filter == "sealed" {
 			filtered := []string{}
-			for _, seller := range GetSellers() {
+			for _, seller := range p.sellers {
 				if (seller.Info().SealedMode && filter == "singles") || (!seller.Info().SealedMode && filter == "sealed") {
 					continue
 				}
@@ -302,7 +303,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 					filtered = append(filtered, shorthand)
 				}
 			}
-			for _, vendor := range GetVendors() {
+			for _, vendor := range p.vendors {
 				if (vendor.Info().SealedMode && filter == "singles") || (!vendor.Info().SealedMode && filter == "sealed") {
 					continue
 				}
@@ -322,7 +323,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		if tagName == "names" {
 			var filtered []string
 			for _, tag := range output {
-				filtered = append(filtered, scraperName(tag))
+				filtered = append(filtered, p.scraperName(tag))
 			}
 			output = filtered
 		}
@@ -456,17 +457,17 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	if ((kind == "retail" || kind == "all") && canRetail) || isSealed {
 		dumpType += "retail"
 		if isV2 {
-			retailV2 = sellerSectionV2(b, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish, isSealed)
+			retailV2 = sellerSectionV2(b, p, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish, isSealed)
 		} else {
-			out.Retail = getSellerPrices(b, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+			out.Retail = getSellerPrices(b, p, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}
 	}
 	if ((kind == "buylist" || kind == "all") && canBuylist) || isSealed {
 		dumpType += "buylist"
 		if isV2 {
-			buylistV2 = vendorSectionV2(b, idOpt, enabledVendors, filterByEdition, filterByHash, filterByFinish, isSealed)
+			buylistV2 = vendorSectionV2(b, p, idOpt, enabledVendors, filterByEdition, filterByHash, filterByFinish, isSealed)
 		} else {
-			out.Buylist = getVendorPrices(b, idOpt, enabledVendors, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+			out.Buylist = getVendorPrices(b, p, idOpt, enabledVendors, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}
 	}
 
@@ -499,7 +500,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 
 	// v2 builds its prices as it writes them, so it is timed once written
 	if isV2 {
-		err := writeV2Response(w, b, out.Meta, retailV2, buylistV2)
+		err := writeV2Response(w, b, p, out.Meta, retailV2, buylistV2)
 		if err != nil {
 			log.Println("API v2 write:", err)
 		}
@@ -755,7 +756,7 @@ func banPricesFromRows(b *matcher.Backend, cardIDs []string, found map[string]ma
 	return out
 }
 
-func getSellerPrices(b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
+func getSellerPrices(b *matcher.Backend, p *prices, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 
 	// Filtered requests funnel through the shared search gathering: resolve
@@ -770,8 +771,8 @@ func getSellerPrices(b *matcher.Backend, mode string, enabledStores []string, fi
 	if filterByEdition != "" || filterByHash != nil {
 		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
-		cardIDs := filterUUIDs(b, config.UUIDs, config.CardFilters)
-		return banPricesFromRows(b, cardIDs, searchSellers(cardIDs, config), mode, tagName, qty, conds, false)
+		cardIDs := filterUUIDs(b, p, config.UUIDs, config.CardFilters)
+		return banPricesFromRows(b, cardIDs, searchSellers(p, cardIDs, config), mode, tagName, qty, conds, false)
 	}
 
 	var finishFilter []string
@@ -779,7 +780,7 @@ func getSellerPrices(b *matcher.Backend, mode string, enabledStores []string, fi
 		finishFilter = fixupFinishNG(filterByFinish)
 	}
 
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		// Only keep the right product type
 		if (!sealed && seller.Info().SealedMode) ||
 			(sealed && !seller.Info().SealedMode) {
@@ -812,7 +813,7 @@ func getSellerPrices(b *matcher.Backend, mode string, enabledStores []string, fi
 			Finish: finishFilter,
 		}
 		for cardID := range inventory {
-			processEntry(b, out, inventory[cardID], mode, cardID, sellerTag, shouldQty, conds, shouldBaseCond, rule)
+			processEntry(b, p, out, inventory[cardID], mode, cardID, sellerTag, shouldQty, conds, shouldBaseCond, rule)
 		}
 	}
 
@@ -834,7 +835,7 @@ type EntryRule struct {
 	Rate     float64
 }
 
-func processEntry[T mtgban.GenericEntry](b *matcher.Backend, out map[string]map[string]*BanPrice, entries []T, idMode, cardID, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
+func processEntry[T mtgban.GenericEntry](b *matcher.Backend, p *prices, out map[string]map[string]*BanPrice, entries []T, idMode, cardID, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
 	// Unpriced listings (zero, or a NaN) are ignored throughout, matching the
 	// search walk the filtered endpoints ride (shouldSkipPrice drops them
 	// before they become rows): the base price is the first priced entry, and
@@ -863,7 +864,7 @@ func processEntry[T mtgban.GenericEntry](b *matcher.Backend, out map[string]map[
 
 	rate := 1.0
 	for _, rule := range rules {
-		if len(rule.Finish) > 0 && applyCardFilter(b, "finish", rule.Finish, co) {
+		if len(rule.Finish) > 0 && applyCardFilter(b, p, "finish", rule.Finish, co) {
 			return
 		}
 		if rule.skips(b, co) {
@@ -1011,7 +1012,7 @@ func setGrade(price *BanPrice, condTag string, value float64, quantity int, buy,
 	}
 }
 
-func getVendorPrices(b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
+func getVendorPrices(b *matcher.Backend, p *prices, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 
 	// Filtered requests funnel through the shared search gathering, exactly
@@ -1020,8 +1021,8 @@ func getVendorPrices(b *matcher.Backend, mode string, enabledStores []string, fi
 	if filterByEdition != "" || filterByHash != nil {
 		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
-		cardIDs := filterUUIDs(b, config.UUIDs, config.CardFilters)
-		return banPricesFromRows(b, cardIDs, searchVendors(cardIDs, config), mode, tagName, qty, conds, true)
+		cardIDs := filterUUIDs(b, p, config.UUIDs, config.CardFilters)
+		return banPricesFromRows(b, cardIDs, searchVendors(p, cardIDs, config), mode, tagName, qty, conds, true)
 	}
 
 	var finishFilter []string
@@ -1029,7 +1030,7 @@ func getVendorPrices(b *matcher.Backend, mode string, enabledStores []string, fi
 		finishFilter = fixupFinishNG(filterByFinish)
 	}
 
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		// Only keep the right product type
 		if (!sealed && vendor.Info().SealedMode) ||
 			(sealed && !vendor.Info().SealedMode) {
@@ -1060,7 +1061,7 @@ func getVendorPrices(b *matcher.Backend, mode string, enabledStores []string, fi
 			Finish: finishFilter,
 		}
 		for cardID := range buylist {
-			processEntry(b, out, buylist[cardID], mode, cardID, vendorTag, shouldQty, conds, shouldBaseCond, rule)
+			processEntry(b, p, out, buylist[cardID], mode, cardID, vendorTag, shouldQty, conds, shouldBaseCond, rule)
 		}
 	}
 

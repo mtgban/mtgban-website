@@ -36,7 +36,7 @@ func productWithVariableCards(t *testing.T) *matcher.CardObject {
 				continue
 			}
 			config := parseSearchOptionsNG(backend(), `variable:"`+co.Name+`"`, nil, nil, nil)
-			found, err := searchAndFilter(currentDatastore(), config)
+			found, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 			if err != nil || !containsSingles(backend(), found) {
 				continue
 			}
@@ -88,7 +88,7 @@ func TestDropOddsAnswerTheVariableReadingOnly(t *testing.T) {
 	// And the cards the reading finds are the ones it answers for. Not
 	// every one: a Countdown Kit upgrades cards to foil at a chance the data
 	// cannot express, and those foils have no odds to show.
-	found, err := searchAndFilter(currentDatastore(), config)
+	found, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 	if err != nil {
 		t.Fatal(err)
 	}

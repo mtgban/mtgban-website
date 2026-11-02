@@ -151,8 +151,8 @@ func BenchmarkSearchExact(b *testing.B) {
 	}
 
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallel(allKeys, config)
+		allKeys, _ := searchAndFilter(currentDatastore(), currentPrices(), config)
+		searchParallel(currentPrices(), allKeys, config)
 	}
 }
 
@@ -160,8 +160,8 @@ func BenchmarkSearchPrefix(b *testing.B) {
 	config := parseSearchOptionsWrapper(fmt.Sprintf("%s sm:prefix", NameToBeFound))
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallel(allKeys, config)
+		allKeys, _ := searchAndFilter(currentDatastore(), currentPrices(), config)
+		searchParallel(currentPrices(), allKeys, config)
 	}
 }
 
@@ -170,8 +170,8 @@ func BenchmarkSearchAllFromEdition(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallel(allKeys, config)
+		allKeys, _ := searchAndFilter(currentDatastore(), currentPrices(), config)
+		searchParallel(currentPrices(), allKeys, config)
 	}
 }
 
@@ -180,8 +180,8 @@ func BenchmarkSearchWithEdition(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallel(allKeys, config)
+		allKeys, _ := searchAndFilter(currentDatastore(), currentPrices(), config)
+		searchParallel(currentPrices(), allKeys, config)
 	}
 }
 
@@ -190,8 +190,8 @@ func BenchmarkSearchWithNumber(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallel(allKeys, config)
+		allKeys, _ := searchAndFilter(currentDatastore(), currentPrices(), config)
+		searchParallel(currentPrices(), allKeys, config)
 	}
 }
 
@@ -200,8 +200,8 @@ func BenchmarkSearchWithEditionPrefix(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallel(allKeys, config)
+		allKeys, _ := searchAndFilter(currentDatastore(), currentPrices(), config)
+		searchParallel(currentPrices(), allKeys, config)
 	}
 }
 
@@ -213,8 +213,8 @@ func BenchmarkSearchOnlyRetail(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallel(allKeys, config)
+		allKeys, _ := searchAndFilter(currentDatastore(), currentPrices(), config)
+		searchParallel(currentPrices(), allKeys, config)
 	}
 }
 
@@ -226,8 +226,8 @@ func BenchmarkSearchOnlyBuylist(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallel(allKeys, config)
+		allKeys, _ := searchAndFilter(currentDatastore(), currentPrices(), config)
+		searchParallel(currentPrices(), allKeys, config)
 	}
 }
 
@@ -244,7 +244,7 @@ func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
 	}
 
 	config := parseSearchOptionsNG(backend(), "s:leb serra", nil, nil, nil)
-	results, err := searchAndFilter(currentDatastore(), config)
+	results, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
 
 	// Bare exact query: only the exact matches, no widening
 	config = parseSearchOptionsNG(backend(), "serra", nil, nil, nil)
-	results, err = searchAndFilter(currentDatastore(), config)
+	results, err = searchAndFilter(currentDatastore(), currentPrices(), config)
 	if err != nil {
 		t.Fatal(err)
 	}

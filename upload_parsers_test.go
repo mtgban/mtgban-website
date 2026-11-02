@@ -55,7 +55,7 @@ func joinRows(sep string) string {
 func TestLoadCsvReadsWhatTheHeaderNames(t *testing.T) {
 	quietUploadLog(t)
 
-	entries, err := loadCsv(newUploadParser(backend()), strings.NewReader(joinRows(",")), ',', uploadRowLimit)
+	entries, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader(joinRows(",")), ',', uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadCsv: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestLoadCsvFindsTheRealSeparator(t *testing.T) {
 		{"semicolons offered as tabs", ";", '\t'},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			entries, err := loadCsv(newUploadParser(backend()), strings.NewReader(joinRows(tt.sep)), tt.comma, uploadRowLimit)
+			entries, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader(joinRows(tt.sep)), tt.comma, uploadRowLimit)
 			if err != nil {
 				t.Fatalf("loadCsv: %v", err)
 			}
@@ -116,7 +116,7 @@ func TestLoadCsvTakesTheSeparatorTheFileDeclares(t *testing.T) {
 	quietUploadLog(t)
 
 	body := "sep=;\n" + joinRows(";")
-	entries, err := loadCsv(newUploadParser(backend()), strings.NewReader(body), ',', uploadRowLimit)
+	entries, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader(body), ',', uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadCsv: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestLoadCsvKeepsTheFirstCardOfAHeaderlessList(t *testing.T) {
 	quietUploadLog(t)
 
 	body := "4 Lightning Bolt\n2 Counterspell\n1 Black Lotus\n"
-	entries, err := loadCsv(newUploadParser(backend()), strings.NewReader(body), ',', uploadRowLimit)
+	entries, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader(body), ',', uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadCsv: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestLoadCsvKeepsTheFirstCardOfAHeaderlessList(t *testing.T) {
 func TestLoadCsvRefusesAnEmptyFile(t *testing.T) {
 	quietUploadLog(t)
 
-	_, err := loadCsv(newUploadParser(backend()), strings.NewReader(""), ',', uploadRowLimit)
+	_, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader(""), ',', uploadRowLimit)
 	if err == nil {
 		t.Fatal("an empty file was accepted")
 	}
@@ -170,7 +170,7 @@ func TestLoadCsvStopsAtTheRowLimit(t *testing.T) {
 		b.WriteString("Lightning Bolt,Beta,1\n")
 	}
 
-	entries, err := loadCsv(newUploadParser(backend()), strings.NewReader(b.String()), ',', 10)
+	entries, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader(b.String()), ',', 10)
 	if err != nil {
 		t.Fatalf("loadCsv: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestLoadCsvKeepsReadingPastARaggedRow(t *testing.T) {
 		"Counterspell,Ice Age\n" +
 		"Black Lotus,Alpha,1,$9999.00\n"
 
-	entries, err := loadCsv(newUploadParser(backend()), strings.NewReader(body), ',', uploadRowLimit)
+	entries, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader(body), ',', uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadCsv: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestLoadCsvReadsADecklistWithCommasInTheNames(t *testing.T) {
 	quietUploadLog(t)
 
 	body := "1 Hanna, Ship's Navigator\n1 Jhoira, Weatherlight Captain\n1 Sisay, Weatherlight Captain\n"
-	entries, err := loadCsv(newUploadParser(backend()), strings.NewReader(body), ',', uploadRowLimit)
+	entries, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader(body), ',', uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadCsv: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestLoadCsvSkipsRowsWithNoStock(t *testing.T) {
 		"Counterspell,Ice Age,0\n" +
 		"Black Lotus,Alpha,1\n"
 
-	entries, err := loadCsv(newUploadParser(backend()), strings.NewReader(body), ',', uploadRowLimit)
+	entries, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader(body), ',', uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadCsv: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestLoadCsvNamesTheLineACardFailedOn(t *testing.T) {
 		"Lightning Bolt,Beta,1\n" +
 		"Definitely Not A Magic Card,Nowhere,1\n"
 
-	entries, err := loadCsv(newUploadParser(backend()), strings.NewReader(body), ',', uploadRowLimit)
+	entries, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader(body), ',', uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadCsv: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestLoadCsvNamesTheLineACardFailedOn(t *testing.T) {
 func TestLoadCsvRefusesAFileThatIsOnlyASeparator(t *testing.T) {
 	quietUploadLog(t)
 
-	if _, err := loadCsv(newUploadParser(backend()), strings.NewReader("sep=;\n"), ',', uploadRowLimit); err == nil {
+	if _, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader("sep=;\n"), ',', uploadRowLimit); err == nil {
 		t.Fatal("a file with nothing after its separator line was accepted")
 	}
 }
@@ -293,11 +293,11 @@ func TestLoadCsvRefusesAFileThatIsOnlyASeparator(t *testing.T) {
 func TestLoadCsvTakesABareSeparatorLineAsNone(t *testing.T) {
 	quietUploadLog(t)
 
-	if _, err := loadCsv(newUploadParser(backend()), strings.NewReader("sep=\n"), ',', uploadRowLimit); err == nil {
+	if _, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader("sep=\n"), ',', uploadRowLimit); err == nil {
 		t.Error("a file that is only \"sep=\" was accepted")
 	}
 
-	entries, err := loadCsv(newUploadParser(backend()), strings.NewReader("sep=\n"+joinRows(",")), ',', uploadRowLimit)
+	entries, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader("sep=\n"+joinRows(",")), ',', uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadCsv: %v", err)
 	}
@@ -351,7 +351,7 @@ func TestLoadCsvStopsWhenTheFileStopsBeingReadable(t *testing.T) {
 
 	for _, maxRows := range []int{50, MaxUploadTotalEntries} {
 		reader := &dyingReader{data: []byte(b.String()), until: 60}
-		entries, err := loadCsv(newUploadParser(backend()), reader, ',', maxRows)
+		entries, err := loadCsv(newUploadParser(backend(), currentPrices()), reader, ',', maxRows)
 		if err == nil {
 			t.Errorf("maxRows=%d: a file that died mid-read came back as %d good entries",
 				maxRows, len(entries))
@@ -377,7 +377,7 @@ func TestLoadCsvDoesNotFailAFileOverAStrayQuote(t *testing.T) {
 		"Lightning Bolt,Beta,4\n" +
 		"Sol\"Ring,Commander 2013,1\n"
 
-	entries, err := loadCsv(newUploadParser(backend()), strings.NewReader(body), ',', uploadRowLimit)
+	entries, err := loadCsv(newUploadParser(backend(), currentPrices()), strings.NewReader(body), ',', uploadRowLimit)
 	if err != nil {
 		t.Fatalf("a stray quote failed the whole file: %v", err)
 	}
@@ -429,7 +429,7 @@ func TestLoadXlsxReadsWhatTheHeaderNames(t *testing.T) {
 	quietUploadLog(t)
 
 	rows := append([][]string{parserHeader}, parserRows...)
-	entries, err := loadXlsx(newUploadParser(backend()), buildXlsx(t, map[string][][]string{"Sheet1": rows}, []string{"Sheet1"}), uploadRowLimit)
+	entries, err := loadXlsx(newUploadParser(backend(), currentPrices()), buildXlsx(t, map[string][][]string{"Sheet1": rows}, []string{"Sheet1"}), uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadXlsx: %v", err)
 	}
@@ -456,7 +456,7 @@ func TestLoadXlsxPrefersTheSheetNamedForUs(t *testing.T) {
 		"MTGBAN List":  ours,
 	}, []string{"Instructions", "MTGBAN List"})
 
-	entries, err := loadXlsx(newUploadParser(backend()), reader, uploadRowLimit)
+	entries, err := loadXlsx(newUploadParser(backend(), currentPrices()), reader, uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadXlsx: %v", err)
 	}
@@ -479,7 +479,7 @@ func TestLoadXlsxRefusesWhatIsNotAWorkbook(t *testing.T) {
 		{"empty", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := loadXlsx(newUploadParser(backend()), strings.NewReader(tt.body), uploadRowLimit); err == nil {
+			if _, err := loadXlsx(newUploadParser(backend(), currentPrices()), strings.NewReader(tt.body), uploadRowLimit); err == nil {
 				t.Error("a file that is not a workbook was accepted")
 			}
 		})
@@ -492,7 +492,7 @@ func TestLoadXlsxKeepsARowWithABlankLastCell(t *testing.T) {
 	quietUploadLog(t)
 
 	rows := [][]string{{"Edition", "Quantity", "Name"}, {"Beta", "4", ""}, {"Beta", "1", "Lightning Bolt"}}
-	entries, err := loadXlsx(newUploadParser(backend()), buildXlsx(t, map[string][][]string{"Sheet1": rows}, []string{"Sheet1"}), uploadRowLimit)
+	entries, err := loadXlsx(newUploadParser(backend(), currentPrices()), buildXlsx(t, map[string][][]string{"Sheet1": rows}, []string{"Sheet1"}), uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadXlsx: %v", err)
 	}
@@ -514,7 +514,7 @@ func TestLoadXlsxStopsAtTheRowLimit(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		rows = append(rows, []string{"Lightning Bolt", "Beta", "1"})
 	}
-	entries, err := loadXlsx(newUploadParser(backend()), buildXlsx(t, map[string][][]string{"Sheet1": rows}, []string{"Sheet1"}), 10)
+	entries, err := loadXlsx(newUploadParser(backend(), currentPrices()), buildXlsx(t, map[string][][]string{"Sheet1": rows}, []string{"Sheet1"}), 10)
 	if err != nil {
 		t.Fatalf("loadXlsx: %v", err)
 	}
@@ -541,7 +541,7 @@ func TestLoadXlsxRefusesARowPastTheColumnCap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := loadXlsx(newUploadParser(backend()), &buf, uploadRowLimit)
+	_, err := loadXlsx(newUploadParser(backend(), currentPrices()), &buf, uploadRowLimit)
 	if err == nil || !strings.Contains(err.Error(), "row 2 has 16384 columns") {
 		t.Errorf("err = %v, want row 2 refused for its width", err)
 	}
@@ -555,7 +555,7 @@ func TestLoadXlsxReadsARowAtTheColumnCap(t *testing.T) {
 	wide := make([]string, maxUploadColumns)
 	wide[0], wide[len(wide)-1] = "Lightning Bolt", "x"
 	rows := [][]string{{"Name", "Edition", "Quantity"}, wide, {"Lightning Bolt", "Beta", "1"}}
-	entries, err := loadXlsx(newUploadParser(backend()), buildXlsx(t, map[string][][]string{"Sheet1": rows}, []string{"Sheet1"}), uploadRowLimit)
+	entries, err := loadXlsx(newUploadParser(backend(), currentPrices()), buildXlsx(t, map[string][][]string{"Sheet1": rows}, []string{"Sheet1"}), uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadXlsx: %v", err)
 	}
@@ -582,7 +582,7 @@ func TestLoadXlsxRefusesAWorkbookPastTheUnzipLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = loadXlsx(newUploadParser(backend()), &buf, uploadRowLimit)
+	_, err = loadXlsx(newUploadParser(backend(), currentPrices()), &buf, uploadRowLimit)
 	if err == nil || !strings.Contains(err.Error(), "unzip size exceeds") {
 		t.Errorf("err = %v, want the workbook refused for its unpacked size", err)
 	}
@@ -615,7 +615,7 @@ func TestLoadXlsxLeavesNoTempFileWhenRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = loadXlsx(newUploadParser(backend()), &buf, uploadRowLimit)
+	_, err = loadXlsx(newUploadParser(backend(), currentPrices()), &buf, uploadRowLimit)
 	if err == nil {
 		t.Fatal("loadXlsx read a workbook with a broken workbook.xml")
 	}
@@ -654,7 +654,7 @@ func TestLoadXlsxRefusesACompoundFile(t *testing.T) {
 	binary.LittleEndian.PutUint32(header[60:], 0xfffffffe) // mini FAT start
 	binary.LittleEndian.PutUint32(header[68:], 0xfffffffe) // DIFAT start
 
-	_, err := loadXlsx(newUploadParser(backend()), bytes.NewReader(header), uploadRowLimit)
+	_, err := loadXlsx(newUploadParser(backend(), currentPrices()), bytes.NewReader(header), uploadRowLimit)
 	if err == nil || !strings.Contains(err.Error(), ".xls") {
 		t.Errorf("err = %v, want the compound file refused", err)
 	}
@@ -668,7 +668,7 @@ func TestLoadOldXlsReadsWhatTheHeaderNames(t *testing.T) {
 	quietUploadLog(t)
 
 	rows := append([][]string{parserHeader}, parserRows...)
-	entries, err := loadOldXls(newUploadParser(backend()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), uploadRowLimit)
+	entries, err := loadOldXls(newUploadParser(backend(), currentPrices()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadOldXls: %v", err)
 	}
@@ -688,7 +688,7 @@ func TestLoadOldXlsPrefersTheSheetNamedForUs(t *testing.T) {
 
 	decoy := [][]string{{"Name", "Edition", "Quantity"}, {"Decoy Card", "Nowhere", "99"}}
 	ours := append([][]string{parserHeader}, parserRows...)
-	entries, err := loadOldXls(newUploadParser(backend()), buildXls(
+	entries, err := loadOldXls(newUploadParser(backend(), currentPrices()), buildXls(
 		xlstest.Sheet{Name: "Instructions", Rows: decoy},
 		xlstest.Sheet{Name: "MTGBAN List", Rows: ours},
 	), uploadRowLimit)
@@ -707,7 +707,7 @@ func TestLoadOldXlsStopsAtTheRowLimit(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		rows = append(rows, []string{"Lightning Bolt", "Beta", "1"})
 	}
-	entries, err := loadOldXls(newUploadParser(backend()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), 10)
+	entries, err := loadOldXls(newUploadParser(backend(), currentPrices()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), 10)
 	if err != nil {
 		t.Fatalf("loadOldXls: %v", err)
 	}
@@ -722,7 +722,7 @@ func TestLoadOldXlsReadsPastABlankRow(t *testing.T) {
 	quietUploadLog(t)
 
 	rows := [][]string{parserHeader, parserRows[0], nil, parserRows[1]}
-	entries, err := loadOldXls(newUploadParser(backend()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), uploadRowLimit)
+	entries, err := loadOldXls(newUploadParser(backend(), currentPrices()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), uploadRowLimit)
 	if err != nil {
 		t.Fatalf("loadOldXls: %v", err)
 	}
@@ -737,7 +737,7 @@ func TestLoadOldXlsRefusesARowPastTheColumnCap(t *testing.T) {
 	wide := make([]string, maxUploadColumns+1)
 	wide[0], wide[maxUploadColumns] = "Lightning Bolt", "x"
 	rows := [][]string{{"Name", "Edition", "Quantity"}, wide}
-	_, err := loadOldXls(newUploadParser(backend()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), uploadRowLimit)
+	_, err := loadOldXls(newUploadParser(backend(), currentPrices()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), uploadRowLimit)
 	if err == nil || !strings.Contains(err.Error(), "row 2 has 257 columns") {
 		t.Errorf("err = %v, want row 2 refused for its width", err)
 	}
@@ -751,7 +751,7 @@ func TestLoadUploadFileReadsAnXlsByItsContent(t *testing.T) {
 	rows := append([][]string{parserHeader}, parserRows...)
 	data := xlstest.Workbook(xlstest.Sheet{Name: "Sheet1", Rows: rows})
 	for _, name := range []string{"list.xls", "list.xlsx", "list.csv"} {
-		entries, err := loadUploadFile(newUploadParser(backend()), bytes.NewReader(data), name, uploadRowLimit)
+		entries, err := loadUploadFile(newUploadParser(backend(), currentPrices()), bytes.NewReader(data), name, uploadRowLimit)
 		if err != nil || len(entries) != 2 {
 			t.Errorf("%s: %d entries, err %v, want the 2 rows", name, len(entries), err)
 		}
@@ -767,7 +767,7 @@ func TestLoadUploadFileReadsAnUppercaseExtension(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, err := loadUploadFile(newUploadParser(backend()), bytes.NewReader(xlsx), "LIST.XLSX", uploadRowLimit)
+	entries, err := loadUploadFile(newUploadParser(backend(), currentPrices()), bytes.NewReader(xlsx), "LIST.XLSX", uploadRowLimit)
 	if err != nil || len(entries) != 2 {
 		t.Errorf("%d entries, err %v, want the 2 rows", len(entries), err)
 	}
@@ -780,7 +780,7 @@ func TestLoadOldXlsRefusesTheFileThatCrashedTheOldReader(t *testing.T) {
 
 	data := append(append([]byte{}, oleSignature...), make([]byte, 20)...)
 	data = append(data, 0xfe, 0xff)
-	if _, err := loadOldXls(newUploadParser(backend()), bytes.NewReader(data), uploadRowLimit); err == nil {
+	if _, err := loadOldXls(newUploadParser(backend(), currentPrices()), bytes.NewReader(data), uploadRowLimit); err == nil {
 		t.Error("a 30-byte compound file was accepted")
 	}
 }
@@ -799,7 +799,7 @@ func TestLoadOldXlsRefusesWhatIsNotAWorkbook(t *testing.T) {
 		{"a zip, which is the newer format", "PK\x03\x04not really"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			entries, err := loadOldXls(newUploadParser(backend()), strings.NewReader(tt.body), uploadRowLimit)
+			entries, err := loadOldXls(newUploadParser(backend(), currentPrices()), strings.NewReader(tt.body), uploadRowLimit)
 			if err == nil {
 				t.Errorf("accepted %s and returned %d entries", tt.name, len(entries))
 			}
@@ -829,7 +829,7 @@ func TestLoadCollectionOnlyFetchesATCGplayerCollection(t *testing.T) {
 		{"empty", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := loadCollection(context.Background(), newUploadParser(backend()), tt.link, uploadRowLimit)
+			_, _, err := loadCollection(context.Background(), newUploadParser(backend(), currentPrices()), tt.link, uploadRowLimit)
 			if err == nil {
 				t.Fatalf("%q was accepted", tt.link)
 			}
@@ -867,7 +867,7 @@ func collectionParser() *docparse.Parser {
 		ExternalIdentifiers: map[matcher.IDSpace]map[string]string{
 			matcher.IDSpaceTCGplayer: {"1234": "fzz-uuid"},
 		},
-	})
+	}, currentPrices())
 }
 
 // The page's own layout: the product id goes to column 5 and the finish to

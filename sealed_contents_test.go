@@ -90,7 +90,7 @@ func TestVariableIsTheContentsWithoutTheFixedList(t *testing.T) {
 
 	// And the cards it keeps are the ones the product does not guarantee.
 	for _, uuid := range deck {
-		if !shouldSkipCardNG(backend(), uuid, config.CardFilters) {
+		if !shouldSkipCardNG(backend(), currentPrices(), uuid, config.CardFilters) {
 			card, _ := backend().GetUUID(uuid)
 			t.Errorf("%s is guaranteed but survives the variable reading", card)
 			break
@@ -156,7 +156,7 @@ func TestAWrapperAnswersWithProductsNotCards(t *testing.T) {
 	}
 
 	config := parseSearchOptionsNG(backend(), `contents:"`+wrapper+`"`, nil, nil, nil)
-	found, err := searchAndFilter(currentDatastore(), config)
+	found, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 	if err != nil || len(found) == 0 {
 		t.Skipf("%s finds nothing at all: %v", wrapper, err)
 	}
@@ -346,7 +346,7 @@ func TestVariableNamesSeveralProductsExcludesEachOnesGuaranteedCards(t *testing.
 		t.Errorf("naming two products still offers a switch over %q", config.ContentsProduct)
 	}
 
-	found, err := searchAndFilter(currentDatastore(), config)
+	found, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 	if err != nil {
 		t.Fatal(err)
 	}

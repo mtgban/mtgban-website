@@ -47,9 +47,9 @@ func TestReverseSortKeepsNonfoilFirst(t *testing.T) {
 	for _, sortMode := range []string{"chrono", "alpha", "hybrid", "number", "odds"} {
 		t.Run(sortMode, func(t *testing.T) {
 			forward := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, forward, odds, sortMode)
+			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, currentPrices(), forward, odds, sortMode)
 			reversed := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest("GET", "/search?reverse=true", nil), ds, reversed, odds, sortMode)
+			sortSearchKeys(httptest.NewRequest("GET", "/search?reverse=true", nil), ds, currentPrices(), reversed, odds, sortMode)
 
 			if forward[0] == reversed[0] {
 				t.Errorf("%s leads both directions: the list was not reversed", forward[0])
@@ -103,7 +103,7 @@ func TestReverseOddsSortKeepsUncoveredLast(t *testing.T) {
 		"?reverse=true": {"high", "low", "zero"},
 	} {
 		keys := []string{"none", "high", "missing", "zero", "low"}
-		sortSearchKeys(httptest.NewRequest("GET", "/search"+query, nil), ds, keys, odds, "odds")
+		sortSearchKeys(httptest.NewRequest("GET", "/search"+query, nil), ds, currentPrices(), keys, odds, "odds")
 		if !slices.Equal(keys[:3], want) {
 			t.Errorf("%q: covered cards sorted %v, want %v", query, keys[:3], want)
 		}
@@ -141,9 +141,9 @@ func TestReverseSortKeepsEveryGamesFinishOrder(t *testing.T) {
 	for _, sortMode := range []string{"chrono", "alpha", "hybrid", "number"} {
 		t.Run(sortMode, func(t *testing.T) {
 			forward := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, forward, nil, sortMode)
+			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, currentPrices(), forward, nil, sortMode)
 			reversed := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest("GET", "/search?reverse=true", nil), ds, reversed, nil, sortMode)
+			sortSearchKeys(httptest.NewRequest("GET", "/search?reverse=true", nil), ds, currentPrices(), reversed, nil, sortMode)
 
 			// Each card's finishes in the order shown, and the cards in theirs
 			finishesOf := func(sorted []string) (map[string][]string, []string) {

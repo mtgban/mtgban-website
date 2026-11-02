@@ -474,7 +474,7 @@ func TestPriceAPIv2CardmarketIDs(t *testing.T) {
 	}
 
 	var v1 []string
-	for id := range getSellerPrices(b, "mkm", []string{"CT"}, "", nil, "", false, false, false, "") {
+	for id := range getSellerPrices(b, currentPrices(), "mkm", []string{"CT"}, "", nil, "", false, false, false, "") {
 		v1 = append(v1, id)
 	}
 	slices.Sort(v1)
@@ -495,7 +495,7 @@ type PriceAPIOutputV2 struct {
 func collectV2(t testing.TB, b *matcher.Backend, section *v2Section) banprice.V2 {
 	t.Helper()
 	out := banprice.V2{}
-	err := section.walk(b, func(id string, finishes map[string]map[string][]banprice.Entry) error {
+	err := section.walk(b, currentPrices(), func(id string, finishes map[string]map[string][]banprice.Entry) error {
 		out[id] = map[string]map[string][]banprice.Entry{}
 		for finish, stores := range finishes {
 			out[id][finish] = maps.Clone(stores)
@@ -509,11 +509,11 @@ func collectV2(t testing.TB, b *matcher.Backend, section *v2Section) banprice.V2
 }
 
 func sellerPricesV2(t testing.TB, b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
-	return collectV2(t, b, sellerSectionV2(b, mode, enabledStores, filterByEdition, filterByHash, filterByFinish, sealed))
+	return collectV2(t, b, sellerSectionV2(b, currentPrices(), mode, enabledStores, filterByEdition, filterByHash, filterByFinish, sealed))
 }
 
 func vendorPricesV2(t testing.TB, b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
-	return collectV2(t, b, vendorSectionV2(b, mode, enabledStores, filterByEdition, filterByHash, filterByFinish, sealed))
+	return collectV2(t, b, vendorSectionV2(b, currentPrices(), mode, enabledStores, filterByEdition, filterByHash, filterByFinish, sealed))
 }
 
 // TestWriteV2Response pins the streamed response to the bytes json.Encoder
@@ -563,7 +563,7 @@ func TestWriteV2Response(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = writeV2Response(&got, b, meta, sections[0], sections[1])
+		err = writeV2Response(&got, b, currentPrices(), meta, sections[0], sections[1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -697,8 +697,8 @@ func TestV1SharedIDKeepsTheBestPrice(t *testing.T) {
 		hash []string
 	}{{"funnel path", []string{"lor-3", "lor-1", "lor-2"}}, {"full dump path", nil}} {
 		t.Run(tc.name, func(t *testing.T) {
-			sell := getSellerPrices(b, "mkm", []string{"CT"}, "", tc.hash, "", false, false, false, "")["600001"]["CT"]
-			buy := getVendorPrices(b, "mkm", []string{"CK"}, "", tc.hash, "", false, false, false, "")["600001"]["CK"]
+			sell := getSellerPrices(b, currentPrices(), "mkm", []string{"CT"}, "", tc.hash, "", false, false, false, "")["600001"]["CT"]
+			buy := getVendorPrices(b, currentPrices(), "mkm", []string{"CK"}, "", tc.hash, "", false, false, false, "")["600001"]["CK"]
 			if sell == nil || buy == nil {
 				t.Fatalf("store missing: retail %v, buylist %v", sell, buy)
 			}
@@ -730,7 +730,7 @@ func TestPriceAPISkipsNonFinitePrices(t *testing.T) {
 
 	b := &matcher.Backend{AllUUIDs: []string{"lor-1"}, UUIDs: map[string]*matcher.CardObject{"lor-1": co}}
 	out := map[string]map[string]*BanPrice{}
-	processEntry(b, out, record["lor-1"], "mtgban", "lor-1", "CT", true, true, true)
+	processEntry(b, currentPrices(), out, record["lor-1"], "mtgban", "lor-1", "CT", true, true, true)
 	wire, err := json.Marshal(out)
 	if err != nil {
 		t.Fatalf("v1 does not encode: %v", err)

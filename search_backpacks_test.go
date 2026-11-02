@@ -45,7 +45,7 @@ func TestBackpackSearchFindsTheBackpacksCards(t *testing.T) {
 			config.SearchMode = "sealed"
 		}
 		applyBackpacks(b, &config, packs)
-		got, err := searchAndFilter(ds, config)
+		got, err := searchAndFilter(ds, currentPrices(), config)
 		slices.Sort(got)
 		if err != nil || !slices.Equal(got, tc.want) {
 			t.Errorf("%s (sealed %v) = %v, %v; want %v", tc.query, tc.sealed, got, err, tc.want)
@@ -55,7 +55,7 @@ func TestBackpackSearchFindsTheBackpacksCards(t *testing.T) {
 	// An empty backpack holds no cards, as an empty in: does.
 	config := parseSearchPage(ds, "on:empty", false, false, nil, nil, nil)
 	applyBackpacks(b, &config, packs)
-	if _, err := searchAndFilter(ds, config); !errors.Is(err, errEmptyPool) {
+	if _, err := searchAndFilter(ds, currentPrices(), config); !errors.Is(err, errEmptyPool) {
 		t.Errorf("on:empty = %v, want errEmptyPool", err)
 	}
 }
@@ -74,13 +74,13 @@ func TestBackpackFilterBesideOtherLists(t *testing.T) {
 	if f.Name != "on" || !slices.Equal(f.Values, []string{"nosuch"}) {
 		t.Fatalf("on:nosuch,trade = %s %v, want on [nosuch]", f.Name, f.Values)
 	}
-	if shouldSkipCard(nil, two, config.CardFilters) || !shouldSkipCard(nil, one, config.CardFilters) {
+	if shouldSkipCard(nil, currentPrices(), two, config.CardFilters) || !shouldSkipCard(nil, currentPrices(), one, config.CardFilters) {
 		t.Error("on:nosuch,trade should keep the backpack's card alone")
 	}
 
 	config = SearchConfig{CardFilters: []FilterElem{{Name: "on", Negate: true, Values: fixupOnNG("trade")}}}
 	applyBackpacks(nil, &config, packs)
-	if !shouldSkipCard(nil, two, config.CardFilters) || shouldSkipCard(nil, one, config.CardFilters) {
+	if !shouldSkipCard(nil, currentPrices(), two, config.CardFilters) || shouldSkipCard(nil, currentPrices(), one, config.CardFilters) {
 		t.Error("-on:trade should leave the backpack's card out")
 	}
 
@@ -131,7 +131,7 @@ func TestDidYouMeanKeepsABackpack(t *testing.T) {
 	for _, tt := range tests {
 		config := parseSearchPage(ds, tt.query, false, false, nil, nil, nil)
 		applyBackpacks(ds.backend, &config, packs)
-		got, _ := searchSuggestions(ds, tt.query, config, nil, packs, false)
+		got, _ := searchSuggestions(ds, currentPrices(), tt.query, config, nil, packs, false)
 		if got != tt.want {
 			t.Errorf("%q: did-you-mean %q, want %q", tt.query, got, tt.want)
 		}

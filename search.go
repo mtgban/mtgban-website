@@ -267,7 +267,7 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 // name, the collector number read off the words, and the filters typed,
 // each read under the key that finds cards (see rekeyFilters). packs holds
 // the reader's backpacks, by on: value.
-func searchSuggestions(ds *datastore, rawQuery string, config SearchConfig, pinned []FilterElem, packs map[string]map[string]bool, sealed bool) (string, []suggest.AltSearch) {
+func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchConfig, pinned []FilterElem, packs map[string]map[string]bool, sealed bool) (string, []suggest.AltSearch) {
 	if config.SearchMode == "hashing" {
 		return "", nil
 	}
@@ -293,7 +293,7 @@ func searchSuggestions(ds *datastore, rawQuery string, config SearchConfig, pinn
 	if config.NumberTerms != "" {
 		query = append(query, config.NumberTerms)
 	}
-	filters, rekeyed := rekeyFilters(ds, query, config.AppliedFilters, pinned, packs, sealed)
+	filters, rekeyed := rekeyFilters(ds, p, query, config.AppliedFilters, pinned, packs, sealed)
 	if !corrected && !rekeyed {
 		return "", alts
 	}
@@ -309,7 +309,7 @@ func searchSuggestions(ds *datastore, rawQuery string, config SearchConfig, pinn
 // Every filter the query already carried is kept, so "s:OGN metal" still means
 // that set; only the name is read a second way. A hashing search names its own
 // cards and is left alone.
-func searchFallback(ds *datastore, config SearchConfig) []string {
+func searchFallback(ds *datastore, p *prices, config SearchConfig) []string {
 	if config.CleanQuery == "" || config.SearchMode == "hashing" {
 		return nil
 	}
@@ -324,7 +324,7 @@ func searchFallback(ds *datastore, config SearchConfig) []string {
 			Name:   "is",
 			Values: promoTypes,
 		})
-		if keys, err := searchAndFilter(ds, config); err == nil && len(keys) > 0 {
+		if keys, err := searchAndFilter(ds, p, config); err == nil && len(keys) > 0 {
 			return keys
 		}
 	}
@@ -341,7 +341,7 @@ func searchFallback(ds *datastore, config SearchConfig) []string {
 			Name:   "edition",
 			Values: codes,
 		})
-		if keys, err := searchAndFilter(ds, config); err == nil && len(keys) > 0 {
+		if keys, err := searchAndFilter(ds, p, config); err == nil && len(keys) > 0 {
 			return keys
 		}
 	}
@@ -625,7 +625,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// Only the mobile page lists the stores in its own settings drawer; the
 	// desktop modal asks /api/settings/modal for them when it opens.
 	if pageVars.IsMobile {
-		pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys()
+		pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys(p)
 		pageVars.SealedStores = p.sealedStores()
 	}
 
@@ -703,13 +703,13 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.SearchSort = readSearchSort(r, config)
 	pageVars.NoSort = config.SortMode != ""
 
-	result := runSearch(r, ds, config)
+	result := runSearch(r, ds, p, config)
 	if result.message != "" {
 		pageVars.Notices = append(pageVars.Notices, result.message)
 	}
 	if len(result.keys) == 0 {
-		pageVars.PopularSearches = getPopularSearches(ds)
-		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(ds, query, config, pinned, packs, pageVars.IsSealed)
+		pageVars.PopularSearches = getPopularSearches(ds, p)
+		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(ds, p, query, config, pinned, packs, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}
@@ -724,11 +724,11 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sort sets as requested, default to chronological
-	shown := orderSearchKeys(r, ds, result, pageVars.SearchSort)
+	shown := orderSearchKeys(r, ds, p, result, pageVars.SearchSort)
 	pageVars.ReverseMode = shown.reversed
 	pageVars.Pagination = shown.pagination
 
-	result.sellers, result.vendors = collectOffers(b, r, config, shown.keys)
+	result.sellers, result.vendors = collectOffers(b, p, r, config, shown.keys)
 	applyStoreFactors(result, readStoreFactors(r))
 
 	pageVars.Metadata, pageVars.Printings = searchMetadata(ds, shown.keys, preferFlavor)
@@ -739,9 +739,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	preview := searchPreview(r, b, shown.keys, result)
-	fillEmbed(&pageVars.SearchVars, pageVars.Metadata, b, preview, shown.keys)
+	fillEmbed(&pageVars.SearchVars, pageVars.Metadata, b, p, preview, shown.keys)
 
-	rebuildIndexRows(&pageVars.SearchVars, pageVars.Metadata, b, config, shown.keys, result)
+	rebuildIndexRows(&pageVars.SearchVars, pageVars.Metadata, b, p, config, shown.keys, result)
 
 	fillSearchResults(&pageVars.SearchVars, b, query, config, result, shown.keys)
 
@@ -807,6 +807,7 @@ func searchMetadata(ds *datastore, keys []string, preferFlavor bool) (cardMetada
 // preview of that page's search, in json.
 func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
+	p := s.prices()
 	b := ds.backend
 
 	// A consumer that cannot read what we would send is told so rather
@@ -864,13 +865,13 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 		config.SearchMode = "sealed"
 	}
 
-	result := runSearch(page, ds, config)
+	result := runSearch(page, ds, p, config)
 	if len(result.keys) == 0 {
 		oembedError(w, http.StatusNotFound)
 		return
 	}
-	keys := orderSearchKeys(page, ds, result, readSearchSort(page, config)).keys
-	result.sellers, result.vendors = collectOffers(b, page, config, keys)
+	keys := orderSearchKeys(page, ds, p, result, readSearchSort(page, config)).keys
+	result.sellers, result.vendors = collectOffers(b, p, page, config, keys)
 	sortOfferRows(page, keys, result)
 
 	payload, err := json.Marshal(searchPreview(page, b, keys, result))
@@ -1099,17 +1100,17 @@ type searchResults struct {
 
 // runSearch finds the cards a search asks for, every one of them judged by
 // the post filters; collectOffers then gathers the offers of the ones shown.
-func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResults {
+func runSearch(r *http.Request, ds *datastore, p *prices, config SearchConfig) searchResults {
 	b := ds.backend
 
 	var result searchResults
 
 	// Perform search, resolving the pools once for it and the fallback both
 	var allKeys []string
-	filters, err := resolvePools(ds, config)
+	filters, err := resolvePools(ds, p, config)
 	if err == nil {
 		config.CardFilters = filters
-		allKeys, err = searchAndFilter(ds, config)
+		allKeys, err = searchAndFilter(ds, p, config)
 	}
 	if err != nil {
 		// No card carries the name, so read it another way before giving up.
@@ -1118,7 +1119,7 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 		// an invitation to answer a different question. An empty pool stays
 		// empty however the name is read.
 		if !errors.Is(err, errEmptyPool) {
-			allKeys = searchFallback(ds, config)
+			allKeys = searchFallback(ds, p, config)
 		}
 		if len(allKeys) == 0 {
 			result.message = NoCardsMessage
@@ -1141,7 +1142,7 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 	// card found; the offers themselves are built for the page shown
 	// (collectOffers), so the filters ask the stores about each card here.
 	if len(config.PostFilters) > 0 {
-		allKeys = PostSearchFilter(config, allKeys, newPostStores(b, r, allKeys, config))
+		allKeys = PostSearchFilter(config, allKeys, newPostStores(b, p, r, allKeys, config))
 	}
 
 	// Early exit if there no matches are found
@@ -1185,10 +1186,10 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 // reader's custom buylist included. A page calls it for the cards it shows:
 // the sort reads prices on its own, and runSearch has judged the post
 // filters, so the rest of the result never needs its offers built.
-func collectOffers(b *matcher.Backend, r *http.Request, config SearchConfig, keys []string) (sellers, vendors map[string]map[mtgban.Condition][]SearchEntry) {
-	sellers, vendors = searchParallel(keys, config)
+func collectOffers(b *matcher.Backend, p *prices, r *http.Request, config SearchConfig, keys []string) (sellers, vendors map[string]map[mtgban.Condition][]SearchEntry) {
+	sellers, vendors = searchParallel(p, keys, config)
 	if config.CustomBuylist && !config.SkipBuylist {
-		searchCustomBuylist(b, r, keys, vendors)
+		searchCustomBuylist(b, p, r, keys, vendors)
 	}
 	return sellers, vendors
 }
@@ -1256,9 +1257,9 @@ func searchPageSize(r *http.Request) int {
 // orderSearchKeys sorts the results as the reader asked and returns the page
 // of them to show. The sort works in place: CardHashes is the same slice, and
 // the Uploader transfer posts it in this order.
-func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortMode string) searchPage {
+func orderSearchKeys(r *http.Request, ds *datastore, p *prices, result searchResults, sortMode string) searchPage {
 	var shown searchPage
-	shown.reversed = sortSearchKeys(r, ds, result.keys, result.odds, sortMode)
+	shown.reversed = sortSearchKeys(r, ds, p, result.keys, result.odds, sortMode)
 
 	// If results can't fit in one page, chunk response and enable pagination
 	shown.keys = result.keys
@@ -1276,7 +1277,7 @@ func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortM
 
 // sortSearchKeys orders keys in place as the reader asked, odds being what a
 // variable search's cards are expected at, and says whether it reversed them.
-func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[string]float64, sortMode string) bool {
+func sortSearchKeys(r *http.Request, ds *datastore, p *prices, allKeys []string, odds map[string]float64, sortMode string) bool {
 	b := ds.backend
 	sortData := resolveSortingData(b, allKeys)
 
@@ -1333,7 +1334,7 @@ func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[s
 			retSellers = append([]string{retSeller}, defaultSellerPriorityOpt...)
 		}
 
-		prices := resolveBestPrices(allKeys, retSellers, price4seller)
+		prices := resolveBestPrices(p, allKeys, retSellers, price4seller)
 		less = func(i, j int) bool {
 			priceI, priceJ := prices[allKeys[i]], prices[allKeys[j]]
 			if priceI == priceJ {
@@ -1348,8 +1349,8 @@ func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[s
 			blVendors = append([]string{blVendor}, defaultVendorPriorityOpt...)
 		}
 
-		buyPrices := resolveBestPrices(allKeys, blVendors, price4vendor)
-		retPrices := resolveBestPrices(allKeys, defaultSellerPriorityOpt, price4seller)
+		buyPrices := resolveBestPrices(p, allKeys, blVendors, price4vendor)
+		retPrices := resolveBestPrices(p, allKeys, defaultSellerPriorityOpt, price4seller)
 		less = func(i, j int) bool {
 			priceI, priceJ := buyPrices[allKeys[i]], buyPrices[allKeys[j]]
 			if priceI != priceJ {
@@ -1442,7 +1443,7 @@ func sortOfferRows(r *http.Request, allKeys []string, result searchResults) {
 // fillEmbed fills the page's link preview: the title the oEmbed answer
 // carries, and the first card's image, description and a retail and a
 // buylist reference price.
-func fillEmbed(pageVars *SearchVars, metadata cardMetadata, b *matcher.Backend, preview *embed.OEmbed, allKeys []string) {
+func fillEmbed(pageVars *SearchVars, metadata cardMetadata, b *matcher.Backend, p *prices, preview *embed.OEmbed, allKeys []string) {
 	pageVars.Embed.Title = preview.Title
 	if len(allKeys) > 0 {
 		pageVars.Embed.ImageURL = metadata[allKeys[0]].FullImageURL
@@ -1468,8 +1469,8 @@ func fillEmbed(pageVars *SearchVars, metadata cardMetadata, b *matcher.Backend, 
 		// Name the store each price came from rather than assuming which
 		// ones this site carries: an instance without them would otherwise
 		// print "N/A" under the name of a marketplace it never loaded.
-		pageVars.Embed.RetailLabel, pageVars.Embed.RetailPrice = sellerReference(allKeys[0], "TCGMarket")
-		pageVars.Embed.BuylistLabel, pageVars.Embed.BuylistPrice = vendorReference(allKeys[0], "CK")
+		pageVars.Embed.RetailLabel, pageVars.Embed.RetailPrice = sellerReference(p, allKeys[0], "TCGMarket")
+		pageVars.Embed.BuylistLabel, pageVars.Embed.BuylistPrice = vendorReference(p, allKeys[0], "CK")
 	}
 }
 
@@ -1477,7 +1478,7 @@ func fillEmbed(pageVars *SearchVars, metadata cardMetadata, b *matcher.Backend, 
 // reference rows and the fallback marketplace links, adds the average-count
 // row to its buylist, and where the listing is locked, locks the offers a
 // logged-out reader may not see.
-func rebuildIndexRows(pageVars *SearchVars, metadata cardMetadata, b *matcher.Backend, config SearchConfig, allKeys []string, result searchResults) {
+func rebuildIndexRows(pageVars *SearchVars, metadata cardMetadata, b *matcher.Backend, p *prices, config SearchConfig, allKeys []string, result searchResults) {
 	cautioned := false
 
 	// When the user asked to drop index data (skip:index), don't synthesize the
@@ -1493,8 +1494,8 @@ func rebuildIndexRows(pageVars *SearchVars, metadata cardMetadata, b *matcher.Ba
 	// The two fallback rows below stand in for a price this site does not
 	// have, with a link to go and look it up - which is worth offering only
 	// where the site carries that marketplace at all.
-	hasTCGScraper := marketplaceLoaded("TCG")
-	hasMKMScraper := marketplaceLoaded("MKM")
+	hasTCGScraper := marketplaceLoaded(p, "TCG")
+	hasMKMScraper := marketplaceLoaded(p, "MKM")
 
 	// Rebuild each card's INDEX rows. collapseIndex/collapseSealedEV scan the
 	// array themselves, so there's no per-entry dispatch here — just collapse
@@ -1502,7 +1503,7 @@ func rebuildIndexRows(pageVars *SearchVars, metadata cardMetadata, b *matcher.Ba
 	// resulting reference rows alphabetically by store name.
 	for _, cardID := range allKeys {
 		indexArray := result.sellers[cardID]["INDEX"]
-		evShorts := scraperStoreConfig()["sealed_ev"]["retail"]
+		evShorts := p.scrapers.byStore["sealed_ev"]["retail"]
 
 		tcgRow, hasTCG := collapseIndex(indexArray, "TCGLow", "TCGMarket", "", "", "TCG (Low / Market)")
 		mkmRow, hasMKM := collapseIndex(indexArray, "MKMLow", "MKMTrend", "Cardmarket Low", "Cardmarket Trend", "CM (Low / Trend)")
@@ -1889,8 +1890,8 @@ func (cache chartTargetCache) series(ctx context.Context, b *matcher.Backend, id
 // marketplaceLoaded reports whether this site serves a seller from the named
 // scraper family. Sellers only: the rows it gates stand in for a reference
 // price, which is a seller's to give.
-func marketplaceLoaded(family string) bool {
-	for _, seller := range GetSellers() {
+func marketplaceLoaded(p *prices, family string) bool {
+	for _, seller := range p.sellers {
 		if seller.Info().Family == family {
 			return true
 		}
@@ -1996,20 +1997,20 @@ func passthroughIndex(entries []SearchEntry, consumed []string) []SearchEntry {
 // sellerEntryFound reports whether a seller's entry for a card passes a
 // search's condition and price filters. An index's entries carry no
 // condition, so only its price is filtered.
-func sellerEntryFound(info mtgban.ScraperInfo, cardID string, entry mtgban.InventoryEntry, config SearchConfig) bool {
+func sellerEntryFound(p *prices, info mtgban.ScraperInfo, cardID string, entry mtgban.InventoryEntry, config SearchConfig) bool {
 	if !info.MetadataOnly && shouldSkipEntryNG(entry, config.EntryFilters) {
 		return false
 	}
-	return !shouldSkipPrice(cardID, entry, config.PriceFilters, info.Shorthand)
+	return !shouldSkipPrice(p, cardID, entry, config.PriceFilters, info.Shorthand)
 }
 
 // vendorEntryFound reports whether a vendor's entry for a card passes a
 // search's condition and price filters.
-func vendorEntryFound(info mtgban.ScraperInfo, cardID string, entry mtgban.BuylistEntry, config SearchConfig) bool {
+func vendorEntryFound(p *prices, info mtgban.ScraperInfo, cardID string, entry mtgban.BuylistEntry, config SearchConfig) bool {
 	if shouldSkipEntryNG(entry, config.EntryFilters) {
 		return false
 	}
-	return !shouldSkipPrice(cardID, entry, config.PriceFilters, info.Shorthand)
+	return !shouldSkipPrice(p, cardID, entry, config.PriceFilters, info.Shorthand)
 }
 
 // sellerOfferCondition is the condition a seller's entry is listed under: an
@@ -2031,7 +2032,7 @@ func vendorOfferCondition(info mtgban.ScraperInfo, entry mtgban.BuylistEntry) mt
 	return entry.Conditions
 }
 
-func searchSellers(cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry) {
+func searchSellers(p *prices, cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry) {
 	// Allocate memory
 	foundSellers = map[string]map[mtgban.Condition][]SearchEntry{}
 
@@ -2041,7 +2042,7 @@ func searchSellers(cardIDs []string, config SearchConfig) (foundSellers map[stri
 	cardIDs = dedupeKeys(cardIDs)
 
 	// Search sellers
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		if shouldSkipStoreNG(seller, config.StoreFilters) {
 			continue
 		}
@@ -2052,7 +2053,7 @@ func searchSellers(cardIDs []string, config SearchConfig) (foundSellers map[stri
 		// Fetch the seller info (a struct copy) and its display name once
 		// per store instead of once per entry
 		info := seller.Info()
-		name := scraperName(info.Shorthand)
+		name := p.scraperName(info.Shorthand)
 		restricted := slices.Contains(Config().Stores.SearchRetailBlockList, info.Shorthand)
 
 		for _, cardID := range cardIDs {
@@ -2063,7 +2064,7 @@ func searchSellers(cardIDs []string, config SearchConfig) (foundSellers map[stri
 
 			// Loop thorugh available conditions
 			for _, entry := range entries {
-				if !sellerEntryFound(info, cardID, entry, config) {
+				if !sellerEntryFound(p, info, cardID, entry, config) {
 					continue
 				}
 
@@ -2107,12 +2108,12 @@ func searchSellers(cardIDs []string, config SearchConfig) (foundSellers map[stri
 	return
 }
 
-func searchVendors(cardIDs []string, config SearchConfig) (foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+func searchVendors(p *prices, cardIDs []string, config SearchConfig) (foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
 	foundVendors = map[string]map[mtgban.Condition][]SearchEntry{}
 
 	cardIDs = dedupeKeys(cardIDs)
 
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		if shouldSkipStoreNG(vendor, config.StoreFilters) {
 			continue
 		}
@@ -2122,7 +2123,7 @@ func searchVendors(cardIDs []string, config SearchConfig) (foundVendors map[stri
 		// Fetch the vendor info and its display name once per store, like
 		// in searchSellers
 		info := vendor.Info()
-		name := scraperName(info.Shorthand)
+		name := p.scraperName(info.Shorthand)
 		restricted := slices.Contains(Config().Stores.SearchBuylistBlockList, info.Shorthand)
 
 		for _, cardID := range cardIDs {
@@ -2132,7 +2133,7 @@ func searchVendors(cardIDs []string, config SearchConfig) (foundVendors map[stri
 			}
 
 			for _, entry := range entries {
-				if !vendorEntryFound(info, cardID, entry, config) {
+				if !vendorEntryFound(p, info, cardID, entry, config) {
 					continue
 				}
 
@@ -2225,8 +2226,8 @@ func customBuylistSetting(s string) float64 {
 
 // Append a virtual buylist to search results, priced off the reference
 // seller inventories according to the custom buylist rule settings
-func searchCustomBuylist(b *matcher.Backend, r *http.Request, cardIDs []string, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
-	for _, offer := range customBuylistOffers(b, r, cardIDs) {
+func searchCustomBuylist(b *matcher.Backend, p *prices, r *http.Request, cardIDs []string, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+	for _, offer := range customBuylistOffers(b, p, r, cardIDs) {
 		if foundVendors[offer.cardID] == nil {
 			foundVendors[offer.cardID] = map[mtgban.Condition][]SearchEntry{}
 		}
@@ -2249,7 +2250,7 @@ type customOffer struct {
 // according to the reader's custom buylist rule, each card once: a price at
 // every condition the reference lists, or at INDEX when the reference is a
 // price index, which has one meaningful price.
-func customBuylistOffers(b *matcher.Backend, r *http.Request, cardIDs []string) []customOffer {
+func customBuylistOffers(b *matcher.Backend, p *prices, r *http.Request, cardIDs []string) []customOffer {
 	rule := readCustomBuylistRule(r)
 	if rule.rate == 0 {
 		return nil
@@ -2257,8 +2258,8 @@ func customBuylistOffers(b *matcher.Backend, r *http.Request, cardIDs []string) 
 	rate, minPrice := rule.rate, rule.minPrice
 	releasedBy := time.Now().Add(-customBuylistMinAge)
 
-	singles, _ := findSellerInventory(rule.seller)
-	sealed, _ := findSellerInventory(rule.sealedSeller)
+	singles, _ := p.sellerInventory(rule.seller)
+	sealed, _ := p.sellerInventory(rule.sealedSeller)
 
 	isIndex := slices.Contains(UploadIndexComparePriceList, rule.seller)
 
@@ -2556,7 +2557,7 @@ func numberSeedUUIDs(numbers *numbersSnapshot, filters []FilterElem) ([]string, 
 // names what a card must not have among possibly many others it does, which
 // is not a set this can name by enumerating one store's keys - and a
 // negated store filter carries no Values to enumerate regardless.
-func storeSeedUUIDs(b *matcher.Backend, config SearchConfig) ([]string, bool) {
+func storeSeedUUIDs(b *matcher.Backend, p *prices, config SearchConfig) ([]string, bool) {
 	var f *FilterPostElem
 	for i := range config.PostFilters {
 		if config.PostFilters[i].Name == "any" && len(config.PostFilters[i].Values) > 0 {
@@ -2581,7 +2582,7 @@ func storeSeedUUIDs(b *matcher.Backend, config SearchConfig) ([]string, bool) {
 		uuids = append(uuids, cardID)
 	}
 	if !f.OnlyForVendor {
-		for _, seller := range GetSellers() {
+		for _, seller := range p.sellers {
 			if !slices.Contains(f.Values, strings.ToLower(seller.Info().Shorthand)) {
 				continue
 			}
@@ -2591,7 +2592,7 @@ func storeSeedUUIDs(b *matcher.Backend, config SearchConfig) ([]string, bool) {
 		}
 	}
 	if !f.OnlyForSeller {
-		for _, vendor := range GetVendors() {
+		for _, vendor := range p.vendors {
 			if !slices.Contains(f.Values, strings.ToLower(vendor.Info().Shorthand)) {
 				continue
 			}
@@ -2620,7 +2621,7 @@ var errEmptyPool = errors.New("pool holds no cards")
 // inherits sealed or mixed from the outer search, so a pool on the sealed
 // tab names products. A resolved pool drops its sub-search, so handing the
 // filters back in runs no sub-search again.
-func resolvePools(ds *datastore, config SearchConfig) ([]FilterElem, error) {
+func resolvePools(ds *datastore, p *prices, config SearchConfig) ([]FilterElem, error) {
 	filters := slices.Clone(config.CardFilters)
 	for i := range filters {
 		if filters[i].Name != "pool" {
@@ -2639,7 +2640,7 @@ func resolvePools(ds *datastore, config SearchConfig) ([]FilterElem, error) {
 			sub.DefaultMode = false
 		}
 		members := map[string]bool{}
-		if uuids, err := searchAndFilter(ds, sub); err == nil {
+		if uuids, err := searchAndFilter(ds, p, sub); err == nil {
 			for _, uuid := range uuids {
 				members[uuid] = true
 			}
@@ -2678,9 +2679,9 @@ func poolSeedUUIDs(mode string, filters []FilterElem) ([]string, bool) {
 	return nil, false
 }
 
-func searchAndFilter(ds *datastore, config SearchConfig) ([]string, error) {
+func searchAndFilter(ds *datastore, p *prices, config SearchConfig) ([]string, error) {
 	query := config.CleanQuery
-	filters, err := resolvePools(ds, config)
+	filters, err := resolvePools(ds, p, config)
 	if err != nil {
 		return nil, err
 	}
@@ -2739,7 +2740,7 @@ func searchAndFilter(ds *datastore, config SearchConfig) ([]string, error) {
 		if !seeded {
 			switch config.SearchMode {
 			case "", "prefix", "any":
-				uuids, seeded = storeSeedUUIDs(ds.backend, config)
+				uuids, seeded = storeSeedUUIDs(ds.backend, p, config)
 			}
 		}
 	}
@@ -2780,7 +2781,7 @@ func searchAndFilter(ds *datastore, config SearchConfig) ([]string, error) {
 			// surviving exact matches return directly so the filters run
 			// once either way.
 			if err == nil && len(filters) != 0 {
-				selected := filterUUIDs(ds.backend, uuids, filters)
+				selected := filterUUIDs(ds.backend, p, uuids, filters)
 				if len(selected) != 0 {
 					return selected, nil
 				}
@@ -2807,14 +2808,14 @@ func searchAndFilter(ds *datastore, config SearchConfig) ([]string, error) {
 		}
 	}
 
-	return filterUUIDs(ds.backend, uuids, filters), nil
+	return filterUUIDs(ds.backend, p, uuids, filters), nil
 }
 
 // filterUUIDs returns the uuids that pass every card filter.
-func filterUUIDs(b *matcher.Backend, uuids []string, filters []FilterElem) []string {
+func filterUUIDs(b *matcher.Backend, p *prices, uuids []string, filters []FilterElem) []string {
 	var selected []string
 	for _, uuid := range uuids {
-		if shouldSkipCardNG(b, uuid, filters) {
+		if shouldSkipCardNG(b, p, uuid, filters) {
 			continue
 		}
 		// Doubled when full: append grows a long slice by a quarter, which
@@ -2947,7 +2948,7 @@ func attemptMatch(b *matcher.Backend, query string) ([]string, error) {
 	return uuids, nil
 }
 
-func searchParallel(cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+func searchParallel(p *prices, cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
 	// Initialize up front so callers can always assign into them; when retail or
 	// buylist is skipped the corresponding search is never run and the map would
 	// otherwise stay nil, panicking on the first write (e.g. the INDEX block).
@@ -2960,13 +2961,13 @@ func searchParallel(cardIDs []string, config SearchConfig) (foundSellers map[str
 	wg.Go(func() {
 		defer recoverJob("search sellers scan")
 		if !config.SkipRetail {
-			foundSellers = searchSellers(cardIDs, config)
+			foundSellers = searchSellers(p, cardIDs, config)
 		}
 	})
 	wg.Go(func() {
 		defer recoverJob("search vendors scan")
 		if !config.SkipBuylist {
-			foundVendors = searchVendors(cardIDs, config)
+			foundVendors = searchVendors(p, cardIDs, config)
 		}
 	})
 
@@ -3089,7 +3090,7 @@ func resolveSortingData(b *matcher.Backend, cardIDs []string) map[string]*Sortin
 // among the listed stores: each price4seller/price4vendor call walks
 // the scraper list, so the price sorts must not repeat it per
 // comparison, let alone N log N times.
-func resolveBestPrices(cardIDs []string, stores []string, price4 func(cardId, shorthand string) float64) map[string]float64 {
+func resolveBestPrices(p *prices, cardIDs []string, stores []string, price4 func(*prices, string, string) float64) map[string]float64 {
 	prices := make(map[string]float64, len(cardIDs))
 	for _, cardID := range cardIDs {
 		_, found := prices[cardID]
@@ -3098,7 +3099,7 @@ func resolveBestPrices(cardIDs []string, stores []string, price4 func(cardId, sh
 		}
 		var best float64
 		for _, store := range stores {
-			price := price4(cardID, store)
+			price := price4(p, cardID, store)
 			if price > best {
 				best = price
 			}

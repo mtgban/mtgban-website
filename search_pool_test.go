@@ -24,7 +24,7 @@ func poolSearch(t *testing.T, query, scope string, sealed bool) ([]string, error
 	if sealed {
 		config.SearchMode = "sealed"
 	}
-	keys, err := searchAndFilter(ds, config)
+	keys, err := searchAndFilter(ds, currentPrices(), config)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func TestPoolDefaultModeInherits(t *testing.T) {
 	sub.SearchMode = "any"
 	sub.DefaultMode = true
 	config := SearchConfig{SearchMode: "sealed", CardFilters: []FilterElem{{Name: "pool", Pool: &sub}}}
-	keys, err := searchAndFilter(currentDatastore(), config)
+	keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +258,7 @@ func TestPoolKeepsDecklistCopies(t *testing.T) {
 	ds := currentDatastore()
 
 	config := parseSearchOptionsNG(ds.backend, `decklist:"`+product+`"`, nil, nil, nil)
-	deck, err := searchAndFilter(ds, config)
+	deck, err := searchAndFilter(ds, currentPrices(), config)
 	if err != nil || len(deck) == 0 {
 		t.Fatalf("decklist: %d keys, %v", len(deck), err)
 	}
@@ -268,7 +268,7 @@ func TestPoolKeepsDecklistCopies(t *testing.T) {
 	}
 
 	config = parseSearchOptionsNG(ds.backend, `decklist:"`+product+`" in:`+co.SetCode, nil, nil, nil)
-	pooled, err := searchAndFilter(ds, config)
+	pooled, err := searchAndFilter(ds, currentPrices(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,8 +310,8 @@ func TestContentsSeedMatchesFullWalk(t *testing.T) {
 			t.Errorf("%s: no seed", co.Name)
 			continue
 		}
-		got := filterUUIDs(b, seed, config.CardFilters)
-		want := filterUUIDs(b, all, config.CardFilters)
+		got := filterUUIDs(b, currentPrices(), seed, config.CardFilters)
+		want := filterUUIDs(b, currentPrices(), all, config.CardFilters)
 		slices.Sort(got)
 		slices.Sort(want)
 		if !slices.Equal(slices.Compact(got), slices.Compact(want)) {
@@ -400,7 +400,7 @@ func TestShowAllAndSuggestionsQuoteFilterLikeName(t *testing.T) {
 	if got := quoteIfFilter(config.CleanQuery); got != `"S:P Little Knight"` {
 		t.Errorf("show-all query = %q", got)
 	}
-	didYouMean, alts := searchSuggestions(testSite.datastore(), query, config, nil, nil, false)
+	didYouMean, alts := searchSuggestions(testSite.datastore(), testSite.prices(), query, config, nil, nil, false)
 	if !slices.ContainsFunc(alts, func(alt suggest.AltSearch) bool {
 		return alt.Query == `"S:P Little Knight"`
 	}) {
@@ -508,7 +508,7 @@ func registerCountingSeller(t *testing.T, shorthand string, uuids []string) *ato
 func TestPoolResolvedOncePerSearch(t *testing.T) {
 	skipWithoutDatastore(t)
 	ds := currentDatastore()
-	if _, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, "confetti", nil, nil, nil)); err == nil {
+	if _, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, "confetti", nil, nil, nil)); err == nil {
 		t.Skip("a card is named confetti here; the fallback would not run")
 	}
 	if len(promoTypeMatches(ds.backend, "confetti")) == 0 {
@@ -529,7 +529,7 @@ func TestPoolResolvedOncePerSearch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			reads := registerCountingSeller(t, "POOLCOUNT", tc.uuids)
 			config := parseSearchOptionsNG(ds.backend, "confetti in:(store:POOLCOUNT)", nil, nil, nil)
-			result := runSearch(httptest.NewRequest("GET", "/search", nil), ds, config)
+			result := runSearch(httptest.NewRequest("GET", "/search", nil), ds, currentPrices(), config)
 			if len(result.keys) != 0 || result.message != NoCardsMessage {
 				t.Fatalf("got %d keys, message %q; want no cards", len(result.keys), result.message)
 			}

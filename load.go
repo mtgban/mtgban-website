@@ -167,6 +167,30 @@ func GetVendors() []mtgban.Vendor {
 	return currentPrices().vendors
 }
 
+// filterSellers is the shorthand of every loaded seller predicate keeps.
+func (p *prices) filterSellers(predicate func(mtgban.ScraperInfo) bool) []string {
+	var out []string
+	for _, seller := range p.sellers {
+		info := seller.Info()
+		if predicate(info) {
+			out = append(out, info.Shorthand)
+		}
+	}
+	return out
+}
+
+// filterVendors is filterSellers for the buylist side.
+func (p *prices) filterVendors(predicate func(mtgban.ScraperInfo) bool) []string {
+	var out []string
+	for _, vendor := range p.vendors {
+		info := vendor.Info()
+		if predicate(info) {
+			out = append(out, info.Shorthand)
+		}
+	}
+	return out
+}
+
 // sellerInventory is the inventory of the loaded seller with this
 // shorthand, any case, or an error naming none.
 func (p *prices) sellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
