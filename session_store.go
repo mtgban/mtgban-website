@@ -57,7 +57,7 @@ func dropSessionScraper(kind, shorthand string) {
 	next := slices.DeleteFunc(slices.Clone(p.vendors), func(vendor mtgban.Vendor) bool {
 		return vendor.Info().Shorthand == shorthand
 	})
-	pricesPtr.Store(newPrices(p.sellers, next, p.scrapers))
+	pricesPtr.Store(withVendors(p, next))
 }
 
 // isConfiguredScraper reports whether the dumps bucket's last listing named
