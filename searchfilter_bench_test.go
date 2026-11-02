@@ -28,7 +28,7 @@ func TestPriceFilterCacheConcurrent(t *testing.T) {
 		filters := []*FilterPriceElem{filter}
 		for c := range 500 {
 			cardID := "bench-card-" + strconv.Itoa(c)
-			shouldSkipPriceNG(cardID, mtgban.BuylistEntry{BuyPrice: 6.0, Conditions: "NM"}, filters, "SCR050")
+			shouldSkipPrice(cardID, mtgban.BuylistEntry{BuyPrice: 6.0, Conditions: "NM"}, filters, "SCR050")
 		}
 	})
 	wg.Wait()
@@ -54,8 +54,8 @@ func benchPrice4Store(scrapers []string) func(string, string) float64 {
 }
 
 // runPriceFilterRequest pushes one search-request-shaped workload through
-// shouldSkipPriceNG: nCards cards with four condition entries each, all
-// evaluated against a single price filter, mirroring searchSellersNG's loop.
+// shouldSkipPrice: nCards cards with four condition entries each, all
+// evaluated against a single price filter, mirroring searchSellers's loop.
 func runPriceFilterRequest(nCards int, filter *FilterPriceElem) {
 	filters := []*FilterPriceElem{filter}
 	entries := []mtgban.InventoryEntry{
@@ -67,7 +67,7 @@ func runPriceFilterRequest(nCards int, filter *FilterPriceElem) {
 	for c := range nCards {
 		cardID := "bench-card-" + strconv.Itoa(c)
 		for _, entry := range entries {
-			shouldSkipPriceNG(cardID, entry, filters, "SCR050")
+			shouldSkipPrice(cardID, entry, filters, "SCR050")
 		}
 	}
 }

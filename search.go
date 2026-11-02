@@ -1186,7 +1186,7 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 // the sort reads prices on its own, and runSearch has judged the post
 // filters, so the rest of the result never needs its offers built.
 func collectOffers(b *matcher.Backend, r *http.Request, config SearchConfig, keys []string) (sellers, vendors map[string]map[mtgban.Condition][]SearchEntry) {
-	sellers, vendors = searchParallelNG(keys, config)
+	sellers, vendors = searchParallel(keys, config)
 	if config.CustomBuylist && !config.SkipBuylist {
 		searchCustomBuylist(b, r, keys, vendors)
 	}
@@ -2000,7 +2000,7 @@ func sellerEntryFound(info mtgban.ScraperInfo, cardID string, entry mtgban.Inven
 	if !info.MetadataOnly && shouldSkipEntryNG(entry, config.EntryFilters) {
 		return false
 	}
-	return !shouldSkipPriceNG(cardID, entry, config.PriceFilters, info.Shorthand)
+	return !shouldSkipPrice(cardID, entry, config.PriceFilters, info.Shorthand)
 }
 
 // vendorEntryFound reports whether a vendor's entry for a card passes a
@@ -2009,7 +2009,7 @@ func vendorEntryFound(info mtgban.ScraperInfo, cardID string, entry mtgban.Buyli
 	if shouldSkipEntryNG(entry, config.EntryFilters) {
 		return false
 	}
-	return !shouldSkipPriceNG(cardID, entry, config.PriceFilters, info.Shorthand)
+	return !shouldSkipPrice(cardID, entry, config.PriceFilters, info.Shorthand)
 }
 
 // sellerOfferCondition is the condition a seller's entry is listed under: an
@@ -2031,7 +2031,7 @@ func vendorOfferCondition(info mtgban.ScraperInfo, entry mtgban.BuylistEntry) mt
 	return entry.Conditions
 }
 
-func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry) {
+func searchSellers(cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry) {
 	// Allocate memory
 	foundSellers = map[string]map[mtgban.Condition][]SearchEntry{}
 
@@ -2107,7 +2107,7 @@ func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[st
 	return
 }
 
-func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+func searchVendors(cardIDs []string, config SearchConfig) (foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
 	foundVendors = map[string]map[mtgban.Condition][]SearchEntry{}
 
 	cardIDs = dedupeKeys(cardIDs)
@@ -2120,7 +2120,7 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 		buylist := vendor.Buylist()
 
 		// Fetch the vendor info and its display name once per store, like
-		// in searchSellersNG
+		// in searchSellers
 		info := vendor.Info()
 		name := scraperName(info.Shorthand)
 		restricted := slices.Contains(Config().Stores.SearchBuylistBlockList, info.Shorthand)
@@ -2947,7 +2947,7 @@ func attemptMatch(b *matcher.Backend, query string) ([]string, error) {
 	return uuids, nil
 }
 
-func searchParallelNG(cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+func searchParallel(cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
 	// Initialize up front so callers can always assign into them; when retail or
 	// buylist is skipped the corresponding search is never run and the map would
 	// otherwise stay nil, panicking on the first write (e.g. the INDEX block).
@@ -2960,13 +2960,13 @@ func searchParallelNG(cardIDs []string, config SearchConfig) (foundSellers map[s
 	wg.Go(func() {
 		defer recoverJob("search sellers scan")
 		if !config.SkipRetail {
-			foundSellers = searchSellersNG(cardIDs, config)
+			foundSellers = searchSellers(cardIDs, config)
 		}
 	})
 	wg.Go(func() {
 		defer recoverJob("search vendors scan")
 		if !config.SkipBuylist {
-			foundVendors = searchVendorsNG(cardIDs, config)
+			foundVendors = searchVendors(cardIDs, config)
 		}
 	})
 

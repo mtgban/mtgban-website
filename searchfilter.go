@@ -3276,7 +3276,7 @@ func unpriced(p float64) bool {
 	return p == 0 || math.IsNaN(p) || math.IsInf(p, 0)
 }
 
-func shouldSkipPriceNG[T mtgban.GenericEntry](cardID string, entry T, filters []*FilterPriceElem, shorthand string) bool {
+func shouldSkipPrice[T mtgban.GenericEntry](cardID string, entry T, filters []*FilterPriceElem, shorthand string) bool {
 	if unpriced(entry.Pricing()) {
 		return true
 	}

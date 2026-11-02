@@ -126,8 +126,8 @@ func BenchmarkSetPricesSearchQuery(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		foundSellers := searchSellersNG(uuids, config)
-		foundVendors := searchVendorsNG(uuids, config)
+		foundSellers := searchSellers(uuids, config)
+		foundVendors := searchVendors(uuids, config)
 		if len(foundSellers) == 0 || len(foundVendors) == 0 {
 			b.Fatal("no results")
 		}
@@ -172,8 +172,8 @@ func BenchmarkSetPricesSearchByHash(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		foundSellers := searchSellersNG(benchSetUUIDs, config)
-		foundVendors := searchVendorsNG(benchSetUUIDs, config)
+		foundSellers := searchSellers(benchSetUUIDs, config)
+		foundVendors := searchVendors(benchSetUUIDs, config)
 		if len(foundSellers) == 0 || len(foundVendors) == 0 {
 			b.Fatal("no results")
 		}
@@ -190,8 +190,8 @@ func BenchmarkSetPricesSearchScan(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		foundSellers := searchSellersNG(benchPoolUUIDs, config)
-		foundVendors := searchVendorsNG(benchPoolUUIDs, config)
+		foundSellers := searchSellers(benchPoolUUIDs, config)
+		foundVendors := searchVendors(benchPoolUUIDs, config)
 		if len(foundSellers) == 0 || len(foundVendors) == 0 {
 			b.Fatal("no results")
 		}

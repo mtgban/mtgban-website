@@ -101,7 +101,7 @@ func TestPriceParityRetail(t *testing.T) {
 
 	cardIDs := []string{regular, foil}
 	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
-	found := searchSellersNG(cardIDs, config)
+	found := searchSellers(cardIDs, config)
 
 	api := getSellerPrices(backend(), "", []string{"PARITYA", "PARITYIDX"}, "", cardIDs, "", true, true, false, "")
 
@@ -170,14 +170,14 @@ func TestWalkRepeatedIds(t *testing.T) {
 	cardIDs := []string{regular, regular, regular, regular}
 	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
 
-	found := searchSellersNG(cardIDs, config)
+	found := searchSellers(cardIDs, config)
 	for _, cond := range []mtgban.Condition{mtgban.NM, mtgban.SP, mtgban.PO} {
 		if got := len(found[regular][cond]); got != 1 {
 			t.Errorf("sellers %s rows = %d, want 1", cond, got)
 		}
 	}
 
-	foundBl := searchVendorsNG(cardIDs, config)
+	foundBl := searchVendors(cardIDs, config)
 	for _, cond := range []mtgban.Condition{mtgban.NM, mtgban.SP} {
 		if got := len(foundBl[regular][cond]); got != 1 {
 			t.Errorf("vendors %s rows = %d, want 1", cond, got)
@@ -191,7 +191,7 @@ func TestPriceParityBuylist(t *testing.T) {
 
 	cardIDs := []string{regular}
 	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
-	found := searchVendorsNG(cardIDs, config)
+	found := searchVendors(cardIDs, config)
 
 	api := getVendorPrices(backend(), "", []string{"PARITYV"}, "", cardIDs, "", true, true, false, "")
 
@@ -216,8 +216,8 @@ func TestPriceParityBuylist(t *testing.T) {
 
 // A vendor like SYP flags QuantityPriority because its rows are a count of
 // copies wanted, not an offer; quantityUnit reads that flag into the
-// PriceUnit the template keys its display off. searchSellersNG already
-// copied the flag from Info() - searchVendorsNG silently didn't, so every
+// PriceUnit the template keys its display off. searchSellers already
+// copied the flag from Info() - searchVendors silently didn't, so every
 // buylist result read as a price no matter what the vendor declared.
 func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
 	regular, _, _ := parityCards(t)
@@ -233,7 +233,7 @@ func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
 	withPrices(t, GetSellers(), vendors)
 
 	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
-	found := searchVendorsNG([]string{regular}, config)
+	found := searchVendors([]string{regular}, config)
 
 	var got bool
 	for _, res := range found[regular]["INDEX"] {
@@ -242,7 +242,7 @@ func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
 		}
 	}
 	if !got {
-		t.Error("QuantityPriority did not carry through searchVendorsNG as PriceUnitCount")
+		t.Error("QuantityPriority did not carry through searchVendors as PriceUnitCount")
 	}
 }
 
@@ -351,7 +351,7 @@ func TestSearchDownloadFilters(t *testing.T) {
 	config := SearchConfig{StoreFilters: []FilterStoreElem{{
 		Name: "seller", Values: []string{"paritya"}, OnlyForSeller: true,
 	}}}
-	api := banPricesFromRows(backend(), cardIDs, searchSellersNG(cardIDs, config), "", "", true, true, false)
+	api := banPricesFromRows(backend(), cardIDs, searchSellers(cardIDs, config), "", "", true, true, false)
 	if _, found := api[regular]["PARITYIDX"]; found {
 		t.Error("seller filter should exclude PARITYIDX from the output")
 	}
@@ -364,7 +364,7 @@ func TestSearchDownloadFilters(t *testing.T) {
 	config = SearchConfig{EntryFilters: []FilterEntryElem{{
 		Name: "condition", Values: []string{"NM"}, OnlyForVendor: true,
 	}}}
-	bl := banPricesFromRows(backend(), cardIDs, searchVendorsNG(cardIDs, config), "", "", true, true, true)
+	bl := banPricesFromRows(backend(), cardIDs, searchVendors(cardIDs, config), "", "", true, true, true)
 	if got := bl[regular]["PARITYV"].Conditions.Get("NM"); got != 5 {
 		t.Errorf("conditions[NM] = %v, want 5", got)
 	}
@@ -379,7 +379,7 @@ func TestSearchDownloadFilters(t *testing.T) {
 // TestZeroPricedListings pins how both API paths treat zero-priced listings:
 // they are ignored entirely. The base price is the first nonzero entry, and
 // zero entries contribute neither conditions nor quantities. This is the
-// search walk's semantic (shouldSkipPriceNG drops them), adopted by
+// search walk's semantic (shouldSkipPrice drops them), adopted by
 // processEntry too - the old behavior dropped the whole store when a zero
 // listing sorted first, while still counting its quantity when it didn't.
 func TestZeroPricedListings(t *testing.T) {
