@@ -3449,19 +3449,24 @@ func shouldSkipEntryNG(entry mtgban.GenericEntry, filters []FilterEntryElem) boo
 	return false
 }
 
-func postFilterEmpty(filters []string, cardID string, foundScraper map[string]map[mtgban.Condition][]SearchEntry) bool {
-	return len(foundScraper[cardID]) == 0 ||
-		(len(foundScraper[cardID]) == 1 && len(foundScraper[cardID]["INDEX"]) != 0)
+// postFilterEmpty reports whether the side offers nothing for the card, an
+// INDEX quote alone counting as nothing.
+func postFilterEmpty(filters []string, cardID string, presence offerPresences) bool {
+	pr := presence[cardID]
+	return pr == nil || !pr.offer
 }
 
-func postFilterAny(filters []string, cardID string, foundScraper map[string]map[mtgban.Condition][]SearchEntry) bool {
-	for _, cond := range AllConditions {
-		for _, entry := range foundScraper[cardID][cond] {
-			for _, shorthand := range filters {
-				if strings.ToLower(entry.Shorthand) == shorthand {
-					return false
-				}
-			}
+// postFilterAny reports whether none of the stores in filters offers the card
+// on the side.
+func postFilterAny(filters []string, cardID string, presence offerPresences) bool {
+	pr := presence[cardID]
+	if pr == nil {
+		return true
+	}
+	for _, shorthand := range filters {
+		_, found := pr.stores[shorthand]
+		if found {
+			return false
 		}
 	}
 	return true
@@ -3470,26 +3475,26 @@ func postFilterAny(filters []string, cardID string, foundScraper map[string]map[
 // applyPostFilter dispatches a post-search filter by name, mirroring
 // applyCardFilter. Unknown names panic, preserving the old registry
 // behavior.
-func applyPostFilter(name string, filters []string, cardID string, foundScraper map[string]map[mtgban.Condition][]SearchEntry) bool {
+func applyPostFilter(name string, filters []string, cardID string, presence offerPresences) bool {
 	switch name {
 	case "empty":
-		return postFilterEmpty(filters, cardID, foundScraper)
+		return postFilterEmpty(filters, cardID, presence)
 	case "any":
-		return postFilterAny(filters, cardID, foundScraper)
+		return postFilterAny(filters, cardID, presence)
 	}
 	panic(name + " option not found")
 }
 
-func shouldSkipPostNG(cardID string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry, filters []FilterPostElem) bool {
+func shouldSkipPostNG(cardID string, sellers, vendors offerPresences, filters []FilterPostElem) bool {
 	for i := range filters {
-		var foundScrapers map[string]map[mtgban.Condition][]SearchEntry
+		var presence offerPresences
 		if filters[i].OnlyForSeller {
-			foundScrapers = foundSellers
+			presence = sellers
 		} else if filters[i].OnlyForVendor {
-			foundScrapers = foundVendors
+			presence = vendors
 		} else {
-			resS := applyPostFilter(filters[i].Name, filters[i].Values, cardID, foundSellers)
-			resV := applyPostFilter(filters[i].Name, filters[i].Values, cardID, foundVendors)
+			resS := applyPostFilter(filters[i].Name, filters[i].Values, cardID, sellers)
+			resV := applyPostFilter(filters[i].Name, filters[i].Values, cardID, vendors)
 			res := resS && resV
 			if res {
 				return true
@@ -3497,7 +3502,7 @@ func shouldSkipPostNG(cardID string, foundSellers, foundVendors map[string]map[m
 			continue
 		}
 
-		res := applyPostFilter(filters[i].Name, filters[i].Values, cardID, foundScrapers)
+		res := applyPostFilter(filters[i].Name, filters[i].Values, cardID, presence)
 		if res {
 			return true
 		}
@@ -3506,7 +3511,9 @@ func shouldSkipPostNG(cardID string, foundSellers, foundVendors map[string]map[m
 	return false
 }
 
-func PostSearchFilter(config SearchConfig, allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry) []string {
+// PostSearchFilter keeps the cards the post filters pass, judged on what
+// searchOfferPresence gathered of each side's offers.
+func PostSearchFilter(config SearchConfig, allKeys []string, sellers, vendors offerPresences) []string {
 	if len(config.PostFilters) == 0 {
 		return allKeys
 	}
@@ -3514,7 +3521,7 @@ func PostSearchFilter(config SearchConfig, allKeys []string, foundSellers, found
 	var keepIDs []string
 
 	for _, cardID := range allKeys {
-		if shouldSkipPostNG(cardID, foundSellers, foundVendors, config.PostFilters) {
+		if shouldSkipPostNG(cardID, sellers, vendors, config.PostFilters) {
 			continue
 		}
 		keepIDs = append(keepIDs, cardID)

@@ -693,7 +693,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.NoSort = config.SortMode != ""
 
 	result := runSearch(r, ds, config)
-	applyStoreFactors(result, readStoreFactors(r))
 	if result.message != "" {
 		pageVars.Notices = append(pageVars.Notices, result.message)
 	}
@@ -717,6 +716,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	shown := orderSearchKeys(r, ds, result, pageVars.SearchSort)
 	pageVars.ReverseMode = shown.reversed
 	pageVars.Pagination = shown.pagination
+
+	result.sellers, result.vendors = collectOffers(b, r, config, shown.keys)
+	applyStoreFactors(result, readStoreFactors(r))
 
 	pageVars.Metadata, pageVars.Printings = searchMetadata(ds, shown.keys, preferFlavor)
 
@@ -846,6 +848,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	keys := orderSearchKeys(page, ds, result, readSearchSort(page, config)).keys
+	result.sellers, result.vendors = collectOffers(b, page, config, keys)
 	sortOfferRows(page, keys, result)
 
 	payload, err := json.Marshal(searchPreview(page, b, keys, result))
@@ -1054,7 +1057,8 @@ func sortedEditionKeys(editions *editionsSnapshot, sortOpt string) []string {
 	return sortedKeys
 }
 
-// searchResults are the cards a search found and what each is offered at.
+// searchResults are the cards a search found and, once collectOffers filled
+// sellers and vendors, what the cards it was given are offered at.
 // hashes lists every card found, a decklist's repeats included, and keys each
 // card once; the two share an array unless a repeat was folded, so ordering
 // keys in place orders hashes with it. total is how many cards matched when
@@ -1071,7 +1075,8 @@ type searchResults struct {
 	message string
 }
 
-// runSearch runs the search and collects each card's offers.
+// runSearch finds the cards a search asks for, every one of them judged by
+// the post filters; collectOffers then gathers the offers of the ones shown.
 func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResults {
 	b := ds.backend
 
@@ -1110,15 +1115,13 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 		allKeys = allKeys[:MaxSearchTotalResults]
 	}
 
-	result.sellers, result.vendors = searchParallelNG(allKeys, config)
-
-	// Append the virtual custom buylist when enabled in the upload settings
-	if config.CustomBuylist && !config.SkipBuylist {
-		searchCustomBuylist(b, r, allKeys, result.vendors)
+	// A post filter reads what each card is offered at, so it judges every
+	// card found; the offers themselves are built for the page shown
+	// (collectOffers), so only their presence is gathered here.
+	if len(config.PostFilters) > 0 {
+		sellers, vendors := searchOfferPresence(b, r, allKeys, config)
+		allKeys = PostSearchFilter(config, allKeys, sellers, vendors)
 	}
-
-	// Filter away any empty result
-	allKeys = PostSearchFilter(config, allKeys, result.sellers, result.vendors)
 
 	// Early exit if there no matches are found
 	if len(allKeys) == 0 {
@@ -1155,6 +1158,18 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 	result.odds = dropOdds(b, config)
 
 	return result
+}
+
+// collectOffers gathers what keys are offered at, retail and buylist, the
+// reader's custom buylist included. A page calls it for the cards it shows:
+// the sort reads prices on its own, and runSearch has judged the post
+// filters, so the rest of the result never needs its offers built.
+func collectOffers(b *matcher.Backend, r *http.Request, config SearchConfig, keys []string) (sellers, vendors map[string]map[mtgban.Condition][]SearchEntry) {
+	sellers, vendors = searchParallelNG(keys, config)
+	if config.CustomBuylist && !config.SkipBuylist {
+		searchCustomBuylist(b, r, keys, vendors)
+	}
+	return sellers, vendors
 }
 
 // withoutSealed returns keys without the sealed products, in a new slice.
@@ -1976,6 +1991,25 @@ func vendorEntryFound(info mtgban.ScraperInfo, cardID string, entry mtgban.Buyli
 	return !shouldSkipPriceNG(cardID, entry, config.PriceFilters, info.Shorthand)
 }
 
+// sellerOfferCondition is the condition a seller's entry is listed under: an
+// index source quotes one price, so its entries sit under INDEX, at the top
+// of the results.
+func sellerOfferCondition(info mtgban.ScraperInfo, entry mtgban.InventoryEntry) mtgban.Condition {
+	if info.MetadataOnly {
+		return "INDEX"
+	}
+	return entry.Conditions
+}
+
+// vendorOfferCondition is the same for a vendor's entry; a sealed index
+// keeps the conditions it lists.
+func vendorOfferCondition(info mtgban.ScraperInfo, entry mtgban.BuylistEntry) mtgban.Condition {
+	if info.MetadataOnly && !info.SealedMode {
+		return "INDEX"
+	}
+	return entry.Conditions
+}
+
 func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry) {
 	// Allocate memory
 	foundSellers = map[string]map[mtgban.Condition][]SearchEntry{}
@@ -2018,12 +2052,7 @@ func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[st
 					foundSellers[cardID] = map[mtgban.Condition][]SearchEntry{}
 				}
 
-				// Set conditions - handle the special TCG one that appears
-				// at the top of the results
-				conditions := entry.Conditions
-				if info.MetadataOnly {
-					conditions = "INDEX"
-				}
+				conditions := sellerOfferCondition(info, entry)
 
 				icon := Config().ScraperConfig.Icons[info.Shorthand]
 
@@ -2091,10 +2120,7 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 					foundVendors[cardID] = map[mtgban.Condition][]SearchEntry{}
 				}
 
-				conditions := entry.Conditions
-				if info.MetadataOnly && !info.SealedMode {
-					conditions = "INDEX"
-				}
+				conditions := vendorOfferCondition(info, entry)
 
 				icon := Config().ScraperConfig.Icons[info.Shorthand]
 
@@ -2179,9 +2205,33 @@ func customBuylistSetting(s string) float64 {
 // Append a virtual buylist to search results, priced off the reference
 // seller inventories according to the custom buylist rule settings
 func searchCustomBuylist(b *matcher.Backend, r *http.Request, cardIDs []string, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+	for _, offer := range customBuylistOffers(b, r, cardIDs) {
+		if foundVendors[offer.cardID] == nil {
+			foundVendors[offer.cardID] = map[mtgban.Condition][]SearchEntry{}
+		}
+		foundVendors[offer.cardID][offer.condition] = append(foundVendors[offer.cardID][offer.condition], SearchEntry{
+			ScraperName: "Custom Buylist",
+			Shorthand:   "CUSTOM",
+			Price:       offer.price,
+		})
+	}
+}
+
+// customOffer is one price the custom buylist puts on a card.
+type customOffer struct {
+	cardID    string
+	condition mtgban.Condition
+	price     float64
+}
+
+// customBuylistOffers prices cardIDs off the reference seller inventories
+// according to the reader's custom buylist rule, each card once: a price at
+// every condition the reference lists, or at INDEX when the reference is a
+// price index, which has one meaningful price.
+func customBuylistOffers(b *matcher.Backend, r *http.Request, cardIDs []string) []customOffer {
 	rule := readCustomBuylistRule(r)
 	if rule.rate == 0 {
-		return
+		return nil
 	}
 	rate, minPrice := rule.rate, rule.minPrice
 	releasedBy := time.Now().Add(-customBuylistMinAge)
@@ -2189,12 +2239,11 @@ func searchCustomBuylist(b *matcher.Backend, r *http.Request, cardIDs []string, 
 	singles, _ := findSellerInventory(rule.seller)
 	sealed, _ := findSellerInventory(rule.sealedSeller)
 
-	// Index price sources have a single meaningful price, while regular
-	// retailers list one price per condition
 	isIndex := slices.Contains(UploadIndexComparePriceList, rule.seller)
 
-	// Decklist/hashing searches repeat a key once per copy; foundVendors is
-	// keyed by the unique card, so dedupe to avoid appending an entry per copy.
+	var offers []customOffer
+	// Decklist/hashing searches repeat a key once per copy; the offers are
+	// per card, so dedupe to avoid pricing a card once per copy.
 	for _, cardID := range dedupeKeys(cardIDs) {
 		co, err := b.GetUUID(cardID)
 		if err != nil || customBuylistSkips(b, co, releasedBy) {
@@ -2218,10 +2267,6 @@ func searchCustomBuylist(b *matcher.Backend, r *http.Request, cardIDs []string, 
 			continue
 		}
 
-		if foundVendors[cardID] == nil {
-			foundVendors[cardID] = map[mtgban.Condition][]SearchEntry{}
-		}
-
 		for _, entry := range entries {
 			if entry.Price == 0 {
 				continue
@@ -2230,13 +2275,10 @@ func searchCustomBuylist(b *matcher.Backend, r *http.Request, cardIDs []string, 
 			if !isIndex {
 				condition = entry.Conditions
 			}
-			foundVendors[cardID][condition] = append(foundVendors[cardID][condition], SearchEntry{
-				ScraperName: "Custom Buylist",
-				Shorthand:   "CUSTOM",
-				Price:       entry.Price * rate,
-			})
+			offers = append(offers, customOffer{cardID: cardID, condition: condition, price: entry.Price * rate})
 		}
 	}
+	return offers
 }
 
 // dedupeKeys returns the keys with duplicates removed, preserving first-seen

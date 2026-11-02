@@ -289,7 +289,9 @@ func TestStoreFactorsLeavePriceFiltersOnTheQuotedPrice(t *testing.T) {
 	search := func(query, cookie string) searchResults {
 		r := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query), nil)
 		r.AddCookie(&http.Cookie{Name: storeFactorsCookie, Value: cookie})
-		result := runSearch(r, ds, parseSearchOptionsNG(backend(), query, nil, nil, nil))
+		config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
+		result := runSearch(r, ds, config)
+		result.sellers, result.vendors = collectOffers(ds.backend, r, config, result.keys)
 		applyStoreFactors(result, readStoreFactors(r))
 		return result
 	}
