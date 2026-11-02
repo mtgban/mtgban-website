@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"maps"
 	"math"
 	"net/url"
 	"slices"
@@ -512,6 +514,16 @@ func (st arbitState) apply(b *matcher.Backend, m arbitMode) (*mtgban.ArbitOpts, 
 		}
 	}
 	return opts, arbitRowFilter{limits: l, global: m.Global}
+}
+
+// engineKey names everything apply builds ArbitOpts from in mode m: the
+// spread and difference limits, the picks and the toggles in effect. Two
+// states with one key get the same rows from the engine, whatever their
+// other limits, which only arbitRowFilter applies.
+func (st arbitState) engineKey(m arbitMode) string {
+	l := st.limits(m)
+	toggles := slices.Sorted(maps.Keys(st.applied(m)))
+	return fmt.Sprint(l.MinSpread, l.MinDiff, st.Conditions, st.Finishes, st.Rarities, toggles)
 }
 
 // arbitBar is the filter bar a results page renders: what the reader set

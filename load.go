@@ -54,11 +54,11 @@ var DataBucket simplecloud.Reader
 // prices is one published snapshot of the loaded stores: the retail and
 // buylist sides, the by-shorthand index over them, the Cardmarket product
 // ids and the TCGplayer SKUs the retail side prices, the dumps the bucket
-// listed and the Sleepers tiers' hits found so far. A writer builds the
-// next one whole and publishes it in a single Store, so a reader sees
-// sides and indexes from the same publish. Nothing in a published value
-// is changed in place: the slices GetSellers and GetVendors return are
-// shared and read-only.
+// listed, and the Sleepers tiers' hits and the arbitrage comparisons
+// found so far. A writer builds the next one whole and publishes it in a
+// single Store, so a reader sees sides and indexes from the same publish.
+// Nothing in a published value is changed in place: the slices
+// GetSellers and GetVendors return are shared and read-only.
 type prices struct {
 	sellers  []mtgban.Seller
 	vendors  []mtgban.Vendor
@@ -69,6 +69,9 @@ type prices struct {
 
 	// The Sleepers tiers' hits per pair of these stores
 	sleepers *sleeperCache
+
+	// The arbitrage pages' comparisons of these stores
+	arbit *arbitCache
 }
 
 var (
@@ -97,9 +100,9 @@ func currentPrices() *prices {
 // newPrices builds the snapshot to publish from its parts, indexing the
 // stores by shorthand. The Cardmarket id map and the TCGplayer SKU index
 // are prev's where the sellers each reads are the ones prev's was built
-// from, and built again otherwise, and prev's Sleepers pairs carry across
-// where both their stores do; prev is the snapshot being replaced, nil
-// before the first publish.
+// from, and built again otherwise, and prev's Sleepers pairs and
+// arbitrage comparisons carry across where their stores do; prev is the
+// snapshot being replaced, nil before the first publish.
 func newPrices(prev *prices, sellers []mtgban.Seller, vendors []mtgban.Vendor, scrapers scraperIndex) *prices {
 	p := &prices{
 		sellers:  sellers,
@@ -110,6 +113,7 @@ func newPrices(prev *prices, sellers []mtgban.Seller, vendors []mtgban.Vendor, s
 		scrapers: scrapers,
 	}
 	p.sleepers = sleeperTiersFor(prev, p)
+	p.arbit = arbitHeldFor(prev, p)
 	return p
 }
 
@@ -135,8 +139,8 @@ func tcgSKUsFor(prev *prices, sellers []mtgban.Seller) tcgskuparser.Index {
 
 // withVendors builds the snapshot to publish from p with vendors in place of
 // its buylist side. The sellers and the two indexes built from them carry
-// across as they are, and the Sleepers pairs whose vendor does; only the
-// store index is built again, over both sides.
+// across as they are, and the Sleepers pairs and arbitrage comparisons
+// whose vendor does; only the store index is built again, over both sides.
 func withVendors(p *prices, vendors []mtgban.Vendor) *prices {
 	next := &prices{
 		sellers:  p.sellers,
@@ -147,6 +151,7 @@ func withVendors(p *prices, vendors []mtgban.Vendor) *prices {
 		scrapers: p.scrapers,
 	}
 	next.sleepers = sleeperTiersFor(p, next)
+	next.arbit = arbitHeldFor(p, next)
 	return next
 }
 
