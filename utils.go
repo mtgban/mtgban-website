@@ -813,29 +813,19 @@ func errorResponse(w http.ResponseWriter, status int, msg string) {
 
 // Return the CreditMultiplier for any given vendor, by shorthand in any case
 func findCredit(shorthand string) float64 {
-	vendor, found := currentStoreIndex().vendorFold[strings.ToLower(shorthand)]
-	if !found {
-		return 0
-	}
-	return vendor.Info().CreditMultiplier
+	return currentPrices().credit(shorthand)
 }
 
-// Look up a seller by shorthand, case-insensitively, and return its inventory
+// findSellerInventory is the published snapshot's sellerInventory, for a
+// caller not handed one.
 func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
-	seller, ok := currentStoreIndex().sellerFold[strings.ToLower(shorthand)]
-	if !ok {
-		return nil, errors.New("seller not found")
-	}
-	return seller.Inventory(), nil
+	return currentPrices().sellerInventory(shorthand)
 }
 
-// Look up a vendor by shorthand, case-insensitively, and return its buylist
+// findVendorBuylist is the published snapshot's vendorBuylist, for a caller
+// not handed one.
 func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
-	vendor, ok := currentStoreIndex().vendorFold[strings.ToLower(shorthand)]
-	if !ok {
-		return nil, errors.New("vendor not found")
-	}
-	return vendor.Buylist(), nil
+	return currentPrices().vendorBuylist(shorthand)
 }
 
 // Look up a seller with its name and return its inventory
@@ -935,23 +925,6 @@ func tcgSKU2Condition(sku string) mtgban.Condition {
 		return ""
 	}
 	return entries[0].Conditions
-}
-
-// ckBuylistIDs is Card Kingdom's buylist id for each of cardIDs its buylist
-// carries, for a page's "load buylist" form.
-func ckBuylistIDs(cardIDs []string) map[string]string {
-	bl, err := findVendorBuylist("CK")
-	if err != nil {
-		return nil
-	}
-	ids := map[string]string{}
-	for _, id := range cardIDs {
-		entries, found := bl[id]
-		if found && len(entries) > 0 {
-			ids[id] = entries[0].OriginalID
-		}
-	}
-	return ids
 }
 
 // Look for the original id (product id) of a card in a given inventory
@@ -1801,23 +1774,6 @@ func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T
 	return slice[head:tail], page
 }
 
-// tcgMarketPrices is TCG Market's price for each of cardIDs it prices, for
-// a page to judge other stores' prices by.
-func tcgMarketPrices(cardIDs []string) map[string]float64 {
-	inv, err := findSellerInventory("TCGMarket")
-	if err != nil {
-		return nil
-	}
-	market := map[string]float64{}
-	for _, id := range cardIDs {
-		price := tcgMarketPriceIn(inv, id)
-		if price != 0 {
-			market[id] = price
-		}
-	}
-	return market
-}
-
 // tcgMarketPriceIn probes an already-resolved TCGMarket inventory, so
 // per-row loops resolve the seller once instead of per card.
 func tcgMarketPriceIn(inv mtgban.InventoryRecord, cardID string) float64 {
@@ -1862,42 +1818,30 @@ func getTCGSimulationIQR(productID string) float64 {
 	return entries[0].ExtraValues["iqr"]
 }
 
-// Return the full display name displayed from the input shorthand
+// scraperName is the published snapshot's scraperName, for a caller not
+// handed one.
 func scraperName(shorthand string) string {
-	info, ok := scraperInfo(shorthand)
-	if !ok {
-		// If nothing is found, check if there is a custom override for the shorthand itself
-		return Config().ScraperConfig.NameOverride[shorthand]
-	}
-	override, found := Config().ScraperConfig.NameOverride[info.Name]
-	if found {
-		return override
-	}
-	return info.Name
+	return currentPrices().scraperName(shorthand)
 }
 
-// isSealedScraper says whether the loaded store with this shorthand trades
-// sealed product rather than singles.
+// isSealedScraper is the published snapshot's isSealedScraper, for a caller
+// not handed one.
 func isSealedScraper(shorthand string) bool {
-	info, _ := scraperInfo(shorthand)
-	return info.SealedMode
+	return currentPrices().isSealedScraper(shorthand)
 }
 
-// sealedStores is isSealedScraper's answer for every loaded shorthand, for
-// a page listing stores.
+// sealedStores, ckBuylistIDs and tcgMarketPrices are the published
+// snapshot's, for a caller not handed one.
 func sealedStores() map[string]bool {
-	idx := currentStoreIndex()
-	sealed := make(map[string]bool, len(idx.seller)+len(idx.vendor))
-	for shorthand, seller := range idx.seller {
-		sealed[shorthand] = seller.Info().SealedMode
-	}
-	for shorthand, vendor := range idx.vendor {
-		_, listed := sealed[shorthand]
-		if !listed {
-			sealed[shorthand] = vendor.Info().SealedMode
-		}
-	}
-	return sealed
+	return currentPrices().sealedStores()
+}
+
+func ckBuylistIDs(cardIDs []string) map[string]string {
+	return currentPrices().ckBuylistIDs(cardIDs)
+}
+
+func tcgMarketPrices(cardIDs []string) map[string]float64 {
+	return currentPrices().tcgMarketPrices(cardIDs)
 }
 
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically

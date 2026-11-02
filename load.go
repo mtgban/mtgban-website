@@ -108,6 +108,125 @@ func GetVendors() []mtgban.Vendor {
 	return currentPrices().vendors
 }
 
+// sellerInventory is the inventory of the loaded seller with this
+// shorthand, any case, or an error naming none.
+func (p *prices) sellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
+	seller, ok := p.index.sellerFold[strings.ToLower(shorthand)]
+	if !ok {
+		return nil, errors.New("seller not found")
+	}
+	return seller.Inventory(), nil
+}
+
+// vendorBuylist is sellerInventory for the buylist side.
+func (p *prices) vendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
+	vendor, ok := p.index.vendorFold[strings.ToLower(shorthand)]
+	if !ok {
+		return nil, errors.New("vendor not found")
+	}
+	return vendor.Buylist(), nil
+}
+
+// credit is the store credit multiplier of the loaded vendor with this
+// shorthand, any case, or 0 for none.
+func (p *prices) credit(shorthand string) float64 {
+	vendor, found := p.index.vendorFold[strings.ToLower(shorthand)]
+	if !found {
+		return 0
+	}
+	return vendor.Info().CreditMultiplier
+}
+
+// scraperInfo is the loaded store with exactly this shorthand, seller
+// first, as the scans it replaced did.
+func (p *prices) scraperInfo(shorthand string) (mtgban.ScraperInfo, bool) {
+	if seller, ok := p.index.seller[shorthand]; ok {
+		return seller.Info(), true
+	}
+	if vendor, ok := p.index.vendor[shorthand]; ok {
+		return vendor.Info(), true
+	}
+	return mtgban.ScraperInfo{}, false
+}
+
+// scraperName is the display name of the store with this shorthand: the
+// config's override for its name, else its name; for a shorthand no store
+// has, the config's override for the shorthand itself.
+func (p *prices) scraperName(shorthand string) string {
+	info, ok := p.scraperInfo(shorthand)
+	if !ok {
+		return Config().ScraperConfig.NameOverride[shorthand]
+	}
+	override, found := Config().ScraperConfig.NameOverride[info.Name]
+	if found {
+		return override
+	}
+	return info.Name
+}
+
+// isSealedScraper says whether the loaded store with this shorthand trades
+// sealed product rather than singles.
+func (p *prices) isSealedScraper(shorthand string) bool {
+	info, _ := p.scraperInfo(shorthand)
+	return info.SealedMode
+}
+
+// sealedStores is isSealedScraper's answer for every loaded shorthand, for
+// a page listing stores.
+func (p *prices) sealedStores() map[string]bool {
+	sealed := make(map[string]bool, len(p.index.seller)+len(p.index.vendor))
+	for shorthand, seller := range p.index.seller {
+		sealed[shorthand] = seller.Info().SealedMode
+	}
+	for shorthand, vendor := range p.index.vendor {
+		_, listed := sealed[shorthand]
+		if !listed {
+			sealed[shorthand] = vendor.Info().SealedMode
+		}
+	}
+	return sealed
+}
+
+// ckBuylistIDs is Card Kingdom's buylist id for each of cardIDs its buylist
+// carries, for a page's "load buylist" form.
+func (p *prices) ckBuylistIDs(cardIDs []string) map[string]string {
+	bl, err := p.vendorBuylist("CK")
+	if err != nil {
+		return nil
+	}
+	ids := map[string]string{}
+	for _, id := range cardIDs {
+		entries, found := bl[id]
+		if found && len(entries) > 0 {
+			ids[id] = entries[0].OriginalID
+		}
+	}
+	return ids
+}
+
+// tcgMarketPrices is TCG Market's price for each of cardIDs it prices, for
+// a page to judge other stores' prices by.
+func (p *prices) tcgMarketPrices(cardIDs []string) map[string]float64 {
+	inv, err := p.sellerInventory("TCGMarket")
+	if err != nil {
+		return nil
+	}
+	market := map[string]float64{}
+	for _, id := range cardIDs {
+		price := tcgMarketPriceIn(inv, id)
+		if price != 0 {
+			market[id] = price
+		}
+	}
+	return market
+}
+
+// storeOf is the store that publishes shorthand, per the dumps listing.
+func (p *prices) storeOf(shorthand string) (string, bool) {
+	store, ok := p.scrapers.byShorthand[shorthand]
+	return store, ok
+}
+
 // storeIndex is the by-shorthand lookup over one snapshot's sides, keyed
 // both exactly and in lower case so each lookup keeps the match the scan it
 // replaced made. It is built with the snapshot it indexes, so it cannot
@@ -156,19 +275,6 @@ func buildStoreIndex(sellers []mtgban.Seller, vendors []mtgban.Vendor) storeInde
 		}
 	}
 	return idx
-}
-
-// scraperInfo returns the loaded store with exactly this shorthand, seller
-// first, as the scans it replaces did.
-func scraperInfo(shorthand string) (mtgban.ScraperInfo, bool) {
-	idx := currentStoreIndex()
-	if seller, ok := idx.seller[shorthand]; ok {
-		return seller.Info(), true
-	}
-	if vendor, ok := idx.vendor[shorthand]; ok {
-		return vendor.Info(), true
-	}
-	return mtgban.ScraperInfo{}, false
 }
 
 type ScraperConfig struct {
@@ -253,11 +359,10 @@ func scraperStoreConfig() map[string]map[string][]string {
 	return currentScraperIndex().byStore
 }
 
-// scraperStoreOf returns the store that publishes shorthand, per the last
-// listing - the dashboard's per-row "Id" column.
+// scraperStoreOf is the published snapshot's storeOf, for a caller not
+// handed one: the dashboard's per-row "Id" column.
 func scraperStoreOf(shorthand string) (string, bool) {
-	store, ok := currentScraperIndex().byShorthand[shorthand]
-	return store, ok
+	return currentPrices().storeOf(shorthand)
 }
 
 // updateScraperIndexStore replaces store's entry in the published index
