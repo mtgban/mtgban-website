@@ -477,12 +477,12 @@ test('a sync hands the store adjustments to their mirror', () => {
     expect(source).toContain('window.StoreFactors.mirror()');
 });
 
-test('base.html loads store-factors.js before settings.js', () => {
+test('base.html loads store-factors.js with the page and settings.js through its loader', () => {
     const html = readFileSync(new URL('../templates/base.html', import.meta.url), 'utf8');
-    const factorsIdx = html.indexOf('/js/store-factors.js');
-    const settingsIdx = html.indexOf('/js/settings.js');
-    expect(factorsIdx).toBeGreaterThan(-1);
-    expect(factorsIdx).toBeLessThan(settingsIdx);
+    expect(html).toContain('/js/store-factors.js');
+    expect(html).not.toContain('/js/settings.js');
+    const loader = readFileSync(new URL('../js/settings-loader.js', import.meta.url), 'utf8');
+    expect(loader).toContain("'/js/settings.js'");
 });
 
 test('base-mobile.html loads store-factors.js after cookies.js', () => {

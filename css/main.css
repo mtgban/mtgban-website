@@ -36,7 +36,11 @@ nearly black #292929
  */
 
 /* Global font scaling: adjust html { font-size } to scale all text sizes together. */
-html { font-size: 17px; }
+html {
+    font-size: 17px;
+    /* Reserved, so a modal hiding the page's scrollbar does not shift the page */
+    scrollbar-gutter: stable;
+}
 
 :root {
     --white: #f8f8f8;

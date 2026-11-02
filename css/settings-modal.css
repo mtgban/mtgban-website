@@ -606,39 +606,6 @@ html:has(.settings-modal.open) { overflow: hidden; }
     to   { transform: scaleX(0); }
 }
 
-/* ── Navbar gear button (matches .ban-nav-ext / .ban-theme-toggle hover) ── */
-.ban-settings-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 7px;
-    border-radius: var(--radius-sm, 6px);
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    color: var(--greytext);
-    text-decoration: none;
-    transition: background 0.12s ease, color 0.12s ease;
-}
-.ban-settings-btn:hover {
-    background: var(--surface-3, var(--navbackground));
-    color: var(--ainfo);
-}
-.ban-settings-btn.is-disabled {
-    color: var(--text-dim);
-    opacity: 0.4;
-    cursor: not-allowed;
-    pointer-events: none;
-}
-.ban-settings-btn.is-disabled:hover {
-    background: transparent;
-    color: var(--text-dim);
-}
-
-/* Reserve the scrollbar gutter so the page doesn't shift when settings opens */
-html {
-    scrollbar-gutter: stable;
-}
 body.settings-open {
     overflow: hidden;
 }

@@ -378,7 +378,11 @@
         if (modalEl && backdropEl) return true;
         modalEl = document.getElementById('settings-modal');
         backdropEl = document.getElementById('settings-backdrop');
-        return !!(modalEl && backdropEl);
+        if (!modalEl || !backdropEl) return false;
+        // Hidden in the markup until this script and its sheet are in
+        modalEl.hidden = false;
+        backdropEl.hidden = false;
+        return true;
     }
 
     function updateDirtyUI() {
@@ -621,14 +625,19 @@
         setTimeout(function () { openSettings(tab); }, 0);
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    function init() {
         bindModalChrome();
         if (ensureEls()) openFromQuery();
         consumeSavedToast();
-    });
+    }
+
+    // Loaded on demand (js/settings-loader.js), usually after the document is in
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
     document.addEventListener('keydown', onKeydown);
 
-    // Globals used by the nav gear's inline onclick fallback.
+    // Globals used by the nav gear's inline onclick fallback, and by the
+    // loader, which held them until now.
     window.openSettings = openSettings;
     window.closeSettings = closeModal;
 

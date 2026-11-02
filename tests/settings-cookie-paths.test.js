@@ -137,7 +137,7 @@ async function openModal({ pathname, cookie, values }) {
     new Function('window', 'document', 'fetch', 'sessionStorage',
         'with (window) {' + cookiesSrc + '\n' + settingsSrc + '}')(window, document, fetch, sessionStorage);
 
-    docListeners.DOMContentLoaded();
+    // The document is in when the loader runs settings.js, which sets up at once
     window.openSettings('arbit');
     await new Promise(r => setTimeout(r, 10));
 
