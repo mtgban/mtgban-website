@@ -49,49 +49,70 @@ const (
 
 var DataBucket simplecloud.Reader
 
-// Snapshots of the loaded retail and buylist data. Held behind atomic.Pointer
-// so readers always observe a fully-constructed, immutable slice and writers
-// publish via a single atomic store. Mutating the slice returned by
-// GetSellers/GetVendors is a bug — treat it as read-only.
-var (
-	sellersPtr atomic.Pointer[[]mtgban.Seller]
-	vendorsPtr atomic.Pointer[[]mtgban.Vendor]
+// prices is one published snapshot of the loaded stores: the retail and
+// buylist sides, the by-shorthand index over them and the dumps the bucket
+// listed. A writer builds the next one whole and publishes it in a single
+// Store, so a reader sees sides and indexes from the same publish. Nothing
+// in a published value is changed in place: the slices GetSellers and
+// GetVendors return are shared and read-only.
+type prices struct {
+	sellers  []mtgban.Seller
+	vendors  []mtgban.Vendor
+	index    storeIndex
+	scrapers scraperIndex
+}
 
-	// Serializes writers so concurrent updateSellers/updateVendors calls
-	// don't lose each other's changes during the read-modify-publish cycle.
+var (
+	// pricesPtr holds the published snapshot, nil until the first publish.
+	pricesPtr atomic.Pointer[prices]
+
+	// emptyPrices is served until then, so currentPrices is never nil
+	// whatever reads first.
+	emptyPrices = newPrices(nil, nil, *newScraperIndex())
+
+	// Serializes writers so concurrent publishes don't lose each other's
+	// changes during the read-build-publish cycle.
 	scrapersWriteMu sync.Mutex
 )
+
+// currentPrices returns the published snapshot, or the empty one before the
+// first publish. Never nil.
+func currentPrices() *prices {
+	p := pricesPtr.Load()
+	if p == nil {
+		return emptyPrices
+	}
+	return p
+}
+
+// newPrices builds the snapshot to publish from its parts, indexing the
+// stores by shorthand.
+func newPrices(sellers []mtgban.Seller, vendors []mtgban.Vendor, scrapers scraperIndex) *prices {
+	return &prices{
+		sellers:  sellers,
+		vendors:  vendors,
+		index:    buildStoreIndex(sellers, vendors),
+		scrapers: scrapers,
+	}
+}
 
 // GetSellers returns the current sellers snapshot. The returned slice is
 // shared and MUST NOT be modified by callers.
 func GetSellers() []mtgban.Seller {
-	p := sellersPtr.Load()
-	if p == nil {
-		return nil
-	}
-	return *p
+	return currentPrices().sellers
 }
 
 // GetVendors returns the current vendors snapshot. The returned slice is
 // shared and MUST NOT be modified by callers.
 func GetVendors() []mtgban.Vendor {
-	p := vendorsPtr.Load()
-	if p == nil {
-		return nil
-	}
-	return *p
+	return currentPrices().vendors
 }
 
-// storeIndex is the by-shorthand lookup over one pair of snapshots, keyed
+// storeIndex is the by-shorthand lookup over one snapshot's sides, keyed
 // both exactly and in lower case so each lookup keeps the match the scan it
-// replaced made. It is derived from the snapshots on the first lookup after
-// either pointer changes, rather than rebuilt where they are published: the
-// tests store a snapshot from two hundred places, and a stale index there
-// would pass as a missing store. A published snapshot is never changed in
-// place, so its pointer alone says whether the index still holds.
+// replaced made. It is built with the snapshot it indexes, so it cannot
+// describe another one.
 type storeIndex struct {
-	sellers *[]mtgban.Seller
-	vendors *[]mtgban.Vendor
 	// seller and vendor are keyed by the exact shorthand, sellerFold and
 	// vendorFold by its lower case.
 	seller     map[string]mtgban.Seller
@@ -100,35 +121,21 @@ type storeIndex struct {
 	vendorFold map[string]mtgban.Vendor
 }
 
-var storeIndexPtr atomic.Pointer[storeIndex]
-
-// currentStoreIndex returns the index for the snapshots as published now,
-// building it when either moved. Two callers racing the build publish the
-// same answer, so the last store wins harmlessly.
+// currentStoreIndex returns the published snapshot's index.
 func currentStoreIndex() *storeIndex {
-	sellers, vendors := sellersPtr.Load(), vendorsPtr.Load()
-	idx := storeIndexPtr.Load()
-	if idx != nil && idx.sellers == sellers && idx.vendors == vendors {
-		return idx
+	return &currentPrices().index
+}
+
+// buildStoreIndex indexes the stores by shorthand. First wins on a
+// duplicate, as the scans this replaced did.
+func buildStoreIndex(sellers []mtgban.Seller, vendors []mtgban.Vendor) storeIndex {
+	idx := storeIndex{
+		seller:     make(map[string]mtgban.Seller, len(sellers)),
+		vendor:     make(map[string]mtgban.Vendor, len(vendors)),
+		sellerFold: make(map[string]mtgban.Seller, len(sellers)),
+		vendorFold: make(map[string]mtgban.Vendor, len(vendors)),
 	}
-	var sellerList []mtgban.Seller
-	if sellers != nil {
-		sellerList = *sellers
-	}
-	var vendorList []mtgban.Vendor
-	if vendors != nil {
-		vendorList = *vendors
-	}
-	idx = &storeIndex{
-		sellers:    sellers,
-		vendors:    vendors,
-		seller:     make(map[string]mtgban.Seller, len(sellerList)),
-		vendor:     make(map[string]mtgban.Vendor, len(vendorList)),
-		sellerFold: make(map[string]mtgban.Seller, len(sellerList)),
-		vendorFold: make(map[string]mtgban.Vendor, len(vendorList)),
-	}
-	// First wins on a duplicate, as the scans this replaces did.
-	for _, seller := range sellerList {
+	for _, seller := range sellers {
 		key := seller.Info().Shorthand
 		if _, dup := idx.seller[key]; !dup {
 			idx.seller[key] = seller
@@ -138,7 +145,7 @@ func currentStoreIndex() *storeIndex {
 			idx.sellerFold[key] = seller
 		}
 	}
-	for _, vendor := range vendorList {
+	for _, vendor := range vendors {
 		key := vendor.Info().Shorthand
 		if _, dup := idx.vendor[key]; !dup {
 			idx.vendor[key] = vendor
@@ -148,7 +155,6 @@ func currentStoreIndex() *storeIndex {
 			idx.vendorFold[key] = vendor
 		}
 	}
-	storeIndexPtr.Store(idx)
 	return idx
 }
 
@@ -225,22 +231,20 @@ func buildScraperIndex(byStore map[string]map[string][]string) *scraperIndex {
 	return idx
 }
 
-// scraperIndexPtr holds the currently published scraperIndex, next to
-// sellersPtr/vendorsPtr above. Only loadScrapersNG (full replace) and
-// updateScraperIndexStore (single-store replace) publish to it.
-var scraperIndexPtr atomic.Pointer[scraperIndex]
-
-// emptyScraperIndex is served before the first listing publishes.
-var emptyScraperIndex = newScraperIndex()
-
-// currentScraperIndex returns the live scraperIndex, or an empty one before
-// the first load. Never nil.
+// currentScraperIndex returns the published snapshot's scraperIndex, empty
+// before the first listing. Never nil.
 func currentScraperIndex() *scraperIndex {
-	idx := scraperIndexPtr.Load()
-	if idx != nil {
-		return idx
-	}
-	return emptyScraperIndex
+	return &currentPrices().scrapers
+}
+
+// publishScrapers publishes the snapshot with scrapers in place of the
+// listing it holds. Only loadScrapersNG (full replace) and
+// updateScraperIndexStore (single-store replace) call it, holding
+// scrapersWriteMu.
+func publishScrapers(scrapers scraperIndex) {
+	next := *currentPrices()
+	next.scrapers = scrapers
+	pricesPtr.Store(&next)
 }
 
 // scraperStoreConfig returns the current store -> kind -> shorthands map.
@@ -269,7 +273,7 @@ func updateScraperIndexStore(store string, kinds map[string][]string) {
 	maps.Copy(next.byStore, current.byStore)
 	maps.Copy(next.byShorthand, current.byShorthand)
 	next.replaceStore(store, kinds)
-	scraperIndexPtr.Store(next)
+	publishScrapers(*next)
 }
 
 // parseDumpKey parses a bucket key of the form
@@ -445,7 +449,7 @@ func loadScrapersNG(bucket simplecloud.Reader, stores []string) error {
 	// Publish before loading, so no reader sees every store as unknown
 	// during the load, and a concurrent /api/load isn't overwritten.
 	scrapersWriteMu.Lock()
-	scraperIndexPtr.Store(idx)
+	publishScrapers(*idx)
 	scrapersWriteMu.Unlock()
 
 	type scraperLoad struct {
@@ -618,7 +622,8 @@ func updateSellers(scraper mtgban.Scraper) error {
 	scrapersWriteMu.Lock()
 	defer scrapersWriteMu.Unlock()
 
-	current := GetSellers()
+	p := currentPrices()
+	current := p.sellers
 
 	sellerIndex := -1
 	for i, s := range current {
@@ -638,7 +643,7 @@ func updateSellers(scraper mtgban.Scraper) error {
 	if err != nil {
 		return err
 	}
-	sellersPtr.Store(&next)
+	pricesPtr.Store(newPrices(next, p.vendors, p.scrapers))
 
 	log.Printf("%s inventory updated at position %d", scraper.Info().Shorthand, sellerIndex)
 	return nil
@@ -704,7 +709,8 @@ func updateVendors(scraper mtgban.Scraper) error {
 	scrapersWriteMu.Lock()
 	defer scrapersWriteMu.Unlock()
 
-	current := GetVendors()
+	p := currentPrices()
+	current := p.vendors
 
 	vendorIndex := -1
 	for i, v := range current {
@@ -723,7 +729,7 @@ func updateVendors(scraper mtgban.Scraper) error {
 	if err != nil {
 		return err
 	}
-	vendorsPtr.Store(&next)
+	pricesPtr.Store(newPrices(p.sellers, next, p.scrapers))
 
 	log.Printf("%s buylist updated at position %d", scraper.Info().Shorthand, vendorIndex)
 	return nil

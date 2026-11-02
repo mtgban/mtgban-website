@@ -106,8 +106,8 @@ func apiLimited(t *testing.T, reqs ...*http.Request) []bool {
 		vendorsPtr.Store(prevVendors)
 		APIRateLimiter = prevLimiter
 	})
-	sellers := []mtgban.Seller{nil}
-	vendors := []mtgban.Vendor{nil}
+	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
+	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
 	sellersPtr.Store(&sellers)
 	vendorsPtr.Store(&vendors)
 	APIRateLimiter = ratelimit.NewLimiter(rate.Every(time.Hour), 1)
