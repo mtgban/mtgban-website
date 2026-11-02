@@ -57,6 +57,19 @@ func fixtureBackend(setCode, setName, releaseDate string, cards [][2]string) *ma
 	return b
 }
 
+// fixtureSite is a private site over b, serving sellers and vendors until
+// the test ends (withPrices): real-shaped cards and prices without the
+// datastore load, so a feature test runs under MTGBAN_TEST_DATASTORE=off.
+// Stores registered later through updateSellers or updateVendors join the
+// snapshot and are put back with it.
+func fixtureSite(tb testing.TB, b *matcher.Backend, sellers []mtgban.Seller, vendors []mtgban.Vendor) *site {
+	tb.Helper()
+	s := newSite()
+	s.ds.Store(s.newDatastore(b, time.Now()))
+	withPrices(tb, sellers, vendors)
+	return s
+}
+
 // TestDatastorePublishSwapsEverySnapshotAtOnce publishes two small, distinct
 // fixture backends in turn and checks that every derived snapshot - numbers,
 // editions, names and the palette lists - describes the same load as the
