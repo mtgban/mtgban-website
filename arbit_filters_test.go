@@ -385,7 +385,7 @@ func TestArbitMinQuantitySparesSellersWithout(t *testing.T) {
 
 	r := httptest.NewRequest("GET", "/arbit?source=NOQTY&minqty=1", nil)
 	w := httptest.NewRecorder()
-	scraperCompare(testSite.datastore(), w, r, PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"NOQTY"}, nil, scraperCompareOpts{AllResults: true})
+	scraperCompare(testSite.datastore(), testSite.prices(), w, r, PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"NOQTY"}, nil, scraperCompareOpts{AllResults: true})
 	if !strings.Contains(w.Body.String(), `data-arb-id="`+cardID+`"`) {
 		t.Error("a minimum quantity empties the table of a seller that publishes none")
 	}
@@ -437,7 +437,7 @@ func TestArbitStoreLinksCarryState(t *testing.T) {
 		r := httptest.NewRequest("GET", "/global?source=LINKSRC"+query, nil)
 		w := httptest.NewRecorder()
 		pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: true}, UserNav: &NavElem{Short: "beta"}}
-		scraperCompare(testSite.datastore(), w, r, pageVars, []string{"LINKSRC", "LINKOTH"}, nil, scraperCompareOpts{AllResults: true})
+		scraperCompare(testSite.datastore(), testSite.prices(), w, r, pageVars, []string{"LINKSRC", "LINKOTH"}, nil, scraperCompareOpts{AllResults: true})
 		return w.Body.String()
 	}
 
@@ -508,7 +508,7 @@ func TestArbitSavedCookies(t *testing.T) {
 		r.Header.Set("Cookie", cookies)
 		w := httptest.NewRecorder()
 		pageVars.UserNav = &NavElem{Short: "beta"}
-		scraperCompare(testSite.datastore(), w, r, pageVars, allow, nil, scraperCompareOpts{AllResults: true})
+		scraperCompare(testSite.datastore(), testSite.prices(), w, r, pageVars, allow, nil, scraperCompareOpts{AllResults: true})
 		return w.Body.String()
 	}
 	for _, tt := range []struct {
@@ -657,7 +657,7 @@ func TestArbitApplyKeepsReverseTradable(t *testing.T) {
 	r := httptest.NewRequest("GET", "/arbit?source=CARRYSRC", nil)
 	r.Header.Set("Cookie", "ArbitFilters="+url.QueryEscape("f=1&tradable=0&t=1"))
 	w := httptest.NewRecorder()
-	scraperCompare(testSite.datastore(), w, r, PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"CARRYSRC"}, nil, scraperCompareOpts{AllResults: true})
+	scraperCompare(testSite.datastore(), testSite.prices(), w, r, PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"CARRYSRC"}, nil, scraperCompareOpts{AllResults: true})
 	if !strings.Contains(w.Body.String(), `<input type="hidden" name="tradable" value="0" data-carry>`) {
 		t.Fatal("arbit's form does not carry the saved only Tradable")
 	}
@@ -750,7 +750,7 @@ func TestGlobalPreviewCannotSteerItsSample(t *testing.T) {
 		r := httptest.NewRequest("GET", "/global?source=PREVIDX&f=1&legit=0"+query, nil)
 		w := httptest.NewRecorder()
 		pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: true}, UserNav: &NavElem{Short: "beta"}}
-		scraperCompare(testSite.datastore(), w, r, pageVars, []string{"PREVIDX"}, nil, scraperCompareOpts{})
+		scraperCompare(testSite.datastore(), testSite.prices(), w, r, pageVars, []string{"PREVIDX"}, nil, scraperCompareOpts{})
 		return strings.Count(w.Body.String(), `data-arb-id="`)
 	}
 	all := rows("")
@@ -837,7 +837,7 @@ func TestArbitBarShowsTheCarriedLimit(t *testing.T) {
 	r := httptest.NewRequest("GET", "/arbit?source=CARRYSRC", nil)
 	r.Header.Set("Cookie", "ArbitFilters="+url.QueryEscape("f=1&mindiff=-500&t=1"))
 	w := httptest.NewRecorder()
-	scraperCompare(testSite.datastore(), w, r, PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"CARRYSRC"}, nil, scraperCompareOpts{AllResults: true})
+	scraperCompare(testSite.datastore(), testSite.prices(), w, r, PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"CARRYSRC"}, nil, scraperCompareOpts{AllResults: true})
 	body := w.Body.String()
 	for _, want := range []string{
 		`<input type="hidden" name="mindiff" value="-500" data-limit>`,

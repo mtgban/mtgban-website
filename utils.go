@@ -1830,20 +1830,6 @@ func isSealedScraper(shorthand string) bool {
 	return currentPrices().isSealedScraper(shorthand)
 }
 
-// sealedStores, ckBuylistIDs and tcgMarketPrices are the published
-// snapshot's, for a caller not handed one.
-func sealedStores() map[string]bool {
-	return currentPrices().sealedStores()
-}
-
-func ckBuylistIDs(cardIDs []string) map[string]string {
-	return currentPrices().ckBuylistIDs(cardIDs)
-}
-
-func tcgMarketPrices(cardIDs []string) map[string]float64 {
-	return currentPrices().tcgMarketPrices(cardIDs)
-}
-
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
 // by their resolved display name (case-insensitive). Stable for equal names.
 func sortKeysByScraperName(keys []string) []string {

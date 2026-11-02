@@ -126,7 +126,7 @@ func renderReverse(t *testing.T, query string) string {
 	r := httptest.NewRequest("GET", "/reverse?"+query, nil)
 	w := httptest.NewRecorder()
 	pageVars := PageVars{ReverseMode: true, UserNav: &NavElem{Short: "beta"}}
-	scraperCompare(testSite.datastore(), w, r, pageVars, nil, nil, scraperCompareOpts{AllResults: true})
+	scraperCompare(testSite.datastore(), testSite.prices(), w, r, pageVars, nil, nil, scraperCompareOpts{AllResults: true})
 	return w.Body.String()
 }
 
@@ -314,7 +314,7 @@ func TestArbitAppliesOnlyShownFilters(t *testing.T) {
 		r := httptest.NewRequest("GET", "/?source=FILTSHOP"+tt.query, nil)
 		w := httptest.NewRecorder()
 		pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: tt.global}, UserNav: &NavElem{Short: "beta"}}
-		scraperCompare(testSite.datastore(), w, r, pageVars, []string{"FILTSHOP"}, nil, scraperCompareOpts{AllResults: true})
+		scraperCompare(testSite.datastore(), testSite.prices(), w, r, pageVars, []string{"FILTSHOP"}, nil, scraperCompareOpts{AllResults: true})
 		got := strings.Contains(w.Body.String(), row)
 		if got != tt.want {
 			t.Errorf("global=%v source=FILTSHOP%s lists the row: %v, want %v", tt.global, tt.query, got, tt.want)
@@ -359,7 +359,7 @@ func renderGlobal(t *testing.T, source, query string) string {
 	r := httptest.NewRequest("GET", "/global?source="+source+query, nil)
 	w := httptest.NewRecorder()
 	pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: true}, UserNav: &NavElem{Short: "beta"}}
-	scraperCompare(testSite.datastore(), w, r, pageVars, []string{source}, nil, scraperCompareOpts{AllResults: true})
+	scraperCompare(testSite.datastore(), testSite.prices(), w, r, pageVars, []string{source}, nil, scraperCompareOpts{AllResults: true})
 	return w.Body.String()
 }
 

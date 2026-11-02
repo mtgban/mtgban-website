@@ -252,7 +252,7 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 		EditionsByCategory: ds.editions.AllEditionsByCategory,
 	}
 	v.SellerKeys, v.VendorKeys = searchSettingsKeys()
-	v.SealedStores = sealedStores()
+	v.SealedStores = s.prices().sealedStores()
 
 	up := uploadSettingsKeys(sig)
 	v.UploadAltKeys = up.AltKeys

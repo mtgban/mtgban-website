@@ -580,6 +580,7 @@ type SearchVars struct {
 func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
+	p := s.prices()
 	sig := verifiedSignature(r)
 
 	pageVars := genPageNav(s, r, "Search", sig)
@@ -621,7 +622,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// desktop modal asks /api/settings/modal for them when it opens.
 	if pageVars.IsMobile {
 		pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys()
-		pageVars.SealedStores = sealedStores()
+		pageVars.SealedStores = p.sealedStores()
 	}
 
 	page := r.FormValue("page")
@@ -736,7 +737,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	rebuildIndexRows(&pageVars.SearchVars, pageVars.Metadata, b, config, shown.keys, result)
 
-	fillSearchResults(&pageVars.SearchVars, b, query, config, result, shown.keys)
+	fillSearchResults(&pageVars.SearchVars, b, p, query, config, result, shown.keys)
 
 	// CHART ALL THE THINGS
 	if roster.id != "" {
@@ -1179,7 +1180,7 @@ func withoutSealed(b *matcher.Backend, keys []string) []string {
 // fillSearchResults puts the cards found on the page: the page of them with
 // their offers, how many there are, and the contents switch for a sealed
 // product that has one.
-func fillSearchResults(pageVars *SearchVars, b *matcher.Backend, query string, config SearchConfig, result searchResults, keys []string) {
+func fillSearchResults(pageVars *SearchVars, b *matcher.Backend, p *prices, query string, config SearchConfig, result searchResults, keys []string) {
 	// Offered once the search has found cards to switch between. A product
 	// that holds nothing but other products answers with those products: rows
 	// on the page, but not cards, and reading them another way finds nothing.
@@ -1198,7 +1199,7 @@ func fillSearchResults(pageVars *SearchVars, b *matcher.Backend, query string, c
 	pageVars.AllKeys = keys
 	pageVars.FoundSellers = result.sellers
 	pageVars.FoundVendors = result.vendors
-	pageVars.TCGMarketPrices = tcgMarketPrices(keys)
+	pageVars.TCGMarketPrices = p.tcgMarketPrices(keys)
 }
 
 // searchPage is the page of results to show: its cards in the order asked

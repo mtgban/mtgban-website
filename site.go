@@ -202,6 +202,12 @@ func (s *site) datastore() *datastore {
 	return s.ds.Load()
 }
 
+// prices returns the served price snapshot: the process's one snapshot,
+// read once per unit of work where it starts and handed down.
+func (s *site) prices() *prices {
+	return currentPrices()
+}
+
 func (s *site) backend() *matcher.Backend {
 	return s.datastore().backend
 }

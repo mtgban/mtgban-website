@@ -392,7 +392,7 @@ func arbit(s *site, ds *datastore, w http.ResponseWriter, r *http.Request, rever
 
 	start := time.Now()
 
-	scraperCompare(ds, w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+	scraperCompare(ds, s.prices(), w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults:    true,
 		CustomBuylist: customRule,
 	})
@@ -455,7 +455,7 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	scraperCompare(s.datastore(), w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+	scraperCompare(s.datastore(), s.prices(), w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults: anyEnabled,
 		AnySpread:  anySpread,
 	})
@@ -611,7 +611,7 @@ func customBuylistEntries(inventory []mtgban.InventoryEntry, rule customBuylistR
 	return entries
 }
 
-func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
+func scraperCompare(ds *datastore, p *prices, w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
 	r.ParseForm()
 	b := ds.backend
 
@@ -745,7 +745,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 	}
 
 	pageVars.ScraperShort = source.Info().Shorthand
-	pageVars.SealedSource = isSealedScraper(source.Info().Shorthand)
+	pageVars.SealedSource = p.isSealedScraper(source.Info().Shorthand)
 
 	pageVars.Arb = []Arbitrage{}
 	pageVars.Metadata = map[string]GenericCard{}
@@ -987,7 +987,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 			ids = append(ids, entry.CardID)
 		}
 	}
-	pageVars.CKBuylistIDs = ckBuylistIDs(ids)
+	pageVars.CKBuylistIDs = p.ckBuylistIDs(ids)
 
 	if pageVars.GlobalMode {
 		pageVars.Title = "Market Imbalance in " + scraperName(source.Info().Shorthand)

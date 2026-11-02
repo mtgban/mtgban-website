@@ -797,7 +797,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			cardIDs = append(cardIDs, entry.CardID)
 		}
 	}
-	pageVars.CKBuylistIDs = ckBuylistIDs(cardIDs)
+	pageVars.CKBuylistIDs = s.prices().ckBuylistIDs(cardIDs)
 
 	// Logs
 	user := GetParamFromSig(sig, "UserEmail")
