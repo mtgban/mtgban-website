@@ -1813,12 +1813,6 @@ func isSealedScraper(shorthand string) bool {
 	return currentPrices().isSealedScraper(shorthand)
 }
 
-// sealedStores is the published snapshot's sealedStores, for a caller not
-// handed one.
-func sealedStores() map[string]bool {
-	return currentPrices().sealedStores()
-}
-
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
 // by their resolved display name (case-insensitive). Stable for equal names.
 func sortKeysByScraperName(keys []string) []string {

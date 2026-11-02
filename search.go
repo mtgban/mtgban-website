@@ -581,6 +581,7 @@ type SearchVars struct {
 func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
+	p := s.prices()
 	sig := verifiedSignature(r)
 
 	pageVars := genPageNav(s, r, "Search", sig)
@@ -622,7 +623,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// desktop modal asks /api/settings/modal for them when it opens.
 	if pageVars.IsMobile {
 		pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys()
-		pageVars.SealedStores = sealedStores()
+		pageVars.SealedStores = p.sealedStores()
 	}
 
 	page := r.FormValue("page")
