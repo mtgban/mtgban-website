@@ -709,8 +709,8 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 			allKeys = withoutSealed(b, allKeys)
 		}
 		sortSearchKeys(r, ds, allKeys, dropOdds(b, config), readSearchSort(r, config))
-		if len(allKeys) > MaxSearchTotalResults {
-			allKeys = allKeys[:MaxSearchTotalResults]
+		if len(allKeys) > MaxAPISearchResults {
+			allKeys = allKeys[:MaxAPISearchResults]
 		}
 	}
 
@@ -800,13 +800,15 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 
 }
 
-// writeSearchCSV downloads the search as the page lists it: the same cut,
-// post filters and order, with the offers the page shows, keyed by BAN UUID
-// so foil and nonfoil stay separate. CSV is never the demo mode.
+// writeSearchCSV downloads the search as the page lists it: the same post
+// filters and order, with the offers the page shows, keyed by BAN UUID so
+// foil and nonfoil stay separate, up to MaxAPISearchResults cards. CSV is
+// never the demo mode.
 func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datastore, config SearchConfig, sig string, retail, buylist bool, tagName string) {
 	b := ds.backend
 	result := runSearch(r, ds, config)
 	sortSearchKeys(r, ds, result.keys, result.odds, readSearchSort(r, config))
+	result.keys = result.keys[:min(len(result.keys), MaxAPISearchResults)]
 	result.sellers, result.vendors = collectOffers(b, r, config, result.keys)
 
 	setCSVDownloadHeaders(w, "ban_search.csv")

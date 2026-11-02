@@ -48,6 +48,9 @@ const (
 	// form value each, plus the mode, under the 10,000 values Go's form
 	// parser takes before it hands back an empty form.
 	MaxUploadTransfer = 9999
+	// MaxAPISearchResults is the most cards a price API search or a search
+	// CSV export answers with: each builds every card's offers, not a page's.
+	MaxAPISearchResults = MaxUploadTransfer
 )
 
 var (
