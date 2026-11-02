@@ -78,7 +78,7 @@ func BenchmarkSearchAndFilter(b *testing.B) {
 			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				out, err := searchAndFilter(currentDatastore(), config)
+				out, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 				if err != nil {
 					b.Fatal(err)
 				}

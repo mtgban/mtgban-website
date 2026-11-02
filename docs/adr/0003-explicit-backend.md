@@ -39,7 +39,9 @@ Every change is reviewed against seven rules:
    load, so it would keep the empty datastore forever.
 3. **Pass the narrowest thing.** A function that only matches cards takes
    `b *matcher.Backend` first, after a `ctx`; one that reads a derived
-   snapshot takes `ds *datastore`. Neither goes into `SearchConfig`,
+   snapshot takes `ds *datastore`; one that reads the loaded stores takes
+   `p *prices`, read once with `s.prices()` where the work starts, as the
+   arbitrage and Sleepers pages do. None goes into `SearchConfig`,
    `PageVars` or any other data struct.
 4. **Read-only.** A published backend is shared by every goroutine, and
    accessors such as `GetUUIDs`, `GetAllSets` and `SearchEquals` return its
@@ -136,7 +138,7 @@ guard, and the root package runs in 3 s, or 31 s under `-race`.
   assumes one. Moving the rest is Phase D:
   - `Config`: some `Config.Game` readers already hold a `b` whose `Game`
     would do;
-  - the scrapers (`sellersPtr`/`vendorsPtr`, `scrapersWriteMu`, load.go)
+  - the prices snapshot (`pricesPtr`, `scrapersWriteMu`, load.go)
     and the session stores;
   - the caches built from prices (newspaper, reprints, infos, TCG catalog,
     screener, popular searches): plain values that pin nothing, but can lag

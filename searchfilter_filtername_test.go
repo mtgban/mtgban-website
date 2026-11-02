@@ -112,7 +112,7 @@ func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
 					queries = append(queries, genQuery(co))
 				}
 				for _, query := range queries {
-					keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
+					keys, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 					if err != nil {
 						t.Errorf("%q does not run: %v", query, err)
 						continue

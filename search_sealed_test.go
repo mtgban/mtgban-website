@@ -10,9 +10,9 @@ func sealedSearch(t *testing.T, query string) []string {
 	config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
 	config.SearchMode = "sealed"
 
-	keys, err := searchAndFilter(currentDatastore(), config)
+	keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 	if err != nil {
-		keys = searchFallback(currentDatastore(), config)
+		keys = searchFallback(currentDatastore(), currentPrices(), config)
 	}
 	return keys
 }

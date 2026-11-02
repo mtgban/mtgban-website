@@ -33,7 +33,7 @@ import (
 // tried, and the cards it finds are walked once: what the rest of the
 // query finds for a filter is the cards every other filter tried keeps.
 // A walk of the datastore follows for each filter a key stands in for.
-func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, packs map[string]map[string]bool, sealed bool) ([]string, bool) {
+func rekeyFilters(ds *datastore, p *prices, name, filters []string, pinned []FilterElem, packs map[string]map[string]bool, sealed bool) ([]string, bool) {
 	if len(filters) > maxRekeyFilters {
 		return filters, false
 	}
@@ -129,7 +129,7 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, pa
 			}
 		}
 	}
-	found, err := searchAndFilter(ds, config)
+	found, err := searchAndFilter(ds, p, config)
 	if err != nil {
 		return filters, false
 	}
@@ -142,7 +142,7 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, pa
 		if err != nil {
 			continue
 		}
-		dropped, by := droppedBy(ds.backend, tries, co)
+		dropped, by := droppedBy(ds.backend, p, tries, co)
 		for j := range tries {
 			if dropped == 0 || (dropped == 1 && by == j) {
 				exactRest[j] = true
@@ -155,10 +155,10 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, pa
 			continue
 		}
 		// A card is in a filter's rest when no other filter tried drops it.
-		dropped, by := droppedBy(ds.backend, tries, co)
+		dropped, by := droppedBy(ds.backend, p, tries, co)
 		for j := range tries {
 			if (dropped == 0 || (dropped == 1 && by == j)) && (exact[cardID] || !exactRest[j]) {
-				tries[j].try(ds.backend, co)
+				tries[j].try(ds.backend, p, co)
 			}
 		}
 	}
@@ -175,7 +175,7 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, pa
 			}
 			// Asked only of a filter some key would stand in for: the
 			// walk covers the whole datastore when the value names nothing.
-			if t.typed == nil || !readsAnywhere(ds, t.typed.filter[0], t.key, sealed) {
+			if t.typed == nil || !readsAnywhere(ds, p, t.typed.filter[0], t.key, sealed) {
 				out[t.index] = c.token
 				rekeyed = true
 			}
@@ -187,9 +187,9 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, pa
 
 // droppedBy counts the filters tried that drop a card, and names the last
 // of them; a store filter drops no card.
-func droppedBy(b *matcher.Backend, tries []rekeyTry, co *matcher.CardObject) (dropped, by int) {
+func droppedBy(b *matcher.Backend, p *prices, tries []rekeyTry, co *matcher.CardObject) (dropped, by int) {
 	for j, t := range tries {
-		if t.typed != nil && shouldSkipCard(b, co, t.typed.filter) {
+		if t.typed != nil && shouldSkipCard(b, p, co, t.typed.filter) {
 			dropped, by = dropped+1, j
 		}
 	}
@@ -208,27 +208,27 @@ type rekeyTry struct {
 
 // try reads a card the rest of the query finds, past the filter as typed
 // once that reads its value.
-func (t *rekeyTry) try(b *matcher.Backend, co *matcher.CardObject) {
+func (t *rekeyTry) try(b *matcher.Backend, p *prices, co *matcher.CardObject) {
 	if t.typed != nil {
-		t.typed.try(b, co)
+		t.typed.try(b, p, co)
 		if !t.typed.failed() {
 			return
 		}
 	}
 	for j := range t.candidates {
 		for k := range t.candidates[j].parts {
-			t.candidates[j].parts[k].try(b, co)
+			t.candidates[j].parts[k].try(b, p, co)
 		}
 	}
 }
 
 // readsAnywhere reports whether a filter keeps a card somewhere in the
 // datastore and reads its value there, as a filter naming nothing does not.
-func readsAnywhere(ds *datastore, elem FilterElem, key string, sealed bool) bool {
-	p := newRekeyPart(ds, elem, key, sealed)
+func readsAnywhere(ds *datastore, p *prices, elem FilterElem, key string, sealed bool) bool {
+	part := newRekeyPart(ds, elem, key, sealed)
 	for _, co := range ds.backend.UUIDs {
-		p.try(ds.backend, co)
-		if !p.failed() {
+		part.try(ds.backend, p, co)
+		if !part.failed() {
 			return true
 		}
 	}
@@ -308,19 +308,19 @@ type rekeyPart struct {
 	keeps, readsValue bool
 }
 
-func (p *rekeyPart) try(b *matcher.Backend, co *matcher.CardObject) {
-	if !p.failed() {
+func (part *rekeyPart) try(b *matcher.Backend, p *prices, co *matcher.CardObject) {
+	if !part.failed() {
 		return
 	}
-	skip := shouldSkipCard(b, co, p.filter)
-	p.keeps = p.keeps || !skip
-	if !p.readsValue && skip != shouldSkipCard(b, co, p.nonsense) {
-		p.readsValue = true
+	skip := shouldSkipCard(b, p, co, part.filter)
+	part.keeps = part.keeps || !skip
+	if !part.readsValue && skip != shouldSkipCard(b, p, co, part.nonsense) {
+		part.readsValue = true
 	}
 }
 
-func (p rekeyPart) failed() bool {
-	return !p.keeps || !p.readsValue
+func (part rekeyPart) failed() bool {
+	return !part.keeps || !part.readsValue
 }
 
 // nonsenseValue is a filter value that names nothing, to tell a key that

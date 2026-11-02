@@ -156,8 +156,8 @@ func mergePopular(organic, curated []PopularSearch, floor int) []PopularSearch {
 
 // getPopularSearches is the landing strip: the organic ranking first, the
 // curated config list padding it to popularFloor.
-func getPopularSearches(ds *datastore) []PopularSearch {
-	curated := curatedPopularSearches(ds)
+func getPopularSearches(ds *datastore, p *prices) []PopularSearch {
+	curated := curatedPopularSearches(ds, p)
 	var organic []PopularSearch
 	if snap := popularOrganicSnapshot(); snap != nil {
 		for _, t := range snap.Tiles {
@@ -171,7 +171,7 @@ func getPopularSearches(ds *datastore) []PopularSearch {
 // thumbnail, reusing the regular search pipeline. The result is cached and
 // rebuilt whenever the configured queries change (e.g. after a config
 // reload) or while the datastore is still loading.
-func curatedPopularSearches(ds *datastore) []PopularSearch {
+func curatedPopularSearches(ds *datastore, p *prices) []PopularSearch {
 	cfg := Config().PopularSearches
 
 	popularSearchesMu.Lock()
@@ -191,7 +191,7 @@ func curatedPopularSearches(ds *datastore) []PopularSearch {
 	var out []PopularSearch
 	usedImages := make(map[string]struct{})
 	for _, q := range cfg {
-		uuids := popularTopCards(ds, q.Query)
+		uuids := popularTopCards(ds, p, q.Query)
 		if len(uuids) == 0 {
 			continue
 		}
@@ -200,7 +200,7 @@ func curatedPopularSearches(ds *datastore) []PopularSearch {
 		// thumbnail; fall back to the query's results when unresolved or when
 		// its images are already used by another tile.
 		if q.Card != "" {
-			if ids, err := searchAndFilter(ds, parseSearchQuery(ds, q.Card, nil, nil, nil)); err == nil && len(ids) > 0 {
+			if ids, err := searchAndFilter(ds, p, parseSearchQuery(ds, q.Card, nil, nil, nil)); err == nil && len(ids) > 0 {
 				candidateIDs = append(append([]string{}, ids...), uuids...)
 			}
 		}
@@ -251,15 +251,15 @@ func firstUnusedPopularCard(ids []string, usedImages map[string]struct{}, resolv
 // popularTopCards runs a tile's query and orders the results the way the
 // tile wants them: searchAndFilter leaves sort:retail to the caller, since
 // that needs live prices.
-func popularTopCards(ds *datastore, query string) []string {
+func popularTopCards(ds *datastore, p *prices, query string) []string {
 	config := parseSearchQuery(ds, query, nil, nil, nil)
-	uuids, err := searchAndFilter(ds, config)
+	uuids, err := searchAndFilter(ds, p, config)
 	if err != nil || len(uuids) == 0 {
 		return nil
 	}
 	if config.SortMode == "retail" {
 		sortData := resolveSortingData(ds.backend, uuids)
-		prices := resolveBestPrices(uuids, defaultSellerPriorityOpt, price4seller)
+		prices := resolveBestPrices(p, uuids, defaultSellerPriorityOpt, price4seller)
 		sort.Slice(uuids, func(i, j int) bool {
 			priceI, priceJ := prices[uuids[i]], prices[uuids[j]]
 			if priceI == priceJ {
@@ -293,7 +293,7 @@ func popularRankQuery(b *matcher.Backend, rank observability.SearchRank) (search
 // resolvePopularRanks turns a ranking into tiles, in rank order, skipping
 // a key that no longer resolves or a card wider than popularMaxPrintings,
 // and never showing the same art twice.
-func resolvePopularRanks(ds *datastore, ranks []observability.SearchRank) []PopularTile {
+func resolvePopularRanks(ds *datastore, p *prices, ranks []observability.SearchRank) []PopularTile {
 	var out []PopularTile
 	usedImages := make(map[string]struct{})
 	for _, rank := range ranks {
@@ -301,7 +301,7 @@ func resolvePopularRanks(ds *datastore, ranks []observability.SearchRank) []Popu
 		if searchQuery == "" {
 			continue
 		}
-		ids := popularTopCards(ds, searchQuery)
+		ids := popularTopCards(ds, p, searchQuery)
 		// Every printing of a basic land is too wide a search to feature
 		if strings.HasPrefix(rank.Key, "card:") && len(ids) > popularMaxPrintings {
 			continue
@@ -347,6 +347,7 @@ func (s *site) refreshPopularSearches() {
 		return
 	}
 	ds := s.datastore()
+	p := s.prices()
 	if len(ds.backend.GetUUIDs()) == 0 {
 		// No datastore yet: its load runs this once it is in.
 		return
@@ -371,7 +372,7 @@ func (s *site) refreshPopularSearches() {
 		backgroundJobs.Report(jobPopular, "", "rank: "+err.Error())
 		return
 	}
-	tiles := resolvePopularRanks(ds, ranks)
+	tiles := resolvePopularRanks(ds, p, ranks)
 	popularOrganicPtr.Store(&popularOrganic{At: now, Tiles: tiles})
 	if len(ranks) > 0 && len(tiles) == 0 {
 		backgroundJobs.Report(jobPopular, "", fmt.Sprintf("none of %d ranked keys resolved", len(ranks)))

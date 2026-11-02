@@ -92,7 +92,7 @@ func TestTheSearchPageHandsOverTheReadableQuery(t *testing.T) {
 // and carries no link.
 func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 	skipWithoutDatastore(t)
-	uuids, err := searchAndFilter(currentDatastore(), parseSearchOptionsWrapper("Plaguecrafter s:SLD cns:1116jpn f:nonfoil"))
+	uuids, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsWrapper("Plaguecrafter s:SLD cns:1116jpn f:nonfoil"))
 	if err != nil || len(uuids) != 1 {
 		t.Skipf("expected one printing, got %d (%v)", len(uuids), err)
 	}

@@ -67,8 +67,8 @@ func TestSearchMarksRestrictedStores(t *testing.T) {
 		rows []SearchEntry
 		want string
 	}{
-		{"seller", searchSellers([]string{"card"}, SearchConfig{})["card"]["NM"], "RHID"},
-		{"vendor", searchVendors([]string{"card"}, SearchConfig{})["card"]["NM"], "BHID"},
+		{"seller", searchSellers(currentPrices(), []string{"card"}, SearchConfig{})["card"]["NM"], "RHID"},
+		{"vendor", searchVendors(currentPrices(), []string{"card"}, SearchConfig{})["card"]["NM"], "BHID"},
 	} {
 		if len(tc.rows) != 3 {
 			t.Fatalf("%s: got %d rows, want 3", tc.kind, len(tc.rows))

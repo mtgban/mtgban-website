@@ -116,10 +116,10 @@ func TestAPIOnlyStoresStayOffArbitrage(t *testing.T) {
 	}
 
 	for name, c := range map[string]struct{ got, want []string }{
-		"arbit grid":   {arbitVendorKeys(arbitBlockedVendors(""), false), []string{"REVBUY"}},
-		"reverse grid": {arbitVendorKeys(arbitBlockedVendors(""), true), []string{"PROBESHOP", "REVSHOP"}},
-		"global grid":  {globalVendorKeys(globalProbeBlocklist()), []string{"PROBESHOP"}},
-		"global probe": {globalProbeBlocklist(), []string{"REVSHOP", "APISHOP"}},
+		"arbit grid":   {arbitVendorKeys(currentPrices(), arbitBlockedVendors(""), false), []string{"REVBUY"}},
+		"reverse grid": {arbitVendorKeys(currentPrices(), arbitBlockedVendors(""), true), []string{"PROBESHOP", "REVSHOP"}},
+		"global grid":  {globalVendorKeys(currentPrices(), globalProbeBlocklist(currentPrices())), []string{"PROBESHOP"}},
+		"global probe": {globalProbeBlocklist(currentPrices()), []string{"REVSHOP", "APISHOP"}},
 	} {
 		if !slices.Equal(c.got, c.want) {
 			t.Errorf("%s = %v, want %v", name, c.got, c.want)

@@ -584,6 +584,7 @@ func (s *site) SearchExport(w http.ResponseWriter, r *http.Request) {
 // isAPI, else as the site's CSV export.
 func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) {
 	ds := s.datastore()
+	p := s.prices()
 	b := ds.backend
 	// The API middleware checks a ?sig= and lets a request without one
 	// through unchecked, so a cookie counts only once it is checked here.
@@ -704,11 +705,11 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	// Perform search; the download runs the page's own further down
 	var allKeys []string
 	if !isCSV {
-		allKeys, _ = searchAndFilter(ds, config)
+		allKeys, _ = searchAndFilter(ds, p, config)
 		if config.SkipSealed {
 			allKeys = withoutSealed(b, allKeys)
 		}
-		sortSearchKeys(r, ds, allKeys, dropOdds(b, config), readSearchSort(r, config))
+		sortSearchKeys(r, ds, p, allKeys, dropOdds(b, config), readSearchSort(r, config))
 		if len(allKeys) > MaxAPISearchResults {
 			allKeys = allKeys[:MaxAPISearchResults]
 		}
@@ -735,7 +736,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	}
 
 	if keyScoped {
-		sellers, vendors := apiEnabledStores(storesOpt)
+		sellers, vendors := apiEnabledStores(p, storesOpt)
 		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
 			Name:          "seller",
 			Values:        fixupStoreCodeNG(strings.Join(sellers, ",")),
@@ -748,7 +749,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	}
 
 	if isCSV {
-		writeSearchCSV(w, r, s, ds, config, sig, isRetail && canRetail, isBuylist && canBuylist, tagName)
+		writeSearchCSV(w, r, s, ds, p, config, sig, isRetail && canRetail, isBuylist && canBuylist, tagName)
 		return
 	}
 
@@ -763,9 +764,9 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 			cfg.StoreFilters = demoFilter("seller", true)
 		}
 		if isV2JSON {
-			retailV2 = sellerSearchV2(b, idOpt, allKeys, cfg, isSealed)
+			retailV2 = sellerSearchV2(b, p, idOpt, allKeys, cfg, isSealed)
 		} else {
-			foundSellers = searchSellers(allKeys, cfg)
+			foundSellers = searchSellers(p, allKeys, cfg)
 			out.Retail = banPricesFromRows(b, allKeys, foundSellers, idOpt, tagName, true, true, false)
 		}
 	}
@@ -775,9 +776,9 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 			cfg.StoreFilters = demoFilter("vendor", false)
 		}
 		if isV2JSON {
-			buylistV2 = vendorSearchV2(b, idOpt, allKeys, cfg, isSealed)
+			buylistV2 = vendorSearchV2(b, p, idOpt, allKeys, cfg, isSealed)
 		} else {
-			foundVendors = searchVendors(allKeys, cfg)
+			foundVendors = searchVendors(p, allKeys, cfg)
 			out.Buylist = banPricesFromRows(b, allKeys, foundVendors, idOpt, tagName, true, true, true)
 		}
 	}
@@ -785,7 +786,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	if isV2JSON {
 		out.Meta.Version = APIVersionV2
 		w.Header().Set("Content-Type", "application/json")
-		err := writeV2Response(w, b, out.Meta, retailV2, buylistV2)
+		err := writeV2Response(w, b, p, out.Meta, retailV2, buylistV2)
 		if err != nil {
 			log.Println("API v2 search write:", err)
 		}
@@ -804,12 +805,12 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 // filters and order, with the offers the page shows, keyed by BAN UUID so
 // foil and nonfoil stay separate, up to MaxAPISearchResults cards. CSV is
 // never the demo mode.
-func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datastore, config SearchConfig, sig string, retail, buylist bool, tagName string) {
+func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datastore, p *prices, config SearchConfig, sig string, retail, buylist bool, tagName string) {
 	b := ds.backend
-	result := runSearch(r, ds, config)
-	sortSearchKeys(r, ds, result.keys, result.odds, readSearchSort(r, config))
+	result := runSearch(r, ds, p, config)
+	sortSearchKeys(r, ds, p, result.keys, result.odds, readSearchSort(r, config))
 	result.keys = result.keys[:min(len(result.keys), MaxAPISearchResults)]
-	result.sellers, result.vendors = collectOffers(b, r, config, result.keys)
+	result.sellers, result.vendors = collectOffers(b, p, r, config, result.keys)
 
 	setCSVDownloadHeaders(w, "ban_search.csv")
 	var results map[string]map[string]*BanPrice

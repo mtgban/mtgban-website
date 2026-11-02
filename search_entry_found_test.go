@@ -50,11 +50,11 @@ func TestEntryFoundBySide(t *testing.T) {
 			sinfo := info
 			sinfo.MetadataOnly = tc.metadata
 
-			got := sellerEntryFound(sinfo, "card", s, config)
+			got := sellerEntryFound(currentPrices(), sinfo, "card", s, config)
 			if got != tc.wantSeller {
 				t.Errorf("seller entry found %v, want %v", got, tc.wantSeller)
 			}
-			got = vendorEntryFound(info, "card", v, config)
+			got = vendorEntryFound(currentPrices(), info, "card", v, config)
 			if got != tc.wantVendor {
 				t.Errorf("vendor entry found %v, want %v", got, tc.wantVendor)
 			}
@@ -80,8 +80,8 @@ func TestEntryFoundAllocatesNothing(t *testing.T) {
 	}
 
 	allocs := testing.AllocsPerRun(100, func() {
-		sellerEntryFound(info, "card", seller, config)
-		vendorEntryFound(info, "card", vendor, config)
+		sellerEntryFound(currentPrices(), info, "card", seller, config)
+		vendorEntryFound(currentPrices(), info, "card", vendor, config)
 	})
 	if allocs != 0 {
 		t.Errorf("judging a seller's and a vendor's entry allocates %v times", allocs)

@@ -28,7 +28,7 @@ func keptBy(b *matcher.Backend, query string) []string {
 	config := parseSearchOptionsNG(b, query, nil, nil, nil)
 	var kept []string
 	for _, uuid := range b.AllUUIDs {
-		skip := shouldSkipCardNG(b, uuid, config.CardFilters)
+		skip := shouldSkipCardNG(b, currentPrices(), uuid, config.CardFilters)
 		if !skip {
 			kept = append(kept, uuid)
 		}

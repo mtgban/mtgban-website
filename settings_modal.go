@@ -15,11 +15,11 @@ import (
 
 // searchSettingsKeys lists every loaded seller and vendor the site shows,
 // in display order.
-func searchSettingsKeys() (sellers, vendors []string) {
+func searchSettingsKeys(p *prices) (sellers, vendors []string) {
 	shown := func(info mtgban.ScraperInfo) bool {
 		return !Config().apiOnly(info.Shorthand)
 	}
-	return sortKeysByScraperName(filterSellers(shown)), sortKeysByScraperName(filterVendors(shown))
+	return sortKeysByScraperName(p, p.filterSellers(shown)), sortKeysByScraperName(p, p.filterVendors(shown))
 }
 
 // arbitBlockedVendors is the reader's ArbitDisabledVendors grant; NONE, or
@@ -38,20 +38,20 @@ func arbitBlockedVendors(sig string) []string {
 
 // arbitVendorKeys is the Arbitrage or Reverse vendor grid, in display order.
 // In reverse mode the vendor column is a seller; same blocklist.
-func arbitVendorKeys(blocklistVendors []string, reverse bool) []string {
+func arbitVendorKeys(p *prices, blocklistVendors []string, reverse bool) []string {
 	notBlocked := func(info mtgban.ScraperInfo) bool {
 		return !slices.Contains(blocklistVendors, info.Shorthand)
 	}
 	if reverse {
-		return sortKeysByScraperName(filterSellers(notBlocked))
+		return sortKeysByScraperName(p, p.filterSellers(notBlocked))
 	}
-	return sortKeysByScraperName(filterVendors(notBlocked))
+	return sortKeysByScraperName(p, p.filterVendors(notBlocked))
 }
 
 // globalProbeBlocklist is every seller outside the Global probe list, and
 // every one only the price API serves.
-func globalProbeBlocklist() []string {
-	return filterSellers(func(info mtgban.ScraperInfo) bool {
+func globalProbeBlocklist(p *prices) []string {
+	return p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		return !slices.Contains(Config().Stores.GlobalProbeList, info.Shorthand) ||
 			Config().apiOnly(info.Shorthand)
 	})
@@ -60,8 +60,8 @@ func globalProbeBlocklist() []string {
 // globalVendorKeys is the Global vendor grid, in display order: the sellers
 // Global compares against, which its GlobalVendorsList cookie hides, less
 // the unactionable sealed ones it never compares against.
-func globalVendorKeys(blocklistVendors []string) []string {
-	return sortKeysByScraperName(filterSellers(func(info mtgban.ScraperInfo) bool {
+func globalVendorKeys(p *prices, blocklistVendors []string) []string {
+	return sortKeysByScraperName(p, p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		return comparableSeller(info) &&
 			!slices.Contains(blocklistVendors, info.Shorthand) && !Config().apiOnly(info.Shorthand)
 	}))
@@ -79,12 +79,12 @@ func sleepBlocklists(sig string) (retail, buylist []string) {
 
 // sleepModalKeys is the Sleepers tab's store grids, before the reader's own
 // hide cookie is applied, so a hidden store still shows, ticked.
-func sleepModalKeys(blocklistRetail, blocklistBuylist []string) (sellers, vendors []string) {
-	sellers = filterSellers(func(info mtgban.ScraperInfo) bool {
+func sleepModalKeys(p *prices, blocklistRetail, blocklistBuylist []string) (sellers, vendors []string) {
+	sellers = p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		return info.CountryFlag == "" && !info.SealedMode && !info.MetadataOnly &&
 			!slices.Contains(blocklistRetail, info.Shorthand)
 	})
-	vendors = filterVendors(func(info mtgban.ScraperInfo) bool {
+	vendors = p.filterVendors(func(info mtgban.ScraperInfo) bool {
 		return info.CountryFlag == "" && !info.SealedMode && !info.MetadataOnly &&
 			!slices.Contains(blocklistBuylist, info.Shorthand)
 	})
@@ -93,22 +93,22 @@ func sleepModalKeys(blocklistRetail, blocklistBuylist []string) (sellers, vendor
 
 // uploadStoreLists is every store an upload may be priced against, by kind.
 // Sellers skip MetadataOnly entries; vendors do not.
-func uploadStoreLists(sig string) (singlesSellers, sealedSellers, singlesVendors, sealedVendors []string) {
+func uploadStoreLists(p *prices, sig string) (singlesSellers, sealedSellers, singlesVendors, sealedVendors []string) {
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
-	singlesSellers = filterSellers(func(info mtgban.ScraperInfo) bool {
+	singlesSellers = p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		return !info.MetadataOnly && !info.SealedMode &&
 			!slices.Contains(blocklistRetail, info.Shorthand)
 	})
-	sealedSellers = filterSellers(func(info mtgban.ScraperInfo) bool {
+	sealedSellers = p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		return !info.MetadataOnly && info.SealedMode &&
 			!slices.Contains(Config().Stores.UploadSealedBlockList, info.Shorthand) &&
 			!Config().apiOnly(info.Shorthand)
 	})
-	singlesVendors = filterVendors(func(info mtgban.ScraperInfo) bool {
+	singlesVendors = p.filterVendors(func(info mtgban.ScraperInfo) bool {
 		return !info.SealedMode &&
 			!slices.Contains(blocklistBuylist, info.Shorthand)
 	})
-	sealedVendors = filterVendors(func(info mtgban.ScraperInfo) bool {
+	sealedVendors = p.filterVendors(func(info mtgban.ScraperInfo) bool {
 		return info.SealedMode &&
 			!slices.Contains(Config().Stores.UploadSealedBlockList, info.Shorthand) &&
 			!Config().apiOnly(info.Shorthand)
@@ -127,10 +127,10 @@ type uploadModalKeys struct {
 
 // uploadSettingsKeys reads the Upload tab's data for a verified sig, with
 // the custom buylist gate readUploadSettings applies.
-func uploadSettingsKeys(sig string) uploadModalKeys {
+func uploadSettingsKeys(p *prices, sig string) uploadModalKeys {
 	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
 	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
-	singlesSellers, sealedSellers, _, _ := uploadStoreLists(sig)
+	singlesSellers, sealedSellers, _, _ := uploadStoreLists(p, sig)
 	return uploadModalKeys{
 		AltKeys:          UploadIndexComparePriceList,
 		SellerKeys:       singlesSellers,
@@ -236,6 +236,7 @@ func settingsBodyFiles() (baseName string, files []string) {
 // their navbar earns, and each tab's lists from the code its page runs.
 func settingsModalData(s *site, r *http.Request) settingsModalVars {
 	ds := s.datastore()
+	p := s.prices()
 	// Behind noSigning, so only a sig this host wrote earns tabs
 	sig := verifiedSignature(r)
 	nav := genPageNav(s, r, "", sig).Nav
@@ -251,21 +252,21 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 		EditionsCategories: ds.editions.AllEditionsCategoriesSorted,
 		EditionsByCategory: ds.editions.AllEditionsByCategory,
 	}
-	v.SellerKeys, v.VendorKeys = searchSettingsKeys()
-	v.SealedStores = s.prices().sealedStores()
+	v.SellerKeys, v.VendorKeys = searchSettingsKeys(p)
+	v.SealedStores = p.sealedStores()
 
-	up := uploadSettingsKeys(sig)
+	up := uploadSettingsKeys(p, sig)
 	v.UploadAltKeys = up.AltKeys
 	v.UploadSellerKeys = up.SellerKeys
 	v.UploadSealedSellerKeys = up.SealedSellerKeys
 	v.CanUploadCustom = up.CanUploadCustom
 
-	v.ArbitVendorKeys = arbitVendorKeys(arbitBlockedVendors(sig), false)
-	v.GlobalVendorKeys = globalVendorKeys(globalProbeBlocklist())
-	v.ReverseVendorKeys = arbitVendorKeys(arbitBlockedVendors(sig), true)
+	v.ArbitVendorKeys = arbitVendorKeys(p, arbitBlockedVendors(sig), false)
+	v.GlobalVendorKeys = globalVendorKeys(p, globalProbeBlocklist(p))
+	v.ReverseVendorKeys = arbitVendorKeys(p, arbitBlockedVendors(sig), true)
 
 	retail, buylist := sleepBlocklists(sig)
-	v.SleepSellerKeys, v.SleepVendorKeys = sleepModalKeys(retail, buylist)
+	v.SleepSellerKeys, v.SleepVendorKeys = sleepModalKeys(p, retail, buylist)
 
 	return v
 }

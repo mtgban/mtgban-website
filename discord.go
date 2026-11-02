@@ -179,7 +179,7 @@ var filteredEditions = []string{
 	"WC99",
 }
 
-func parseMessage(ds *datastore, content string, sealed bool) (*EmbedSearchResult, string) {
+func parseMessage(ds *datastore, p *prices, content string, sealed bool) (*EmbedSearchResult, string) {
 	// Clean up query, no blocklist because we only need keys. Without the
 	// numbers snapshot: a bare number would leave no name for the check
 	// below, where as an id it embeds its product.
@@ -214,7 +214,7 @@ func parseMessage(ds *datastore, content string, sealed bool) (*EmbedSearchResul
 		})
 	}
 
-	uuids, err := searchAndFilter(ds, config)
+	uuids, err := searchAndFilter(ds, p, config)
 	if err != nil {
 		// Not found again, let's provide a meaningful error
 		if editionSearched != "" {
@@ -232,7 +232,7 @@ func parseMessage(ds *datastore, content string, sealed bool) (*EmbedSearchResul
 
 		// Do a quick retry to look through sealed
 		if !sealed {
-			return parseMessage(ds, content, true)
+			return parseMessage(ds, p, content, true)
 		}
 		return nil, fmt.Sprintf("No card found for \"%s\"", query)
 	}
@@ -687,9 +687,10 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 	defer recoverJob("discord messageCreate")
 
 	ds := s.datastore()
+	p := s.prices()
 	b := ds.backend
 	// Ignore requests if starting up
-	if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
+	if len(p.sellers) == 0 || len(p.vendors) == 0 {
 		return
 	}
 
@@ -781,7 +782,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 	content = strings.TrimPrefix(content, "$$")
 
 	// Search a single card match
-	searchRes, errMsg := parseMessage(ds, content, sealed)
+	searchRes, errMsg := parseMessage(ds, p, content, sealed)
 	if errMsg != "" {
 		if DevMode {
 			errMsg = "[DEV] " + errMsg
@@ -832,8 +833,8 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 			OnlyForVendor: true,
 		})
 
-		cardIDs, _ := searchAndFilter(ds, config)
-		foundSellers, foundVendors := searchParallel(cardIDs, config)
+		cardIDs, _ := searchAndFilter(ds, p, config)
+		foundSellers, foundVendors := searchParallel(p, cardIDs, config)
 
 		searchRes.ResultsIndex = ProcessEmbedSearchResultsSellers(b, foundSellers, true)
 		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(b, foundSellers, false)

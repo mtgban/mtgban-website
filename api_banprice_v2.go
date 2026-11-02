@@ -72,13 +72,13 @@ func v2Keyer(b *matcher.Backend, mode string, sealed bool, sellers []mtgban.Sell
 
 // v2Cards is the cards a filtered request asks for, kept to its finish and
 // to singles or sealed, and whether the request is filtered at all.
-func v2Cards(b *matcher.Backend, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) ([]string, bool) {
+func v2Cards(b *matcher.Backend, p *prices, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) ([]string, bool) {
 	if filterByEdition == "" && filterByHash == nil {
 		return nil, false
 	}
 	uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
 	config := apiSearchConfig(b, uuids, nil, filterByFinish, sealed)
-	return filterUUIDs(b, config.UUIDs, config.CardFilters), true
+	return filterUUIDs(b, p, config.UUIDs, config.CardFilters), true
 }
 
 // v2Section is one price section of a v2 response, retail or buylist: the
@@ -156,9 +156,9 @@ func newV2Store[T mtgban.GenericEntry](name string, record map[string][]T, withQ
 }
 
 // sellerSectionV2 is the retail section of a request.
-func sellerSectionV2(b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) *v2Section {
-	sellers := GetSellers()
-	section := newV2Section(b, mode, filterByEdition, filterByHash, filterByFinish, sealed, sellers)
+func sellerSectionV2(b *matcher.Backend, p *prices, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) *v2Section {
+	sellers := p.sellers
+	section := newV2Section(b, p, mode, filterByEdition, filterByHash, filterByFinish, sealed, sellers)
 	for _, seller := range sellers {
 		info := seller.Info()
 		if info.SealedMode != sealed || !slices.Contains(enabledStores, info.Shorthand) {
@@ -171,9 +171,9 @@ func sellerSectionV2(b *matcher.Backend, mode string, enabledStores []string, fi
 }
 
 // vendorSectionV2 is the buylist section of a request.
-func vendorSectionV2(b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) *v2Section {
-	section := newV2Section(b, mode, filterByEdition, filterByHash, filterByFinish, sealed, GetSellers())
-	for _, vendor := range GetVendors() {
+func vendorSectionV2(b *matcher.Backend, p *prices, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) *v2Section {
+	section := newV2Section(b, p, mode, filterByEdition, filterByHash, filterByFinish, sealed, p.sellers)
+	for _, vendor := range p.vendors {
 		info := vendor.Info()
 		if info.SealedMode != sealed || !slices.Contains(enabledStores, info.Shorthand) {
 			continue
@@ -193,8 +193,8 @@ func searchSectionV2(b *matcher.Backend, mode string, cardIDs []string, sealed b
 
 // sellerSearchV2 is the retail section of a v2 search: the cards it found,
 // with every entry the search's store, condition and price filters keep.
-func sellerSearchV2(b *matcher.Backend, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
-	sellers := GetSellers()
+func sellerSearchV2(b *matcher.Backend, p *prices, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
+	sellers := p.sellers
 	section := searchSectionV2(b, mode, cardIDs, sealed, sellers)
 	for _, seller := range sellers {
 		if shouldSkipStoreNG(seller, config.StoreFilters) {
@@ -205,7 +205,7 @@ func sellerSearchV2(b *matcher.Backend, mode string, cardIDs []string, config Se
 		found := map[string][]mtgban.InventoryEntry{}
 		for _, cardID := range section.cardIDs {
 			for _, entry := range inventory[cardID] {
-				if sellerEntryFound(info, cardID, entry, config) {
+				if sellerEntryFound(p, info, cardID, entry, config) {
 					found[cardID] = append(found[cardID], entry)
 				}
 			}
@@ -220,9 +220,9 @@ func sellerSearchV2(b *matcher.Backend, mode string, cardIDs []string, config Se
 }
 
 // vendorSearchV2 is the buylist section of a v2 search.
-func vendorSearchV2(b *matcher.Backend, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
-	section := searchSectionV2(b, mode, cardIDs, sealed, GetSellers())
-	for _, vendor := range GetVendors() {
+func vendorSearchV2(b *matcher.Backend, p *prices, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
+	section := searchSectionV2(b, mode, cardIDs, sealed, p.sellers)
+	for _, vendor := range p.vendors {
 		if shouldSkipStoreNG(vendor, config.StoreFilters) {
 			continue
 		}
@@ -231,7 +231,7 @@ func vendorSearchV2(b *matcher.Backend, mode string, cardIDs []string, config Se
 		found := map[string][]mtgban.BuylistEntry{}
 		for _, cardID := range section.cardIDs {
 			for _, entry := range buylist[cardID] {
-				if vendorEntryFound(info, cardID, entry, config) {
+				if vendorEntryFound(p, info, cardID, entry, config) {
 					found[cardID] = append(found[cardID], entry)
 				}
 			}
@@ -245,9 +245,9 @@ func vendorSearchV2(b *matcher.Backend, mode string, cardIDs []string, config Se
 	return section
 }
 
-func newV2Section(b *matcher.Backend, mode, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool, sellers []mtgban.Seller) *v2Section {
+func newV2Section(b *matcher.Backend, p *prices, mode, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool, sellers []mtgban.Seller) *v2Section {
 	section := &v2Section{keyOf: v2Keyer(b, mode, sealed, sellers)}
-	section.cardIDs, section.filtered = v2Cards(b, filterByEdition, filterByHash, filterByFinish, sealed)
+	section.cardIDs, section.filtered = v2Cards(b, p, filterByEdition, filterByHash, filterByFinish, sealed)
 	if filterByFinish != "" && !section.filtered {
 		section.finishFilter = fixupFinishNG(filterByFinish)
 	}
@@ -263,7 +263,7 @@ type v2Printing struct {
 // walk hands emit each card of the section in id order, with every store's
 // prices for it: the entries of every printing the id covers, merged. The
 // map emit is handed is reused for the next card, so emit must not keep it.
-func (section *v2Section) walk(b *matcher.Backend, emit func(id string, finishes map[string]map[string][]banprice.Entry) error) error {
+func (section *v2Section) walk(b *matcher.Backend, p *prices, emit func(id string, finishes map[string]map[string][]banprice.Entry) error) error {
 	cardIDs := section.cardIDs
 	if !section.filtered {
 		priced := map[string]struct{}{}
@@ -288,7 +288,7 @@ func (section *v2Section) walk(b *matcher.Backend, emit func(id string, finishes
 		if id == "" {
 			continue
 		}
-		if len(section.finishFilter) > 0 && applyCardFilter(b, "finish", section.finishFilter, co) {
+		if len(section.finishFilter) > 0 && applyCardFilter(b, p, "finish", section.finishFilter, co) {
 			continue
 		}
 		printings = append(printings, v2Printing{id: id, cardID: cardID, finish: v2Finish(co), co: co})
@@ -418,7 +418,7 @@ func filterV2Finishes(finishes []banprice.Finish, filter string) []banprice.Fini
 // v2StoreList is the enabled sellers and vendors, as stores.json lists them.
 // filter=singles or filter=sealed keeps one kind of store. qty is listed as
 // v2's prices carry it.
-func v2StoreList(enabledSellers, enabledVendors []string, filter string) banprice.Stores {
+func v2StoreList(p *prices, enabledSellers, enabledVendors []string, filter string) banprice.Stores {
 	keep := func(info mtgban.ScraperInfo, enabled []string) bool {
 		if filter == "singles" && info.SealedMode || filter == "sealed" && !info.SealedMode {
 			return false
@@ -437,7 +437,7 @@ func v2StoreList(enabledSellers, enabledVendors []string, filter string) banpric
 
 	out := banprice.Stores{Sellers: []banprice.Store{}, Vendors: []banprice.Store{}}
 	seen := map[string]bool{}
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		info := seller.Info()
 		if !keep(info, enabledSellers) || seen[info.Shorthand] {
 			continue
@@ -449,7 +449,7 @@ func v2StoreList(enabledSellers, enabledVendors []string, filter string) banpric
 		out.Sellers = append(out.Sellers, entry)
 	}
 	seen = map[string]bool{}
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		info := vendor.Info()
 		if !keep(info, enabledVendors) || seen[info.Shorthand] {
 			continue

@@ -445,7 +445,7 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// The "Jump to" section, the probe
-	blocklistVendors := globalProbeBlocklist()
+	blocklistVendors := globalProbeBlocklist(s.prices())
 
 	if r.FormValue("page") == "options" {
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)

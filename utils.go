@@ -752,29 +752,9 @@ const (
 	MaxRuneSymbols = 57
 )
 
-// filterSellers returns the shorthand of every loaded seller for which
-// predicate(info) is true.
+// filterSellers is the published snapshot's, for a caller not handed one.
 func filterSellers(predicate func(mtgban.ScraperInfo) bool) []string {
-	var out []string
-	for _, s := range GetSellers() {
-		info := s.Info()
-		if predicate(info) {
-			out = append(out, info.Shorthand)
-		}
-	}
-	return out
-}
-
-// filterVendors is the vendor analog of filterSellers.
-func filterVendors(predicate func(mtgban.ScraperInfo) bool) []string {
-	var out []string
-	for _, v := range GetVendors() {
-		info := v.Info()
-		if predicate(info) {
-			out = append(out, info.Shorthand)
-		}
-	}
-	return out
+	return currentPrices().filterSellers(predicate)
 }
 
 // canAccessMode reports whether the caller is allowed to read the given
@@ -812,11 +792,6 @@ func errorResponse(w http.ResponseWriter, status int, msg string) {
 	_ = json.NewEncoder(w).Encode(struct {
 		Error string `json:"error"`
 	}{Error: msg})
-}
-
-// Return the CreditMultiplier for any given vendor, by shorthand in any case
-func findCredit(shorthand string) float64 {
-	return currentPrices().credit(shorthand)
 }
 
 // findSellerInventory is the published snapshot's sellerInventory, for a
@@ -1815,11 +1790,11 @@ func isSealedScraper(shorthand string) bool {
 
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
 // by their resolved display name (case-insensitive). Stable for equal names.
-func sortKeysByScraperName(keys []string) []string {
+func sortKeysByScraperName(p *prices, keys []string) []string {
 	out := make([]string, len(keys))
 	copy(out, keys)
 	sort.SliceStable(out, func(i, j int) bool {
-		return strings.ToLower(scraperName(out[i])) < strings.ToLower(scraperName(out[j]))
+		return strings.ToLower(p.scraperName(out[i])) < strings.ToLower(p.scraperName(out[j]))
 	})
 	return out
 }

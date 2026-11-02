@@ -122,12 +122,12 @@ func BenchmarkSetPricesSearchQuery(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		config := parseSearchOptionsNG(backend(), "s:"+benchSetCode, nil, nil, nil)
-		uuids, err := searchAndFilter(currentDatastore(), config)
+		uuids, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 		if err != nil {
 			b.Fatal(err)
 		}
-		foundSellers := searchSellers(uuids, config)
-		foundVendors := searchVendors(uuids, config)
+		foundSellers := searchSellers(currentPrices(), uuids, config)
+		foundVendors := searchVendors(currentPrices(), uuids, config)
 		if len(foundSellers) == 0 || len(foundVendors) == 0 {
 			b.Fatal("no results")
 		}
@@ -141,8 +141,8 @@ func BenchmarkSetPricesAPIEdition(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		retail := getSellerPrices(backend(), "", stores, benchSetCode, nil, "", true, true, false, "")
-		buylist := getVendorPrices(backend(), "", stores, benchSetCode, nil, "", true, true, false, "")
+		retail := getSellerPrices(backend(), currentPrices(), "", stores, benchSetCode, nil, "", true, true, false, "")
+		buylist := getVendorPrices(backend(), currentPrices(), "", stores, benchSetCode, nil, "", true, true, false, "")
 		if len(retail) == 0 || len(buylist) == 0 {
 			b.Fatal("no results")
 		}
@@ -156,8 +156,8 @@ func BenchmarkSetPricesAPIByHash(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		retail := getSellerPrices(backend(), "", stores, "", benchSetUUIDs, "", true, true, false, "")
-		buylist := getVendorPrices(backend(), "", stores, "", benchSetUUIDs, "", true, true, false, "")
+		retail := getSellerPrices(backend(), currentPrices(), "", stores, "", benchSetUUIDs, "", true, true, false, "")
+		buylist := getVendorPrices(backend(), currentPrices(), "", stores, "", benchSetUUIDs, "", true, true, false, "")
 		if len(retail) == 0 || len(buylist) == 0 {
 			b.Fatal("no results")
 		}
@@ -172,8 +172,8 @@ func BenchmarkSetPricesSearchByHash(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		foundSellers := searchSellers(benchSetUUIDs, config)
-		foundVendors := searchVendors(benchSetUUIDs, config)
+		foundSellers := searchSellers(currentPrices(), benchSetUUIDs, config)
+		foundVendors := searchVendors(currentPrices(), benchSetUUIDs, config)
 		if len(foundSellers) == 0 || len(foundVendors) == 0 {
 			b.Fatal("no results")
 		}
@@ -190,8 +190,8 @@ func BenchmarkSetPricesSearchScan(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		foundSellers := searchSellers(benchPoolUUIDs, config)
-		foundVendors := searchVendors(benchPoolUUIDs, config)
+		foundSellers := searchSellers(currentPrices(), benchPoolUUIDs, config)
+		foundVendors := searchVendors(currentPrices(), benchPoolUUIDs, config)
 		if len(foundSellers) == 0 || len(foundVendors) == 0 {
 			b.Fatal("no results")
 		}

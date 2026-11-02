@@ -80,7 +80,7 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 				tightened++
 
 				query := co.SetCode + " " + co.Number
-				keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
+				keys, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 				if err != nil {
 					t.Errorf("%s: %q: %v", game, query, err)
 					continue
@@ -145,7 +145,7 @@ func TestLetteredNumberReachesItsPrintingInEveryGame(t *testing.T) {
 				checked++
 
 				query := "cn:" + co.Number
-				keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
+				keys, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 				if err != nil {
 					t.Errorf("%s: %q: %v", game, query, err)
 					continue
@@ -218,7 +218,7 @@ func TestNumberWithTotalReachesItsPrintingInEveryGame(t *testing.T) {
 				if !strings.ContainsAny(query, "0123456789") {
 					query = "cn:" + query
 				}
-				keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
+				keys, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 				if err != nil {
 					t.Errorf("%q: %v", query, err)
 					continue
@@ -340,7 +340,7 @@ func TestPrintedNumberReachesItsPrintingInEveryGame(t *testing.T) {
 // searchHits runs a query and returns the keys it reaches with their cards.
 func searchHits(t *testing.T, ds *datastore, query string) ([]string, []*matcher.CardObject) {
 	t.Helper()
-	keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
+	keys, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 	if err != nil {
 		t.Errorf("%q: %v", query, err)
 	}
@@ -396,11 +396,11 @@ func TestBareNumberInEveryGame(t *testing.T) {
 					}
 					continue
 				}
-				got, err := searchAndFilter(ds, config)
+				got, err := searchAndFilter(ds, currentPrices(), config)
 				if err != nil {
 					t.Fatalf("%q: %v", query, err)
 				}
-				want, err := searchAndFilter(ds, parseSearchQuery(ds, as, nil, nil, nil))
+				want, err := searchAndFilter(ds, currentPrices(), parseSearchQuery(ds, as, nil, nil, nil))
 				if err != nil || len(want) == 0 {
 					t.Fatalf("%q reaches nothing: %v", as, err)
 				}

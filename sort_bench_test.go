@@ -95,7 +95,7 @@ func BenchmarkSortSetsByRetail(b *testing.B) {
 	for b.Loop() {
 		keys := slices.Clone(uuids)
 		sortData := resolveSortingData(backend(), keys)
-		prices := resolveBestPrices(keys, defaultSellerPriorityOpt, price4seller)
+		prices := resolveBestPrices(currentPrices(), keys, defaultSellerPriorityOpt, price4seller)
 		sort.Slice(keys, func(i, j int) bool {
 			priceI, priceJ := prices[keys[i]], prices[keys[j]]
 			if priceI == priceJ {
@@ -142,8 +142,8 @@ func BenchmarkSortSetsByBuylist(b *testing.B) {
 	for b.Loop() {
 		keys := slices.Clone(uuids)
 		sortData := resolveSortingData(backend(), keys)
-		buyPrices := resolveBestPrices(keys, defaultVendorPriorityOpt, price4vendor)
-		retPrices := resolveBestPrices(keys, defaultSellerPriorityOpt, price4seller)
+		buyPrices := resolveBestPrices(currentPrices(), keys, defaultVendorPriorityOpt, price4vendor)
+		retPrices := resolveBestPrices(currentPrices(), keys, defaultSellerPriorityOpt, price4seller)
 		sort.Slice(keys, func(i, j int) bool {
 			priceI, priceJ := buyPrices[keys[i]], buyPrices[keys[j]]
 			if priceI != priceJ {

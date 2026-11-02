@@ -37,8 +37,8 @@ func TestNumbersSnapshotMatchesScan(t *testing.T) {
 				t.Fatalf("%s did not seed", tt.query)
 			}
 			// The scan the seed replaces: every uuid, same filters.
-			scanned := filterUUIDs(backend(), backend().GetUUIDs(), config.CardFilters)
-			got := filterUUIDs(backend(), seeded, config.CardFilters)
+			scanned := filterUUIDs(backend(), currentPrices(), backend().GetUUIDs(), config.CardFilters)
+			got := filterUUIDs(backend(), currentPrices(), seeded, config.CardFilters)
 
 			slices.Sort(got)
 			slices.Sort(scanned)
@@ -98,8 +98,8 @@ func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
 	for _, query := range []string{"cn:635", "cn:635,635", "cn:999999999", "cn:139s", "cns:107★", "cn:635 -s:SLD", "-cn:635", "cn:SLD:635", "cn:1-10", "cne:^6.5$", "s:LEA cn:999999999"} {
 		t.Run(query, func(t *testing.T) {
 			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
-			want, wantErr := searchAndFilter(&withoutNumbers, config)
-			got, gotErr := searchAndFilter(base, config)
+			want, wantErr := searchAndFilter(&withoutNumbers, currentPrices(), config)
+			got, gotErr := searchAndFilter(base, currentPrices(), config)
 			slices.Sort(want)
 			slices.Sort(got)
 			if !slices.Equal(got, want) || (gotErr == nil) != (wantErr == nil) {
@@ -120,11 +120,11 @@ func BenchmarkNumbersSnapshotSearch(b *testing.B) {
 
 	for _, query := range []string{"cn:635", "cn:161", "cns:107★"} {
 		config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
-		scanned, err := searchAndFilter(&withoutNumbers, config)
+		scanned, err := searchAndFilter(&withoutNumbers, currentPrices(), config)
 		if err != nil {
 			b.Fatal(err)
 		}
-		seeded, err := searchAndFilter(base, config)
+		seeded, err := searchAndFilter(base, currentPrices(), config)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -142,7 +142,7 @@ func BenchmarkNumbersSnapshotSearch(b *testing.B) {
 				}
 				b.ReportAllocs()
 				for b.Loop() {
-					_, err := searchAndFilter(ds, config)
+					_, err := searchAndFilter(ds, currentPrices(), config)
 					if err != nil {
 						b.Fatal(err)
 					}

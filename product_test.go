@@ -198,10 +198,10 @@ func TestCardFilterOnHotlist(t *testing.T) {
 	} {
 		co := &matcher.CardObject{Card: matcher.Card{UUID: tc.card}}
 		// cardFilterOn reports whether to skip the card.
-		if cardFilterOn([]string{"hotlist"}, co) == tc.hotlist {
+		if cardFilterOn(currentPrices(), []string{"hotlist"}, co) == tc.hotlist {
 			t.Errorf("on:hotlist %s: kept %v, want %v", tc.card, !tc.hotlist, tc.hotlist)
 		}
-		if cardFilterOn([]string{"newhigh"}, co) == tc.newhigh {
+		if cardFilterOn(currentPrices(), []string{"newhigh"}, co) == tc.newhigh {
 			t.Errorf("on:newhigh %s: kept %v, want %v", tc.card, !tc.newhigh, tc.newhigh)
 		}
 	}

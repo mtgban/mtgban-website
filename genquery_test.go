@@ -26,7 +26,7 @@ func TestTheRebuiltQueryFindsThePrintingItNames(t *testing.T) {
 		}
 		checked++
 
-		found, err := searchAndFilter(currentDatastore(), parseSearchOptionsWrapper(genQuery(co)))
+		found, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsWrapper(genQuery(co)))
 		if err != nil {
 			missed++
 			if missed < 5 {
@@ -78,7 +78,7 @@ func TestTheRebuiltQueryKeepsTheMarksTheNumberCarries(t *testing.T) {
 	}
 
 	query := genQuery(tagged)
-	found, err := searchAndFilter(currentDatastore(), parseSearchOptionsWrapper(query))
+	found, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsWrapper(query))
 	if err != nil {
 		t.Fatalf("%q found nothing: %s", query, err)
 	}

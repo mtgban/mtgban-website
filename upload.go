@@ -131,8 +131,7 @@ type UploadEntry = docparse.Entry
 // the TCGplayer SKU and Cardmarket id indexes, and the set-recency ordering
 // for alias candidates. Built once per upload, so every row matches against
 // the same datastore and resolves its ids from the same snapshot.
-func newUploadParser(b *matcher.Backend) *docparse.Parser {
-	p := currentPrices()
+func newUploadParser(b *matcher.Backend, p *prices) *docparse.Parser {
 	return &docparse.Parser{
 		Backend: b,
 		Logf: func(format string, v ...any) {
@@ -481,6 +480,7 @@ type UploadVars struct {
 
 func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
+	p := s.prices()
 	b := ds.backend
 	sig := verifiedSignature(r)
 
@@ -572,7 +572,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	cachedRemoteURL := readCookie(r, "gdocURL")
 	pageVars.RemoteLinkURL = cachedRemoteURL
 
-	selected := selectUploadStores(w, r, blMode, st)
+	selected := selectUploadStores(w, r, p, blMode, st)
 
 	// Set the store names for the <select> box, and the ones it ticks
 	pageVars.SellerKeys = selected.singlesSellers
@@ -655,7 +655,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	uploadedData, uploadName, err := loadUploadEntries(r, b, in, modes.maxRows)
+	uploadedData, uploadName, err := loadUploadEntries(r, b, p, in, modes.maxRows)
 	if err != nil {
 		pageVars.WarningMessage = err.Error()
 		render(w, "upload.html", pageVars)
@@ -753,11 +753,11 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	ids := splitUploadIDs(b, uploadedData, st)
 	log.Printf("Card IDs: %d, Sealed product IDs: %d", len(ids.cardIDs), len(ids.sealedProductIDs))
 
-	prices := fetchUploadPrices(r, b, blMode, st, selected, ids)
+	prices := fetchUploadPrices(r, b, p, blMode, st, selected, ids)
 
 	// Allow downloading data as CSV
 	if modes.download && canBuylist {
-		err := writePricesCSV(w, r, b, st, selected, ids, prices, uploadedData)
+		err := writePricesCSV(w, r, b, p, st, selected, ids, prices, uploadedData)
 		if err != nil {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
@@ -766,7 +766,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	indexes := fetchUploadIndexes(b, blMode, st, selected, ids, prices)
+	indexes := fetchUploadIndexes(b, p, blMode, st, selected, ids, prices)
 
 	fillUploadKeys(&pageVars.UploadVars, blMode, selected, ids, prices, indexes)
 
@@ -1611,13 +1611,13 @@ type uploadStores struct {
 // mode is priced against, from the form, the cookies and what the reader may
 // change, and the store lists the page offers and ticks. It writes only the
 // cookies that keep a new index choice.
-func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st uploadSettings) uploadStores {
+func selectUploadStores(w http.ResponseWriter, r *http.Request, p *prices, blMode bool, st uploadSettings) uploadStores {
 	sig := verifiedSignature(r)
 
 	var enabledStores []string
 	var enabledSealedStores []string
 
-	singlesSellers, sealedSellers, singlesVendors, sealedVendors := uploadStoreLists(sig)
+	singlesSellers, sealedSellers, singlesVendors, sealedVendors := uploadStoreLists(p, sig)
 
 	// Load the preferred list of enabled stores for the <select> box
 	// The first check is for when the cookie is not yet set
@@ -1630,7 +1630,7 @@ func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st 
 	// The sealed indexes are the sealed sellers that were made public;
 	// unlike the EV ones, TCGSealed is not MetadataOnly, since it is a
 	// store too
-	sealedIndexes := filterSellers(func(info mtgban.ScraperInfo) bool {
+	sealedIndexes := p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		return info.SealedMode &&
 			slices.Contains(UploadSealedIndexKeysPublic, info.Shorthand)
 	})
@@ -1947,8 +1947,8 @@ func readUploadModes(r *http.Request, canBuylist, magicOnlyExports bool) uploadM
 
 // loadUploadEntries reads the rows of the list the request carries, up to
 // maxRows, and the name of the deck or collection a link points at.
-func loadUploadEntries(r *http.Request, b *matcher.Backend, in uploadInput, maxRows int) ([]UploadEntry, string, error) {
-	parser := newUploadParser(b)
+func loadUploadEntries(r *http.Request, b *matcher.Backend, p *prices, in uploadInput, maxRows int) ([]UploadEntry, string, error) {
+	parser := newUploadParser(b, p)
 
 	// Load data
 	var uploadedData []UploadEntry
@@ -2067,7 +2067,7 @@ type uploadPrices struct {
 // fetchUploadPrices looks up the upload's singles and sealed products in the
 // stores selected, and in the custom buylist when the settings allow one and
 // the request asks for it.
-func fetchUploadPrices(r *http.Request, b *matcher.Backend, blMode bool, st uploadSettings, selected uploadStores, ids uploadIDs) uploadPrices {
+func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bool, st uploadSettings, selected uploadStores, ids uploadIDs) uploadPrices {
 	enabledStores := selected.enabledStores
 	enabledSealedStores := selected.enabledSealedStores
 
@@ -2084,7 +2084,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, blMode bool, st uplo
 		// way the sealed and index fetches below already do.
 		results = map[string]map[string]*BanPrice{}
 		if len(ids.cardIDs) > 0 {
-			results = getVendorPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+			results = getVendorPrices(b, p, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 		}
 
 		// Build the custom buylist if requested
@@ -2103,18 +2103,18 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, blMode bool, st uplo
 
 			customSeller := getUploadSetting(r, "customseller", "UploadCustomBuyer")
 			if customSeller != "" {
-				ref, _ := findSellerInventory(customSeller)
+				ref, _ := p.sellerInventory(customSeller)
 				for _, cardID := range ids.cardIDs {
-					processEntry(b, results, ref[cardID], "", cardID, customStore, false, ids.shouldCheckForConditions, false, rule)
+					processEntry(b, p, results, ref[cardID], "", cardID, customStore, false, ids.shouldCheckForConditions, false, rule)
 				}
 				enabledStores = append(enabledStores, customStore)
 			}
 
 			customSealedSeller := getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer")
 			if customSealedSeller != "" && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-				ref, _ := findSellerInventory(customSealedSeller)
+				ref, _ := p.sellerInventory(customSealedSeller)
 				for _, productID := range ids.sealedProductIDs {
-					processEntry(b, results, ref[productID], "", productID, customSealedStore, false, false, false, rule)
+					processEntry(b, p, results, ref[productID], "", productID, customSealedStore, false, false, false, rule)
 				}
 				enabledSealedStores = append(enabledSealedStores, customSealedStore)
 			}
@@ -2122,14 +2122,14 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, blMode bool, st uplo
 
 		// Fetch sealed vendor prices and merge
 		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			mergePrices(results, getVendorPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
+			mergePrices(results, getVendorPrices(b, p, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
 		}
 
 		if st.priceSource != "" {
 			credits = map[string]float64{}
 			allStores := append(enabledStores, enabledSealedStores...)
 			for _, store := range allStores {
-				credits[store] = findCredit(store)
+				credits[store] = p.credit(store)
 			}
 		}
 	} else {
@@ -2137,12 +2137,12 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, blMode bool, st uplo
 		// upload has no singles (see the comment above).
 		results = map[string]map[string]*BanPrice{}
 		if len(ids.cardIDs) > 0 {
-			results = getSellerPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+			results = getSellerPrices(b, p, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 		}
 
 		// Fetch sealed seller prices and merge
 		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			mergePrices(results, getSellerPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
+			mergePrices(results, getSellerPrices(b, p, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
 		}
 	}
 
@@ -2157,7 +2157,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, blMode bool, st uplo
 // writePricesCSV answers with the upload's prices as a CSV, adding to them in
 // place the CSV index prices the reader keeps enabled. When it fails it drops
 // the download headers, so the caller can answer with a page.
-func writePricesCSV(w http.ResponseWriter, r *http.Request, b *matcher.Backend, st uploadSettings, selected uploadStores, ids uploadIDs, prices uploadPrices, uploadedData []UploadEntry) error {
+func writePricesCSV(w http.ResponseWriter, r *http.Request, b *matcher.Backend, p *prices, st uploadSettings, selected uploadStores, ids uploadIDs, prices uploadPrices, uploadedData []UploadEntry) error {
 	csvName := "ban_prices"
 	if scope := r.FormValue("csvscope"); scope == "singles" || scope == "sealed" {
 		csvName += "_" + scope
@@ -2174,7 +2174,7 @@ func writePricesCSV(w http.ResponseWriter, r *http.Request, b *matcher.Backend, 
 	}
 	indexResults := map[string]map[string]*BanPrice{}
 	if len(ids.cardIDs) > 0 && len(csvIndexKeys) > 0 {
-		indexResults = getSellerPrices(b, "", csvIndexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+		indexResults = getSellerPrices(b, p, "", csvIndexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 	}
 
 	// Copy these index prices in the final results
@@ -2206,7 +2206,7 @@ type uploadIndexes struct {
 // fetchUploadIndexes looks up the index prices of the upload's singles, the
 // comparison price included, and of its sealed products, leaving out in
 // retail mode a sealed index that is also a selected store.
-func fetchUploadIndexes(b *matcher.Backend, blMode bool, st uploadSettings, selected uploadStores, ids uploadIDs, prices uploadPrices) uploadIndexes {
+func fetchUploadIndexes(b *matcher.Backend, p *prices, blMode bool, st uploadSettings, selected uploadStores, ids uploadIDs, prices uploadPrices) uploadIndexes {
 	var indexKeys []string
 	indexResults := map[string]map[string]*BanPrice{}
 
@@ -2215,7 +2215,7 @@ func fetchUploadIndexes(b *matcher.Backend, blMode bool, st uploadSettings, sele
 		if !slices.Contains(indexKeys, st.altPriceSource) {
 			indexKeys = append(indexKeys, st.altPriceSource)
 		}
-		indexResults = getSellerPrices(b, "", indexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+		indexResults = getSellerPrices(b, p, "", indexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 	}
 
 	// An index that is also a selected store (TCGSealed) already gets its
@@ -2230,7 +2230,7 @@ func fetchUploadIndexes(b *matcher.Backend, blMode bool, st uploadSettings, sele
 
 	// Fetch sealed index prices
 	if len(ids.sealedProductIDs) > 0 && len(sealedIndexKeys) > 0 {
-		mergePrices(indexResults, getSellerPrices(b, "", sealedIndexKeys, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
+		mergePrices(indexResults, getSellerPrices(b, p, "", sealedIndexKeys, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
 	}
 
 	return uploadIndexes{

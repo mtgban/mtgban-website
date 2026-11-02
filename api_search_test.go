@@ -846,11 +846,11 @@ func TestSearchAPIReadsANumberAsAnID(t *testing.T) {
 func TestSearchAPIReadsANumberAfterAName(t *testing.T) {
 	skipWithoutDatastore(t)
 	ds := testSite.datastore()
-	printings, err := searchAndFilter(ds, parseSearchQuery(ds, "command tower", nil, nil, nil))
+	printings, err := searchAndFilter(ds, currentPrices(), parseSearchQuery(ds, "command tower", nil, nil, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := searchAndFilter(ds, parseSearchQuery(ds, "command tower cn:7029", nil, nil, nil))
+	want, err := searchAndFilter(ds, currentPrices(), parseSearchQuery(ds, "command tower cn:7029", nil, nil, nil))
 	if err != nil || len(want) == 0 || len(want) == len(printings) {
 		t.Fatalf("command tower cn:7029 finds %v of %d printings: %v", want, len(printings), err)
 	}

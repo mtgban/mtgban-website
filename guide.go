@@ -42,6 +42,7 @@ type GuideStore struct {
 // emitted whatever the tier, which only gates results, but for the stores
 // only the price API serves, which no site search reaches.
 func guideStoresJSON() template.JS {
+	p := currentPrices()
 	stores := map[string]*GuideStore{}
 
 	ensure := func(name, shorthand string, sealed bool) *GuideStore {
@@ -53,7 +54,7 @@ func guideStoresJSON() template.JS {
 		return s
 	}
 
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		if seller == nil {
 			continue
 		}
@@ -68,7 +69,7 @@ func guideStoresJSON() template.JS {
 			s.Retail = true
 		}
 	}
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		if vendor == nil {
 			continue
 		}
@@ -87,7 +88,7 @@ func guideStoresJSON() template.JS {
 	// In shorthand order first, so the stable sort by name keeps stores whose
 	// names tie, like CK and CKSealed, in that order rather than the map's.
 	sort.Strings(keys)
-	keys = sortKeysByScraperName(keys)
+	keys = sortKeysByScraperName(p, keys)
 
 	out := make([]*GuideStore, 0, len(keys))
 	for _, k := range keys {

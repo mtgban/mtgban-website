@@ -802,10 +802,10 @@ func TestCardFilterOnCK(t *testing.T) {
 	} {
 		co := ckTestCard(tc.card)
 		// cardFilterOn reports whether to skip the card.
-		if cardFilterOn([]string{"cksell"}, co) == tc.cksell {
+		if cardFilterOn(currentPrices(), []string{"cksell"}, co) == tc.cksell {
 			t.Errorf("on:cksell %s: kept %v, want %v", tc.card, !tc.cksell, tc.cksell)
 		}
-		if cardFilterOn([]string{"ckwait"}, co) == tc.wait {
+		if cardFilterOn(currentPrices(), []string{"ckwait"}, co) == tc.wait {
 			t.Errorf("on:ckwait %s: kept %v, want %v", tc.card, !tc.wait, tc.wait)
 		}
 	}

@@ -9,7 +9,7 @@ import (
 
 func TestFormatFilter(t *testing.T) {
 	skip := func(filters []string, co *matcher.CardObject) bool {
-		return applyCardFilter(backend(), "format", filters, co)
+		return applyCardFilter(backend(), currentPrices(), "format", filters, co)
 	}
 
 	co := &matcher.CardObject{}
@@ -135,22 +135,22 @@ func TestCollectorNumberPLST(t *testing.T) {
 	if elem == nil {
 		t.Fatal("missing number filter")
 	}
-	if skip := applyCardFilter(backend(), "number", elem.Values, co); skip {
+	if skip := applyCardFilter(backend(), currentPrices(), "number", elem.Values, co); skip {
 		t.Error("cn:akh-127 should match a card numbered AKH-127")
 	}
-	if skip := applyCardFilter(backend(), "number", fixupNumberNG(backend(), "akh-50", "number"), co); !skip {
+	if skip := applyCardFilter(backend(), currentPrices(), "number", fixupNumberNG(backend(), "akh-50", "number"), co); !skip {
 		t.Error("cn:akh-50 should not match a card numbered AKH-127")
 	}
 
 	// Ranges compare the number embedded after the prefix (127), so the
 	// card falls outside 7000-7010 but within 100-200.
-	if skip := applyCardFilter(backend(), "number_greater_than", []string{"7000"}, co); !skip {
+	if skip := applyCardFilter(backend(), currentPrices(), "number_greater_than", []string{"7000"}, co); !skip {
 		t.Error("AKH-127 should be excluded by cn>7000")
 	}
-	if skip := applyCardFilter(backend(), "number_greater_than", []string{"100"}, co); skip {
+	if skip := applyCardFilter(backend(), currentPrices(), "number_greater_than", []string{"100"}, co); skip {
 		t.Error("AKH-127 should be kept by cn>100")
 	}
-	if skip := applyCardFilter(backend(), "number_less_than", []string{"200"}, co); skip {
+	if skip := applyCardFilter(backend(), currentPrices(), "number_less_than", []string{"200"}, co); skip {
 		t.Error("AKH-127 should be kept by cn<200")
 	}
 }
@@ -313,7 +313,7 @@ func TestSetNumberShorthand(t *testing.T) {
 			t.Error("unexpected loose number filter")
 		}
 
-		keys, err := searchAndFilter(currentDatastore(), config)
+		keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -338,7 +338,7 @@ func TestSetNumberShorthand(t *testing.T) {
 		config := parseSearchOptionsNG(backend(), "4ed 107†", nil, nil, nil)
 		checkValues(t, findFilter(config, "number_strict"), "number_strict", "107†")
 
-		keys, err := searchAndFilter(currentDatastore(), config)
+		keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -360,7 +360,7 @@ func TestSetNumberShorthand(t *testing.T) {
 		config := parseSearchOptionsNG(backend(), "spg 17", nil, nil, nil)
 		checkValues(t, findFilter(config, "number"), "number", "17")
 
-		keys, err := searchAndFilter(currentDatastore(), config)
+		keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -381,7 +381,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	// one printing it names.
 	t.Run("a prefixed number reaches its printing", func(t *testing.T) {
 		config := parseSearchOptionsNG(backend(), "plst c16-177", nil, nil, nil)
-		keys, err := searchAndFilter(currentDatastore(), config)
+		keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -415,7 +415,7 @@ func TestSetNumberShorthand(t *testing.T) {
 		config := parseSearchOptionsNG(backend(), "spg #17a", nil, nil, nil)
 		checkValues(t, findFilter(config, "number_strict"), "number_strict", "#17a")
 
-		keys, err := searchAndFilter(currentDatastore(), config)
+		keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -431,7 +431,7 @@ func TestSetNumberShorthand(t *testing.T) {
 		config := parseSearchOptionsNG(backend(), "neo 30a", nil, nil, nil)
 		checkValues(t, findFilter(config, "number_strict"), "number_strict", "30a")
 
-		keys, err := searchAndFilter(currentDatastore(), config)
+		keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -453,7 +453,7 @@ func TestCollectorNumberStrict(t *testing.T) {
 
 	config := parseSearchOptionsNG(backend(), "cn:107", nil, nil, nil)
 	elem := findNumberFilter(t, config, "number")
-	if skip := applyCardFilter(backend(), "number", elem.Values, co); skip {
+	if skip := applyCardFilter(backend(), currentPrices(), "number", elem.Values, co); skip {
 		t.Error("cn:107 should match the starred printing")
 	}
 
@@ -465,7 +465,7 @@ func TestCollectorNumberStrict(t *testing.T) {
 	plain := &matcher.CardObject{}
 	plain.Number = "107"
 	plain.PlainNumber = "107"
-	if skip := applyCardFilter(backend(), "number", elem.Values, plain); !skip {
+	if skip := applyCardFilter(backend(), currentPrices(), "number", elem.Values, plain); !skip {
 		t.Error("cn:107★ should not match the plain printing")
 	}
 
@@ -474,13 +474,13 @@ func TestCollectorNumberStrict(t *testing.T) {
 	if len(elem.Values) != 1 || elem.Values[0] != "107★" {
 		t.Errorf("cns should keep the query verbatim, got %v", elem.Values)
 	}
-	if skip := applyCardFilter(backend(), "number_strict", elem.Values, co); skip {
+	if skip := applyCardFilter(backend(), currentPrices(), "number_strict", elem.Values, co); skip {
 		t.Error("cns:107★ should match the starred printing")
 	}
 
 	config = parseSearchOptionsNG(backend(), "cns:107", nil, nil, nil)
 	elem = findNumberFilter(t, config, "number_strict")
-	if skip := applyCardFilter(backend(), "number_strict", elem.Values, co); !skip {
+	if skip := applyCardFilter(backend(), currentPrices(), "number_strict", elem.Values, co); !skip {
 		t.Error("cns:107 should not match the starred printing")
 	}
 }

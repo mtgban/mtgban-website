@@ -10,6 +10,7 @@ import (
 // Handler for / renders the home.html page
 func (s *site) Home(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
+	p := s.prices()
 	sig := verifiedSignature(r)
 	errmsg := r.FormValue("errmsg")
 	message := ""
@@ -40,7 +41,7 @@ func (s *site) Home(w http.ResponseWriter, r *http.Request) {
 	pageVars := genPageNav(s, r, "Home", sig)
 	pageVars.ErrorMessage = message
 
-	pageVars.PopularSearches = getPopularSearches(ds)
+	pageVars.PopularSearches = getPopularSearches(ds, p)
 
 	// The chart "add a card" modal loads the homepage in an iframe with
 	// ?modal=1&chart=<roster>. In that mode we render chrome-free and carry the

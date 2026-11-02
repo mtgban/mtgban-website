@@ -124,7 +124,7 @@ type FilterPriceElem struct {
 	Value  float64
 
 	// Function used to derive a store price
-	Price4Store func(string, string) float64
+	Price4Store func(*prices, string, string) float64
 
 	// All stores sources (shorthands) present in the map
 	Stores []string
@@ -858,8 +858,8 @@ func fixupContainer(b *matcher.Backend, code string) []string {
 	return cardobject2sources(co)
 }
 
-func price4seller(cardID, shorthand string) float64 {
-	inv, err := findSellerInventory(shorthand)
+func price4seller(p *prices, cardID, shorthand string) float64 {
+	inv, err := p.sellerInventory(shorthand)
 	if err != nil {
 		return 0
 	}
@@ -870,8 +870,8 @@ func price4seller(cardID, shorthand string) float64 {
 	return entries[0].Price
 }
 
-func price4vendor(cardID, shorthand string) float64 {
-	bl, err := findVendorBuylist(shorthand)
+func price4vendor(p *prices, cardID, shorthand string) float64 {
+	bl, err := p.vendorBuylist(shorthand)
 	if err != nil {
 		return 0
 	}
@@ -1791,7 +1791,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareI
 			})
 		case "price", "buy_price", "arb_price", "rev_price":
 			var isSeller, isVendor bool
-			var price4store func(string, string) float64
+			var price4store func(*prices, string, string) float64
 			// Each of these entries applies to either retail or buylist
 			// and needs different price sources for comparisons
 			switch option {
@@ -2520,7 +2520,7 @@ var specialEditionTags = map[string]string{
 // func value forced the freshly copied CardObject to escape to the heap on
 // every card examined (the dominant allocation of pool-scanning searches).
 // Unknown names panic, preserving the old registry behavior.
-func applyCardFilter(b *matcher.Backend, name string, filters []string, co *matcher.CardObject) bool {
+func applyCardFilter(b *matcher.Backend, p *prices, name string, filters []string, co *matcher.CardObject) bool {
 	switch name {
 	case "name":
 		return cardFilterName(filters, co)
@@ -2565,7 +2565,7 @@ func applyCardFilter(b *matcher.Backend, name string, filters []string, co *matc
 	case "altname":
 		return cardFilterAltname(filters, co)
 	case "on":
-		return cardFilterOn(filters, co)
+		return cardFilterOn(p, filters, co)
 	case "is":
 		return cardFilterIs(b, filters, co)
 	}
@@ -2886,17 +2886,17 @@ func cardFilterAltname(filters []string, co *matcher.CardObject) bool {
 		(co.FaceFlavorName != "" && matcher.Normalize(co.FaceFlavorName) != filters[0])
 }
 
-func cardFilterOn(filters []string, co *matcher.CardObject) bool {
+func cardFilterOn(p *prices, filters []string, co *matcher.CardObject) bool {
 	for _, value := range filters {
 		switch value {
 		case "mtgstocks":
-			inv, _ := findSellerInventory("STKS")
+			inv, _ := p.sellerInventory("STKS")
 			_, found := inv[co.UUID]
 			if found {
 				return false
 			}
 		case "tcgsyp", "syp":
-			bl, _ := findVendorBuylist("SYP")
+			bl, _ := p.vendorBuylist("SYP")
 			_, found := bl[co.UUID]
 			if found {
 				return false
@@ -3079,18 +3079,18 @@ func cardFilterIs(b *matcher.Backend, filters []string, co *matcher.CardObject) 
 	return true
 }
 
-func shouldSkipCardNG(b *matcher.Backend, cardID string, filters []FilterElem) bool {
+func shouldSkipCardNG(b *matcher.Backend, p *prices, cardID string, filters []FilterElem) bool {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return true
 	}
-	return shouldSkipCard(b, co, filters)
+	return shouldSkipCard(b, p, co, filters)
 }
 
 // shouldSkipCard is shouldSkipCardNG for a card already looked up.
-func shouldSkipCard(b *matcher.Backend, co *matcher.CardObject, filters []FilterElem) bool {
+func shouldSkipCard(b *matcher.Backend, p *prices, co *matcher.CardObject, filters []FilterElem) bool {
 	for i := range filters {
-		skip := shouldSkipCard(b, co, filters[i].Subfilters)
+		skip := shouldSkipCard(b, p, co, filters[i].Subfilters)
 		if skip {
 			return true
 		}
@@ -3108,9 +3108,9 @@ func shouldSkipCard(b *matcher.Backend, co *matcher.CardObject, filters []Filter
 			res = cardFilterPool(filters[i].Members, co)
 		case "on":
 			// Members holds the cards of the backpacks it names.
-			res = cardFilterOn(filters[i].Values, co) && !filters[i].Members[co.UUID]
+			res = cardFilterOn(p, filters[i].Values, co) && !filters[i].Members[co.UUID]
 		default:
-			res = applyCardFilter(b, filters[i].Name, filters[i].Values, co)
+			res = applyCardFilter(b, p, filters[i].Name, filters[i].Values, co)
 		}
 		if filters[i].Negate {
 			res = !res
@@ -3276,7 +3276,7 @@ func unpriced(p float64) bool {
 	return p == 0 || math.IsNaN(p) || math.IsInf(p, 0)
 }
 
-func shouldSkipPrice[T mtgban.GenericEntry](cardID string, entry T, filters []*FilterPriceElem, shorthand string) bool {
+func shouldSkipPrice[T mtgban.GenericEntry](p *prices, cardID string, entry T, filters []*FilterPriceElem, shorthand string) bool {
 	if unpriced(entry.Pricing()) {
 		return true
 	}
@@ -3305,7 +3305,7 @@ func shouldSkipPrice[T mtgban.GenericEntry](cardID string, entry T, filters []*F
 			// If there is no set value, then look it up with the price4store function
 			if filters[i].Value == 0 {
 				for j := range filters[i].Stores {
-					price := filters[i].Price4Store(cardID, filters[i].Stores[j])
+					price := filters[i].Price4Store(p, cardID, filters[i].Stores[j])
 					// In case a store lacks a price
 					if price == 0 {
 						continue
