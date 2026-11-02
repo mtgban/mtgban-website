@@ -23,7 +23,6 @@ import (
 	"github.com/mtgban/go-mtgban/matcher/magic"
 	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/mtgban-website/internal/mkmidparser"
 	"github.com/mtgban/mtgban-website/internal/notify"
 	"github.com/mtgban/mtgban-website/internal/siteorigin"
 )
@@ -916,14 +915,6 @@ func tcgSKU2UUID(sku string) string {
 		return ""
 	}
 	return entries[0].OriginalID
-}
-
-// mkmIDs resolves a Cardmarket product id to the card it names.
-//
-// The snapshot is handed over rather than reached for: that package holds
-// the resolving, this one holds the sellers.
-var mkmIDs = &mkmidparser.Parser{
-	Sellers: func() *[]mtgban.Seller { return &currentPrices().sellers },
 }
 
 // tcgSKU2Condition resolves a TCGplayer SKU (instance id) to the condition it

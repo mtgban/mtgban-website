@@ -18,6 +18,7 @@ import (
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/alerts"
+	"github.com/mtgban/mtgban-website/internal/mkmidparser"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/simplecloud"
 )
@@ -50,15 +51,17 @@ const (
 var DataBucket simplecloud.Reader
 
 // prices is one published snapshot of the loaded stores: the retail and
-// buylist sides, the by-shorthand index over them and the dumps the bucket
-// listed. A writer builds the next one whole and publishes it in a single
-// Store, so a reader sees sides and indexes from the same publish. Nothing
-// in a published value is changed in place: the slices GetSellers and
-// GetVendors return are shared and read-only.
+// buylist sides, the by-shorthand index over them, the Cardmarket product
+// ids the retail side prices and the dumps the bucket listed. A writer
+// builds the next one whole and publishes it in a single Store, so a reader
+// sees sides and indexes from the same publish. Nothing in a published
+// value is changed in place: the slices GetSellers and GetVendors return
+// are shared and read-only.
 type prices struct {
 	sellers  []mtgban.Seller
 	vendors  []mtgban.Vendor
 	index    storeIndex
+	mkmIDs   mkmidparser.Index
 	scrapers scraperIndex
 }
 
@@ -86,12 +89,13 @@ func currentPrices() *prices {
 }
 
 // newPrices builds the snapshot to publish from its parts, indexing the
-// stores by shorthand.
+// stores by shorthand and the Cardmarket shelves by product id.
 func newPrices(sellers []mtgban.Seller, vendors []mtgban.Vendor, scrapers scraperIndex) *prices {
 	return &prices{
 		sellers:  sellers,
 		vendors:  vendors,
 		index:    buildStoreIndex(sellers, vendors),
+		mkmIDs:   mkmidparser.Build(sellers),
 		scrapers: scrapers,
 	}
 }
