@@ -67,7 +67,7 @@ func TestCustomBuylistSkipsSets(t *testing.T) {
 	}
 	singles.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 1})
 	sealed.Add(sealedID, &mtgban.InventoryEntry{Price: 10, Quantity: 1})
-	publishStores(t, []mtgban.Seller{
+	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(singles, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
 		mtgban.NewSellerFromInventory(sealed, mtgban.ScraperInfo{Shorthand: "CKSealed", Name: "Card Kingdom Sealed", SealedMode: true}),
 	}, []mtgban.Vendor{})

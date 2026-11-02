@@ -89,14 +89,11 @@ func lastSoldSite(t *testing.T, fetch lastSoldFetch) *site {
 	info := mtgban.ScraperInfo{Name: "Test Store", Shorthand: "TEST"}
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info)}
 	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, info)}
-	withPrices(t, sellers, vendors)
-
 	b := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01",
 		[][2]string{{"Fixture Card Alpha", "1"}})
 	b.UUIDs["FIXTUREA-1"].Language = "English"
 
-	s := newSite()
-	s.ds.Store(s.newDatastore(b, time.Now()))
+	s := fixtureSite(t, b, sellers, vendors)
 	s.fetchLastSold = fetch
 	return s
 }

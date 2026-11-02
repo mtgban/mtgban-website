@@ -78,7 +78,7 @@ func TestAPIOnlyStoresStayOffArbitrage(t *testing.T) {
 		bl.Add(cardID, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: price, Quantity: 2, URL: "u"})
 		return bl
 	}
-	publishStores(t, []mtgban.Seller{
+	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(stock(10), mtgban.ScraperInfo{Name: "Reverse Shop", Shorthand: "REVSHOP"}),
 		mtgban.NewSellerFromInventory(stock(40), mtgban.ScraperInfo{Name: "Probe Shop", Shorthand: "PROBESHOP"}),
 		mtgban.NewSellerFromInventory(stock(40), mtgban.ScraperInfo{Name: "API Shop", Shorthand: "APISHOP"}),
