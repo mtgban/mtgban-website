@@ -3276,13 +3276,13 @@ func unpriced(p float64) bool {
 	return p == 0 || math.IsNaN(p) || math.IsInf(p, 0)
 }
 
-func shouldSkipPriceNG(cardID string, entry mtgban.GenericEntry, filters []*FilterPriceElem, shorthand string) bool {
+func shouldSkipPriceNG[T mtgban.GenericEntry](cardID string, entry T, filters []*FilterPriceElem, shorthand string) bool {
 	if unpriced(entry.Pricing()) {
 		return true
 	}
 
-	_, isSeller := entry.(mtgban.InventoryEntry)
-	_, isVendor := entry.(mtgban.BuylistEntry)
+	_, isSeller := any(entry).(mtgban.InventoryEntry)
+	_, isVendor := any(entry).(mtgban.BuylistEntry)
 
 	for i := range filters {
 		// Do not call functions that do not apply to certain elements
@@ -3349,11 +3349,11 @@ var conditionMap = map[mtgban.Condition]int{
 	mtgban.PO: 0,
 }
 
-func entryFilterCondition(filters []string, entry mtgban.GenericEntry) bool {
+func entryFilterCondition[T mtgban.GenericEntry](filters []string, entry T) bool {
 	return !slices.Contains(filters, string(entry.Condition()))
 }
 
-func entryFilterConditionGreaterThan(filters []string, entry mtgban.GenericEntry) bool {
+func entryFilterConditionGreaterThan[T mtgban.GenericEntry](filters []string, entry T) bool {
 	condIndex, found := conditionMap[mtgban.Condition(filters[0])]
 	if !found {
 		return true
@@ -3361,7 +3361,7 @@ func entryFilterConditionGreaterThan(filters []string, entry mtgban.GenericEntry
 	return condIndex >= conditionMap[entry.Condition()]
 }
 
-func entryFilterConditionLessThan(filters []string, entry mtgban.GenericEntry) bool {
+func entryFilterConditionLessThan[T mtgban.GenericEntry](filters []string, entry T) bool {
 	condIndex, found := conditionMap[mtgban.Condition(filters[0])]
 	if !found {
 		return true
@@ -3369,7 +3369,7 @@ func entryFilterConditionLessThan(filters []string, entry mtgban.GenericEntry) b
 	return condIndex <= conditionMap[entry.Condition()]
 }
 
-func entryFilterQtyGreaterThan(filters []string, entry mtgban.GenericEntry) bool {
+func entryFilterQtyGreaterThan[T mtgban.GenericEntry](filters []string, entry T) bool {
 	if entry.Qty() == 0 {
 		return true
 	}
@@ -3377,7 +3377,7 @@ func entryFilterQtyGreaterThan(filters []string, entry mtgban.GenericEntry) bool
 	return num >= entry.Qty()
 }
 
-func entryFilterQtyLessThan(filters []string, entry mtgban.GenericEntry) bool {
+func entryFilterQtyLessThan[T mtgban.GenericEntry](filters []string, entry T) bool {
 	if entry.Qty() == 0 {
 		return true
 	}
@@ -3385,8 +3385,8 @@ func entryFilterQtyLessThan(filters []string, entry mtgban.GenericEntry) bool {
 	return num <= entry.Qty()
 }
 
-func entryFilterRatioGreaterThan(filters []string, entry mtgban.GenericEntry) bool {
-	buylist, ok := entry.(mtgban.BuylistEntry)
+func entryFilterRatioGreaterThan[T mtgban.GenericEntry](filters []string, entry T) bool {
+	buylist, ok := any(entry).(mtgban.BuylistEntry)
 	if !ok || buylist.PriceRatio == 0 {
 		return true
 	}
@@ -3394,8 +3394,8 @@ func entryFilterRatioGreaterThan(filters []string, entry mtgban.GenericEntry) bo
 	return value >= buylist.PriceRatio
 }
 
-func entryFilterRatioLessThan(filters []string, entry mtgban.GenericEntry) bool {
-	buylist, ok := entry.(mtgban.BuylistEntry)
+func entryFilterRatioLessThan[T mtgban.GenericEntry](filters []string, entry T) bool {
+	buylist, ok := any(entry).(mtgban.BuylistEntry)
 	if !ok || buylist.PriceRatio == 0 {
 		return true
 	}
@@ -3406,7 +3406,7 @@ func entryFilterRatioLessThan(filters []string, entry mtgban.GenericEntry) bool 
 // applyEntryFilter dispatches an entry filter by name, mirroring
 // applyCardFilter. Unknown names panic, preserving the old registry
 // behavior.
-func applyEntryFilter(name string, filters []string, entry mtgban.GenericEntry) bool {
+func applyEntryFilter[T mtgban.GenericEntry](name string, filters []string, entry T) bool {
 	switch name {
 	case "condition":
 		return entryFilterCondition(filters, entry)
@@ -3426,9 +3426,9 @@ func applyEntryFilter(name string, filters []string, entry mtgban.GenericEntry) 
 	panic(name + " option not found")
 }
 
-func shouldSkipEntryNG(entry mtgban.GenericEntry, filters []FilterEntryElem) bool {
-	_, isSeller := entry.(mtgban.InventoryEntry)
-	_, isVendor := entry.(mtgban.BuylistEntry)
+func shouldSkipEntryNG[T mtgban.GenericEntry](entry T, filters []FilterEntryElem) bool {
+	_, isSeller := any(entry).(mtgban.InventoryEntry)
+	_, isVendor := any(entry).(mtgban.BuylistEntry)
 
 	for i := range filters {
 		if filters[i].OnlyForSeller && !isSeller {
