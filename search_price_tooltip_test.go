@@ -1,12 +1,59 @@
 package main
 
 import (
+	"io"
+	"log"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
+
+// A Direct price is judged against TCG Market's price for the same card on
+// the same page: under twice the market it carries no warning, over it it
+// does.
+func TestDirectPriceWarnsOnlyOverTwiceTheMarket(t *testing.T) {
+	withSigMode(t, true, false)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Search") })
+	}
+	b := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Fine", "1"}, {"Fixture Off", "2"}})
+	market, direct := mtgban.InventoryRecord{}, mtgban.InventoryRecord{}
+	for _, id := range []string{"FIXTUREA-1", "FIXTUREA-2"} {
+		market.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 1, URL: "u"})
+	}
+	direct.Add("FIXTUREA-1", &mtgban.InventoryEntry{Conditions: "NM", Price: 15, Quantity: 1, URL: "u"})
+	direct.Add("FIXTUREA-2", &mtgban.InventoryEntry{Conditions: "NM", Price: 25, Quantity: 1, URL: "u"})
+	s := fixtureSite(t, b, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(market, mtgban.ScraperInfo{Name: "TCG Market", Shorthand: "TCGMarket"}),
+		mtgban.NewSellerFromInventory(direct, mtgban.ScraperInfo{Name: "TCG Direct", Shorthand: "TCGDirect"}),
+	}, nil)
+
+	for _, tc := range []struct {
+		id   string
+		warn bool
+	}{
+		{"FIXTUREA-1", false},
+		{"FIXTUREA-2", true},
+	} {
+		rec := httptest.NewRecorder()
+		s.Search(rec, httptest.NewRequest(http.MethodGet, "/search?q="+tc.id, nil))
+		page := rec.Body.String()
+		if !strings.Contains(page, "TCG Direct") {
+			t.Fatalf("%s: the Direct row is not on the page", tc.id)
+		}
+		if got := strings.Contains(page, "price-warn"); got != tc.warn {
+			t.Errorf("%s: Direct price flagged = %v, want %v", tc.id, got, tc.warn)
+		}
+	}
+}
 
 // A retail price shows one tooltip: the market warning where it has one, or
 // else what it costs in store credit.
