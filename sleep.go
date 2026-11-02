@@ -10,7 +10,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+	"weak"
 
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/matcher/magic"
@@ -130,7 +132,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "mismatch":
 		pageVars.Subtitle = "Market Mismatch"
 
-		tiers = getTiers(b, blocklistRetail, blocklistBuylist, skipEditions)
+		tiers = getTiers(b, s.prices(), blocklistRetail, blocklistBuylist, skipEditions)
 	case "gap":
 		pageVars.Subtitle = "Ocean Gap"
 
@@ -351,35 +353,41 @@ func getReprints(skipEditions []string) map[string]int {
 	return tiers
 }
 
-func getTiers(b *matcher.Backend, blocklistRetail, blocklistBuylist, skipEditions []string) map[string]int {
+// getTiers counts, per card, the pairs among p's stores that flag it: a
+// vendor buying above a seller's asking price, or the seller asking less than
+// TCGLow. Each pair's hits are held on p, shared by every reader;
+// the reader's blocklists pick the pairs and skipEditions drops cards after.
+func getTiers(b *matcher.Backend, p *prices, blocklistRetail, blocklistBuylist, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
-
-	sellersSnapshot := GetSellers()
-	vendorsSnapshot := GetVendors()
-
-	var tcgSeller mtgban.Seller
-	for _, seller := range sellersSnapshot {
-		if seller != nil && seller.Info().Shorthand == "TCGLow" {
-			tcgSeller = seller
-			break
+	for _, cardIDs := range p.sleepers.hits(b, sleeperPairs(p, blocklistRetail, blocklistBuylist)) {
+		for _, cardID := range cardIDs {
+			tiers[cardID]++
 		}
 	}
-
-	opts := &mtgban.ArbitOpts{
-		MinSpread:        MinSpread,
-		MaxSpread:        MaxSpread,
-		MinPrice:         SleepersMinPrice,
-		Editions:         skipEditions,
-		Conditions:       BadConditions,
-		MaxPriceRatio:    MaxPriceRatio,
-		CustomCardFilter: noOversize,
-		// Safe to ask outright rather than name what to drop: the loop
-		// below skips sealed sellers, and sealed is the one thing the
-		// datastore files with no language at all.
-		OnlyLanguages: sleepersLanguages,
+	for cardID := range tiers {
+		co, err := b.GetUUID(cardID)
+		if err != nil || slices.Contains(skipEditions, co.Edition) || slices.Contains(skipEditions, co.SetCode) {
+			delete(tiers, cardID)
+		}
 	}
+	return tiers
+}
 
-	for _, seller := range sellersSnapshot {
+// sleeperPair is one comparison getTiers counts: vendor's buylist against
+// seller's shelf, or, with no vendor, reference's shelf against it.
+type sleeperPair struct {
+	seller    mtgban.Seller
+	vendor    mtgban.Vendor
+	reference mtgban.Seller
+}
+
+// sleeperPairs lists the pairs of p's stores the blocklists keep, every
+// one for nil blocklists.
+func sleeperPairs(p *prices, blocklistRetail, blocklistBuylist []string) []sleeperPair {
+	tcgSeller := p.index.seller["TCGLow"]
+
+	var pairs []sleeperPair
+	for _, seller := range p.sellers {
 		if seller.Info().MetadataOnly {
 			continue
 		}
@@ -395,7 +403,7 @@ func getTiers(b *matcher.Backend, blocklistRetail, blocklistBuylist, skipEdition
 			continue
 		}
 
-		for _, vendor := range vendorsSnapshot {
+		for _, vendor := range p.vendors {
 			if vendor.Info().Shorthand == seller.Info().Shorthand {
 				continue
 			}
@@ -408,25 +416,108 @@ func getTiers(b *matcher.Backend, blocklistRetail, blocklistBuylist, skipEdition
 				continue
 			}
 
-			arbit := mtgban.Arbit(b, opts, vendor, seller)
-
-			// Load the tiers
-			for i := range arbit {
-				tiers[arbit[i].CardID]++
-			}
+			pairs = append(pairs, sleeperPair{seller: seller, vendor: vendor})
 		}
 
 		if tcgSeller != nil {
-			mismatch := mtgban.Mismatch(b, opts, tcgSeller, seller)
-
-			// Load the tiers
-			for i := range mismatch {
-				tiers[mismatch[i].CardID]++
-			}
+			pairs = append(pairs, sleeperPair{seller: seller, reference: tcgSeller})
 		}
 	}
+	return pairs
+}
 
-	return tiers
+// cardIDs is the card id of every entry the pair reports, once per entry.
+// No edition is skipped here: getTiers drops the reader's after summing.
+func (pair sleeperPair) cardIDs(b *matcher.Backend) []string {
+	opts := &mtgban.ArbitOpts{
+		MinSpread:        MinSpread,
+		MaxSpread:        MaxSpread,
+		MinPrice:         SleepersMinPrice,
+		Conditions:       BadConditions,
+		MaxPriceRatio:    MaxPriceRatio,
+		CustomCardFilter: noOversize,
+		// Safe to ask outright rather than name what to drop: sleeperPairs
+		// skips sealed sellers, and sealed is the one thing the datastore
+		// files with no language at all.
+		OnlyLanguages: sleepersLanguages,
+	}
+
+	var entries []mtgban.ArbitEntry
+	if pair.vendor != nil {
+		entries = mtgban.Arbit(b, opts, pair.vendor, pair.seller)
+	} else {
+		entries = mtgban.Mismatch(b, opts, pair.reference, pair.seller)
+	}
+	cardIDs := make([]string, len(entries))
+	for i := range entries {
+		cardIDs[i] = entries[i].CardID
+	}
+	return cardIDs
+}
+
+// sleeperHits is one pair's card ids, computed by the first request to ask.
+type sleeperHits struct {
+	once    sync.Once
+	cardIDs []string
+}
+
+// sleeperCache holds one prices snapshot's pairs' hits, against the backend
+// they resolved through. A published store is never changed in place, so
+// newPrices carries the pairs the next snapshot still publishes into its
+// own cache, and a replaced snapshot's stores go with it.
+type sleeperCache struct {
+	mu      sync.Mutex
+	backend weak.Pointer[matcher.Backend]
+	pairs   map[sleeperPair]*sleeperHits
+}
+
+// sleeperTiersFor is next's cache: the pairs of prev's that next still
+// publishes, nil before the first publish.
+func sleeperTiersFor(prev, next *prices) *sleeperCache {
+	c := &sleeperCache{pairs: map[sleeperPair]*sleeperHits{}}
+	if prev == nil {
+		return c
+	}
+	prev.sleepers.mu.Lock()
+	defer prev.sleepers.mu.Unlock()
+	c.backend = prev.sleepers.backend
+	for _, pair := range sleeperPairs(next, nil, nil) {
+		entry, found := prev.sleepers.pairs[pair]
+		if found {
+			c.pairs[pair] = entry
+		}
+	}
+	return c
+}
+
+// hits returns each pair's card ids, computing the ones not held yet. A pair
+// is computed once however many requests ask for it at the same time; a new
+// backend starts over.
+func (c *sleeperCache) hits(b *matcher.Backend, pairs []sleeperPair) [][]string {
+	c.mu.Lock()
+	if c.backend != weak.Make(b) {
+		c.backend = weak.Make(b)
+		c.pairs = map[sleeperPair]*sleeperHits{}
+	}
+	held := make([]*sleeperHits, len(pairs))
+	for i, pair := range pairs {
+		entry, found := c.pairs[pair]
+		if !found {
+			entry = &sleeperHits{}
+			c.pairs[pair] = entry
+		}
+		held[i] = entry
+	}
+	c.mu.Unlock()
+
+	out := make([][]string, len(pairs))
+	for i, entry := range held {
+		entry.once.Do(func() {
+			entry.cardIDs = pairs[i].cardIDs(b)
+		})
+		out[i] = entry.cardIDs
+	}
+	return out
 }
 
 func getGap(b *matcher.Backend, blocklistRetail []string, ref, target string, skipEditions []string) map[string]int {
