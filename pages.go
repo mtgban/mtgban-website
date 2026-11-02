@@ -604,6 +604,22 @@ func (nav *NavElem) hiddenOn(s *site) bool {
 	return nav.ShouldHide != nil && nav.ShouldHide(s)
 }
 
+// pageAt is the entry of this section that answers at path, the section
+// itself or one of its sub-pages, matched without the query a Link may
+// carry; found is false where none does.
+func (nav *NavElem) pageAt(path string) (page *NavElem, found bool) {
+	if nav.Link == path {
+		return nav, true
+	}
+	for i := range nav.SubPages {
+		link, _, _ := strings.Cut(nav.SubPages[i].Link, "?")
+		if link == path {
+			return &nav.SubPages[i], true
+		}
+	}
+	return nil, false
+}
+
 // TemplateCache holds pre-parsed templates keyed by their base name.
 // Populated at startup in production; nil in DevMode (re-parsed per request).
 var TemplateCache map[string]*template.Template

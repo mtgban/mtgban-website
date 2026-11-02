@@ -827,6 +827,17 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// An unfurl is shown to readers with no signature, so it previews only
+	// a page this handler draws for them: Search's own, that this site shows
+	// and the ACL opens to everyone. Any other page is not previewed, so a
+	// link to one says no more than the page would.
+	nav, found := ExtraNavs["Search"].pageAt(u.Path)
+	_, open := ACL()["Any"]["Search"]
+	if !found || nav.hiddenOn(s) || !open {
+		oembedError(w, http.StatusNotFound)
+		return
+	}
+
 	// The search runs on the request a reader with the consumer's cookies
 	// would send for the page, so it reads the page's own query, sort,
 	// order, page of results and pinned bar as the page does.
