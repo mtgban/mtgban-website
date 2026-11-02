@@ -49,7 +49,7 @@ func (vendorsPoke) Store(vendors *[]mtgban.Vendor) {
 	for {
 		old := pricesPtr.Load()
 		p := currentPrices()
-		if pricesPtr.CompareAndSwap(old, newPrices(p.sellers, list, p.scrapers)) {
+		if pricesPtr.CompareAndSwap(old, withVendors(p, list)) {
 			return
 		}
 	}
