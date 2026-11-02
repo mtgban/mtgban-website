@@ -177,12 +177,14 @@ Boot sequence (`main()`):
 
 The dominant pattern is **immutable snapshots behind atomic pointers**:
 
-- `sellersPtr`/`vendorsPtr` (`atomic.Pointer[[]mtgban.Seller/Vendor]`,
-  load.go). Readers call `GetSellers()`/`GetVendors()`; writers go
+- `pricesPtr` (`atomic.Pointer[prices]`, load.go): one value holding the
+  sellers, the vendors, the by-shorthand `storeIndex` over them and the
+  dumps `scraperIndex`, built whole by `newPrices`. Readers call
+  `GetSellers()`/`GetVendors()` or `currentStoreIndex()`; writers go
   through `updateSellers()`/`updateVendors()` which validate (timestamp must
   not regress; a new inventory/buylist under half the previous size is
   rejected once the previous one held over 100 entries) and `.Store()` a new
-  slice under `scrapersWriteMu`. Zero-downtime reloads.
+  value under `scrapersWriteMu`. Zero-downtime reloads.
 - Same pattern for newspaper page cache (`newspaperPagesPtr`), reprints
   (`reprintsPtr`), checkpoints (`checkpointsStore`, an
   `internal/bucketstore.Store[T]` — also an atomic-pointer swap, not a
@@ -290,8 +292,8 @@ read, or its workflow state's names.
   `mtgban.ReadSellerFromJSON`/`ReadVendorFromJSON`, 3 retries with backoff
   and a 2-minute timeout per scraper. The listing also builds a
   `scraperIndex`: store → kind → shorthands, and the reverse shorthand →
-  store, published behind its own `atomic.Pointer` next to
-  `sellersPtr`/`vendorsPtr` before any dump loads; the admin dashboard,
+  store, published on the prices snapshot (`publishScrapers`) before any
+  dump loads; the admin dashboard,
   `familyKeys()` and `isConfiguredScraper` all read it. A bucket that cannot
   be opened or listed is a startup error.
 
