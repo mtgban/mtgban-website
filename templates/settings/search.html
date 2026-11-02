@@ -12,12 +12,12 @@
             <h4 class="settings-stores-col-label">Buylist</h4>
 
             <h5 class="settings-stores-row-label">Singles</h5>
-            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "singles")}}
-            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "singles")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "Sealed" .SealedStores "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "singles")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "Sealed" .SealedStores "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "singles")}}
 
             <h5 class="settings-stores-row-label">Sealed</h5>
-            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "sealed")}}
-            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "sealed")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "Sealed" .SealedStores "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "sealed")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "Sealed" .SealedStores "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "sealed")}}
         </div>
     </div>
 </section>

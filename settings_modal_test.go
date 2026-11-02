@@ -458,3 +458,35 @@ func TestSettingsBodyDrawsStoreFactors(t *testing.T) {
 		t.Errorf("data-stores does not carry CK:\n%s", out)
 	}
 }
+
+// The vendor grids split singles from sealed by the modal's data, and the
+// arbitrage tabs, which reach the grid through a dict, are handed it too.
+func TestSettingsModalSplitsSealedVendors(t *testing.T) {
+	signingEnabled(t, true)
+	withPrices(t, nil, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Singles Vendor", Shorthand: "ZZSINGLES"}),
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Sealed Vendor", Shorthand: "ZZSEALED", SealedMode: true}),
+	})
+	body := fetchSettingsModal(t, grantSig(t, "Search", "Arbit"))
+	for _, grid := range []string{"settings-search-vendors", "settings-arbit-vendors"} {
+		for _, tc := range []struct{ section, in, out string }{
+			{"singles", "ZZSINGLES", "ZZSEALED"},
+			{"sealed", "ZZSEALED", "ZZSINGLES"},
+		} {
+			cells := gridCells(body, grid+"-"+tc.section)
+			if !strings.Contains(cells, `name="`+tc.in+`"`) || strings.Contains(cells, `name="`+tc.out+`"`) {
+				t.Errorf("%s-%s lists:\n%s\nwant %s and not %s", grid, tc.section, cells, tc.in, tc.out)
+			}
+		}
+	}
+}
+
+// gridCells is the body of the settings grid with this id, or "".
+func gridCells(body, id string) string {
+	re := regexp.MustCompile(`(?s)<div class="settings-grid" id="` + regexp.QuoteMeta(id) + `"[^>]*>(.*?)</div>`)
+	m := re.FindStringSubmatch(body)
+	if m == nil {
+		return ""
+	}
+	return m[1]
+}

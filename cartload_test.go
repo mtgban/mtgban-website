@@ -1,6 +1,10 @@
 package main
 
 import (
+	"io"
+	"log"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"slices"
@@ -706,7 +710,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 	} {
 		page := renderArbit(t, PageVars{
 			ScraperShort: tc.short,
-			ArbitVars:    ArbitVars{GlobalMode: true},
+			ArbitVars:    ArbitVars{GlobalMode: true, SealedSource: true},
 			UserNav:      &NavElem{Short: "beta"},
 			Arb:          []Arbitrage{{Name: "Store", Key: tc.key, Arbit: sealedRows}},
 		})
@@ -833,5 +837,52 @@ func TestCartLoadAffiliates(t *testing.T) {
 	got = affiliated("CK", "https://www.cardkingdom.com/cart")
 	if got != "https://www.cardkingdom.com/cart?partner=ban&utm_campaign=ban&utm_medium=affiliate&utm_source=ban" {
 		t.Errorf("CK link = %q", got)
+	}
+}
+
+// The optimizer and arbit tables carry Card Kingdom's buylist id for each
+// card, on the row and in the partner_import form, from the buylist the
+// page was built from.
+func TestCartLoadersCarryCardKingdomIDs(t *testing.T) {
+	withSigMode(t, true, false)
+	quietUploadLog(t)
+	if LogPages["Arbitrage"] == nil {
+		LogPages["Arbitrage"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Arbitrage") })
+	}
+	b := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}})
+	bl := mtgban.BuylistRecord{}
+	bl.Add("FIXTUREA-1", &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 5, Quantity: 1, URL: "u", OriginalID: "ck-777"})
+	inv := mtgban.InventoryRecord{}
+	inv.Add("FIXTUREA-1", &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1, URL: "u"})
+	s := fixtureSite(t, b,
+		[]mtgban.Seller{mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Source Shop", Shorthand: "ZZSRC"})},
+		[]mtgban.Vendor{mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK"})})
+
+	form := url.Values{}
+	form.Set("mode", "true")
+	form["stores"] = []string{"CK"}
+	form.Set("minmargin", "true")
+	form.Set("margin", "10")
+	form.Set("lowval", "")
+	form.Set("lowvalabs", "")
+	form.Set("rows", "FIXTUREA-1\t1\t\t0\t\n")
+	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	s.Upload(rec, req)
+	pages := map[string]string{"upload": rec.Body.String()}
+
+	rec = httptest.NewRecorder()
+	s.Arbit(rec, httptest.NewRequest(http.MethodGet, "/arbit?source=ZZSRC", nil))
+	pages["arbit"] = rec.Body.String()
+
+	for name, page := range pages {
+		if !strings.Contains(page, `data-load-ckid="ck-777"`) {
+			t.Errorf("%s: the CK row carries no ck-777 id", name)
+		}
+		if !strings.Contains(page, `"id": ck-777,`) {
+			t.Errorf("%s: the partner_import form carries no ck-777 id", name)
+		}
 	}
 }

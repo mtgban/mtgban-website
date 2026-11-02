@@ -517,12 +517,16 @@ type GenericCard struct {
 	Products    string
 	NumProducts int
 	TCGId       string
-	Date        string
-	Sealed      bool
-	Booster     bool
-	HasDeck     bool
-	Flag        string
-	LangTag     string
+	// Card Kingdom's buylist id for the card, for its cart, and TCG Market's
+	// price, which TCG Direct's is judged by; "" and 0 where they have none
+	CKBuylistID    string
+	TCGMarketPrice float64
+	Date           string
+	Sealed         bool
+	Booster        bool
+	HasDeck        bool
+	Flag           string
+	LangTag        string
 
 	Rarity            string
 	RarityColor       template.CSS
@@ -973,6 +977,14 @@ func uuid2card(b *matcher.Backend, cardID string, preferFlavorName bool, odds *p
 		stocksURL = entries[0].URL
 	}
 
+	var ckBuylistID string
+	ckBuylist, err := findVendorBuylist("CK")
+	if err == nil && len(ckBuylist[cardID]) > 0 {
+		ckBuylistID = ckBuylist[cardID][0].OriginalID
+	}
+	tcgMarket, _ := findSellerInventory("TCGMarket")
+	tcgMarketPrice := tcgMarketPriceIn(tcgMarket, cardID)
+
 	var newspaper bool
 	if uuids := GetNewspaperUUIDs(); uuids != nil {
 		_, newspaper = uuids[cardID]
@@ -1122,39 +1134,41 @@ func uuid2card(b *matcher.Backend, cardID string, preferFlavorName bool, odds *p
 	}
 
 	return GenericCard{
-		UUID:        co.UUID,
-		ChartID:     cardID,
-		Name:        name,
-		FlavorName:  flavor,
-		Edition:     co.Edition,
-		SetCode:     co.Card.SetCode,
-		Number:      co.Card.Number,
-		SetTotal:    co.SetTotal,
-		PromoTypes:  promoTypes,
-		Foil:        co.Foil,
-		Etched:      co.Etched,
-		FinishTag:   finishTag,
-		FinishClass: finishClass,
-		Treatments:  treatments,
-		PromoLabels: promoLabels,
-		Keyrune:     keyrune,
-		SetSymbol:   setSymbol,
-		ImageURL:    imgURL,
-		Title:       editionTitle(b, cardID),
-		Reserved:    co.Card.IsReserved,
-		SearchURL:   searchURL,
-		SypList:     sypList,
-		Stocks:      stocks,
-		StocksURL:   stocksURL,
-		Products:    products,
-		NumProducts: numProducts,
-		TCGId:       tcgID,
-		Date:        co.OriginalReleaseDate,
-		Sealed:      co.Sealed,
-		Booster:     canBoosterGen,
-		HasDeck:     hasDecklist,
-		Flag:        allLanguageFlags[co.Language],
-		LangTag:     matcher.LanguageTag2LanguageCode[co.Language],
+		UUID:           co.UUID,
+		ChartID:        cardID,
+		Name:           name,
+		FlavorName:     flavor,
+		Edition:        co.Edition,
+		SetCode:        co.Card.SetCode,
+		Number:         co.Card.Number,
+		SetTotal:       co.SetTotal,
+		PromoTypes:     promoTypes,
+		Foil:           co.Foil,
+		Etched:         co.Etched,
+		FinishTag:      finishTag,
+		FinishClass:    finishClass,
+		Treatments:     treatments,
+		PromoLabels:    promoLabels,
+		Keyrune:        keyrune,
+		SetSymbol:      setSymbol,
+		ImageURL:       imgURL,
+		Title:          editionTitle(b, cardID),
+		Reserved:       co.Card.IsReserved,
+		SearchURL:      searchURL,
+		SypList:        sypList,
+		Stocks:         stocks,
+		StocksURL:      stocksURL,
+		Products:       products,
+		NumProducts:    numProducts,
+		TCGId:          tcgID,
+		CKBuylistID:    ckBuylistID,
+		TCGMarketPrice: tcgMarketPrice,
+		Date:           co.OriginalReleaseDate,
+		Sealed:         co.Sealed,
+		Booster:        canBoosterGen,
+		HasDeck:        hasDecklist,
+		Flag:           allLanguageFlags[co.Language],
+		LangTag:        matcher.LanguageTag2LanguageCode[co.Language],
 
 		Rarity:            co.Rarity,
 		RarityColor:       rarityColor,
@@ -1775,15 +1789,6 @@ func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T
 	return slice[head:tail], page
 }
 
-// Retrieve the TCGplayer Market price of any given card
-func getTCGMarketPrice(cardID string) float64 {
-	inv, err := findSellerInventory("TCGMarket")
-	if err != nil {
-		return 0
-	}
-	return tcgMarketPriceIn(inv, cardID)
-}
-
 // tcgMarketPriceIn probes an already-resolved TCGMarket inventory, so
 // per-row loops resolve the seller once instead of per card.
 func tcgMarketPriceIn(inv mtgban.InventoryRecord, cardID string) float64 {
@@ -1849,6 +1854,23 @@ func isSealedScraper(shorthand string) bool {
 	return info.SealedMode
 }
 
+// sealedStores is isSealedScraper's answer for every loaded shorthand, for
+// a page listing stores.
+func sealedStores() map[string]bool {
+	idx := currentStoreIndex()
+	sealed := make(map[string]bool, len(idx.seller)+len(idx.vendor))
+	for shorthand, seller := range idx.seller {
+		sealed[shorthand] = seller.Info().SealedMode
+	}
+	for shorthand, vendor := range idx.vendor {
+		_, listed := sealed[shorthand]
+		if !listed {
+			sealed[shorthand] = vendor.Info().SealedMode
+		}
+	}
+	return sealed
+}
+
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
 // by their resolved display name (case-insensitive). Stable for equal names.
 func sortKeysByScraperName(keys []string) []string {
@@ -1860,13 +1882,10 @@ func sortKeysByScraperName(keys []string) []string {
 	return out
 }
 
-// Special function to detect if the input price is bigger than
-// twice as much the market price on TCGplayer - used to detect
-// invalid Direct prices. Ignored for anything lower than $1
-// since Direct minimum is $0.40.
-func invalidDirect(id string, price float64) bool {
-	inv, _ := findSellerInventory("TCGMarket")
-	return invalidDirectIn(inv, id, price)
+// invalidDirect flags a TCG Direct price over twice TCG Market's, market 0
+// for none. Anything under $1 passes, since Direct's minimum is $0.40.
+func invalidDirect(price, market float64) bool {
+	return price >= 1 && price > market*2
 }
 
 // directPriceWarning is the tooltip of a price invalidDirect flags: why it
@@ -1882,12 +1901,7 @@ func directPriceWarning(price, market float64) string {
 // invalidDirectIn is invalidDirect over an already-resolved TCGMarket
 // inventory; a nil inventory reads as no market price.
 func invalidDirectIn(inv mtgban.InventoryRecord, id string, price float64) bool {
-	if price < 1 {
-		return false
-	}
-
-	marketPrice := tcgMarketPriceIn(inv, id)
-	return price > marketPrice*2
+	return invalidDirect(price, tcgMarketPriceIn(inv, id))
 }
 
 // keyruneClass turns a set's keyrune code into the class the font wants, and
