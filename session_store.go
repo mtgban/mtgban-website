@@ -51,7 +51,7 @@ func dropSessionScraper(kind, shorthand string) {
 		next := slices.DeleteFunc(slices.Clone(p.sellers), func(seller mtgban.Seller) bool {
 			return seller.Info().Shorthand == shorthand
 		})
-		pricesPtr.Store(newPrices(next, p.vendors, p.scrapers))
+		pricesPtr.Store(newPrices(p, next, p.vendors, p.scrapers))
 		return
 	}
 	next := slices.DeleteFunc(slices.Clone(p.vendors), func(vendor mtgban.Vendor) bool {

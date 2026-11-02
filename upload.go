@@ -130,9 +130,9 @@ type UploadEntry = docparse.Entry
 // newUploadParser builds a parser bound to b, wired to the site's logger,
 // the TCGplayer SKU and Cardmarket id indexes, and the set-recency ordering
 // for alias candidates. Built once per upload, so every row matches against
-// the same datastore and resolves its Cardmarket id from the same snapshot.
+// the same datastore and resolves its ids from the same snapshot.
 func newUploadParser(b *matcher.Backend) *docparse.Parser {
-	mkmIDs := currentPrices().mkmIDs
+	p := currentPrices()
 	return &docparse.Parser{
 		Backend: b,
 		Logf: func(format string, v ...any) {
@@ -140,9 +140,9 @@ func newUploadParser(b *matcher.Backend) *docparse.Parser {
 				logger.Printf(format, v...)
 			}
 		},
-		TCGSkuToUUID:      tcgSKU2UUID,
-		TCGSkuToCondition: tcgSKU2Condition,
-		MKMIDToUUID:       mkmIDs.Resolve,
+		TCGSkuToUUID:      p.tcgSKUs.Resolve,
+		TCGSkuToCondition: p.tcgSKUs.Condition,
+		MKMIDToUUID:       p.mkmIDs.Resolve,
 		PreferredPrinting: func(x, y string) bool { return sortSets(b, x, y) },
 	}
 }

@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"maps"
 	"os"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/tcgskuparser"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -35,8 +37,12 @@ func TestUploadResolvesCardmarketIDFromThePublishedSnapshot(t *testing.T) {
 	withPrices(t, sellers, GetVendors())
 
 	// A mark a rebuild would not carry, so "was it rebuilt" is answerable
-	// without timing anything.
-	currentPrices().mkmIDs["sentinel"] = "kept"
+	// without timing anything. It is published as a snapshot of its own:
+	// nothing in a published value is changed in place.
+	marked := *currentPrices()
+	marked.mkmIDs = maps.Clone(marked.mkmIDs)
+	marked.mkmIDs["sentinel"] = "kept"
+	pricesPtr.Store(&marked)
 
 	// A buylist-only publish, the way a buylist load does it: the sellers,
 	// and the map, are carried across. The withPrices above restores it.
@@ -64,6 +70,46 @@ func TestUploadResolvesCardmarketIDFromThePublishedSnapshot(t *testing.T) {
 	}
 }
 
+// A retail publish keeps the Cardmarket id map while the shelves are the
+// ones it was built from, and builds it again as soon as one is new. Each
+// publish here builds from the snapshot it replaces, as a load does.
+func TestMKMIDIndexFollowsItsShelves(t *testing.T) {
+	shelf := mkmShelf("MKMTrend", map[string]string{"uuid-aaa": "100"})
+	other := mkmShelf("CK", map[string]string{"uuid-aaa": "ck-1"})
+	withPrices(t, []mtgban.Seller{shelf}, GetVendors())
+	marked := *currentPrices()
+	marked.mkmIDs = maps.Clone(marked.mkmIDs)
+	marked.mkmIDs["sentinel"] = "kept"
+	pricesPtr.Store(&marked)
+
+	// Another store published: a new slice, the same shelf.
+	withPrices(t, []mtgban.Seller{shelf, other}, GetVendors())
+	if got := currentPrices().mkmIDs.Resolve("sentinel"); got != "kept" {
+		t.Errorf("a publish of another store rebuilt the map: sentinel = %q", got)
+	}
+	if got := currentPrices().mkmIDs.Resolve("ck-1"); got != "" {
+		t.Errorf("another store's id resolves: %q", got)
+	}
+
+	// The shelf published again: its map is new.
+	withPrices(t, []mtgban.Seller{mkmShelf("MKMTrend", map[string]string{"uuid-bbb": "200"}), other}, GetVendors())
+	if got := currentPrices().mkmIDs.Resolve("sentinel"); got != "" {
+		t.Errorf("a new shelf kept the old map: sentinel = %q", got)
+	}
+	if got := currentPrices().mkmIDs.Resolve("200"); got != "uuid-bbb" {
+		t.Errorf("Resolve(200) = %q, want uuid-bbb", got)
+	}
+	if got := currentPrices().mkmIDs.Resolve("100"); got != "" {
+		t.Errorf("the replaced shelf's id still resolves: %q", got)
+	}
+
+	// Dropped: the map goes with it.
+	withPrices(t, []mtgban.Seller{other}, GetVendors())
+	if ids := currentPrices().mkmIDs; ids != nil {
+		t.Errorf("no shelf, yet a map of %d ids", len(ids))
+	}
+}
+
 // benchDump reads one store's dump out of the directory MTGBAN_BENCH_DUMPS
 // names, flat, as <shorthand>.json.xz; the benchmark skips when it is unset.
 func benchDump(b *testing.B, shorthand string) mtgban.Seller {
@@ -85,8 +131,8 @@ func benchDump(b *testing.B, shorthand string) mtgban.Seller {
 }
 
 // The two inverted indexes over the retail side, each over the real dumps
-// it reads, so the cost of building one at every publish can be set against
-// the other's twelve-hourly build.
+// it reads: what a publish of one of their sellers pays to build each.
+// Every other publish carries both across.
 func BenchmarkBuildMKMIDIndex(b *testing.B) {
 	sellers := []mtgban.Seller{benchDump(b, "MKMTrend"), benchDump(b, "MKMLow"), benchDump(b, "MKMSealed")}
 	b.ResetTimer()
@@ -96,20 +142,19 @@ func BenchmarkBuildMKMIDIndex(b *testing.B) {
 		b.StopTimer()
 		runtime.GC()
 		b.StartTimer()
-		newPrices(sellers, nil, *newScraperIndex())
+		newPrices(nil, sellers, nil, *newScraperIndex())
 	}
-	b.ReportMetric(float64(len(newPrices(sellers, nil, *newScraperIndex()).mkmIDs)), "ids")
+	b.ReportMetric(float64(len(newPrices(nil, sellers, nil, *newScraperIndex()).mkmIDs)), "ids")
 }
 
 func BenchmarkBuildTCGSKUIndex(b *testing.B) {
-	tcgPlayer := benchDump(b, "TCGPlayer").Inventory()
-	tcgSealed := benchDump(b, "TCGSealed").Inventory()
+	sellers := []mtgban.Seller{benchDump(b, "TCGPlayer"), benchDump(b, "TCGSealed")}
 	b.ResetTimer()
 	for range b.N {
 		b.StopTimer()
 		runtime.GC()
 		b.StartTimer()
-		buildTCGSKUIndex(tcgPlayer, tcgSealed)
+		tcgskuparser.Build(sellers)
 	}
-	b.ReportMetric(float64(len(buildTCGSKUIndex(tcgPlayer, tcgSealed))), "skus")
+	b.ReportMetric(float64(len(tcgskuparser.Build(sellers))), "skus")
 }

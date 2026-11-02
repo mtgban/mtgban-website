@@ -14,7 +14,7 @@ func withPrices(tb testing.TB, sellers []mtgban.Seller, vendors []mtgban.Vendor)
 	tb.Helper()
 	prev := currentPrices()
 	tb.Cleanup(func() { pricesPtr.Store(prev) })
-	pricesPtr.Store(newPrices(sellers, vendors, prev.scrapers))
+	pricesPtr.Store(newPrices(prev, sellers, vendors, prev.scrapers))
 }
 
 // keepPrices puts the snapshot served now back when the test ends, for a
