@@ -96,7 +96,7 @@ func TestMobileSearchListsTheStores(t *testing.T) {
 		LogPages["Search"] = log.New(io.Discard, "", 0)
 		defer delete(LogPages, "Search")
 	}
-	publishStores(t,
+	withPrices(t,
 		[]mtgban.Seller{mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})},
 		[]mtgban.Vendor{mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"})})
 
@@ -123,7 +123,7 @@ func TestSearchListsTheStoresOnlyForAPhone(t *testing.T) {
 		LogPages["Search"] = log.New(io.Discard, "", 0)
 		defer delete(LogPages, "Search")
 	}
-	publishStores(t,
+	withPrices(t,
 		[]mtgban.Seller{mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})},
 		[]mtgban.Vendor{mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"})})
 	prevCache := TemplateCache

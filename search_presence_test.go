@@ -150,7 +150,7 @@ func TestOfferPresenceMatchesCollectedOffers(t *testing.T) {
 	vindex := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{
 		uuids[2]: {{BuyPrice: 1, Conditions: "NM"}},
 	}, mtgban.ScraperInfo{Name: "Presence Vendor Index", Shorthand: "PRESVIDX", MetadataOnly: true, BuylistTimestamp: &now})
-	publishStores(t, []mtgban.Seller{index, retail}, []mtgban.Vendor{vendor, vindex})
+	withPrices(t, []mtgban.Seller{index, retail}, []mtgban.Vendor{vendor, vindex})
 
 	plain := httptest.NewRequest(http.MethodGet, "/search", nil)
 	custom := httptest.NewRequest(http.MethodGet, "/search", nil)

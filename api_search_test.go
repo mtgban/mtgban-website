@@ -39,12 +39,6 @@ func plainCard(t *testing.T) (id, name string) {
 	return "", ""
 }
 
-// publishStores swaps in sellers and vendors for the test.
-func publishStores(t *testing.T, sellers []mtgban.Seller, vendors []mtgban.Vendor) {
-	t.Helper()
-	withPrices(t, sellers, vendors)
-}
-
 // searchStores prices one card at Card Kingdom and at Star City Games and
 // returns its name.
 func searchStores(t *testing.T) string {
@@ -56,7 +50,7 @@ func searchStores(t *testing.T) string {
 		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: price, Quantity: 1})
 		return inventory
 	}
-	publishStores(t, []mtgban.Seller{
+	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(priced(1), mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
 		mtgban.NewSellerFromInventory(priced(2), mtgban.ScraperInfo{Shorthand: "SCG", Name: "Star City Games"}),
 	}, []mtgban.Vendor{
@@ -91,7 +85,7 @@ func TestSearchAPIv2(t *testing.T) {
 	scg.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 2, Quantity: 1})
 	ckbl := mtgban.BuylistRecord{}
 	ckbl.Add(id, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 0.5, Quantity: 3})
-	publishStores(t, []mtgban.Seller{
+	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(ck, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
 		mtgban.NewSellerFromInventory(scg, mtgban.ScraperInfo{Shorthand: "SCG", Name: "Star City Games"}),
 		mtgban.NewSellerFromInventory(sealed, mtgban.ScraperInfo{Shorthand: "CKSealed", Name: "Card Kingdom Sealed", SealedMode: true}),
@@ -483,7 +477,7 @@ func TestSearchAPIKeyScopeMeetsBlockListsAsPrices(t *testing.T) {
 	// the price API and on search alike.
 	buys := mtgban.BuylistRecord{}
 	buys.Add(id, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 1})
-	publishStores(t, slices.Clone(GetSellers()), append(slices.Clone(GetVendors()),
+	withPrices(t, slices.Clone(GetSellers()), append(slices.Clone(GetVendors()),
 		mtgban.NewVendorFromBuylist(buys, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
 		mtgban.NewVendorFromBuylist(buys, mtgban.ScraperInfo{Shorthand: "SCG", Name: "Star City Games"})))
 	v2BuylistStores := func(body []byte) []string {
@@ -565,7 +559,7 @@ func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 		price[id] = float64(i + 1)
 		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: price[id], Quantity: 1})
 	}
-	publishStores(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}, []mtgban.Vendor{})
+	withPrices(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}, []mtgban.Vendor{})
 
 	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
 	exported := func(query, sortMode, saved string) []string {
@@ -626,7 +620,7 @@ func TestSearchCSVListsWhatThePageLists(t *testing.T) {
 	for _, id := range priced {
 		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1})
 	}
-	publishStores(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}, []mtgban.Vendor{})
+	withPrices(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}, []mtgban.Vendor{})
 
 	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
 	exported := func(query string) []string {
@@ -675,7 +669,7 @@ func TestSearchExportKeepsASlashInTheQuery(t *testing.T) {
 		t.Skip("every Fire // Ice printing is in one set")
 	}
 	signingEnabled(t, false)
-	publishStores(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}, []mtgban.Vendor{})
+	withPrices(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}, []mtgban.Vendor{})
 
 	// The set comes first, so a query cut at its last "/" reads " Ice" and
 	// exports every printing.
@@ -722,12 +716,9 @@ func TestSearchAPIKeepsSealedToTheSealedMode(t *testing.T) {
 		Card:   matcher.Card{UUID: box, Name: "Fixture Booster Box", SetCode: "FIXTUREA"},
 		Sealed: true,
 	}
-	s := newSite()
-	s.ds.Store(s.newDatastore(b, time.Now()))
-
 	sealed := mtgban.InventoryRecord{}
 	sealed.Add(box, &mtgban.InventoryEntry{Price: 99, Quantity: 1})
-	publishStores(t, []mtgban.Seller{
+	s := fixtureSite(t, b, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(sealed, mtgban.ScraperInfo{Shorthand: "CKSealed", Name: "Card Kingdom Sealed", SealedMode: true}),
 	}, []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "CKBL", Name: "Card Kingdom Buylist"}),
@@ -806,7 +797,7 @@ func TestSearchAPIReadsANumberAsAnID(t *testing.T) {
 	for _, id := range append([]string{uuid}, ds.numbers.loose[tcgID]...) {
 		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1})
 	}
-	publishStores(t, []mtgban.Seller{
+	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"}),
 	}, []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "CKBL", Name: "Card Kingdom Buylist"}),
@@ -867,7 +858,7 @@ func TestSearchAPIReadsANumberAfterAName(t *testing.T) {
 	for _, id := range printings {
 		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1})
 	}
-	publishStores(t, []mtgban.Seller{
+	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"}),
 	}, []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "CKBL", Name: "Card Kingdom Buylist"}),
