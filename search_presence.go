@@ -1,127 +1,229 @@
 package main
 
 import (
+	"cmp"
 	"net/http"
 	"slices"
 	"strings"
-	"sync"
 
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
-// offerPresence is what the post filters read of a card's offers on one side
-// of the market: whether any is listed under a condition other than INDEX,
-// and which stores list one, by lower-case shorthand. It is gathered without
-// building the offers, so the post filters judge every card a search found
-// while the offers are built for the page shown.
-type offerPresence struct {
-	offer  bool
-	stores map[string]struct{}
+// postSeller is a seller the post filters ask about a card.
+type postSeller struct {
+	info      mtgban.ScraperInfo
+	inventory mtgban.InventoryRecord
 }
 
-// offerPresences is each card's presence by id; a card nothing offers on the
-// side has no entry.
-type offerPresences map[string]*offerPresence
-
-// add records an offer for cardID that store lists under cond. store is the
-// store's shorthand in lower case, as the any filter reads it; the walks
-// lower-case it once per store, not once per entry.
-func (p offerPresences) add(cardID string, cond mtgban.Condition, store string) {
-	pr := p[cardID]
-	if pr == nil {
-		pr = &offerPresence{}
-		p[cardID] = pr
-	}
-	if cond != "INDEX" {
-		pr.offer = true
-	}
-	// The any filter reads the known conditions alone
-	if slices.Contains(AllConditions, cond) {
-		if pr.stores == nil {
-			pr.stores = map[string]struct{}{}
-		}
-		pr.stores[store] = struct{}{}
-	}
+// postVendor is a vendor the post filters ask about a card.
+type postVendor struct {
+	info    mtgban.ScraperInfo
+	buylist mtgban.BuylistRecord
 }
 
-// searchOfferPresence walks the stores a search reads, as searchParallelNG
-// does, and records of each card only what the post filters ask: the same
-// store, condition and price filters judge each entry, and nothing is built
-// for one that passes. The custom buylist counts on the vendor side when the
-// reader has one.
-func searchOfferPresence(b *matcher.Backend, r *http.Request, cardIDs []string, config SearchConfig) (sellers, vendors offerPresences) {
-	sellers = offerPresences{}
-	vendors = offerPresences{}
+// postStores holds the stores a search reads, as the post filters ask them
+// about the cards found: each side by lower-case shorthand, as the any
+// filter names them, and the stores that can offer biggest first, for the
+// empty filter. Each store is asked only about the cards no store before it
+// answered, so the post filters judge every card a search found without
+// building the offers, which are built for the page shown.
+type postStores struct {
+	config          SearchConfig
+	sellers         map[string]*postSeller
+	vendors         map[string]*postVendor
+	offeringSellers []*postSeller
+	offeringVendors []*postVendor
+	// custom holds the conditions the custom buylist prices each card at
+	custom map[string][]mtgban.Condition
+}
 
-	cardIDs = dedupeKeys(cardIDs)
+// newPostStores reads the stores the search's store filters keep, and the
+// custom buylist's offers for cardIDs when a filter asks about them.
+func newPostStores(b *matcher.Backend, r *http.Request, cardIDs []string, config SearchConfig) *postStores {
+	s := &postStores{
+		config:  config,
+		sellers: map[string]*postSeller{},
+		vendors: map[string]*postVendor{},
+	}
 
-	// Each walk recovers its own panic, which then costs only its side: the
-	// presence it would have filled stays empty.
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		defer recoverJob("search sellers presence")
-		if !config.SkipRetail {
-			sellerPresence(cardIDs, config, sellers)
-		}
-	})
-	wg.Go(func() {
-		defer recoverJob("search vendors presence")
-		if config.SkipBuylist {
-			return
-		}
-		vendorPresence(cardIDs, config, vendors)
-		if config.CustomBuylist {
-			for _, offer := range customBuylistOffers(b, r, cardIDs) {
-				vendors.add(offer.cardID, offer.condition, "custom")
+	if !config.SkipRetail {
+		for _, seller := range GetSellers() {
+			if shouldSkipStoreNG(seller, config.StoreFilters) {
+				continue
+			}
+			store := &postSeller{info: seller.Info(), inventory: seller.Inventory()}
+			s.sellers[strings.ToLower(store.info.Shorthand)] = store
+			// An index lists everything under INDEX, which is no offer
+			if !store.info.MetadataOnly {
+				s.offeringSellers = append(s.offeringSellers, store)
 			}
 		}
+	}
+	if !config.SkipBuylist {
+		for _, vendor := range GetVendors() {
+			if shouldSkipStoreNG(vendor, config.StoreFilters) {
+				continue
+			}
+			store := &postVendor{info: vendor.Info(), buylist: vendor.Buylist()}
+			s.vendors[strings.ToLower(store.info.Shorthand)] = store
+			// A sealed index keeps its conditions
+			if !store.info.MetadataOnly || store.info.SealedMode {
+				s.offeringVendors = append(s.offeringVendors, store)
+			}
+		}
+	}
+	slices.SortFunc(s.offeringSellers, func(a, b *postSeller) int {
+		return cmp.Compare(len(b.inventory), len(a.inventory))
 	})
-	wg.Wait()
+	slices.SortFunc(s.offeringVendors, func(a, b *postVendor) int {
+		return cmp.Compare(len(b.buylist), len(a.buylist))
+	})
 
-	return sellers, vendors
+	if config.CustomBuylist && !config.SkipBuylist && asksCustom(config.PostFilters) {
+		s.custom = map[string][]mtgban.Condition{}
+		for _, offer := range customBuylistOffers(b, r, cardIDs) {
+			s.custom[offer.cardID] = append(s.custom[offer.cardID], offer.condition)
+		}
+	}
+
+	return s
 }
 
-// sellerPresence records which sellers offer each card, judged as
-// searchSellersNG judges an entry.
-func sellerPresence(cardIDs []string, config SearchConfig, presence offerPresences) {
-	for _, seller := range GetSellers() {
-		if shouldSkipStoreNG(seller, config.StoreFilters) {
+// asksCustom reports whether a filter reading the vendor side asks about the
+// custom buylist: an empty filter does, and an any filter naming it.
+func asksCustom(filters []FilterPostElem) bool {
+	for _, filter := range filters {
+		if filter.OnlyForSeller {
 			continue
 		}
-
-		inventory := seller.Inventory()
-		info := seller.Info()
-		store := strings.ToLower(info.Shorthand)
-
-		for _, cardID := range cardIDs {
-			for _, entry := range inventory[cardID] {
-				if sellerEntryFound(info, cardID, entry, config) {
-					presence.add(cardID, sellerOfferCondition(info, entry), store)
-				}
-			}
+		if filter.Name == "empty" || slices.Contains(filter.Values, "custom") {
+			return true
 		}
 	}
+	return false
 }
 
-// vendorPresence records which vendors offer each card, judged as
-// searchVendorsNG judges an entry.
-func vendorPresence(cardIDs []string, config SearchConfig, presence offerPresences) {
-	for _, vendor := range GetVendors() {
-		if shouldSkipStoreNG(vendor, config.StoreFilters) {
+// offersUnder reports whether an entry listed under cond counts as an offer
+// for the empty filter: an INDEX quote does not.
+func offersUnder(cond mtgban.Condition) bool {
+	return cond != "INDEX"
+}
+
+// listsUnder reports whether an entry listed under cond counts for the any
+// filter, which reads the known conditions alone.
+func listsUnder(cond mtgban.Condition) bool {
+	return slices.Contains(AllConditions, cond)
+}
+
+// withoutSellerOffers returns the cards in pending no seller offers under a
+// condition other than INDEX, judged as searchSellersNG judges an entry. The
+// biggest inventories go first, and each seller is asked only about the
+// cards the ones before it did not offer. pending is reused.
+func (s *postStores) withoutSellerOffers(pending []string) []string {
+	for _, store := range s.offeringSellers {
+		if len(pending) == 0 {
+			break
+		}
+		pending = slices.DeleteFunc(pending, func(cardID string) bool {
+			return store.offers(cardID, &s.config)
+		})
+	}
+	return pending
+}
+
+// withoutVendorOffers is withoutSellerOffers for the vendors and the custom
+// buylist.
+func (s *postStores) withoutVendorOffers(pending []string) []string {
+	for _, store := range s.offeringVendors {
+		if len(pending) == 0 {
+			break
+		}
+		pending = slices.DeleteFunc(pending, func(cardID string) bool {
+			return store.offers(cardID, &s.config)
+		})
+	}
+	if s.custom != nil {
+		pending = slices.DeleteFunc(pending, func(cardID string) bool {
+			return slices.ContainsFunc(s.custom[cardID], offersUnder)
+		})
+	}
+	return pending
+}
+
+// withoutSellerListings returns the cards in pending none of the named
+// sellers lists under a known condition, each seller asked only about the
+// cards the ones before it did not list. pending is reused.
+func (s *postStores) withoutSellerListings(pending []string, names []string) []string {
+	for _, name := range names {
+		store, found := s.sellers[name]
+		if !found || len(pending) == 0 {
 			continue
 		}
+		pending = slices.DeleteFunc(pending, func(cardID string) bool {
+			return store.lists(cardID, &s.config)
+		})
+	}
+	return pending
+}
 
-		buylist := vendor.Buylist()
-		info := vendor.Info()
-		store := strings.ToLower(info.Shorthand)
-
-		for _, cardID := range cardIDs {
-			for _, entry := range buylist[cardID] {
-				if vendorEntryFound(info, cardID, entry, config) {
-					presence.add(cardID, vendorOfferCondition(info, entry), store)
-				}
-			}
+// withoutVendorListings is withoutSellerListings for the vendors, the custom
+// buylist named as custom.
+func (s *postStores) withoutVendorListings(pending []string, names []string) []string {
+	for _, name := range names {
+		store, found := s.vendors[name]
+		if found && len(pending) > 0 {
+			pending = slices.DeleteFunc(pending, func(cardID string) bool {
+				return store.lists(cardID, &s.config)
+			})
+		}
+		if name == "custom" && s.custom != nil {
+			pending = slices.DeleteFunc(pending, func(cardID string) bool {
+				return slices.ContainsFunc(s.custom[cardID], listsUnder)
+			})
 		}
 	}
+	return pending
+}
+
+// offers reports whether the seller offers the card under a condition other
+// than INDEX.
+func (store *postSeller) offers(cardID string, config *SearchConfig) bool {
+	for _, entry := range store.inventory[cardID] {
+		if sellerEntryFound(store.info, cardID, entry, *config) && offersUnder(sellerOfferCondition(store.info, entry)) {
+			return true
+		}
+	}
+	return false
+}
+
+// lists reports whether the seller lists the card under a known condition.
+func (store *postSeller) lists(cardID string, config *SearchConfig) bool {
+	for _, entry := range store.inventory[cardID] {
+		if sellerEntryFound(store.info, cardID, entry, *config) && listsUnder(sellerOfferCondition(store.info, entry)) {
+			return true
+		}
+	}
+	return false
+}
+
+// offers reports whether the vendor buys the card under a condition other
+// than INDEX.
+func (store *postVendor) offers(cardID string, config *SearchConfig) bool {
+	for _, entry := range store.buylist[cardID] {
+		if vendorEntryFound(store.info, cardID, entry, *config) && offersUnder(vendorOfferCondition(store.info, entry)) {
+			return true
+		}
+	}
+	return false
+}
+
+// lists reports whether the vendor buys the card under a known condition.
+func (store *postVendor) lists(cardID string, config *SearchConfig) bool {
+	for _, entry := range store.buylist[cardID] {
+		if vendorEntryFound(store.info, cardID, entry, *config) && listsUnder(vendorOfferCondition(store.info, entry)) {
+			return true
+		}
+	}
+	return false
 }
