@@ -2,6 +2,7 @@ package main
 
 import (
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -66,6 +67,20 @@ func somePlainCardUUIDs(t *testing.T, n int) []string {
 	return uuids
 }
 
+// fixtureStoreSite is a site over six fixture cards, returned with their
+// uuids, for the store a test registers to carry.
+func fixtureStoreSite(t *testing.T) (*site, []string) {
+	t.Helper()
+	var cards [][2]string
+	var uuids []string
+	for i, name := range []string{"One", "Two", "Three", "Four", "Five", "Six"} {
+		number := strconv.Itoa(i + 1)
+		cards = append(cards, [2]string{"Fixture " + name, number})
+		uuids = append(uuids, "FIXTUREA-"+number)
+	}
+	return fixtureSite(t, fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", cards), nil, nil), uuids
+}
+
 // A plain vendor:/seller:/store: query with no card name and no other
 // filter used to fall to the full-datastore default search - every card the
 // site holds, most of which the named store doesn't even carry - because
@@ -78,17 +93,13 @@ func somePlainCardUUIDs(t *testing.T, n int) []string {
 // inventory/buylist keys instead, the same way an edition or collector
 // number filter already seeds an empty query.
 func TestPlainStoreQuerySeedsFromTheStoreItself(t *testing.T) {
-	skipWithoutDatastore(t)
-
-	uuids := somePlainCardUUIDs(t, 6)
-	if len(uuids) < 6 {
-		t.Skip("datastore doesn't hold enough plain cards for this test")
-	}
+	s, uuids := fixtureStoreSite(t)
 	registerTestVendor(t, "TEST", uuids)
+	ds := s.datastore()
 
 	for _, query := range []string{`vendor:TEST`, `store:TEST`} {
 		t.Run(query, func(t *testing.T) {
-			results, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+			results, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -102,17 +113,13 @@ func TestPlainStoreQuerySeedsFromTheStoreItself(t *testing.T) {
 // seller:/store: seeds from a seller's inventory the same way vendor: does
 // from a buylist.
 func TestPlainSellerQuerySeedsFromTheSellerItself(t *testing.T) {
-	skipWithoutDatastore(t)
-
-	uuids := somePlainCardUUIDs(t, 6)
-	if len(uuids) < 6 {
-		t.Skip("datastore doesn't hold enough plain cards for this test")
-	}
+	s, uuids := fixtureStoreSite(t)
 	registerTestSeller(t, "TESTSELL", uuids)
+	ds := s.datastore()
 
 	for _, query := range []string{`seller:TESTSELL`, `store:TESTSELL`} {
 		t.Run(query, func(t *testing.T) {
-			results, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+			results, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
