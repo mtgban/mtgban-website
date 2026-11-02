@@ -151,12 +151,7 @@ func TestBuildNextSellersRejectsEmpty(t *testing.T) {
 // has to travel: a refusal that only reached the notification channel left
 // the endpoint reporting ok while the site went on serving what it had.
 func TestUpdateAnswersTheInstall(t *testing.T) {
-	prevSellers := sellersPtr.Load()
-	prevVendors := vendorsPtr.Load()
-	defer func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	}()
+	keepPrices(t)
 
 	now := time.Now()
 	old := now.Add(-time.Hour)
@@ -308,18 +303,12 @@ func TestListDumpsLocalDirectory(t *testing.T) {
 func TestLoadScrapersNGFromLocalDirectory(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	prevIdx := scraperIndexPtr.Load()
 	prevGame := Config().Game
 	var noSellers []mtgban.Seller
 	var noVendors []mtgban.Vendor
-	sellersPtr.Store(&noSellers)
-	vendorsPtr.Store(&noVendors)
+	withPrices(t, noSellers, noVendors)
 	Config().Game = "magic"
 	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-		scraperIndexPtr.Store(prevIdx)
 		Config().Game = prevGame
 	})
 
@@ -406,18 +395,12 @@ func TestOnlyStoresKeepsASharedShorthandsOwner(t *testing.T) {
 func TestLoadScrapersNGFromADumpsDirectory(t *testing.T) {
 	dir := t.TempDir()
 
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	prevIdx := scraperIndexPtr.Load()
 	prevGame := Config().Game
 	var noSellers []mtgban.Seller
 	var noVendors []mtgban.Vendor
-	sellersPtr.Store(&noSellers)
-	vendorsPtr.Store(&noVendors)
+	withPrices(t, noSellers, noVendors)
 	Config().Game = "magic"
 	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-		scraperIndexPtr.Store(prevIdx)
 		Config().Game = prevGame
 	})
 
@@ -451,10 +434,8 @@ func TestLoadScrapersNGFromADumpsDirectory(t *testing.T) {
 // A fresh listing replaces one store's entries and leaves every other
 // store alone.
 func TestUpdateScraperIndexStoreReplacesOnlyThatStore(t *testing.T) {
-	prevIdx := scraperIndexPtr.Load()
-	t.Cleanup(func() { scraperIndexPtr.Store(prevIdx) })
 
-	scraperIndexPtr.Store(buildScraperIndex(map[string]map[string][]string{
+	withScraperIndex(t, buildScraperIndex(map[string]map[string][]string{
 		"cardkingdom": {"retail": {"CK"}, "buylist": {"CKBLLast"}},
 		"abugames":    {"retail": {"ABU"}},
 	}))
@@ -485,10 +466,8 @@ func TestUpdateScraperIndexStoreReplacesOnlyThatStore(t *testing.T) {
 // Reloading one store gives it a shared shorthand; reloading an unrelated
 // store, however many times, must never move it.
 func TestUpdateScraperIndexStoreLeavesASharedShorthandsOwnerAlone(t *testing.T) {
-	prevIdx := scraperIndexPtr.Load()
-	t.Cleanup(func() { scraperIndexPtr.Store(prevIdx) })
 
-	scraperIndexPtr.Store(buildScraperIndex(map[string]map[string][]string{
+	withScraperIndex(t, buildScraperIndex(map[string]map[string][]string{
 		"tcg_index":  {"retail": {"MKMLow"}},
 		"cardmarket": {"retail": {"MKMLow"}},
 		"abugames":   {"retail": {"ABU"}},
@@ -512,18 +491,13 @@ func TestUpdateScraperIndexStoreLeavesASharedShorthandsOwnerAlone(t *testing.T) 
 func TestLoadScrapersNGLeavesOutADumpPastDropAfter(t *testing.T) {
 	dir := t.TempDir()
 
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	prevIdx, prevDropped := scraperIndexPtr.Load(), droppedStoresPtr.Load()
+	prevDropped := droppedStoresPtr.Load()
 	prevGame := Config().Game
 	var noSellers []mtgban.Seller
 	var noVendors []mtgban.Vendor
-	sellersPtr.Store(&noSellers)
-	vendorsPtr.Store(&noVendors)
+	withPrices(t, noSellers, noVendors)
 	Config().Game = "magic"
 	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-		scraperIndexPtr.Store(prevIdx)
 		droppedStoresPtr.Store(prevDropped)
 		Config().Game = prevGame
 	})

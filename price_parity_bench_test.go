@@ -101,17 +101,9 @@ func seedBenchScrapers(b *testing.B) (stores []string) {
 	if benchSetCode == "" || len(benchSetUUIDs) == 0 {
 		b.Skip("no suitable set found for benchmarking")
 	}
-
-	prevSellers := sellersPtr.Load()
-	prevVendors := vendorsPtr.Load()
-	b.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	sellers := benchSellers
 	vendors := benchVendors
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(b, sellers, vendors)
 
 	for _, seller := range sellers {
 		stores = append(stores, seller.Info().Shorthand)

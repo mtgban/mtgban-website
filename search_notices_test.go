@@ -117,8 +117,8 @@ func TestSealedCautionShowsOnce(t *testing.T) {
 		mtgban.NewSellerFromInventory(priced(60, 0), info("TCGLowEV", "TCG Low EV")),
 		mtgban.NewSellerFromInventory(priced(58, IQRThreshold+50), info("TCGLowSim", "TCG Low Sim")),
 	}
-	sellersPtr.Store(&sellers)
-	scraperIndexPtr.Store(buildScraperIndex(map[string]map[string][]string{"sealed_ev": {"retail": {"TCGLowEV", "TCGLowSim"}}}))
+	withPrices(t, sellers, GetVendors())
+	withScraperIndex(t, buildScraperIndex(map[string]map[string][]string{"sealed_ev": {"retail": {"TCGLowEV", "TCGLowSim"}}}))
 
 	page := "/sealed?q=" + url.QueryEscape("s:M10") + "&chart=" + strings.Join(cards, ",")
 	w := httptest.NewRecorder()

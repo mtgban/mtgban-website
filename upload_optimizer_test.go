@@ -44,7 +44,7 @@ func closeVendors(t *testing.T) []string {
 		mtgban.NewVendorFromBuylist(v, sessionInfo("ZZV")),
 		mtgban.NewVendorFromBuylist(w, sessionInfo("ZZW")),
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 	return cards
 }
 

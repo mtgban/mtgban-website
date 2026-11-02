@@ -420,12 +420,10 @@ func TestStoreFactorOptions(t *testing.T) {
 }
 
 func TestStoreFactorOptionsSkipsIndexes(t *testing.T) {
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "IDX", Name: "Index", MetadataOnly: true}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	var list []struct {
 		K string `json:"k"`
@@ -440,14 +438,12 @@ func TestStoreFactorOptionsSkipsIndexes(t *testing.T) {
 }
 
 func TestStoreFactorOptionsSealedLast(t *testing.T) {
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "CKSealed", Name: "Card Kingdom", SealedMode: true}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCG", Name: "TCGplayer"}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	var list []struct {
 		K string `json:"k"`

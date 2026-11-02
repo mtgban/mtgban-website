@@ -11,11 +11,6 @@ import (
 
 func alertTestStores(t *testing.T) {
 	t.Helper()
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	ck := mtgban.BuylistRecord{"card-1": {
 		{Conditions: "NM", BuyPrice: 12, Quantity: 4},
 		{Conditions: "SP", BuyPrice: 9, Quantity: 0},
@@ -34,8 +29,7 @@ func alertTestStores(t *testing.T) {
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
 	}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 }
 
 func TestAlertStorePricesSkipsIndexBlockedAndOtherKind(t *testing.T) {
@@ -72,7 +66,7 @@ func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "CKBLLast", Name: "Card Kingdom (last)"}),
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "ABUCredit", Name: "ABU Games (credit)"}),
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "MKMBL", Name: "Cardmarket", CountryFlag: "EU"}))
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 	for _, s := range alertStorePrices("card-1", false, alerts.SideBuylist, nil) {
 		if s.PickedOnly != slices.Contains([]string{"TCGDirectNet", "CKBLLast", "ABUCredit", "MKMBL"}, s.Shorthand) {
 			t.Fatalf("%s PickedOnly = %v", s.Shorthand, s.PickedOnly)
@@ -80,7 +74,7 @@ func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 	}
 	vendors = append(vendors,
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "ABUCreditSealed", Name: "ABU Games (credit)", SealedMode: true}))
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 	for _, s := range alertStorePrices("card-1", true, alerts.SideBuylist, nil) {
 		if s.PickedOnly != (s.Shorthand == "ABUCreditSealed") {
 			t.Fatalf("sealed %s PickedOnly = %v", s.Shorthand, s.PickedOnly)
@@ -89,7 +83,7 @@ func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 	sellers := append(slices.Clip(GetSellers()),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"card-1": {{Conditions: "NM", Price: 18}}},
 			mtgban.ScraperInfo{Shorthand: "MKMLow", Name: "Cardmarket", CountryFlag: "EU"}))
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	for _, s := range alertStorePrices("card-1", false, alerts.SideRetail, nil) {
 		if s.PickedOnly {
 			t.Fatalf("retail %s PickedOnly, want every seller watched", s.Shorthand)

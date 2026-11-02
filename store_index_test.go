@@ -9,11 +9,6 @@ import (
 )
 
 func storeIndexFixture(t testing.TB) {
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"a": nil}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"b": nil}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom Twice"}),
@@ -23,8 +18,7 @@ func storeIndexFixture(t testing.TB) {
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom Buylist"}),
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "ABU", Name: "ABU Games"}),
 	}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 }
 
 // The index answers as the scans it replaced did: the name lookups match the
@@ -63,13 +57,11 @@ func TestStoreIndexMatchesTheScans(t *testing.T) {
 // Two stores whose shorthands differ only by case are told apart by the exact
 // lookups and folded together by the case-insensitive ones, as the scans did.
 func TestStoreIndexCaseOnlyCollision(t *testing.T) {
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"first": nil}, mtgban.ScraperInfo{Shorthand: "Ck", Name: "Mixed Case"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"second": nil}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Upper Case", SealedMode: true}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	if got := scraperName("CK"); got != "Upper Case" {
 		t.Errorf("scraperName(CK) = %q, want the exact match listed second", got)
@@ -98,30 +90,24 @@ func TestStoreIndexFollowsTheSnapshot(t *testing.T) {
 	}
 
 	withTCG := append(slices.Clone(GetSellers()), mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCG", Name: "TCGplayer"}))
-	sellersPtr.Store(&withTCG)
+	withPrices(t, withTCG, GetVendors())
 	if got := scraperName("TCG"); got != "TCGplayer" {
 		t.Errorf("after a new snapshot, scraperName(TCG) = %q", got)
 	}
 
 	withoutTCG := slices.Clone(withTCG[:len(withTCG)-1])
-	sellersPtr.Store(&withoutTCG)
+	withPrices(t, withoutTCG, GetVendors())
 	if got := scraperName("TCG"); got != "" {
 		t.Errorf("after a snapshot without it, scraperName(TCG) = %q", got)
 	}
 
-	sellersPtr.Store(nil)
-	vendorsPtr.Store(nil)
+	withPrices(t, nil, nil)
 	if got := scraperName("CK"); got != "" {
 		t.Errorf("with no snapshot, scraperName(CK) = %q", got)
 	}
 }
 
 func BenchmarkScraperName(b *testing.B) {
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	b.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	var sellers []mtgban.Seller
 	var vendors []mtgban.Vendor
 	for i := range 60 {
@@ -132,8 +118,7 @@ func BenchmarkScraperName(b *testing.B) {
 		sh := fmt.Sprintf("V%02d", i)
 		vendors = append(vendors, mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: sh, Name: "Vendor " + sh}))
 	}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(b, sellers, vendors)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {

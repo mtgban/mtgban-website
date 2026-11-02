@@ -24,19 +24,12 @@ import (
 // package-level var precisely so a test can swap it out this way.
 func keepScrapers(t *testing.T) {
 	t.Helper()
-	prevSellers := sellersPtr.Load()
-	prevVendors := vendorsPtr.Load()
-	prevIdx := scraperIndexPtr.Load()
 	prevSessions := Sessions
 	var noSellers []mtgban.Seller
 	var noVendors []mtgban.Vendor
-	sellersPtr.Store(&noSellers)
-	vendorsPtr.Store(&noVendors)
+	withPrices(t, noSellers, noVendors)
 	Sessions = sessionstore.New(sessionHooks())
 	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-		scraperIndexPtr.Store(prevIdx)
 		Sessions = prevSessions
 	})
 }
@@ -170,7 +163,7 @@ func TestPublishAndRemoveSessionStore(t *testing.T) {
 // GetSellers, updateSellers - deliver the same refusal.
 func TestPublishSessionStoreRefusesARealStore(t *testing.T) {
 	keepScrapers(t)
-	scraperIndexPtr.Store(buildScraperIndex(map[string]map[string][]string{
+	withScraperIndex(t, buildScraperIndex(map[string]map[string][]string{
 		"cardkingdom": {"retail": {"CK"}, "buylist": {"CK"}},
 	}))
 	err := updateSellers(inventoryOf("ZZREAL", 5, time.Now()))
@@ -221,14 +214,14 @@ func TestPublishSessionStoreRefusesARealStore(t *testing.T) {
 // dashboard's remove nor a fresh publish may touch what serves under it.
 func TestSessionStoreYieldsToTheConfig(t *testing.T) {
 	keepScrapers(t)
-	scraperIndexPtr.Store(newScraperIndex())
+	withScraperIndex(t, newScraperIndex())
 	rows := []UploadEntry{{CardID: "uuid-a", OriginalPrice: 1}}
 
 	_, err := Sessions.Publish(backend(), sessionstore.Retail, sessionInfo("ZZS"), rows)
 	if err != nil {
 		t.Fatalf("publishing: %s", err)
 	}
-	scraperIndexPtr.Store(buildScraperIndex(map[string]map[string][]string{
+	withScraperIndex(t, buildScraperIndex(map[string]map[string][]string{
 		"zzs": {"retail": {"ZZS"}},
 	}))
 
