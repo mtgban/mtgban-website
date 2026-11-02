@@ -807,6 +807,7 @@ func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datasto
 	b := ds.backend
 	result := runSearch(r, ds, config)
 	sortSearchKeys(r, ds, result.keys, result.odds, readSearchSort(r, config))
+	result.sellers, result.vendors = collectOffers(b, r, config, result.keys)
 
 	setCSVDownloadHeaders(w, "ban_search.csv")
 	var results map[string]map[string]*BanPrice
