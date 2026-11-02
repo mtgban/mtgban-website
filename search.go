@@ -1139,10 +1139,9 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 
 	// A post filter reads what each card is offered at, so it judges every
 	// card found; the offers themselves are built for the page shown
-	// (collectOffers), so only their presence is gathered here.
+	// (collectOffers), so the filters ask the stores about each card here.
 	if len(config.PostFilters) > 0 {
-		sellers, vendors := searchOfferPresence(b, r, allKeys, config)
-		allKeys = PostSearchFilter(config, allKeys, sellers, vendors)
+		allKeys = PostSearchFilter(config, allKeys, newPostStores(b, r, allKeys, config))
 	}
 
 	// Early exit if there no matches are found
@@ -2539,13 +2538,13 @@ func numberSeedUUIDs(numbers *numbersSnapshot, filters []FilterElem) ([]string, 
 
 // storeSeedUUIDs returns the uuids a plain store:/seller:/vendor: query
 // names, and whether one did. That filter ("vendor:TEST") is a PostFilter,
-// not a CardFilter - shouldSkipPostNG only runs once every store's pricing
-// for a candidate has already been fetched, well after this function
-// returns - so on its own it bounds nothing at this stage the way an edition
-// or number filter does. Without a seed here, the empty-query fallback below
-// degrades to the whole datastore, and every card in it gets a full pass
-// over every loaded scraper only to be thrown away later by the very filter
-// that could have picked its candidates directly to begin with.
+// not a CardFilter - PostSearchFilter only runs once the search has found
+// its candidates, well after this function returns - so on its own it
+// bounds nothing at this stage the way an edition or number filter does.
+// Without a seed here, the empty-query fallback below degrades to the whole
+// datastore, and every card in it gets a full pass over every loaded scraper
+// only to be thrown away later by the very filter that could have picked its
+// candidates directly to begin with.
 //
 // The first store-naming ("any") PostFilter present seeds. Other
 // PostFilters can ride alongside it - an automatic "hide empty" from qty>

@@ -3449,82 +3449,93 @@ func shouldSkipEntryNG[T mtgban.GenericEntry](entry T, filters []FilterEntryElem
 	return false
 }
 
-// postFilterEmpty reports whether the side offers nothing for the card, an
-// INDEX quote alone counting as nothing.
-func postFilterEmpty(filters []string, cardID string, presence offerPresences) bool {
-	pr := presence[cardID]
-	return pr == nil || !pr.offer
+// postFilterEmpty returns the cards in pending the side offers nothing for,
+// an INDEX quote alone counting as nothing.
+func postFilterEmpty(filters []string, pending []string, stores *postStores, seller bool) []string {
+	if seller {
+		return stores.withoutSellerOffers(pending)
+	}
+	return stores.withoutVendorOffers(pending)
 }
 
-// postFilterAny reports whether none of the stores in filters offers the card
-// on the side.
-func postFilterAny(filters []string, cardID string, presence offerPresences) bool {
-	pr := presence[cardID]
-	if pr == nil {
-		return true
+// postFilterAny returns the cards in pending none of the stores in filters
+// offers on the side.
+func postFilterAny(filters []string, pending []string, stores *postStores, seller bool) []string {
+	if seller {
+		return stores.withoutSellerListings(pending, filters)
 	}
-	for _, shorthand := range filters {
-		_, found := pr.stores[shorthand]
-		if found {
-			return false
-		}
-	}
-	return true
+	return stores.withoutVendorListings(pending, filters)
 }
 
 // applyPostFilter dispatches a post-search filter by name, mirroring
 // applyCardFilter. Unknown names panic, preserving the old registry
 // behavior.
-func applyPostFilter(name string, filters []string, cardID string, presence offerPresences) bool {
+func applyPostFilter(name string, filters []string, pending []string, stores *postStores, seller bool) []string {
 	switch name {
 	case "empty":
-		return postFilterEmpty(filters, cardID, presence)
+		return postFilterEmpty(filters, pending, stores, seller)
 	case "any":
-		return postFilterAny(filters, cardID, presence)
+		return postFilterAny(filters, pending, stores, seller)
 	}
 	panic(name + " option not found")
 }
 
-func shouldSkipPostNG(cardID string, sellers, vendors offerPresences, filters []FilterPostElem) bool {
-	for i := range filters {
-		var presence offerPresences
-		if filters[i].OnlyForSeller {
-			presence = sellers
-		} else if filters[i].OnlyForVendor {
-			presence = vendors
-		} else {
-			resS := applyPostFilter(filters[i].Name, filters[i].Values, cardID, sellers)
-			resV := applyPostFilter(filters[i].Name, filters[i].Values, cardID, vendors)
-			res := resS && resV
-			if res {
-				return true
-			}
-			continue
-		}
+// postFilterSkips returns the cards in cardIDs filter drops: those its side
+// fails, or both sides for a filter bound to neither. Each half of the cards
+// is asked on a goroutine of its own; a half whose walk panics drops nothing.
+func postFilterSkips(cardIDs []string, stores *postStores, filter FilterPostElem) []string {
+	pending := slices.Clone(cardIDs)
+	half := (len(pending) + 1) / 2
+	halves := [][]string{pending[:half], pending[half:]}
+	skips := make([][]string, len(halves))
 
-		res := applyPostFilter(filters[i].Name, filters[i].Values, cardID, presence)
-		if res {
-			return true
-		}
+	var wg sync.WaitGroup
+	for i := range halves {
+		wg.Go(func() {
+			defer recoverJob("search post filter")
+			skips[i] = postFilterHalf(halves[i], stores, filter)
+		})
 	}
+	wg.Wait()
 
-	return false
+	return slices.Concat(skips...)
 }
 
-// PostSearchFilter keeps the cards the post filters pass, judged on what
-// searchOfferPresence gathered of each side's offers.
-func PostSearchFilter(config SearchConfig, allKeys []string, sellers, vendors offerPresences) []string {
-	if len(config.PostFilters) == 0 {
-		return allKeys
+// postFilterHalf returns the cards in pending filter drops, asking the
+// seller side first and the vendor side about what the sellers left.
+// pending is reused.
+func postFilterHalf(pending []string, stores *postStores, filter FilterPostElem) []string {
+	if !filter.OnlyForVendor {
+		pending = applyPostFilter(filter.Name, filter.Values, pending, stores, true)
 	}
+	if !filter.OnlyForSeller {
+		pending = applyPostFilter(filter.Name, filter.Values, pending, stores, false)
+	}
+	return pending
+}
 
-	var keepIDs []string
-
-	for _, cardID := range allKeys {
-		if shouldSkipPostNG(cardID, sellers, vendors, config.PostFilters) {
+// PostSearchFilter keeps the cards the post filters pass, each filter asking
+// the stores about the cards the ones before it kept.
+func PostSearchFilter(config SearchConfig, allKeys []string, stores *postStores) []string {
+	keepIDs := allKeys
+	for _, filter := range config.PostFilters {
+		skips := postFilterSkips(keepIDs, stores, filter)
+		if len(skips) == 0 {
 			continue
 		}
-		keepIDs = append(keepIDs, cardID)
+		skipped := make(map[string]struct{}, len(skips))
+		for _, cardID := range skips {
+			skipped[cardID] = struct{}{}
+		}
+
+		var kept []string
+		for _, cardID := range keepIDs {
+			_, found := skipped[cardID]
+			if !found {
+				kept = append(kept, cardID)
+			}
+		}
+		keepIDs = kept
 	}
 
 	return keepIDs
