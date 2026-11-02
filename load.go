@@ -53,11 +53,12 @@ var DataBucket simplecloud.Reader
 
 // prices is one published snapshot of the loaded stores: the retail and
 // buylist sides, the by-shorthand index over them, the Cardmarket product
-// ids and the TCGplayer SKUs the retail side prices and the dumps the
-// bucket listed. A writer builds the next one whole and publishes
-// it in a single Store, so a reader sees sides and indexes from the same
-// publish. Nothing in a published value is changed in place: the slices
-// GetSellers and GetVendors return are shared and read-only.
+// ids and the TCGplayer SKUs the retail side prices, the dumps the bucket
+// listed and the Sleepers tiers' hits found so far. A writer builds the
+// next one whole and publishes it in a single Store, so a reader sees
+// sides and indexes from the same publish. Nothing in a published value
+// is changed in place: the slices GetSellers and GetVendors return are
+// shared and read-only.
 type prices struct {
 	sellers  []mtgban.Seller
 	vendors  []mtgban.Vendor
@@ -65,6 +66,9 @@ type prices struct {
 	mkmIDs   mkmidparser.Index
 	tcgSKUs  tcgskuparser.Index
 	scrapers scraperIndex
+
+	// The Sleepers tiers' hits per pair of these stores
+	sleepers *sleeperCache
 }
 
 var (
@@ -93,10 +97,11 @@ func currentPrices() *prices {
 // newPrices builds the snapshot to publish from its parts, indexing the
 // stores by shorthand. The Cardmarket id map and the TCGplayer SKU index
 // are prev's where the sellers each reads are the ones prev's was built
-// from, and built again otherwise; prev is the snapshot being replaced,
-// nil before the first publish.
+// from, and built again otherwise, and prev's Sleepers pairs carry across
+// where both their stores do; prev is the snapshot being replaced, nil
+// before the first publish.
 func newPrices(prev *prices, sellers []mtgban.Seller, vendors []mtgban.Vendor, scrapers scraperIndex) *prices {
-	return &prices{
+	p := &prices{
 		sellers:  sellers,
 		vendors:  vendors,
 		index:    buildStoreIndex(sellers, vendors),
@@ -104,6 +109,8 @@ func newPrices(prev *prices, sellers []mtgban.Seller, vendors []mtgban.Vendor, s
 		tcgSKUs:  tcgSKUsFor(prev, sellers),
 		scrapers: scrapers,
 	}
+	p.sleepers = sleeperTiersFor(prev, p)
+	return p
 }
 
 // mkmIDsFor returns the Cardmarket id map over sellers. A published seller
@@ -128,9 +135,10 @@ func tcgSKUsFor(prev *prices, sellers []mtgban.Seller) tcgskuparser.Index {
 
 // withVendors builds the snapshot to publish from p with vendors in place of
 // its buylist side. The sellers and the two indexes built from them carry
-// across as they are; only the store index is built again, over both sides.
+// across as they are, and the Sleepers pairs whose vendor does; only the
+// store index is built again, over both sides.
 func withVendors(p *prices, vendors []mtgban.Vendor) *prices {
-	return &prices{
+	next := &prices{
 		sellers:  p.sellers,
 		vendors:  vendors,
 		index:    buildStoreIndex(p.sellers, vendors),
@@ -138,6 +146,8 @@ func withVendors(p *prices, vendors []mtgban.Vendor) *prices {
 		tcgSKUs:  p.tcgSKUs,
 		scrapers: p.scrapers,
 	}
+	next.sleepers = sleeperTiersFor(p, next)
+	return next
 }
 
 // GetSellers returns the current sellers snapshot. The returned slice is
