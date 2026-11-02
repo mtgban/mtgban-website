@@ -54,13 +54,6 @@ func parityCards(t *testing.T) (regular, foil, sealed string) {
 func seedParityScrapers(t *testing.T, regular, foil string) {
 	t.Helper()
 
-	prevSellers := sellersPtr.Load()
-	prevVendors := vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
-
 	inv := mtgban.InventoryRecord{}
 	inv.Add(regular, &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 2, URL: "u"})
 	inv.Add(regular, &mtgban.InventoryEntry{Conditions: "SP", Price: 8, Quantity: 1, URL: "u"})
@@ -78,7 +71,7 @@ func seedParityScrapers(t *testing.T, regular, foil string) {
 			Name: "Parity Index", Shorthand: "PARITYIDX", MetadataOnly: true,
 		}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	bl := mtgban.BuylistRecord{}
 	bl.Add(regular, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 5, Quantity: 4, URL: "u"})
@@ -89,7 +82,7 @@ func seedParityScrapers(t *testing.T, regular, foil string) {
 			Name: "Parity Buyer", Shorthand: "PARITYV", CreditMultiplier: 1.3,
 		}),
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 }
 
 // searchPrice returns the price of the first row for the given store and
@@ -230,9 +223,6 @@ func TestPriceParityBuylist(t *testing.T) {
 func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
 	regular, _, _ := parityCards(t)
 
-	prevVendors := vendorsPtr.Load()
-	t.Cleanup(func() { vendorsPtr.Store(prevVendors) })
-
 	bl := mtgban.BuylistRecord{}
 	bl.Add(regular, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 5, Quantity: 12, URL: "u"})
 	vendors := []mtgban.Vendor{
@@ -241,7 +231,7 @@ func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
 			MetadataOnly: true, QuantityPriority: true,
 		}),
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 
 	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
 	found := searchVendorsNG([]string{regular}, config)
@@ -265,14 +255,12 @@ func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
 func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
 	regular, foil, _ := parityCards(t)
 
-	prevVendors := vendorsPtr.Load()
-	t.Cleanup(func() { vendorsPtr.Store(prevVendors) })
 	vendors := []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{
 			Name: "Fake Index Vendor", Shorthand: "FAKEIDX", MetadataOnly: true,
 		}),
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 
 	found := map[string]map[mtgban.Condition][]SearchEntry{
 		regular: {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitCount}}},
@@ -398,16 +386,13 @@ func TestSearchDownloadFilters(t *testing.T) {
 func TestZeroPricedListings(t *testing.T) {
 	regular, _, _ := parityCards(t)
 
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
-
 	inv := mtgban.InventoryRecord{}
 	inv.Add(regular, &mtgban.InventoryEntry{Conditions: "NM", Price: 0, Quantity: 1, URL: "u1"})
 	inv.Add(regular, &mtgban.InventoryEntry{Conditions: "NM", Price: 5, Quantity: 2, URL: "u2"})
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Zero Store", Shorthand: "ZEROA"}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	check := func(t *testing.T, api map[string]map[string]*BanPrice) {
 		t.Helper()
@@ -452,12 +437,6 @@ func TestGradesKeepTheBestPriceAndTheTotal(t *testing.T) {
 	}
 	cards := []struct{ id, suffix string }{{regular, ""}, {foil, "_foil"}, {etched, "_etched"}}
 
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
-
 	inv := mtgban.InventoryRecord{}
 	bl := mtgban.BuylistRecord{}
 	var ids []string
@@ -471,8 +450,7 @@ func TestGradesKeepTheBestPriceAndTheTotal(t *testing.T) {
 	}
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Grade Store", Shorthand: "GRADEA"})}
 	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{Name: "Grade Buyer", Shorthand: "GRADEV"})}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 
 	for _, tc := range []struct {
 		name string
@@ -585,26 +563,26 @@ func TestApiEnabledStores(t *testing.T) {
 	sealedSeller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{
 		Name: "Parity Sealed", Shorthand: "PARITYSEALED", SealedMode: true,
 	})
-	sellers := append(*sellersPtr.Load(), sealedSeller)
-	sellersPtr.Store(&sellers)
+	sellers := append(GetSellers(), sealedSeller)
+	withPrices(t, sellers, GetVendors())
 
 	euVendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{
 		Name: "Parity EU", Shorthand: "PARITYEU", CountryFlag: "EU",
 	})
-	vendors := append(*vendorsPtr.Load(), euVendor)
-	vendorsPtr.Store(&vendors)
+	vendors := append(GetVendors(), euVendor)
+	withPrices(t, GetSellers(), vendors)
 
 	euIndexSeller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{
 		Name: "Parity EU Index", Shorthand: "PARITYEUIDX", CountryFlag: "EU", MetadataOnly: true,
 	})
-	withIndexSeller := append(slices.Clone(*sellersPtr.Load()), euIndexSeller)
-	sellersPtr.Store(&withIndexSeller)
+	withIndexSeller := append(slices.Clone(GetSellers()), euIndexSeller)
+	withPrices(t, withIndexSeller, GetVendors())
 
 	euIndexVendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{
 		Name: "Parity EU Vendor Index", Shorthand: "PARITYEUVIDX", CountryFlag: "EU", MetadataOnly: true,
 	})
-	withIndexVendor := append(slices.Clone(*vendorsPtr.Load()), euIndexVendor)
-	vendorsPtr.Store(&withIndexVendor)
+	withIndexVendor := append(slices.Clone(GetVendors()), euIndexVendor)
+	withPrices(t, GetSellers(), withIndexVendor)
 
 	got = enabled("BASE_ACCESS")
 	if !slices.Contains(got, "PARITYA") {
@@ -636,13 +614,11 @@ func TestApiEnabledStores(t *testing.T) {
 // narrows its sets, as the guide documents.
 func TestStoresFilterNarrowsBothWays(t *testing.T) {
 	withSigMode(t, true, false)
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Singles", Shorthand: "SINGLES1"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Sealed", Shorthand: "SEALED1", SealedMode: true}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	for filter, want := range map[string]string{"sealed": `["SEALED1"]`, "singles": `["SINGLES1"]`} {
 		rec := httptest.NewRecorder()
@@ -655,7 +631,7 @@ func TestStoresFilterNarrowsBothWays(t *testing.T) {
 
 	// A key whose scope holds no sealed store gets an empty list, not null.
 	singles := sellers[:1]
-	sellersPtr.Store(&singles)
+	withPrices(t, singles, GetVendors())
 	rec := httptest.NewRecorder()
 	testSite.PriceAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgban/stores.json?filter=sealed", nil))
 	got := strings.TrimSpace(rec.Body.String())

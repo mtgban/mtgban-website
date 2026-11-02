@@ -249,11 +249,7 @@ func TestStoreFactorsRankOffers(t *testing.T) {
 // carries a credit the factor can scale. Restored once the test ends.
 func registerFactorStore(t *testing.T, shorthand, uuid string, retail, buy float64) {
 	t.Helper()
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
+	keepPrices(t)
 
 	now := time.Now()
 	inv := mtgban.InventoryRecord{uuid: {{Price: retail, Conditions: "NM"}}}

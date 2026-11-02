@@ -345,15 +345,9 @@ func TestDiscordHandlersRecover(t *testing.T) {
 
 		// The handler ignores messages until scrapers are loaded: a stub store
 		// each gets past that check, then a message with no author panics.
-		prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-		t.Cleanup(func() {
-			sellersPtr.Store(prevSellers)
-			vendorsPtr.Store(prevVendors)
-		})
 		sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
 		vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-		sellersPtr.Store(&sellers)
-		vendorsPtr.Store(&vendors)
+		withPrices(t, sellers, vendors)
 
 		go testSite.messageCreate(session, &discordgo.MessageCreate{Message: &discordgo.Message{Content: "!Lightning Bolt"}})
 
@@ -376,13 +370,12 @@ func (panicBucket) NewReader(context.Context, string) (io.ReadCloser, error) {
 func TestOverrideReloadRecovers(t *testing.T) {
 	posts := serverWebhook(t)
 
-	prevBucket, prevIdx := DataBucket, scraperIndexPtr.Load()
+	prevBucket := DataBucket
 	t.Cleanup(func() {
 		DataBucket = prevBucket
-		scraperIndexPtr.Store(prevIdx)
 	})
 	DataBucket = panicBucket{}
-	scraperIndexPtr.Store(newScraperIndex())
+	withScraperIndex(t, newScraperIndex())
 	updateScraperIndexStore("cardkingdom", map[string][]string{"retail": {"CK"}})
 
 	newSite().reloadOverriddenScrapers(map[string]struct{}{"CK": {}})

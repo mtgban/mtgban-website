@@ -132,12 +132,6 @@ func stubCartStores(t *testing.T) {
 	tcgDirect.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.4, SellerName: "TCG Direct", OriginalID: "590519", InstanceID: "8313277"})
 	tcgTrends := mtgban.InventoryRecord{}
 	tcgTrends.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.3, SellerName: "TCGplayer Trends", OriginalID: "1828", InstanceID: "15955"})
-
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	vendors := []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(buylist, mtgban.ScraperInfo{Shorthand: "ABUGames"}),
 		mtgban.NewVendorFromBuylist(mkm, mtgban.ScraperInfo{Shorthand: "MKM"}),
@@ -171,8 +165,8 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewSellerFromInventory(tcgDirect, mtgban.ScraperInfo{Shorthand: "TCGDirect"}),
 		mtgban.NewSellerFromInventory(tcgTrends, mtgban.ScraperInfo{Shorthand: "TCGTrends"}),
 	}
-	vendorsPtr.Store(&vendors)
-	sellersPtr.Store(&sellers)
+	withPrices(t, GetSellers(), vendors)
+	withPrices(t, sellers, GetVendors())
 }
 
 func TestCartRows(t *testing.T) {
@@ -686,7 +680,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		sealed("HASealed", mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100, OriginalID: "88001", InstanceID: "88002"}),
 		sealed("ABUSealed", mtgban.InventoryEntry{Price: 100, OriginalID: "abu-1"}),
 	)
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	sealedRows := []mtgban.ArbitEntry{{
 		CardID:         "box-a",
 		InventoryEntry: mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100},

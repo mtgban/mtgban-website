@@ -368,12 +368,6 @@ func TestArbitMinQuantitySparesSellersWithout(t *testing.T) {
 	}
 	cardID := m10[0]
 	withSigMode(t, true, false)
-
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	inv := mtgban.InventoryRecord{}
 	inv.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: 10, URL: "u"})
 	// Add counts a copy with no quantity as one; a dump keeps the zero
@@ -381,13 +375,13 @@ func TestArbitMinQuantitySparesSellersWithout(t *testing.T) {
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "No Qty Shop", Shorthand: "NOQTY", NoQuantityInventory: true}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	bl := mtgban.BuylistRecord{}
 	bl.Add(cardID, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 40, URL: "u"})
 	vendors := []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{Name: "Qty Buyer", Shorthand: "QTYBUY"}),
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 
 	r := httptest.NewRequest("GET", "/arbit?source=NOQTY&minqty=1", nil)
 	w := httptest.NewRecorder()
@@ -407,8 +401,6 @@ func TestGlobalDirectKeepsItsConditions(t *testing.T) {
 	}
 	cardID := m10[0]
 
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
 	shelf := func(price float64) mtgban.InventoryRecord {
 		inv := mtgban.InventoryRecord{}
 		inv.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: price, Quantity: 1, URL: "u"})
@@ -418,7 +410,7 @@ func TestGlobalDirectKeepsItsConditions(t *testing.T) {
 		mtgban.NewSellerFromInventory(shelf(10), mtgban.ScraperInfo{Name: "Filter Shop", Shorthand: "FILTSHOP"}),
 		mtgban.NewSellerFromInventory(shelf(40), mtgban.ScraperInfo{Name: "Direct", Shorthand: "TCGDirect"}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	// No TCG Market is loaded, which "only Legit" reads as every price
 	// being off
@@ -434,13 +426,11 @@ func TestGlobalDirectKeepsItsConditions(t *testing.T) {
 // TestArbitStoreLinksCarryState pins the store links to the state asked
 // for, and to nothing where none was.
 func TestArbitStoreLinksCarryState(t *testing.T) {
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Link Source", Shorthand: "LINKSRC"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Link Other", Shorthand: "LINKOTH"}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	withSigMode(t, true, false)
 
 	render := func(query string) string {
@@ -500,21 +490,16 @@ func TestRequestArbitState(t *testing.T) {
 // TestArbitSavedCookies pins arbit and reverse to one saved state, and
 // global to its own, read off the request the way the handler reads it.
 func TestArbitSavedCookies(t *testing.T) {
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Saved Source", Shorthand: "SAVSRC"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Saved Other", Shorthand: "SAVOTH"}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	vendors := []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Saved Buyer", Shorthand: "SAVBUY"}),
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Saved Buyer Two", Shorthand: "SAVBU2"}),
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 	withSigMode(t, true, false)
 
 	cookies := "ArbitFilters=" + url.QueryEscape("f=1&minsell=2&t=1") + "; GlobalFilters=" + url.QueryEscape("f=1&minsell=7&t=1")
@@ -663,12 +648,10 @@ func TestArbitBarGreysWhatTheSourceDoesNotApply(t *testing.T) {
 // only Tradable it has no control for: the form carries it unseen, so
 // reverse reads it back through the shared cookie.
 func TestArbitApplyKeepsReverseTradable(t *testing.T) {
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Carry Source", Shorthand: "CARRYSRC"}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	withSigMode(t, true, false)
 
 	r := httptest.NewRequest("GET", "/arbit?source=CARRYSRC", nil)
@@ -747,8 +730,6 @@ func TestGlobalPreviewCannotSteerItsSample(t *testing.T) {
 	if len(m10) < 2*MaxResultsGlobalLimit {
 		t.Skip("M10 not present in this datastore")
 	}
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
 	probe, reference := mtgban.InventoryRecord{}, mtgban.InventoryRecord{}
 	for i, cardID := range m10[:2*MaxResultsGlobalLimit] {
 		price := 100.0
@@ -762,7 +743,7 @@ func TestGlobalPreviewCannotSteerItsSample(t *testing.T) {
 		mtgban.NewSellerFromInventory(probe, mtgban.ScraperInfo{Name: "Preview Index", Shorthand: "PREVIDX"}),
 		mtgban.NewSellerFromInventory(reference, mtgban.ScraperInfo{Name: "Preview Store", Shorthand: "PREVSTORE"}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	withSigMode(t, true, false)
 
 	rows := func(query string) int {
@@ -847,12 +828,10 @@ func TestArbitCarriedLimitSurvivesApply(t *testing.T) {
 // TestArbitBarShowsTheCarriedLimit pins a saved limit the floor holds up to
 // showing beside its empty field, with a button that drops it.
 func TestArbitBarShowsTheCarriedLimit(t *testing.T) {
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Carry Source", Shorthand: "CARRYSRC"}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	withSigMode(t, true, false)
 
 	r := httptest.NewRequest("GET", "/arbit?source=CARRYSRC", nil)

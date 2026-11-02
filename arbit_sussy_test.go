@@ -87,13 +87,6 @@ func TestReverseSussyBadge(t *testing.T) {
 func seedReverseScrapers(t *testing.T, cardID string) {
 	t.Helper()
 
-	prevSellers := sellersPtr.Load()
-	prevVendors := vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
-
 	shopInv := mtgban.InventoryRecord{}
 	shopInv.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 2, URL: "u"})
 
@@ -109,7 +102,7 @@ func seedReverseScrapers(t *testing.T, cardID string) {
 			Name: "Reverse Index", Shorthand: "REVIDX", MetadataOnly: true,
 		}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	bl := mtgban.BuylistRecord{}
 	bl.Add(cardID, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 40, Quantity: 2, URL: "u"})
@@ -119,7 +112,7 @@ func seedReverseScrapers(t *testing.T, cardID string) {
 			Name: "Reverse Buyer", Shorthand: "REVBUY",
 		}),
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 }
 
 // renderReverse runs one reverse comparison the way the handler does.
@@ -209,9 +202,6 @@ func TestSuspectPriceFor(t *testing.T) {
 func seedArbitScraper(t *testing.T, shorthand string, sealed bool) {
 	t.Helper()
 
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
-
 	inv := mtgban.InventoryRecord{}
 	inv.Add("card-a", &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 1, URL: "u"})
 
@@ -220,7 +210,7 @@ func seedArbitScraper(t *testing.T, shorthand string, sealed bool) {
 			Name: "Filter Test", Shorthand: shorthand, SealedMode: sealed,
 		}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 }
 
 // TestArbitFilterOptionsRouteBySealedMode pins which of legit/stable a
@@ -288,12 +278,6 @@ func TestArbitAppliesOnlyShownFilters(t *testing.T) {
 	}
 	cardID := m10[0]
 	withSigMode(t, true, false)
-
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	shelf := func(price float64) mtgban.InventoryRecord {
 		inv := mtgban.InventoryRecord{}
 		inv.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: price, Quantity: 1, URL: "u"})
@@ -305,14 +289,14 @@ func TestArbitAppliesOnlyShownFilters(t *testing.T) {
 		mtgban.NewSellerFromInventory(shelf(10), mtgban.ScraperInfo{Name: "Filter Shop", Shorthand: "FILTSHOP"}),
 		mtgban.NewSellerFromInventory(shelf(40), mtgban.ScraperInfo{Name: "Filter Market", Shorthand: "TCGMarket"}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	// TCG Direct (net) pays over twice the market, which arbit warns about
 	bl := mtgban.BuylistRecord{}
 	bl.Add(cardID, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 100, URL: "u"})
 	vendors := []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{Name: "Filter Buyer", Shorthand: "TCGDirectNet"}),
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 
 	// No SYP buylist is loaded, so wherever "only SYP" applies it drops the row
 	row := `data-arb-id="` + cardID + `"`
@@ -347,9 +331,6 @@ func TestArbitAppliesOnlyShownFilters(t *testing.T) {
 func seedVolatileSealed(t *testing.T, productID string) {
 	t.Helper()
 
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
-
 	src := mtgban.InventoryRecord{}
 	src.Add(productID, &mtgban.InventoryEntry{Conditions: "NM", Price: 100, Quantity: 1, URL: "u"})
 	probe := mtgban.InventoryRecord{}
@@ -363,7 +344,7 @@ func seedVolatileSealed(t *testing.T, productID string) {
 		mtgban.NewSellerFromInventory(probe, mtgban.ScraperInfo{Name: "Sealed Probe", Shorthand: "SEALPRB", SealedMode: true}),
 		mtgban.NewSellerFromInventory(sim, mtgban.ScraperInfo{Name: "TCG Low Sim", Shorthand: "TCGLowSim", SealedMode: true, MetadataOnly: true}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 }
 
 // renderGlobal runs one global comparison from the given source the way the

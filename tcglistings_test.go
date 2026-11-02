@@ -152,15 +152,13 @@ func TestTCGListingsFor(t *testing.T) {
 // TestSearchSellersCarryTCGListings checks the counts go on the TCGplayer
 // store's rows and no other store's.
 func TestSearchSellersCarryTCGListings(t *testing.T) {
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
 	now := time.Now()
 	inv := mtgban.InventoryRecord{"complete": {{Conditions: "NM", Price: 7.5, Quantity: 1}}}
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "TCGplayer", Shorthand: tcgListingsStore, NoQuantityInventory: true, InventoryTimestamp: &now}),
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Other Store", Shorthand: "OS", InventoryTimestamp: &now}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	setTestTCGListings(t, map[string]*tcgListings{
 		"complete": {Sellers: [5]int32{51}, Copies: [5]int32{83}, Total: 60},
 	})

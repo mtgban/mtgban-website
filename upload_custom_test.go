@@ -56,7 +56,7 @@ func TestCustomBuylistKeepsItsOffersInCredit(t *testing.T) {
 		ref[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 10 + float64(k)}}
 	}
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(ref, sessionInfo("ZZA"))}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	var rows strings.Builder
 	for _, card := range cards {
@@ -101,7 +101,7 @@ func TestUploadCustomBuylistIgnoresABadSetting(t *testing.T) {
 		ref[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 10 + float64(k)}}
 	}
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(ref, sessionInfo("ZZA"))}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	var rows strings.Builder
 	for _, card := range cards {

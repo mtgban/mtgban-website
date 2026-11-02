@@ -461,21 +461,19 @@ func TestLoadCKHistoryKeepsTheLastLoad(t *testing.T) {
 // place of whatever is loaded, restoring it when the test ends.
 func setTestCK(t *testing.T, bl mtgban.BuylistRecord, inv mtgban.InventoryRecord) {
 	t.Helper()
-	prevSellers, prevVendors, prevSignals := sellersPtr.Load(), vendorsPtr.Load(), ckSignalsPtr.Load()
+	prevSignals := ckSignalsPtr.Load()
 	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
 		ckSignalsPtr.Store(prevSignals)
 	})
 	now := time.Now()
 	info := mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK", BuylistTimestamp: &now, InventoryTimestamp: &now}
 	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(bl, info)}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 	sellers := []mtgban.Seller{}
 	if inv != nil {
 		sellers = append(sellers, mtgban.NewSellerFromInventory(inv, info))
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 }
 
 // TestCKQuoteFrom reads CK's offer the way its scraper files it: an entry per
@@ -669,9 +667,8 @@ func TestRebuildCKPauses(t *testing.T) {
 		odds.products[id] = ckProduct{}
 	}
 	setTestCKOdds(t, odds)
-	prevVendors, prevSignals := vendorsPtr.Load(), ckSignalsPtr.Load()
+	prevSignals := ckSignalsPtr.Load()
 	t.Cleanup(func() {
-		vendorsPtr.Store(prevVendors)
 		ckSignalsPtr.Store(prevSignals)
 	})
 	vendor := func(shorthand string, bl mtgban.BuylistRecord) mtgban.Vendor {
@@ -695,7 +692,7 @@ func TestRebuildCKPauses(t *testing.T) {
 		// A credit list pays more, but not in cash.
 		vendor("ABUCredit", mtgban.BuylistRecord{"p": {{Conditions: "NM", BuyPrice: 12}}}),
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 	today := ckToday(time.Now())
 	paused := ckHistory{LastBuying: today.AddDate(0, 0, -5)}
 	setTestCKInputs(t, mtgban.InventoryRecord{}, &ckHistorySnapshot{
@@ -818,13 +815,12 @@ func TestCardFilterOnCK(t *testing.T) {
 // TestCKWorkNeedsCKBuylist builds no CK signals on a site that does not
 // serve CK's buylist, whatever its game.
 func TestCKWorkNeedsCKBuylist(t *testing.T) {
-	prevVendors, prevSignals := vendorsPtr.Load(), ckSignalsPtr.Load()
+	prevSignals := ckSignalsPtr.Load()
 	t.Cleanup(func() {
-		vendorsPtr.Store(prevVendors)
 		ckSignalsPtr.Store(prevSignals)
 	})
 	vendors := []mtgban.Vendor{buylistOf("SCG", 1, time.Now())}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 	ckSignalsPtr.Store(nil)
 
 	(&site{}).refreshCKSignals()

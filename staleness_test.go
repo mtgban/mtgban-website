@@ -88,12 +88,9 @@ func TestClassifyStaleTransition(t *testing.T) {
 // Pins that a stale/recovered transition notifies exactly once, and a
 // repeat check while a row stays stale does not notify again.
 func TestCheckStalenessTracksTransitionsOverRepeatedChecks(t *testing.T) {
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevState := staleAlarmState.stale
 	prevNotify := notifyStale
 	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
 		staleAlarmState.stale = prevState
 		notifyStale = prevNotify
 	})
@@ -109,8 +106,7 @@ func TestCheckStalenessTracksTransitionsOverRepeatedChecks(t *testing.T) {
 	fresh := time.Now()
 	sellers := []mtgban.Seller{inventoryOf("ZZSTALE", 1, old), inventoryOf("ZZFRESH", 1, fresh)}
 	var noVendors []mtgban.Vendor
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&noVendors)
+	withPrices(t, sellers, noVendors)
 
 	checkStaleness()
 	if !staleAlarmState.stale["ZZSTALE/retail"] {
@@ -136,7 +132,7 @@ func TestCheckStalenessTracksTransitionsOverRepeatedChecks(t *testing.T) {
 	// ZZSTALE loads fresh data: the next check must flip it back and notify
 	// exactly once more, for the recovery.
 	recovered := []mtgban.Seller{inventoryOf("ZZSTALE", 1, time.Now()), inventoryOf("ZZFRESH", 1, fresh)}
-	sellersPtr.Store(&recovered)
+	withPrices(t, recovered, GetVendors())
 	checkStaleness()
 	if staleAlarmState.stale["ZZSTALE/retail"] {
 		t.Fatal("check after a fresh load still reads ZZSTALE/retail as stale")
@@ -149,13 +145,10 @@ func TestCheckStalenessTracksTransitionsOverRepeatedChecks(t *testing.T) {
 // Pins that checkStaleness never alarms on a session store, matching the
 // dashboard's own stale banner.
 func TestCheckStalenessSkipsSessionStores(t *testing.T) {
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevState := staleAlarmState.stale
 	prevNotify := notifyStale
 	prevSessions := Sessions
 	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
 		staleAlarmState.stale = prevState
 		notifyStale = prevNotify
 		Sessions = prevSessions
@@ -171,8 +164,7 @@ func TestCheckStalenessSkipsSessionStores(t *testing.T) {
 
 	var noSellers []mtgban.Seller
 	var noVendors []mtgban.Vendor
-	sellersPtr.Store(&noSellers)
-	vendorsPtr.Store(&noVendors)
+	withPrices(t, noSellers, noVendors)
 
 	// Publish stamps the served copy "now"; back-date it directly so the
 	// row reads stale while Sessions still claims the shorthand.
@@ -183,7 +175,7 @@ func TestCheckStalenessSkipsSessionStores(t *testing.T) {
 	}
 	old := time.Now().Add(-72 * time.Hour)
 	sellers := []mtgban.Seller{inventoryOf("ZZUPLOAD", 1, old)}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	checkStaleness()
 	if len(notices) != 0 {
@@ -198,20 +190,16 @@ func TestCheckStalenessSkipsSessionStores(t *testing.T) {
 // standing in for Discord.
 func withStaleAlarm(t *testing.T, sellers []mtgban.Seller, post func(message string) error) {
 	t.Helper()
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevState := staleAlarmState.stale
 	prevNotify := notifyStale
 	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
 		staleAlarmState.stale = prevState
 		notifyStale = prevNotify
 	})
 	staleAlarmState.stale = map[string]bool{}
 	notifyStale = func(_, message string) error { return post(message) }
 	var noVendors []mtgban.Vendor
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&noVendors)
+	withPrices(t, sellers, noVendors)
 }
 
 // The rows that go stale in one check are announced in one message, so a
@@ -297,23 +285,19 @@ func TestCheckStalenessSplitsWhatDoesNotFit(t *testing.T) {
 // drops on record and a fresh alarm, and puts all of it back afterwards.
 func withDropState(t *testing.T, sellers []mtgban.Seller, vendors []mtgban.Vendor) *[]string {
 	t.Helper()
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevDropped := droppedStoresPtr.Load()
 	prevState := staleAlarmState.stale
 	prevNotify := notifyStale
 	prevSessions := Sessions
 	prevSignals := ckSignalsPtr.Load()
 	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
 		droppedStoresPtr.Store(prevDropped)
 		staleAlarmState.stale = prevState
 		notifyStale = prevNotify
 		Sessions = prevSessions
 		ckSignalsPtr.Store(prevSignals)
 	})
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 	droppedStoresPtr.Store(nil)
 	staleAlarmState.stale = map[string]bool{}
 	Sessions = sessionstore.New(sessionHooks())
@@ -350,7 +334,7 @@ func TestDropStaleStoresStopsServingOnlyOldData(t *testing.T) {
 	}
 	// Publish served the session store anew; serve the back-dated copy.
 	sellers := []mtgban.Seller{inventoryOf("ZZOLD", 1, old), inventoryOf("ZZSTALE", 1, stale), inventoryOf("ZZUPLOAD", 1, old), undated}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	dropStaleStores(now)
 
@@ -389,7 +373,7 @@ func TestCheckStalenessAnnouncesADropAndItsReturn(t *testing.T) {
 	}
 
 	sellers := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	checkStaleness()
 	if len(*notices) != 2 || !strings.Contains((*notices)[1], "(ZZOLD) is served again") {
 		t.Errorf("after a fresh load: %q, want a served-again notice", *notices)
@@ -477,11 +461,11 @@ func TestAReturnAfterADropIsAnnouncedOnce(t *testing.T) {
 	checkStaleness()
 
 	sellers := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	checkStaleness()
 
 	back := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
-	sellersPtr.Store(&back)
+	withPrices(t, back, GetVendors())
 	checkStaleness()
 
 	// One check's lines go out as one message
@@ -515,7 +499,7 @@ func TestARefusedDropLineKeepsTheStaleRow(t *testing.T) {
 	checkStaleness()
 
 	sellers := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	notifyStale = func(string, string) error { return errors.New("refused") }
 	checkStaleness()
 
@@ -524,7 +508,7 @@ func TestARefusedDropLineKeepsTheStaleRow(t *testing.T) {
 		return nil
 	}
 	back := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
-	sellersPtr.Store(&back)
+	withPrices(t, back, GetVendors())
 	checkStaleness()
 
 	if len(*notices) != 2 || !strings.Contains((*notices)[1], "(ZZOLD) is fresh again") {
@@ -547,9 +531,9 @@ func TestDropStaleStoresKeepsTheLastRealStoreBesideASessionStore(t *testing.T) {
 		t.Fatalf("publishing the session store: %s", err)
 	}
 	sellers := append([]mtgban.Seller{inventoryOf("AAOLD", 1, now.Add(-8*24*time.Hour)), inventoryOf("AAOLDER", 1, now.Add(-9*24*time.Hour))}, GetSellers()...)
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	vendors := append([]mtgban.Vendor{buylistOf("AAOLDV", 1, now.Add(-8*24*time.Hour)), buylistOf("AAOLDERV", 1, now.Add(-9*24*time.Hour))}, GetVendors()...)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 
 	dropStaleStores(now)
 
@@ -619,7 +603,7 @@ func TestDropStaleStoresAsksAgainAfterALoadMeanwhile(t *testing.T) {
 			if tc.real {
 				scrapersWriteMu.Lock()
 				sellers := append(GetSellers(), inventoryOf("ZZFRESH", 1, now))
-				sellersPtr.Store(&sellers)
+				withPrices(t, sellers, GetVendors())
 				scrapersWriteMu.Unlock()
 			}
 			close(release)
@@ -664,7 +648,7 @@ func TestDropStaleStoresKeepsTheLastStoreOnASide(t *testing.T) {
 
 	// A fresh store back on the side lets the kept one go
 	sellers := append(GetSellers(), inventoryOf("ZZFRESH", 1, now))
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 	dropStaleStores(now)
 	gotSellers, _ = servedShorthands()
 	if !slices.Equal(gotSellers, []string{"ZZFRESH"}) {

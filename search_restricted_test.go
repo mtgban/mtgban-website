@@ -50,12 +50,6 @@ func TestSearchMarksRestrictedStores(t *testing.T) {
 	withConfigCopy(t)
 	Config().Stores.SearchRetailBlockList = []string{"RHID"}
 	Config().Stores.SearchBuylistBlockList = []string{"BHID"}
-
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	now := time.Now()
 	inv := mtgban.InventoryRecord{"card": {{Conditions: "NM", Price: 5}}}
 	bl := mtgban.BuylistRecord{"card": {{Conditions: "NM", BuyPrice: 3}}}
@@ -66,8 +60,7 @@ func TestSearchMarksRestrictedStores(t *testing.T) {
 		sellers = append(sellers, mtgban.NewSellerFromInventory(inv, info))
 		vendors = append(vendors, mtgban.NewVendorFromBuylist(bl, info))
 	}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 
 	for _, tc := range []struct {
 		kind string

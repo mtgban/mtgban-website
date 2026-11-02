@@ -41,14 +41,11 @@ func searchWithStock(t *testing.T, stocked string, target string, cookies ...*ht
 		t.Cleanup(func() { delete(LogPages, "Search") })
 	}
 
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
-
 	stock := mtgban.InventoryRecord{}
 	stock.Add(stocked, &mtgban.InventoryEntry{Conditions: "NM", Price: 1.5, Quantity: 1})
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(stock,
 		mtgban.ScraperInfo{Name: "CK", Shorthand: "CK"})}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	for _, cookie := range cookies {

@@ -42,20 +42,11 @@ func TestNewBantoolWorkflow(t *testing.T) {
 func TestAdminDashboardShowsStaleBadgeAndBanner(t *testing.T) {
 	withSigMode(t, true, false)
 
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	prevIdx := scraperIndexPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-		scraperIndexPtr.Store(prevIdx)
-	})
-
 	threeDaysAgo := time.Now().Add(-72 * time.Hour)
 	sellers := []mtgban.Seller{inventoryOf("CK", 5, threeDaysAgo)}
 	var noVendors []mtgban.Vendor
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&noVendors)
-	scraperIndexPtr.Store(buildScraperIndex(map[string]map[string][]string{
+	withPrices(t, sellers, noVendors)
+	withScraperIndex(t, buildScraperIndex(map[string]map[string][]string{
 		"cardkingdom": {"retail": {"CK"}},
 	}))
 
@@ -85,20 +76,11 @@ func TestAdminDashboardShowsStaleBadgeAndBanner(t *testing.T) {
 func TestAdminDashboardShowsAStoreWithNoTimestamp(t *testing.T) {
 	withSigMode(t, true, false)
 
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	prevIdx := scraperIndexPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-		scraperIndexPtr.Store(prevIdx)
-	})
-
 	seller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"uuid-0": {{Price: 1}}}, mtgban.ScraperInfo{Name: "CK", Shorthand: "CK"})
 	sellers := []mtgban.Seller{seller}
 	var noVendors []mtgban.Vendor
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&noVendors)
-	scraperIndexPtr.Store(buildScraperIndex(map[string]map[string][]string{
+	withPrices(t, sellers, noVendors)
+	withScraperIndex(t, buildScraperIndex(map[string]map[string][]string{
 		"cardkingdom": {"retail": {"CK"}},
 	}))
 

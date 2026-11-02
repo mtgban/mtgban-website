@@ -319,12 +319,6 @@ func TestSearchSurvivesAPanickingScan(t *testing.T) {
 	}
 	seller := mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Name: "Seller", Shorthand: "SLR"})
 	vendor := mtgban.NewVendorFromBuylist(buylist, mtgban.ScraperInfo{Name: "Vendor", Shorthand: "VND"})
-
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	for _, probe := range []struct {
 		job     string
 		value   string
@@ -336,8 +330,7 @@ func TestSearchSurvivesAPanickingScan(t *testing.T) {
 	} {
 		t.Run(probe.job, func(t *testing.T) {
 			posts := serverWebhook(t)
-			sellersPtr.Store(&probe.sellers)
-			vendorsPtr.Store(&probe.vendors)
+			withPrices(t, probe.sellers, probe.vendors)
 
 			rec := httptest.NewRecorder()
 			testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(uuid), nil))

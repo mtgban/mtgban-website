@@ -62,13 +62,7 @@ func TestListingPriorityNeedsASignature(t *testing.T) {
 		sellers = append(sellers, mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Name: store.name + " Seller", Shorthand: store.shorthands[0]}))
 		vendors = append(vendors, mtgban.NewVendorFromBuylist(buylist, mtgban.ScraperInfo{Name: store.name + " Vendor", Shorthand: store.shorthands[1]}))
 	}
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 
 	prevAffiliates := affiliatesPtr.Load()
 	t.Cleanup(func() { affiliatesPtr.Store(prevAffiliates) })

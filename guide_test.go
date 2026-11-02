@@ -17,11 +17,6 @@ import (
 // name alone left tied ones in the map's order, which changes per render, so
 // a hundred renders all but ensure a wrong one if the tie is not broken.
 func TestGuideStoresBreakNameTiesByShorthand(t *testing.T) {
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	store := func(name, shorthand string, sealed bool) mtgban.Seller {
 		return mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{
 			Name:       name,
@@ -36,8 +31,7 @@ func TestGuideStoresBreakNameTiesByShorthand(t *testing.T) {
 		store("Star City Games", "SCGSealed", true),
 	}
 	vendors := []mtgban.Vendor{}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 
 	want := []string{"CK", "CKSealed", "SCG", "SCGSealed"}
 	for range 100 {
@@ -61,11 +55,6 @@ func TestGuideStoresBreakNameTiesByShorthand(t *testing.T) {
 func TestGuideStoresLeaveOutAPIOnlyStores(t *testing.T) {
 	withConfigCopy(t)
 	Config().Stores.APIOnlyStores = []string{"APIINDEX", "APIBUY"}
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "An Index", Shorthand: "APIINDEX", MetadataOnly: true}),
@@ -74,8 +63,7 @@ func TestGuideStoresLeaveOutAPIOnlyStores(t *testing.T) {
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK"}),
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "A Buylist", Shorthand: "APIBUY"}),
 	}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 
 	var stores []GuideStore
 	err := json.Unmarshal([]byte(guideStoresJSON()), &stores)
