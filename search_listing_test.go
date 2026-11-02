@@ -25,7 +25,6 @@ var storeNameCell = regexp.MustCompile(`class="store-name[^"]*"[^>]*>([^<]+)<`)
 // markup in TestSettingsBodyDrawsListingLocked) marks the pills locked rather
 // than bound to that cookie.
 func TestListingPriorityNeedsASignature(t *testing.T) {
-	skipWithoutDatastore(t)
 	signingEnabled(t, true)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
@@ -35,8 +34,10 @@ func TestListingPriorityNeedsASignature(t *testing.T) {
 		t.Cleanup(func() { delete(LogPages, "Search") })
 	}
 
+	b := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}})
+	uuid := "FIXTUREA-1"
+
 	// Name order and price order disagree on both sides.
-	uuid := backend().GetUUIDs()[0]
 	var sellers []mtgban.Seller
 	var vendors []mtgban.Vendor
 	for _, store := range []struct {
@@ -62,7 +63,7 @@ func TestListingPriorityNeedsASignature(t *testing.T) {
 		sellers = append(sellers, mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Name: store.name + " Seller", Shorthand: store.shorthands[0]}))
 		vendors = append(vendors, mtgban.NewVendorFromBuylist(buylist, mtgban.ScraperInfo{Name: store.name + " Vendor", Shorthand: store.shorthands[1]}))
 	}
-	withPrices(t, sellers, vendors)
+	s := fixtureSite(t, b, sellers, vendors)
 
 	prevAffiliates := affiliatesPtr.Load()
 	t.Cleanup(func() { affiliatesPtr.Store(prevAffiliates) })
@@ -90,7 +91,7 @@ func TestListingPriorityNeedsASignature(t *testing.T) {
 				req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: tc.sig})
 			}
 			rec := httptest.NewRecorder()
-			testSite.Search(rec, req)
+			s.Search(rec, req)
 			page := rec.Body.String()
 
 			var gotSellers, gotVendors []string
@@ -113,7 +114,7 @@ func TestListingPriorityNeedsASignature(t *testing.T) {
 				t.Errorf("%d locked rows, want %d", n, tc.lockedRows)
 			}
 
-			if v := settingsModalData(testSite, req); v.ListingLocked != tc.locked {
+			if v := settingsModalData(s, req); v.ListingLocked != tc.locked {
 				t.Errorf("ListingLocked = %v, want %v", v.ListingLocked, tc.locked)
 			}
 		})

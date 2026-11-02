@@ -273,24 +273,20 @@ func registerFactorStore(t *testing.T, shorthand, uuid string, retail, buy float
 // discount can show a row below a price< threshold that hid a cheaper quote,
 // and buy_price reads the cash offer, which the credit factor never moves.
 func TestStoreFactorsLeavePriceFiltersOnTheQuotedPrice(t *testing.T) {
-	skipWithoutDatastore(t)
+	s := fixtureSite(t, fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}}), nil, nil)
+	uuid := "FIXTUREA-1"
+	registerFactorStore(t, "TESTFACT", uuid, 5.5, 5)
 
-	uuids := somePlainCardUUIDs(t, 1)
-	if len(uuids) < 1 {
-		t.Skip("datastore holds no plain card for this test")
-	}
-	registerFactorStore(t, "TESTFACT", uuids[0], 5.5, 5)
-
-	ds := currentDatastore()
+	ds := s.datastore()
 	search := func(query, cookie string) searchResults {
 		r := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query), nil)
 		r.AddCookie(&http.Cookie{Name: storeFactorsCookie, Value: cookie})
-		result := runSearch(r, ds, parseSearchOptionsNG(backend(), query, nil, nil, nil))
+		result := runSearch(r, ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 		applyStoreFactors(result, readStoreFactors(r))
 		return result
 	}
 	rowOf := func(rows map[string]map[mtgban.Condition][]SearchEntry) *SearchEntry {
-		for _, e := range rows[uuids[0]]["NM"] {
+		for _, e := range rows[uuid]["NM"] {
 			if e.Shorthand == "TESTFACT" {
 				return &e
 			}
