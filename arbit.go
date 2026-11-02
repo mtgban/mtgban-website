@@ -335,14 +335,14 @@ type ArbitVars struct {
 }
 
 func (s *site) Arbit(w http.ResponseWriter, r *http.Request) {
-	arbit(s, s.datastore(), w, r, false)
+	arbit(s, w, r, false)
 }
 
 func (s *site) Reverse(w http.ResponseWriter, r *http.Request) {
-	arbit(s, s.datastore(), w, r, true)
+	arbit(s, w, r, true)
 }
 
-func arbit(s *site, ds *datastore, w http.ResponseWriter, r *http.Request, reverse bool) {
+func arbit(s *site, w http.ResponseWriter, r *http.Request, reverse bool) {
 	sig := verifiedSignature(r)
 
 	pageName := "Arbitrage"
@@ -392,7 +392,7 @@ func arbit(s *site, ds *datastore, w http.ResponseWriter, r *http.Request, rever
 
 	start := time.Now()
 
-	scraperCompare(ds, w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+	s.scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults:    true,
 		CustomBuylist: customRule,
 	})
@@ -455,7 +455,7 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	scraperCompare(s.datastore(), w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+	s.scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults: anyEnabled,
 		AnySpread:  anySpread,
 	})
@@ -611,7 +611,9 @@ func customBuylistEntries(inventory []mtgban.InventoryEntry, rule customBuylistR
 	return entries
 }
 
-func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
+func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
+	ds := s.datastore()
+	p := s.prices()
 	r.ParseForm()
 	b := ds.backend
 
@@ -636,7 +638,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 					break
 				}
 
-				vendor, found := currentStoreIndex().vendor[v[0]]
+				vendor, found := p.index.vendor[v[0]]
 				if found {
 					source = vendor
 				}
@@ -647,7 +649,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 					break
 				}
 
-				seller, found := currentStoreIndex().seller[v[0]]
+				seller, found := p.index.seller[v[0]]
 				if found {
 					source = seller
 					// Global prices against Direct; its stock caps no
@@ -674,14 +676,14 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 	// Set up menu bar, by selecting which scrapers should be selectable as source
 	var menuScrapers []mtgban.Scraper
 	if pageVars.ReverseMode {
-		for _, vendor := range GetVendors() {
+		for _, vendor := range p.vendors {
 			if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
 				continue
 			}
 			menuScrapers = append(menuScrapers, vendor)
 		}
 	} else {
-		for _, seller := range GetSellers() {
+		for _, seller := range p.sellers {
 			if !slices.Contains(allowlistSellers, seller.Info().Shorthand) {
 				continue
 			}
@@ -693,8 +695,8 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 	// kept in load order (updates replace entries in place), so without this the
 	// menu follows config order instead of name order.
 	sort.SliceStable(menuScrapers, func(i, j int) bool {
-		return strings.ToLower(scraperName(menuScrapers[i].Info().Shorthand)) <
-			strings.ToLower(scraperName(menuScrapers[j].Info().Shorthand))
+		return strings.ToLower(p.scraperName(menuScrapers[i].Info().Shorthand)) <
+			strings.ToLower(p.scraperName(menuScrapers[j].Info().Shorthand))
 	})
 
 	// Populate the menu bar with the pool selected above
@@ -710,7 +712,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 		}
 
 		nav := NavElem{
-			Name:  scraperName(scraper.Info().Shorthand),
+			Name:  p.scraperName(scraper.Info().Shorthand),
 			Short: scraper.Info().Shorthand,
 			Link:  link,
 		}
@@ -745,7 +747,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 	}
 
 	pageVars.ScraperShort = source.Info().Shorthand
-	pageVars.SealedSource = isSealedScraper(source.Info().Shorthand)
+	pageVars.SealedSource = p.isSealedScraper(source.Info().Shorthand)
 
 	pageVars.Arb = []Arbitrage{}
 	pageVars.Metadata = map[string]GenericCard{}
@@ -784,7 +786,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 	// The pool of scrapers that source will be compared against
 	var scrapers []mtgban.Scraper
 	if pageVars.GlobalMode || pageVars.ReverseMode {
-		for _, seller := range GetSellers() {
+		for _, seller := range p.sellers {
 			if !comparableSeller(seller.Info()) {
 				continue
 			}
@@ -801,7 +803,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 			scrapers = append(scrapers, seller)
 		}
 	} else {
-		for _, vendor := range GetVendors() {
+		for _, vendor := range p.vendors {
 			if source.Info().SealedMode != vendor.Info().SealedMode {
 				continue
 			}
@@ -896,7 +898,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 		// and a Direct listing above twice the market passed. Both are dropped
 		// here, on the price suspectPriceFor names for the mode.
 		if suspectPrice != nil && (applied["tradable"] || applied["legit"]) {
-			tcgMarket, _ := findSellerInventory("TCGMarket")
+			tcgMarket, _ := p.sellerInventory("TCGMarket")
 			arbit = slices.DeleteFunc(arbit, func(res mtgban.ArbitEntry) bool {
 				return invalidDirectIn(tcgMarket, res.CardID, suspectPrice(res))
 			})
@@ -909,7 +911,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 		if !applied["legit"] && !applied["tradable"] && suspectPrice != nil {
 			sussy = map[string]float64{}
 
-			tcgMarket, _ := findSellerInventory("TCGMarket")
+			tcgMarket, _ := p.sellerInventory("TCGMarket")
 			for _, res := range arbit {
 				isSussy := invalidDirectIn(tcgMarket, res.CardID, suspectPrice(res))
 				if isSussy {
@@ -952,7 +954,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 			creditInfo = source.Info()
 		}
 
-		name := scraperName(scraper.Info().Shorthand)
+		name := p.scraperName(scraper.Info().Shorthand)
 		if name == "" {
 			name = scraper.Info().Name
 		}
@@ -983,7 +985,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 	}
 
 	if pageVars.GlobalMode {
-		pageVars.Title = "Market Imbalance in " + scraperName(source.Info().Shorthand)
+		pageVars.Title = "Market Imbalance in " + p.scraperName(source.Info().Shorthand)
 	} else {
 		pageVars.Title = "Arbitrage"
 		if pageVars.ReverseMode {
@@ -991,7 +993,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 		} else {
 			pageVars.Title += " from "
 		}
-		pageVars.Title += scraperName(source.Info().Shorthand)
+		pageVars.Title += p.scraperName(source.Info().Shorthand)
 	}
 
 	render(w, "arbit.html", pageVars)
