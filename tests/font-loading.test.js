@@ -40,5 +40,7 @@ test('nightmode and guide-data load once', () => {
     expect(jsIdx).toBeGreaterThan(-1);
     expect(dataIdx).toBeLessThan(jsIdx);
 
-    expect(t('base.html')).toContain('/js/guide-data.js');
+    // The bases hand the data to the palette through its loader instead
+    expect(t('base.html')).not.toContain('/js/guide-data.js');
+    expect(t('base-landing.html')).not.toContain('/js/guide-data.js');
 });

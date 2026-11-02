@@ -18,7 +18,6 @@
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/navbar.css?hash={{.Hash}}">
     {{block "extra-css" .}}{{end}}
-    <link rel="stylesheet" type="text/css" href="/css/command-palette.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/settings-modal.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/editions-picker.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css">
@@ -106,10 +105,10 @@ window.__BAN_PALETTE_TARGETS = {
 <script type="text/javascript" src="/js/offline/offline-prefer.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/navbar.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}" defer></script>
-<script type="text/javascript" src="/js/palette-chips.js?hash={{.Hash}}" defer></script>
+<!-- The search boxes read the providers for their filter completions; the
+     palette itself loads on the first Ctrl+K or "/", through the loader. -->
 <script type="text/javascript" src="/js/palette-providers.js?hash={{.Hash}}" defer></script>
-{{block "guide-data" .}}<script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}" defer></script>{{end}}
-<script type="text/javascript" src="/js/command-palette.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/palette-loader.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/offline/offline-db.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/offline/offline-mode.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/offline/offline-watch.js?hash={{.Hash}}" defer></script>

@@ -1,13 +1,13 @@
 {{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/guide.css?hash={{.Hash}}">
+    {{/* for the Copied! toast, which guide.js shows the palette's way */}}
+    <link rel="stylesheet" type="text/css" href="/css/command-palette.css?hash={{.Hash}}">
 {{end}}
 
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}" defer></script>
     <script>window.__BAN_STORES = {{guide_stores}}; window.__BAN_PROMOS = {{.GuidePromos}};</script>
 {{end}}
-
-{{define "guide-data"}}<!-- guide.html loads its own copy above, in extra-head -->{{end}}
 
 {{define "content"}}
 <div class="guide-container">

@@ -29,6 +29,7 @@ var SHELL_URLS = [
     '/js/palette-providers.js?hash=' + BUILD,
     '/js/guide-data.js?hash=' + BUILD,
     '/js/command-palette.js?hash=' + BUILD,
+    '/js/palette-loader.js?hash=' + BUILD,
     '/js/cookies.js?hash=' + BUILD,
     '/js/editions-picker.js?hash=' + BUILD,
     '/js/store-factors.js?hash=' + BUILD,
