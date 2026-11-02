@@ -44,6 +44,10 @@ const (
 	NoCardsMessage         = "No products matching your search could be found"
 
 	MaxSearchTotalResults = 10000
+	// MaxUploadTransfer is the most results the Uploader transfer posts: a
+	// form value each, plus the mode, under the 10,000 values Go's form
+	// parser takes before it hands back an empty form.
+	MaxUploadTransfer = 9999
 )
 
 var (
@@ -705,7 +709,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		render(w, "search.html", pageVars)
 		return
 	}
-	pageVars.CardHashes = result.hashes
+	pageVars.CardHashes = result.hashes[:min(len(result.hashes), MaxUploadTransfer)]
 
 	// Allow displaying the "search all" link only when something
 	// was searched and no options were specified for it
