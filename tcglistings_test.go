@@ -163,7 +163,7 @@ func TestSearchSellersCarryTCGListings(t *testing.T) {
 		"complete": {Sellers: [5]int32{51}, Copies: [5]int32{83}, Total: 60},
 	})
 
-	found := searchSellersNG([]string{"complete"}, SearchConfig{})
+	found := searchSellers([]string{"complete"}, SearchConfig{})
 	entries := found["complete"]["NM"]
 	if len(entries) != 2 {
 		t.Fatalf("got %d NM entries, want 2: %+v", len(entries), entries)

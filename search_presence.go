@@ -117,7 +117,7 @@ func listsUnder(cond mtgban.Condition) bool {
 }
 
 // withoutSellerOffers returns the cards in pending no seller offers under a
-// condition other than INDEX, judged as searchSellersNG judges an entry. The
+// condition other than INDEX, judged as searchSellers judges an entry. The
 // biggest inventories go first, and each seller is asked only about the
 // cards the ones before it did not offer. pending is reused.
 func (s *postStores) withoutSellerOffers(pending []string) []string {

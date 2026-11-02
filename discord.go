@@ -833,7 +833,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 		})
 
 		cardIDs, _ := searchAndFilter(ds, config)
-		foundSellers, foundVendors := searchParallelNG(cardIDs, config)
+		foundSellers, foundVendors := searchParallel(cardIDs, config)
 
 		searchRes.ResultsIndex = ProcessEmbedSearchResultsSellers(b, foundSellers, true)
 		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(b, foundSellers, false)

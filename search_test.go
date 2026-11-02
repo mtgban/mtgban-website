@@ -152,7 +152,7 @@ func BenchmarkSearchExact(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallelNG(allKeys, config)
+		searchParallel(allKeys, config)
 	}
 }
 
@@ -161,7 +161,7 @@ func BenchmarkSearchPrefix(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallelNG(allKeys, config)
+		searchParallel(allKeys, config)
 	}
 }
 
@@ -171,7 +171,7 @@ func BenchmarkSearchAllFromEdition(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallelNG(allKeys, config)
+		searchParallel(allKeys, config)
 	}
 }
 
@@ -181,7 +181,7 @@ func BenchmarkSearchWithEdition(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallelNG(allKeys, config)
+		searchParallel(allKeys, config)
 	}
 }
 
@@ -191,7 +191,7 @@ func BenchmarkSearchWithNumber(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallelNG(allKeys, config)
+		searchParallel(allKeys, config)
 	}
 }
 
@@ -201,7 +201,7 @@ func BenchmarkSearchWithEditionPrefix(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallelNG(allKeys, config)
+		searchParallel(allKeys, config)
 	}
 }
 
@@ -214,7 +214,7 @@ func BenchmarkSearchOnlyRetail(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallelNG(allKeys, config)
+		searchParallel(allKeys, config)
 	}
 }
 
@@ -227,7 +227,7 @@ func BenchmarkSearchOnlyBuylist(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		allKeys, _ := searchAndFilter(currentDatastore(), config)
-		searchParallelNG(allKeys, config)
+		searchParallel(allKeys, config)
 	}
 }
 

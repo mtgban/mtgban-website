@@ -765,7 +765,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 		if isV2JSON {
 			retailV2 = sellerSearchV2(b, idOpt, allKeys, cfg, isSealed)
 		} else {
-			foundSellers = searchSellersNG(allKeys, cfg)
+			foundSellers = searchSellers(allKeys, cfg)
 			out.Retail = banPricesFromRows(b, allKeys, foundSellers, idOpt, tagName, true, true, false)
 		}
 	}
@@ -777,7 +777,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 		if isV2JSON {
 			buylistV2 = vendorSearchV2(b, idOpt, allKeys, cfg, isSealed)
 		} else {
-			foundVendors = searchVendorsNG(allKeys, cfg)
+			foundVendors = searchVendors(allKeys, cfg)
 			out.Buylist = banPricesFromRows(b, allKeys, foundVendors, idOpt, tagName, true, true, true)
 		}
 	}

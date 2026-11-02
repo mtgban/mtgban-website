@@ -681,7 +681,7 @@ func banPricesFromRows(b *matcher.Backend, cardIDs []string, found map[string]ma
 				if !seen {
 					// First row per store is the record's best entry. The
 					// zero check is defensive only: the walk already drops
-					// zero-priced entries (shouldSkipPriceNG), the same
+					// zero-priced entries (shouldSkipPrice), the same
 					// contract processEntry applies to the full dumps.
 					if row.Price == 0 {
 						prices[row.Shorthand] = nil
@@ -771,7 +771,7 @@ func getSellerPrices(b *matcher.Backend, mode string, enabledStores []string, fi
 		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
 		cardIDs := filterUUIDs(b, config.UUIDs, config.CardFilters)
-		return banPricesFromRows(b, cardIDs, searchSellersNG(cardIDs, config), mode, tagName, qty, conds, false)
+		return banPricesFromRows(b, cardIDs, searchSellers(cardIDs, config), mode, tagName, qty, conds, false)
 	}
 
 	var finishFilter []string
@@ -836,7 +836,7 @@ type EntryRule struct {
 
 func processEntry[T mtgban.GenericEntry](b *matcher.Backend, out map[string]map[string]*BanPrice, entries []T, idMode, cardID, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
 	// Unpriced listings (zero, or a NaN) are ignored throughout, matching the
-	// search walk the filtered endpoints ride (shouldSkipPriceNG drops them
+	// search walk the filtered endpoints ride (shouldSkipPrice drops them
 	// before they become rows): the base price is the first priced entry, and
 	// unpriced entries contribute neither conditions nor quantities. Records
 	// sort by grade then price, so the base stays the best grade's cheapest
@@ -1021,7 +1021,7 @@ func getVendorPrices(b *matcher.Backend, mode string, enabledStores []string, fi
 		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
 		cardIDs := filterUUIDs(b, config.UUIDs, config.CardFilters)
-		return banPricesFromRows(b, cardIDs, searchVendorsNG(cardIDs, config), mode, tagName, qty, conds, true)
+		return banPricesFromRows(b, cardIDs, searchVendors(cardIDs, config), mode, tagName, qty, conds, true)
 	}
 
 	var finishFilter []string
