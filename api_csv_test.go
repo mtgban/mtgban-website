@@ -33,11 +33,9 @@ func TestSimplePrice2CSVTCGSKU(t *testing.T) {
 	for cond, sku := range map[mtgban.Condition]string{mtgban.NM: "111", mtgban.SP: "222"} {
 		inventory.Add(id, &mtgban.InventoryEntry{Conditions: cond, InstanceID: sku})
 	}
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(
 		inventory, mtgban.ScraperInfo{Shorthand: "TCGPlayer"})}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	pm := map[string]map[string]*BanPrice{
 		id: {"TCGPlayer": &BanPrice{Regular: 1.0}},
@@ -89,14 +87,12 @@ func TestCSVCondQtyIndexing(t *testing.T) {
 
 	// Inject empty TCG sellers so the inventory lookups in UUID2TCGCSV succeed
 	// (prices come out 0, which is fine — we only assert condition/quantity).
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
 	var sellers []mtgban.Seller
 	for _, sh := range []string{"TCGPlayer", "TCGDirectLow", "TCGLow", "TCGSealed"} {
 		sellers = append(sellers, mtgban.NewSellerFromInventory(
 			mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: sh}))
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	// Two distinct non-foil, non-sealed cards so condition codes map cleanly to
 	// labels (no " Foil" suffix) and Rarity is present.
@@ -163,8 +159,6 @@ func TestCSVCondQtyIndexing(t *testing.T) {
 // buylist entry; CK also skips a card with no CK title. A quantity of "0",
 // or quantities not matching the ids, reads as 1.
 func TestUUID2BuylistCSV(t *testing.T) {
-	prev := vendorsPtr.Load()
-	t.Cleanup(func() { vendorsPtr.Store(prev) })
 	ck := mtgban.BuylistRecord{
 		"a": {{CustomFields: map[string]string{"CKTitle": "A", "CKEdition": "Set", "CKFoil": "true"}}},
 		"b": {{CustomFields: map[string]string{"CKEdition": "Set"}}},
@@ -178,7 +172,7 @@ func TestUUID2BuylistCSV(t *testing.T) {
 		mtgban.NewVendorFromBuylist(ck, mtgban.ScraperInfo{Shorthand: "CK"}),
 		mtgban.NewVendorFromBuylist(scg, mtgban.ScraperInfo{Shorthand: "SCG"}),
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 
 	ids := []string{"a", "b", "c", "a"}
 	for _, tc := range []struct {

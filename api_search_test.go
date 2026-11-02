@@ -42,13 +42,7 @@ func plainCard(t *testing.T) (id, name string) {
 // publishStores swaps in sellers and vendors for the test.
 func publishStores(t *testing.T, sellers []mtgban.Seller, vendors []mtgban.Vendor) {
 	t.Helper()
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 }
 
 // searchStores prices one card at Card Kingdom and at Star City Games and

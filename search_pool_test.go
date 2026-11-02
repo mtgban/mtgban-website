@@ -485,8 +485,6 @@ func (s countingSeller) Inventory() mtgban.InventoryRecord {
 // returns the count of its inventory reads.
 func registerCountingSeller(t *testing.T, shorthand string, uuids []string) *atomic.Int32 {
 	t.Helper()
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
 
 	now := time.Now()
 	inv := mtgban.InventoryRecord{}
@@ -501,7 +499,7 @@ func registerCountingSeller(t *testing.T, shorthand string, uuids []string) *ato
 		reads: reads,
 	}
 	next := append(slices.Clone(GetSellers()), seller)
-	sellersPtr.Store(&next)
+	withPrices(t, next, GetVendors())
 	return reads
 }
 

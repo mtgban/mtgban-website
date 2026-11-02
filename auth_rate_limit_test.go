@@ -99,17 +99,13 @@ func TestUserRateLimitKeepsAForgedEmailOutOfItsOwnersBucket(t *testing.T) {
 // for each request, whether it got through.
 func apiLimited(t *testing.T, reqs ...*http.Request) []bool {
 	t.Helper()
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevLimiter := APIRateLimiter
 	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
 		APIRateLimiter = prevLimiter
 	})
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
 	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 	APIRateLimiter = ratelimit.NewLimiter(rate.Every(time.Hour), 1)
 
 	h := enforceAPISigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))

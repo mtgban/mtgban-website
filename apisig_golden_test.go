@@ -118,15 +118,9 @@ func TestOptionalFieldsCoverAPIFields(t *testing.T) {
 func TestEnforceAPISigningDoesNotNeedServerURL(t *testing.T) {
 	// enforceAPISigning only checks these are non-empty, and the stub next
 	// handler never reads them, so a stub store each is enough.
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
 	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 
 	withSigMode(t, false, true)
 
@@ -153,15 +147,9 @@ func TestEnforceAPISigningDoesNotNeedServerURL(t *testing.T) {
 func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
 	// enforceAPISigning only checks these are non-empty, and the stub next
 	// handler never reads them, so a stub store each is enough.
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
 	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 
 	withSigMode(t, false, true)
 
@@ -217,11 +205,8 @@ func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
 // Every refusal is a JSON error with a failure status, so a caller testing
 // the status alone, as the scraper pinging /api/load/ does, sees it.
 func TestEnforceAPISigningRefusesWithAStatus(t *testing.T) {
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevLimiter := APIRateLimiter
 	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
 		APIRateLimiter = prevLimiter
 	})
 	withSigMode(t, false, true)
@@ -242,13 +227,12 @@ func TestEnforceAPISigningRefusesWithAStatus(t *testing.T) {
 
 	APIRateLimiter = ratelimit.NewLimiter(1000, 1000)
 	var noSellers []mtgban.Seller
-	sellersPtr.Store(&noSellers)
+	withPrices(t, noSellers, GetVendors())
 	check("not ready", serve("/api/load/cardkingdom?sig=x"), http.StatusServiceUnavailable)
 
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
 	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 	check("undecodable", serve("/api/load/cardkingdom?sig=not-base64!"), http.StatusUnauthorized)
 	check("unsigned load", serve("/api/load/cardkingdom"), http.StatusUnauthorized)
 

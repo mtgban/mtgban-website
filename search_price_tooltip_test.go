@@ -12,10 +12,8 @@ import (
 // else what it costs in store credit.
 func TestRetailPriceCarriesOneTooltip(t *testing.T) {
 	// No TCGMarket price, so every Direct price of a dollar or more looks off.
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
 	var none []mtgban.Seller
-	sellersPtr.Store(&none)
+	withPrices(t, none, GetVendors())
 
 	const id = "card"
 	out := renderPage(t, "search.html", false, PageVars{
@@ -70,10 +68,8 @@ func TestDirectPriceWarning(t *testing.T) {
 // A buylist offer that looks off stays red, though it reaches the P90 that
 // turns any other offer green.
 func TestBuylistPriceThatLooksOffIsNotBest(t *testing.T) {
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
 	var none []mtgban.Seller
-	sellersPtr.Store(&none)
+	withPrices(t, none, GetVendors())
 
 	const id = "card"
 	pv := PageVars{
@@ -110,10 +106,8 @@ func TestBuylistPriceThatLooksOffIsNotBest(t *testing.T) {
 
 // An adjusted retail price keeps one tooltip, now two lines, and is marked.
 func TestAdjustedRetailPriceTooltip(t *testing.T) {
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
 	var none []mtgban.Seller
-	sellersPtr.Store(&none)
+	withPrices(t, none, GetVendors())
 
 	const id = "card"
 	out := renderPage(t, "search.html", false, PageVars{
@@ -171,10 +165,8 @@ Store price $ 10.00, your 20% discount applied"`) {
 // Mobile shows the adjusted number where the Best re-pick reads it, and
 // the quoted number in the details.
 func TestAdjustedPricesOnMobile(t *testing.T) {
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
 	var none []mtgban.Seller
-	sellersPtr.Store(&none)
+	withPrices(t, none, GetVendors())
 
 	const id = "card"
 	out := renderPage(t, "search.html", true, PageVars{

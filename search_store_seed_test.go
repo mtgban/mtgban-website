@@ -12,13 +12,11 @@ import (
 // the given shorthand, carrying real card uuids drawn from the loaded
 // datastore (fake ones would just fail the backend's GetUUID and be silently
 // dropped by storeSeedUUIDs, defeating the point of the test). Restores
-// whatever was registered before once the test ends, via t.Cleanup - these
-// touch the same process-wide sellersPtr/vendorsPtr every real scraper load
-// does.
+// whatever was registered before once the test ends, via keepPrices: these
+// publish the same process-wide snapshot every real scraper load does.
 func registerTestVendor(t *testing.T, shorthand string, uuids []string) {
 	t.Helper()
-	prev := vendorsPtr.Load()
-	t.Cleanup(func() { vendorsPtr.Store(prev) })
+	keepPrices(t)
 
 	now := time.Now()
 	bl := mtgban.BuylistRecord{}
@@ -35,8 +33,7 @@ func registerTestVendor(t *testing.T, shorthand string, uuids []string) {
 
 func registerTestSeller(t *testing.T, shorthand string, uuids []string) {
 	t.Helper()
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
+	keepPrices(t)
 
 	now := time.Now()
 	inv := mtgban.InventoryRecord{}

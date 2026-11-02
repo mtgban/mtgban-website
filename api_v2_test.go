@@ -46,11 +46,6 @@ func v2Backend() *matcher.Backend {
 // on the coldfoil.
 func seedV2Scrapers(t *testing.T) {
 	t.Helper()
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	setTestTCGDirect(t, map[string]*tcgListings{
 		"lor-1": {Direct: [5]int32{7}, Copies: [5]int32{20, 5}},
 		"lor-2": {Copies: [5]int32{3}, Capped: true},
@@ -93,7 +88,7 @@ func seedV2Scrapers(t *testing.T) {
 		mtgban.NewSellerFromInventory(mp, mtgban.ScraperInfo{Name: "Mana Pool", Shorthand: "MP", NoQuantityInventory: true}),
 		mtgban.NewSellerFromInventory(sealed, mtgban.ScraperInfo{Name: "Card Trader Sealed", Shorthand: "CTSealed", SealedMode: true}),
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	ck := mtgban.BuylistRecord{}
 	ck.Add("lor-1", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 0.5, Quantity: 4})
@@ -111,7 +106,7 @@ func seedV2Scrapers(t *testing.T) {
 		mtgban.NewVendorFromBuylist(syp, mtgban.ScraperInfo{Name: "TCG SYP", Shorthand: "SYP", MetadataOnly: true, QuantityPriority: true}),
 		mtgban.NewVendorFromBuylist(idx, mtgban.ScraperInfo{Name: "Index Buyer", Shorthand: "IDXV", MetadataOnly: true}),
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 }
 
 func wireOf(t *testing.T, v any) string {
@@ -421,8 +416,6 @@ func TestPriceAPIv2CardmarketIDs(t *testing.T) {
 
 	singles := []string{"unlisted", "moved", "unpriced", "trend-only"}
 
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
 	low := mtgban.InventoryRecord{}
 	low.Add("unlisted", &mtgban.InventoryEntry{Price: 1, OriginalID: "700001"})
 	low.Add("moved", &mtgban.InventoryEntry{Price: 2, OriginalID: "610000"})
@@ -448,15 +441,13 @@ func TestPriceAPIv2CardmarketIDs(t *testing.T) {
 		mtgban.NewSellerFromInventory(ct, mtgban.ScraperInfo{Name: "Card Trader", Shorthand: "CT"}),
 		mtgban.NewSellerFromInventory(cts, mtgban.ScraperInfo{Name: "Card Trader Sealed", Shorthand: "CTSealed", SealedMode: true}),
 	}
-	sellersPtr.Store(&sellers)
-	prevVendors := vendorsPtr.Load()
-	t.Cleanup(func() { vendorsPtr.Store(prevVendors) })
+	withPrices(t, sellers, GetVendors())
 	ck := mtgban.BuylistRecord{}
 	for _, uuid := range singles {
 		ck.Add(uuid, &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1})
 	}
 	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(ck, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK"})}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 
 	ids := func(prices map[string]map[string]map[string][]banprice.Entry) []string {
 		var out []string

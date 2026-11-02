@@ -34,13 +34,10 @@ func withLocalDumpsBucket(t *testing.T, game matcher.Game) {
 
 	prevGame := Config().Game
 	prevBucket := DataBucket
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	prevIdx := scraperIndexPtr.Load()
 	var noSellers []mtgban.Seller
 	var noVendors []mtgban.Vendor
-	sellersPtr.Store(&noSellers)
-	vendorsPtr.Store(&noVendors)
-	scraperIndexPtr.Store(newScraperIndex())
+	withPrices(t, noSellers, noVendors)
+	withScraperIndex(t, newScraperIndex())
 
 	Config().Game = game
 	DataBucket = &simplecloud.FileBucket{}
@@ -48,9 +45,6 @@ func withLocalDumpsBucket(t *testing.T, game matcher.Game) {
 	t.Cleanup(func() {
 		Config().Game = prevGame
 		DataBucket = prevBucket
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-		scraperIndexPtr.Store(prevIdx)
 	})
 }
 
@@ -114,7 +108,7 @@ func TestLoadFromCloudUpdatesTheIndexToWhatItJustListed(t *testing.T) {
 	signingEnabled(t, false)
 	withLocalDumpsBucket(t, "magic")
 
-	scraperIndexPtr.Store(buildScraperIndex(map[string]map[string][]string{
+	withScraperIndex(t, buildScraperIndex(map[string]map[string][]string{
 		"cardkingdom": {"retail": {"CKOLD"}},
 	}))
 
@@ -216,7 +210,7 @@ func TestLoadFromCloudPostsARefusalOnce(t *testing.T) {
 
 	now := time.Now()
 	vendors := []mtgban.Vendor{buylistOf("CK", 300, now.Add(-time.Hour))}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 	writeSellerDump(t, filepath.Join("magic", "cardkingdom", "retail", "CK.json.xz"), inventoryOf("CK", 3, now))
 	writeVendorDump(t, filepath.Join("magic", "cardkingdom", "buylist", "CK.json.xz"), buylistOf("CK", 3, now))
 
@@ -241,7 +235,7 @@ func TestOverrideReloadPostsARefusalOnce(t *testing.T) {
 
 	now := time.Now()
 	vendors := []mtgban.Vendor{buylistOf("CK", 300, now.Add(-time.Hour))}
-	vendorsPtr.Store(&vendors)
+	withPrices(t, GetSellers(), vendors)
 	writeVendorDump(t, filepath.Join("magic", "cardkingdom", "buylist", "CK.json.xz"), buylistOf("CK", 3, now))
 	updateScraperIndexStore("cardkingdom", map[string][]string{"buylist": {"CK"}})
 

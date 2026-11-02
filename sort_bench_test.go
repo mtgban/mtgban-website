@@ -77,8 +77,6 @@ func BenchmarkSortByNumberAndFinish(b *testing.B) {
 func BenchmarkSortSetsByRetail(b *testing.B) {
 	uuids := benchSortUUIDs(b, 5000)
 
-	prevSellers := sellersPtr.Load()
-	b.Cleanup(func() { sellersPtr.Store(prevSellers) })
 	var sellers []mtgban.Seller
 	for _, shorthand := range defaultSellerPriorityOpt {
 		inv := mtgban.InventoryRecord{}
@@ -91,7 +89,7 @@ func BenchmarkSortSetsByRetail(b *testing.B) {
 			Name: "Bench " + shorthand, Shorthand: shorthand,
 		}))
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(b, sellers, GetVendors())
 
 	b.ReportAllocs()
 	for b.Loop() {
@@ -113,13 +111,6 @@ func BenchmarkSortSetsByRetail(b *testing.B) {
 // benched uuid; the repeating prices force the tie-breaks to run.
 func BenchmarkSortSetsByBuylist(b *testing.B) {
 	uuids := benchSortUUIDs(b, 5000)
-
-	prevSellers := sellersPtr.Load()
-	prevVendors := vendorsPtr.Load()
-	b.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	var sellers []mtgban.Seller
 	for _, shorthand := range defaultSellerPriorityOpt {
 		inv := mtgban.InventoryRecord{}
@@ -132,7 +123,7 @@ func BenchmarkSortSetsByBuylist(b *testing.B) {
 			Name: "Bench " + shorthand, Shorthand: shorthand,
 		}))
 	}
-	sellersPtr.Store(&sellers)
+	withPrices(b, sellers, GetVendors())
 	var vendors []mtgban.Vendor
 	for _, shorthand := range defaultVendorPriorityOpt {
 		bl := mtgban.BuylistRecord{}
@@ -145,7 +136,7 @@ func BenchmarkSortSetsByBuylist(b *testing.B) {
 			Name: "Bench " + shorthand, Shorthand: shorthand,
 		}))
 	}
-	vendorsPtr.Store(&vendors)
+	withPrices(b, GetSellers(), vendors)
 
 	b.ReportAllocs()
 	for b.Loop() {

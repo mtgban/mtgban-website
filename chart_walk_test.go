@@ -55,12 +55,6 @@ func serveVendor(shorthand, cardID string, entry mtgban.BuylistEntry, ts time.Ti
 	})
 }
 
-// serve publishes the given scrapers as the site's current snapshots.
-func serve(sellers []mtgban.Seller, vendors []mtgban.Vendor) {
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
-}
-
 // A dataset claims a scraper by shorthand, on whichever side it named it. The
 // same shorthand can be a seller and a vendor at once (CSI and SCG are both),
 // and the retail and buylist lists decide which price each dataset gets.
@@ -73,7 +67,7 @@ func TestWalkSnapshotPricesMatchesEachSideByShorthand(t *testing.T) {
 	})
 
 	now := time.Now()
-	serve(
+	withPrices(t,
 		[]mtgban.Seller{serveSeller("ZZCSI", ids[0], mtgban.InventoryEntry{Price: 10, Conditions: "NM"}, now)},
 		[]mtgban.Vendor{serveVendor("ZZCSI", ids[0], mtgban.BuylistEntry{BuyPrice: 4, Conditions: "NM"}, now)},
 	)
@@ -100,7 +94,7 @@ func TestWalkSnapshotPricesIgnoresUnclaimedScrapers(t *testing.T) {
 	})
 
 	now := time.Now()
-	serve([]mtgban.Seller{
+	withPrices(t, []mtgban.Seller{
 		serveSeller("ZZWANTED", ids[0], mtgban.InventoryEntry{Price: 3, Conditions: "NM"}, now),
 		serveSeller("ZZOTHER", ids[0], mtgban.InventoryEntry{Price: 99, Conditions: "NM"}, now),
 	}, nil)
@@ -135,7 +129,7 @@ func TestWalkSnapshotPricesScalesByCondition(t *testing.T) {
 				{Retail: []string{"ZZG"}, PublicName: "Graded", Provider: timeseries.ProviderTCGLow},
 			})
 			now := time.Now()
-			serve([]mtgban.Seller{serveSeller("ZZG", ids[0],
+			withPrices(t, []mtgban.Seller{serveSeller("ZZG", ids[0],
 				mtgban.InventoryEntry{Price: tc.price, Conditions: tc.conditions}, now)}, nil)
 
 			got := collectSnapshotVisits(now)["Graded"]
@@ -158,7 +152,7 @@ func TestWalkSnapshotPricesPrefersTheScrapersOwnRetailPrice(t *testing.T) {
 	})
 
 	now := time.Now()
-	serve([]mtgban.Seller{serveSeller("ZZR", ids[0], mtgban.InventoryEntry{
+	withPrices(t, []mtgban.Seller{serveSeller("ZZR", ids[0], mtgban.InventoryEntry{
 		Price:        10, // would scale to 12.50 as SP
 		Conditions:   "SP",
 		CustomFields: map[string]string{"RetailPrice": "11.25"},
@@ -179,7 +173,7 @@ func TestWalkSnapshotPricesKeepsAnNMPriceOverTheOverride(t *testing.T) {
 	})
 
 	now := time.Now()
-	serve([]mtgban.Seller{serveSeller("ZZR", ids[0], mtgban.InventoryEntry{
+	withPrices(t, []mtgban.Seller{serveSeller("ZZR", ids[0], mtgban.InventoryEntry{
 		Price:        10,
 		Conditions:   "NM",
 		CustomFields: map[string]string{"RetailPrice": "99"},
@@ -200,7 +194,7 @@ func TestWalkSnapshotPricesSkipsZeroPrices(t *testing.T) {
 	})
 
 	now := time.Now()
-	serve(
+	withPrices(t,
 		[]mtgban.Seller{serveSeller("ZZS", ids[0], mtgban.InventoryEntry{Price: 0, Conditions: "NM"}, now)},
 		[]mtgban.Vendor{serveVendor("ZZV", ids[0], mtgban.BuylistEntry{BuyPrice: 0, Conditions: "NM"}, now)},
 	)
@@ -225,7 +219,7 @@ func TestWalkSnapshotPricesSkipsSessionStores(t *testing.T) {
 	// A normally-served seller on a second dataset is the control: it proves
 	// the walk ran and found what it should, so an empty session result is the
 	// skip working rather than the setup failing.
-	serve([]mtgban.Seller{serveSeller("ZZREAL", ids[0],
+	withPrices(t, []mtgban.Seller{serveSeller("ZZREAL", ids[0],
 		mtgban.InventoryEntry{Price: 7, Conditions: "NM"}, now)}, nil)
 
 	// Publishing goes through the real hooks, so the session store joins the
@@ -255,7 +249,7 @@ func TestWalkSnapshotPricesTakesTheDateFromTheScrape(t *testing.T) {
 
 	now := time.Now()
 	stale := now.AddDate(0, 0, -3)
-	serve([]mtgban.Seller{serveSeller("ZZOLD", ids[0],
+	withPrices(t, []mtgban.Seller{serveSeller("ZZOLD", ids[0],
 		mtgban.InventoryEntry{Price: 5, Conditions: "NM"}, stale)}, nil)
 
 	want := stale.Format("2006-01-02")

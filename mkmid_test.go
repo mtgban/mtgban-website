@@ -31,23 +31,18 @@ func TestUploadResolvesCardmarketIDFromThePublishedSnapshot(t *testing.T) {
 	b := fixtureBackend("FIXTUREMKM", "Fixture Cardmarket", "2020-01-01", [][2]string{
 		{"Fixture Cardmarket Card", "1"},
 	})
-
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	sellers := []mtgban.Seller{mkmShelf("MKMTrend", map[string]string{"FIXTUREMKM-1": "265854"})}
-	sellersPtr.Store(&sellers)
+	withPrices(t, sellers, GetVendors())
 
 	// A mark a rebuild would not carry, so "was it rebuilt" is answerable
 	// without timing anything.
 	currentPrices().mkmIDs["sentinel"] = "kept"
 
-	// A buylist-only publish: the sellers, and the map, are carried across.
+	// A buylist-only publish, the way a buylist load does it: the sellers,
+	// and the map, are carried across. The withPrices above restores it.
 	vendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "CK", Shorthand: "CK"})
 	vendors := []mtgban.Vendor{vendor}
-	vendorsPtr.Store(&vendors)
+	pricesPtr.Store(withVendors(currentPrices(), vendors))
 	if got := currentPrices().mkmIDs["sentinel"]; got != "kept" {
 		t.Errorf("a buylist publish rebuilt the map: sentinel = %q", got)
 	}

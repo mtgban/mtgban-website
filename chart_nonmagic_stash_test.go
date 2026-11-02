@@ -221,7 +221,7 @@ func TestCollectNonMagicSnapshotFromServedScrapers(t *testing.T) {
 	})
 
 	now := time.Now()
-	serve(
+	withPrices(t,
 		[]mtgban.Seller{
 			serveSellerN("ZZMKM", map[string]float64{known: 2, unknown: 5}, now),
 			serveSellerN("ZZTCG", map[string]float64{known: 9}, now),

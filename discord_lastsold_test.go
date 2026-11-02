@@ -86,16 +86,10 @@ type lastSoldFetch = func(context.Context, *matcher.Backend, string, bool) ([]tc
 // handler ignores every message.
 func lastSoldSite(t *testing.T, fetch lastSoldFetch) *site {
 	t.Helper()
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	info := mtgban.ScraperInfo{Name: "Test Store", Shorthand: "TEST"}
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info)}
 	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, info)}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 
 	b := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01",
 		[][2]string{{"Fixture Card Alpha", "1"}})

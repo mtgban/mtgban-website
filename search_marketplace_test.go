@@ -32,8 +32,6 @@ func TestSearchLinksOnlyTheMarketplacesItCarries(t *testing.T) {
 
 	search := func(t *testing.T, families ...string) string {
 		t.Helper()
-		prev := sellersPtr.Load()
-		t.Cleanup(func() { sellersPtr.Store(prev) })
 
 		// One stocked seller so the search has a result to render, plus a
 		// reference seller per marketplace under test.
@@ -43,7 +41,7 @@ func TestSearchLinksOnlyTheMarketplacesItCarries(t *testing.T) {
 			sellers = append(sellers, mtgban.NewSellerFromInventory(mtgban.InventoryRecord{},
 				mtgban.ScraperInfo{Name: family, Shorthand: family, Family: family, MetadataOnly: true}))
 		}
-		sellersPtr.Store(&sellers)
+		withPrices(t, sellers, GetVendors())
 
 		rec := httptest.NewRecorder()
 		testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(uuid), nil))

@@ -109,18 +109,12 @@ func TestOEmbedQuotesWhatAnyReaderSees(t *testing.T) {
 	for _, id := range ids {
 		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1})
 	}
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "SHOWNIDX", Name: "Shown Index", MetadataOnly: true}),
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "HIDDENIDX", Name: "Hidden Index", MetadataOnly: true}),
 	}
 	vendors := []mtgban.Vendor{}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 
 	withConfigCopy(t)
 	Config().Stores.SearchRetailBlockList = []string{"HIDDENIDX"}
@@ -200,17 +194,11 @@ func TestOEmbedLeavesOutTheCustomBuylist(t *testing.T) {
 	for _, id := range ids {
 		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 1})
 	}
-	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "HIDDENSTORE", Name: "Hidden Store"}),
 	}
 	vendors := []mtgban.Vendor{}
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	withPrices(t, sellers, vendors)
 
 	withConfigCopy(t)
 	Config().Stores.SearchRetailBlockList = []string{"HIDDENSTORE"}
