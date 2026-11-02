@@ -343,15 +343,15 @@ func TestDiscordHandlersRecover(t *testing.T) {
 	t.Run("messageCreate", func(t *testing.T) {
 		posts := serverWebhook(t)
 
-		// The handler ignores messages until scrapers are loaded: one nil
+		// The handler ignores messages until scrapers are loaded: a stub store
 		// each gets past that check, then a message with no author panics.
 		prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 		t.Cleanup(func() {
 			sellersPtr.Store(prevSellers)
 			vendorsPtr.Store(prevVendors)
 		})
-		sellers := []mtgban.Seller{nil}
-		vendors := []mtgban.Vendor{nil}
+		sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
+		vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
 		sellersPtr.Store(&sellers)
 		vendorsPtr.Store(&vendors)
 
@@ -399,16 +399,11 @@ func TestAdminSnapshotRecovers(t *testing.T) {
 	posts := serverWebhook(t)
 	setTestJobs(t)
 
-	prevDB, prevSellers := PricesArchiveDB, sellersPtr.Load()
-	t.Cleanup(func() {
-		PricesArchiveDB = prevDB
-		sellersPtr.Store(prevSellers)
-	})
-	// Any archive gets the stash past its first check, and a nil seller
-	// panics it on the first read.
+	prevDB := PricesArchiveDB
+	t.Cleanup(func() { PricesArchiveDB = prevDB })
+	// A zero archive gets the stash past its nil check, and panics it on
+	// the first query, warming the variant cache.
 	PricesArchiveDB = &timeseries.Client{}
-	sellers := []mtgban.Seller{nil}
-	sellersPtr.Store(&sellers)
 
 	testSite.Admin(httptest.NewRecorder(), adminRequest(http.MethodPost, url.Values{"tool": {"snapshot"}}))
 

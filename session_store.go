@@ -46,17 +46,18 @@ func dropSessionScraper(kind, shorthand string) {
 	scrapersWriteMu.Lock()
 	defer scrapersWriteMu.Unlock()
 
+	p := currentPrices()
 	if kind == sessionstore.Retail {
-		next := slices.DeleteFunc(slices.Clone(GetSellers()), func(seller mtgban.Seller) bool {
+		next := slices.DeleteFunc(slices.Clone(p.sellers), func(seller mtgban.Seller) bool {
 			return seller.Info().Shorthand == shorthand
 		})
-		sellersPtr.Store(&next)
+		pricesPtr.Store(newPrices(next, p.vendors, p.scrapers))
 		return
 	}
-	next := slices.DeleteFunc(slices.Clone(GetVendors()), func(vendor mtgban.Vendor) bool {
+	next := slices.DeleteFunc(slices.Clone(p.vendors), func(vendor mtgban.Vendor) bool {
 		return vendor.Info().Shorthand == shorthand
 	})
-	vendorsPtr.Store(&next)
+	pricesPtr.Store(newPrices(p.sellers, next, p.scrapers))
 }
 
 // isConfiguredScraper reports whether the dumps bucket's last listing named

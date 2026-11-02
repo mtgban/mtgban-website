@@ -170,12 +170,13 @@ func dropStaleStores(now time.Time) {
 func takeStaleStores(now time.Time) []droppedStore {
 	sessions := lockAskedSnapshots()
 	defer scrapersWriteMu.Unlock()
+	p := currentPrices()
 
 	// A real store counts as left on its side only with a date within
 	// DropAfter: an undated one has no age to be fresh by.
 	var oldSellers []mtgban.Seller
 	realSeller := false
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		info := seller.Info()
 		session := sessions[info.Shorthand+"/"+sessionstore.Retail]
 		if pastDrop(info.InventoryTimestamp, now) && !session {
@@ -194,7 +195,7 @@ func takeStaleStores(now time.Time) []droppedStore {
 	}
 	var oldVendors []mtgban.Vendor
 	realVendor := false
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		info := vendor.Info()
 		session := sessions[info.Shorthand+"/"+sessionstore.Buylist]
 		if pastDrop(info.BuylistTimestamp, now) && !session {
@@ -221,10 +222,9 @@ func takeStaleStores(now time.Time) []droppedStore {
 	if len(dropped) == 0 {
 		return nil
 	}
-	sellers := withoutStores(GetSellers(), oldSellers)
-	vendors := withoutStores(GetVendors(), oldVendors)
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	sellers := withoutStores(p.sellers, oldSellers)
+	vendors := withoutStores(p.vendors, oldVendors)
+	pricesPtr.Store(newPrices(sellers, vendors, p.scrapers))
 
 	record := map[string]droppedStore{}
 	prev := droppedStoresPtr.Load()
@@ -239,30 +239,26 @@ func takeStaleStores(now time.Time) []droppedStore {
 	return dropped
 }
 
-// lockAskedSnapshots takes scrapersWriteMu over snapshots whose every store
+// lockAskedSnapshots takes scrapersWriteMu over a snapshot whose every store
 // Sessions was asked about, and returns whether each one, keyed like the
 // alarm's rows, was published from an upload. Sessions takes its lock before
 // scrapersWriteMu (see dropSessionScraper), so it is asked first, and asked
-// again when a load swaps a snapshot in meanwhile.
+// again when a publish swaps the snapshot meanwhile.
 func lockAskedSnapshots() map[string]bool {
 	for {
-		sellers, vendors := sellersPtr.Load(), vendorsPtr.Load()
+		p := currentPrices()
 		sessions := map[string]bool{}
-		if sellers != nil {
-			for _, seller := range *sellers {
-				info := seller.Info()
-				sessions[info.Shorthand+"/"+sessionstore.Retail] = Sessions.Is(sessionstore.Retail, info.Shorthand)
-			}
+		for _, seller := range p.sellers {
+			info := seller.Info()
+			sessions[info.Shorthand+"/"+sessionstore.Retail] = Sessions.Is(sessionstore.Retail, info.Shorthand)
 		}
-		if vendors != nil {
-			for _, vendor := range *vendors {
-				info := vendor.Info()
-				sessions[info.Shorthand+"/"+sessionstore.Buylist] = Sessions.Is(sessionstore.Buylist, info.Shorthand)
-			}
+		for _, vendor := range p.vendors {
+			info := vendor.Info()
+			sessions[info.Shorthand+"/"+sessionstore.Buylist] = Sessions.Is(sessionstore.Buylist, info.Shorthand)
 		}
 
 		scrapersWriteMu.Lock()
-		if sellersPtr.Load() == sellers && vendorsPtr.Load() == vendors {
+		if currentPrices() == p {
 			return sessions
 		}
 		scrapersWriteMu.Unlock()

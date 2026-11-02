@@ -117,14 +117,14 @@ func TestOptionalFieldsCoverAPIFields(t *testing.T) {
 
 func TestEnforceAPISigningDoesNotNeedServerURL(t *testing.T) {
 	// enforceAPISigning only checks these are non-empty, and the stub next
-	// handler never reads them, so one nil element each is enough.
+	// handler never reads them, so a stub store each is enough.
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	t.Cleanup(func() {
 		sellersPtr.Store(prevSellers)
 		vendorsPtr.Store(prevVendors)
 	})
-	sellers := []mtgban.Seller{nil}
-	vendors := []mtgban.Vendor{nil}
+	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
+	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
 	sellersPtr.Store(&sellers)
 	vendorsPtr.Store(&vendors)
 
@@ -152,14 +152,14 @@ func TestEnforceAPISigningDoesNotNeedServerURL(t *testing.T) {
 // Expires is unparseable even though the signature over it is good.
 func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
 	// enforceAPISigning only checks these are non-empty, and the stub next
-	// handler never reads them, so one nil element each is enough.
+	// handler never reads them, so a stub store each is enough.
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	t.Cleanup(func() {
 		sellersPtr.Store(prevSellers)
 		vendorsPtr.Store(prevVendors)
 	})
-	sellers := []mtgban.Seller{nil}
-	vendors := []mtgban.Vendor{nil}
+	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
+	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
 	sellersPtr.Store(&sellers)
 	vendorsPtr.Store(&vendors)
 
@@ -245,8 +245,8 @@ func TestEnforceAPISigningRefusesWithAStatus(t *testing.T) {
 	sellersPtr.Store(&noSellers)
 	check("not ready", serve("/api/load/cardkingdom?sig=x"), http.StatusServiceUnavailable)
 
-	sellers := []mtgban.Seller{nil}
-	vendors := []mtgban.Vendor{nil}
+	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
+	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
 	sellersPtr.Store(&sellers)
 	vendorsPtr.Store(&vendors)
 	check("undecodable", serve("/api/load/cardkingdom?sig=not-base64!"), http.StatusUnauthorized)
