@@ -430,6 +430,7 @@ type directStockSeller struct {
 	mtgban.Seller
 	once      sync.Once
 	inventory mtgban.InventoryRecord
+	snap      *tcgListingsSnapshot
 }
 
 // directStockBuild is the stocked inventory last built, with the seller and
@@ -448,22 +449,23 @@ var directStockBuilt atomic.Pointer[directStockBuild]
 // it is current.
 func (s *directStockSeller) Inventory() mtgban.InventoryRecord {
 	s.once.Do(func() {
-		s.inventory = directStockFor(s.Seller)
+		s.inventory, s.snap = directStockFor(s.Seller)
 	})
 	return s.inventory
 }
 
-// directStockFor is seller's stocked inventory, the shared build when it
-// is of this seller and the current listings, else a new one stored there.
-func directStockFor(seller mtgban.Seller) mtgban.InventoryRecord {
+// directStockFor is seller's stocked inventory and the listings it came
+// from, the shared build when it is of this seller and the current
+// listings, else a new one stored there.
+func directStockFor(seller mtgban.Seller) (mtgban.InventoryRecord, *tcgListingsSnapshot) {
 	snap := tcgDirectSnapshot(time.Now())
 	built := directStockBuilt.Load()
 	if built != nil && built.seller == seller && built.snap == snap {
-		return built.inventory
+		return built.inventory, snap
 	}
 	inventory := stockedInventory(seller.Inventory(), snap)
 	directStockBuilt.Store(&directStockBuild{seller: seller, snap: snap, inventory: inventory})
-	return inventory
+	return inventory, snap
 }
 
 // stockedInventory copies the entries snap has Direct stock of, with it as

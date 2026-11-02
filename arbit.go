@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"slices"
@@ -80,6 +81,10 @@ type FilterOpt struct {
 	// Shown only on the reverse page, whose two sides are a seller to buy
 	// from and a buylist to sell into
 	ReverseOnly bool
+
+	// The shorthand of the store Func takes prices from, so the rows it
+	// filters hold only while that store stays the same
+	PriceSource string
 }
 
 // Shown reports whether an arbitrage page offers the option, given which
@@ -147,8 +152,9 @@ var FilterOptConfig = map[string]FilterOpt{
 				return 1, false
 			}
 		},
-		NoSealed:   true,
-		GlobalOnly: true,
+		NoSealed:    true,
+		GlobalOnly:  true,
+		PriceSource: "SYP",
 	},
 	"stocks": {
 		Title: "only Stocks",
@@ -166,8 +172,9 @@ var FilterOptConfig = map[string]FilterOpt{
 				return 1, false
 			}
 		},
-		NoSealed:   true,
-		GlobalOnly: true,
+		NoSealed:    true,
+		GlobalOnly:  true,
+		PriceSource: "STKS",
 	},
 	"legit": {
 		Title: "only Legit",
@@ -184,8 +191,9 @@ var FilterOptConfig = map[string]FilterOpt{
 				return 1, false
 			}
 		},
-		GlobalOnly: true,
-		NoSealed:   true,
+		GlobalOnly:  true,
+		NoSealed:    true,
+		PriceSource: "TCGMarket",
 	},
 	"stable": {
 		Title: "only Stable",
@@ -201,8 +209,9 @@ var FilterOptConfig = map[string]FilterOpt{
 				return 1, false
 			}
 		},
-		GlobalOnly: true,
-		SealedOnly: true,
+		GlobalOnly:  true,
+		SealedOnly:  true,
+		PriceSource: "TCGLowSim",
 	},
 	"tradable": {
 		Title:       "only Tradable",
@@ -773,6 +782,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, pageVars P
 		engineState = state.unbounded()
 	}
 	opts, rows := engineState.apply(b, mode)
+	view := newArbitView(engineState, mode)
 	readerRows := arbitRowFilter{limits: state.limits(mode), global: mode.Global}
 	applied := state.applied(mode)
 
@@ -859,24 +869,17 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, pageVars P
 			}
 		}
 
-		var arbit []mtgban.ArbitEntry
-		if pageVars.GlobalMode && source.Info().SealedMode {
-			arbit = mtgban.Mismatch(b, opts, source.(mtgban.Seller), scraper.(mtgban.Seller))
-		} else if pageVars.GlobalMode {
-			arbit = mtgban.Mismatch(b, opts, scraper.(mtgban.Seller), source.(mtgban.Seller))
-		} else if pageVars.ReverseMode {
-			arbit = mtgban.Arbit(b, opts, source.(mtgban.Vendor), scraper.(mtgban.Seller))
-		} else {
-			arbit = mtgban.Arbit(b, opts, scraper.(mtgban.Vendor), source.(mtgban.Seller))
-		}
 		// The side whose copies a row buys: the probe on Global
 		seller := source
 		if pageVars.ReverseMode || (pageVars.GlobalMode && source.Info().SealedMode) {
 			seller = scraper
 		}
-		arbit = slices.DeleteFunc(arbit, func(res mtgban.ArbitEntry) bool {
-			return !rows.keep(res, seller.Info().NoQuantityInventory)
-		})
+		var arbit []mtgban.ArbitEntry
+		for _, res := range p.arbitRows(b, view, opts, source, scraper) {
+			if rows.keep(res, seller.Info().NoQuantityInventory) {
+				arbit = append(arbit, res)
+			}
+		}
 		if !pageVars.GlobalMode && seller.Info().Shorthand == tcgDirectStore {
 			arbit = rankDirectAsOneCopy(arbit, rows.limits.MinProf)
 		}
@@ -884,7 +887,13 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, pageVars P
 			continue
 		}
 
-		// For Global, drop results before sorting, to add some extra variance
+		// For Global, drop results before sorting, to add some extra
+		// variance; the held rows come in one order, so shuffle the copy
+		if pageVars.GlobalMode {
+			rand.Shuffle(len(arbit), func(i, j int) {
+				arbit[i], arbit[j] = arbit[j], arbit[i]
+			})
+		}
 		if pageVars.GlobalMode && limitedResults {
 			arbit = previewSample(arbit, readerRows, seller.Info().NoQuantityInventory)
 			if len(arbit) == 0 {
