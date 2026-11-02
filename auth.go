@@ -453,6 +453,21 @@ func withSignatureCookie(r *http.Request, sig string) *http.Request {
 	return out
 }
 
+// openPage is the registry key of the section the ACL's "Any" tier opens to
+// every reader whose page answers at path, or "" where the page needs a
+// signature or no page answers there.
+func openPage(path string) string {
+	anyTier := ACL()["Any"]
+	for key, nav := range ExtraNavs {
+		_, open := anyTier[key]
+		_, found := nav.pageAt(path)
+		if open && found {
+			return key
+		}
+	}
+	return ""
+}
+
 // noSigning runs the handler it wraps without checking a signature; it only
 // keeps the one an invite link carries in ?sig= as the cookie, once that
 // checks out.
@@ -656,23 +671,11 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 		// parses a multipart body whole, on every path through here.
 		r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBodySize)
 
-		// Check if this endpoint can be bypassed
-		_, checkNoAuth := ACL()["Any"]
-		if checkNoAuth {
-			for key, nav := range ExtraNavs {
-				if nav.Link == r.URL.Path || slices.ContainsFunc(nav.SubPages, func(p NavElem) bool {
-					// The whole path, without the query params a Link may carry
-					path, _, _ := strings.Cut(p.Link, "?")
-					return path == r.URL.Path
-				}) {
-					_, noAuth := ACL()["Any"][key]
-					if noAuth {
-						recordPageHit(r)
-						noSigning(next).ServeHTTP(w, r)
-						return
-					}
-				}
-			}
+		// A page the ACL opens to everyone needs no signature
+		if openPage(r.URL.Path) != "" {
+			recordPageHit(r)
+			noSigning(next).ServeHTTP(w, r)
+			return
 		}
 
 		sig := unverifiedSignature(r)

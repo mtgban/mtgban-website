@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,8 +17,64 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/embed"
 )
+
+// withACL runs one test against the given access table, restoring the
+// deployment's own after.
+func withACL(t *testing.T, acl string) {
+	t.Helper()
+	savedAccess := Access
+	t.Cleanup(func() { Access = savedAccess })
+	files := map[string]string{"acl": acl, "grants": `[]`}
+	Access = access.New(access.Hooks{
+		Open: func(_ context.Context, path string) (io.ReadCloser, error) {
+			return io.NopCloser(strings.NewReader(files[path])), nil
+		},
+	})
+	err := Access.Load(context.Background(), access.Sources{TablePath: "acl", GrantsPath: "grants"})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// openSearch opens the Search pages to every reader, as the live table does.
+func openSearch(t *testing.T) {
+	t.Helper()
+	withACL(t, `{"Any": {"Search": {}}}`)
+}
+
+// An unfurl is shown to readers with no signature, so the endpoint previews
+// only the pages Search draws for them: not another section's page, not one
+// this site hides, and none at all once the ACL keeps Search behind a login.
+func TestOEmbedPreviewsOnlyPagesOpenToEveryone(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+
+	oembed := func(page string) string {
+		return "/search/oembed?format=json&url=" + url.QueryEscape("https://mtgban.com"+page)
+	}
+	probe := func(name, acl, page string, status int) {
+		t.Helper()
+		withACL(t, acl)
+		w := httptest.NewRecorder()
+		testSite.SearchOEmbed(w, httptest.NewRequest(http.MethodGet, oembed(page), nil))
+		if w.Code != status {
+			t.Errorf("%s: answered %d, want %d", name, w.Code, status)
+		}
+	}
+
+	open := `{"Any": {"Search": {}}, "Legacy": {"Search": {}, "Upload": {}}}`
+	probe("the search page", open, "/search?q=Counterspell", http.StatusOK)
+	probe("the sets page", open, "/sets?q=Counterspell", http.StatusOK)
+	probe("a page of another section", open, "/upload?q=Counterspell", http.StatusNotFound)
+	probe("a sub-page this site hides", open, "/search/shared?q=Counterspell", http.StatusNotFound)
+	probe("a path no page answers", open, "/searching?q=Counterspell", http.StatusNotFound)
+
+	gated := `{"Legacy": {"Search": {}, "Upload": {}}}`
+	probe("the search page behind a login", gated, "/search?q=Counterspell", http.StatusNotFound)
+}
 
 // The endpoint is declared as application/json+oembed, so every answer it
 // gives has to be one, errors included: a consumer asking for json cannot
@@ -25,6 +82,7 @@ import (
 func TestOEmbedAlwaysAnswersInJSON(t *testing.T) {
 	skipWithoutDatastore(t)
 	withSigMode(t, true, false)
+	openSearch(t)
 
 	for _, probe := range []struct {
 		name   string
@@ -63,6 +121,7 @@ func TestOEmbedAlwaysAnswersInJSON(t *testing.T) {
 func TestOEmbedPreviewsThePageItNames(t *testing.T) {
 	skipWithoutDatastore(t)
 	withSigMode(t, true, false)
+	openSearch(t)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -103,6 +162,7 @@ func TestOEmbedPreviewsThePageItNames(t *testing.T) {
 func TestOEmbedQuotesWhatAnyReaderSees(t *testing.T) {
 	skipWithoutDatastore(t)
 	signingEnabled(t, false)
+	openSearch(t)
 
 	ids, _ := backend().SearchEquals("Counterspell")
 	inventory := mtgban.InventoryRecord{}
@@ -178,6 +238,7 @@ func TestOEmbedQuotesWhatAnyReaderSees(t *testing.T) {
 func TestOEmbedLeavesOutTheCustomBuylist(t *testing.T) {
 	skipWithoutDatastore(t)
 	signingEnabled(t, true)
+	openSearch(t)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
