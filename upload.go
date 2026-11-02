@@ -2576,8 +2576,8 @@ func restoreOpenedProducts(entries []UploadEntry) []UploadEntry {
 // carried nothing at all, which is exactly what the handler saw.
 //
 // The arrays are still read when this is absent: a hash transfer from search
-// or the newspaper posts those, and they are short enough never to have been
-// near the ceiling.
+// or the newspaper posts those. Search cuts its list to MaxUploadTransfer to
+// stay under the ceiling; the newspaper's lists never come near it.
 //
 // The rows stop at maxPackedRows, and cut says when they did: only the
 // body cap bounded them, about 250k lines, and the hash path has no row
