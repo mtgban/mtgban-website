@@ -24,8 +24,10 @@ type offerPresence struct {
 // side has no entry.
 type offerPresences map[string]*offerPresence
 
-// add records an offer for cardID that shorthand lists under cond.
-func (p offerPresences) add(cardID string, cond mtgban.Condition, shorthand string) {
+// add records an offer for cardID that store lists under cond. store is the
+// store's shorthand in lower case, as the any filter reads it; the walks
+// lower-case it once per store, not once per entry.
+func (p offerPresences) add(cardID string, cond mtgban.Condition, store string) {
 	pr := p[cardID]
 	if pr == nil {
 		pr = &offerPresence{}
@@ -39,7 +41,7 @@ func (p offerPresences) add(cardID string, cond mtgban.Condition, shorthand stri
 		if pr.stores == nil {
 			pr.stores = map[string]struct{}{}
 		}
-		pr.stores[strings.ToLower(shorthand)] = struct{}{}
+		pr.stores[store] = struct{}{}
 	}
 }
 
@@ -71,7 +73,7 @@ func searchOfferPresence(b *matcher.Backend, r *http.Request, cardIDs []string, 
 		vendorPresence(cardIDs, config, vendors)
 		if config.CustomBuylist {
 			for _, offer := range customBuylistOffers(b, r, cardIDs) {
-				vendors.add(offer.cardID, offer.condition, "CUSTOM")
+				vendors.add(offer.cardID, offer.condition, "custom")
 			}
 		}
 	})
@@ -90,11 +92,12 @@ func sellerPresence(cardIDs []string, config SearchConfig, presence offerPresenc
 
 		inventory := seller.Inventory()
 		info := seller.Info()
+		store := strings.ToLower(info.Shorthand)
 
 		for _, cardID := range cardIDs {
 			for _, entry := range inventory[cardID] {
 				if sellerEntryFound(info, cardID, entry, config) {
-					presence.add(cardID, sellerOfferCondition(info, entry), info.Shorthand)
+					presence.add(cardID, sellerOfferCondition(info, entry), store)
 				}
 			}
 		}
@@ -111,11 +114,12 @@ func vendorPresence(cardIDs []string, config SearchConfig, presence offerPresenc
 
 		buylist := vendor.Buylist()
 		info := vendor.Info()
+		store := strings.ToLower(info.Shorthand)
 
 		for _, cardID := range cardIDs {
 			for _, entry := range buylist[cardID] {
 				if vendorEntryFound(info, cardID, entry, config) {
-					presence.add(cardID, vendorOfferCondition(info, entry), info.Shorthand)
+					presence.add(cardID, vendorOfferCondition(info, entry), store)
 				}
 			}
 		}

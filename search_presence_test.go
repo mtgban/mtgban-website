@@ -19,7 +19,7 @@ func presenceOfOffers(found map[string]map[mtgban.Condition][]SearchEntry) offer
 	for cardID, conds := range found {
 		for cond, entries := range conds {
 			for _, entry := range entries {
-				p.add(cardID, cond, entry.Shorthand)
+				p.add(cardID, cond, strings.ToLower(entry.Shorthand))
 			}
 		}
 	}
@@ -46,11 +46,11 @@ func samePresence(a, b offerPresences) bool {
 // condition keeps it, an index price beside it or not.
 func TestPostFilterEmptyReadsPresence(t *testing.T) {
 	p := offerPresences{}
-	p.add("index-only", "INDEX", "TCGLow")
-	p.add("nm-only", "NM", "CK")
-	p.add("both", "INDEX", "TCGLow")
-	p.add("both", "NM", "CK")
-	p.add("odd", "Sealed", "CK")
+	p.add("index-only", "INDEX", "tcglow")
+	p.add("nm-only", "NM", "ck")
+	p.add("both", "INDEX", "tcglow")
+	p.add("both", "NM", "ck")
+	p.add("odd", "Sealed", "ck")
 
 	for card, want := range map[string]bool{
 		"missing": true, "index-only": true, "nm-only": false, "both": false, "odd": false,
@@ -66,9 +66,9 @@ func TestPostFilterEmptyReadsPresence(t *testing.T) {
 // the page does not list is not read.
 func TestPostFilterAnyReadsPresence(t *testing.T) {
 	p := offerPresences{}
-	p.add("a", "INDEX", "TCGLow")
-	p.add("a", "SP", "CK")
-	p.add("b", "Sealed", "CK")
+	p.add("a", "INDEX", "tcglow")
+	p.add("a", "SP", "ck")
+	p.add("b", "Sealed", "ck")
 
 	for _, tc := range []struct {
 		card   string
@@ -93,10 +93,10 @@ func TestPostFilterAnyReadsPresence(t *testing.T) {
 // card only when both sides agree.
 func TestPostSearchFilterSides(t *testing.T) {
 	sellers, vendors := offerPresences{}, offerPresences{}
-	sellers.add("retail-only", "NM", "CK")
-	vendors.add("buylist-only", "NM", "CK")
-	sellers.add("both", "NM", "CK")
-	vendors.add("both", "NM", "SCG")
+	sellers.add("retail-only", "NM", "ck")
+	vendors.add("buylist-only", "NM", "ck")
+	sellers.add("both", "NM", "ck")
+	vendors.add("both", "NM", "scg")
 	keys := []string{"retail-only", "buylist-only", "both", "neither"}
 
 	for _, tc := range []struct {
