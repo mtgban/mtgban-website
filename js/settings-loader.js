@@ -57,7 +57,13 @@
         scripts.forEach(preload);
         // Sheets first: settings.js unhides the modal's shell as it runs
         loading = Promise.all([stylesheet('/css/settings-modal.css'), stylesheet('/css/editions-picker.css')])
-            .then(function () { return Promise.all(scripts.map(script)); })
+            .then(function () {
+                var runs = scripts.map(script);
+                // settings.js runs without the others, and once it ran a
+                // retry would run it twice, so only its own failure is one
+                runs.slice(0, -1).forEach(function (run) { run.catch(failed); });
+                return runs[runs.length - 1];
+            })
             .then(function () { document.removeEventListener('keydown', onKeydown); })
             .catch(function (err) {
                 loading = null;

@@ -96,14 +96,31 @@ test('a sheet the page already links is not linked again', () => {
     expect(p.of('link', 'stylesheet').map(l => l.href)).toEqual(['/css/editions-picker.css?hash=abc123']);
 });
 
-test('a script that fails to load is reported and tried again on the next open', async () => {
+test('a helper script that fails is reported, and settings.js opens without it', async () => {
     const p = page();
     p.window.openSettings();
     p.of('link', 'stylesheet').forEach(l => l.onload());
     await p.settle();
-    p.of('script')[0].onerror();
+    const scripts = p.of('script');
+    scripts[0].onerror();
+    scripts.slice(1).forEach(s => s.onload());
     await p.settle();
     expect(p.errors).toEqual(['settings: /js/editions-picker.js did not load']);
+    // settings.js ran and took the shortcut: running it again would double it
+    expect(p.listeners.keydown).toHaveLength(0);
+    p.window.openSettings();
+    await p.settle();
+    expect(p.of('script')).toHaveLength(3);
+});
+
+test('settings.js failing is reported and tried again on the next open', async () => {
+    const p = page();
+    p.window.openSettings();
+    p.of('link', 'stylesheet').forEach(l => l.onload());
+    await p.settle();
+    p.of('script')[2].onerror();
+    await p.settle();
+    expect(p.errors).toEqual(['settings: /js/settings.js did not load']);
     expect(p.listeners.keydown).toHaveLength(1);
     // The sheets are in and stay; only the scripts are fetched again
     p.window.openSettings();
