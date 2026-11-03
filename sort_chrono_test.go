@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http/httptest"
-	"os"
 	"slices"
 	"strconv"
 	"testing"
@@ -16,26 +15,16 @@ import (
 // Magic runs whenever the suite loads it; the other games when the
 // variable naming their datastore is set.
 func TestChronoSortIsOneOrderInEverySet(t *testing.T) {
+	t.Parallel()
 	t.Run("magic", func(t *testing.T) {
+		t.Parallel()
 		skipWithoutDatastore(t)
 		checkSetOrders(t, backend())
 	})
-	for game, envVar := range gameDatastores {
+	for game := range gameDatastores {
 		t.Run(string(game), func(t *testing.T) {
-			path := os.Getenv(envVar)
-			if path == "" {
-				t.Skip(envVar + " is not set")
-			}
-			f, err := os.Open(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer f.Close()
-			loaded, err := matcher.Open(game, f)
-			if err != nil {
-				t.Fatal(err)
-			}
-			checkSetOrders(t, loaded)
+			t.Parallel()
+			checkSetOrders(t, gameDatastore(t, game).backend)
 		})
 	}
 }
@@ -111,42 +100,49 @@ func checkSetOrders(t *testing.T, b *matcher.Backend) {
 	number := func(a, b *SortingData) bool { return cmpNumberAndFinish(a, b, false) }
 	ds := &datastore{backend: b}
 	for _, code := range b.GetAllSets() {
-		keys := b.GetUUIDsInSet(code)
-		for _, reversed := range []bool{false, true} {
-			sortData := resolveSortingData(b, keys)
-			if reversed {
-				negateFinishes(sortData)
-			}
-			r := httptest.NewRequest("GET", "/search?reverse="+strconv.FormatBool(reversed), nil)
-			for mode, less := range map[string]func(a, b *SortingData) bool{"chrono": chrono, "number": number} {
-				sorted := slices.Clone(keys)
-				sortSearchKeys(r, ds, currentPrices(), sorted, nil, mode)
-				var inverted int
-				var first [2]*SortingData
-				for i := range sorted {
-					for j := i + 1; j < len(sorted); j++ {
-						a, b := sortData[sorted[i]], sortData[sorted[j]]
-						// A reversed sort puts b first wherever less does
-						x, y := a, b
-						if reversed {
-							x, y = b, a
+		t.Run(code, func(t *testing.T) {
+			t.Parallel()
+			keys := b.GetUUIDsInSet(code)
+			for _, reversed := range []bool{false, true} {
+				sortData := resolveSortingData(b, keys)
+				if reversed {
+					negateFinishes(sortData)
+				}
+				r := httptest.NewRequest("GET", "/search?reverse="+strconv.FormatBool(reversed), nil)
+				for mode, less := range map[string]func(a, b *SortingData) bool{"chrono": chrono, "number": number} {
+					sorted := slices.Clone(keys)
+					sortSearchKeys(r, ds, currentPrices(), sorted, nil, mode)
+					// Every pair is compared, so read each printing's data once
+					data := make([]*SortingData, len(sorted))
+					for i, key := range sorted {
+						data[i] = sortData[key]
+					}
+					var inverted int
+					var first [2]*SortingData
+					for i, a := range data {
+						for _, b := range data[i+1:] {
+							// A reversed sort puts b first wherever less does
+							x, y := a, b
+							if reversed {
+								x, y = b, a
+							}
+							if less(x, y) && !less(y, x) {
+								continue
+							}
+							if inverted == 0 {
+								first = [2]*SortingData{a, b}
+							}
+							inverted++
 						}
-						if less(x, y) && !less(y, x) {
-							continue
-						}
-						if inverted == 0 {
-							first = [2]*SortingData{a, b}
-						}
-						inverted++
+					}
+					if inverted > 0 {
+						t.Errorf("%s %s reversed=%v: %d pairs out of order, first %s %s (%s) before %s %s (%s)",
+							code, mode, reversed, inverted,
+							first[0].co.Number, first[0].co.Language, first[0].co.Finish,
+							first[1].co.Number, first[1].co.Language, first[1].co.Finish)
 					}
 				}
-				if inverted > 0 {
-					t.Errorf("%s %s reversed=%v: %d pairs out of order, first %s %s (%s) before %s %s (%s)",
-						code, mode, reversed, inverted,
-						first[0].co.Number, first[0].co.Language, first[0].co.Finish,
-						first[1].co.Number, first[1].co.Language, first[1].co.Finish)
-				}
 			}
-		}
+		})
 	}
 }

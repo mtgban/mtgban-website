@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,6 +26,43 @@ var gameDatastores = map[matcher.Game]string{
 	"palworld":      "PALWORLD_PATH",
 }
 
+// gameLoads opens each game's datastore once a run, on first use. What they
+// build is read-only, so the tests below share it and run side by side, after
+// the package's sequential tests.
+var gameLoads = func() map[matcher.Game]func() (*datastore, error) {
+	loads := map[matcher.Game]func() (*datastore, error){}
+	for game, envVar := range gameDatastores {
+		loads[game] = sync.OnceValues(func() (*datastore, error) {
+			f, err := os.Open(os.Getenv(envVar))
+			if err != nil {
+				return nil, err
+			}
+			defer f.Close()
+			b, err := matcher.Open(game, f)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", game, err)
+			}
+			return testSite.newDatastore(b, time.Now()), nil
+		})
+	}
+	return loads
+}()
+
+// gameDatastore returns the game's shared datastore, skipping the test when
+// the variable naming it is unset.
+func gameDatastore(t *testing.T, game matcher.Game) *datastore {
+	t.Helper()
+	envVar := gameDatastores[game]
+	if os.Getenv(envVar) == "" {
+		t.Skip(envVar + " is not set")
+	}
+	ds, err := gameLoads[game]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ds
+}
+
 // Whenever the shorthand tightens a number, the tightened query has to reach
 // the printing it named - in every game the site is deployed for, not only
 // the one the suite loads.
@@ -41,27 +80,11 @@ var gameDatastores = map[matcher.Game]string{
 // the predicate, because a check written against the predicate passed while
 // the search was broken.
 func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
-	var ran int
-	for game, envVar := range gameDatastores {
-		path := os.Getenv(envVar)
-		if path == "" {
-			continue
-		}
-		f, err := os.Open(path)
-		if err != nil {
-			t.Logf("%s: %v", game, err)
-			continue
-		}
-		loaded, err := matcher.Open(game, f)
-		f.Close()
-		if err != nil {
-			t.Errorf("%s: %v", game, err)
-			continue
-		}
-		ran++
-
+	t.Parallel()
+	for game := range gameDatastores {
 		t.Run(string(game), func(t *testing.T) {
-			ds := testSite.newDatastore(loaded, time.Now())
+			t.Parallel()
+			ds := gameDatastore(t, game)
 
 			var tightened int
 			for _, uuid := range ds.backend.GetUUIDs() {
@@ -99,37 +122,17 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 			t.Logf("%-14s %d tightened numbers checked", game, tightened)
 		})
 	}
-
-	if ran == 0 {
-		t.Skip("no non-Magic datastore paths in the environment")
-	}
 }
 
 // A lettered cn: number names a printing, in every game: it reaches the card
 // numbered that way and nothing numbered otherwise. Flesh and Blood's
 // cn:HNT222 used to be reduced to 222 and reach every set's card 222.
 func TestLetteredNumberReachesItsPrintingInEveryGame(t *testing.T) {
-	var ran int
-	for game, envVar := range gameDatastores {
-		path := os.Getenv(envVar)
-		if path == "" {
-			continue
-		}
-		f, err := os.Open(path)
-		if err != nil {
-			t.Logf("%s: %v", game, err)
-			continue
-		}
-		loaded, err := matcher.Open(game, f)
-		f.Close()
-		if err != nil {
-			t.Errorf("%s: %v", game, err)
-			continue
-		}
-		ran++
-
+	t.Parallel()
+	for game := range gameDatastores {
 		t.Run(string(game), func(t *testing.T) {
-			ds := testSite.newDatastore(loaded, time.Now())
+			t.Parallel()
+			ds := gameDatastore(t, game)
 
 			var checked int
 			for _, uuid := range ds.backend.GetUUIDs() {
@@ -171,37 +174,17 @@ func TestLetteredNumberReachesItsPrintingInEveryGame(t *testing.T) {
 			t.Logf("%-14s %d lettered numbers checked", game, checked)
 		})
 	}
-
-	if ran == 0 {
-		t.Skip("no non-Magic datastore paths in the environment")
-	}
 }
 
 // A number typed with the set total its card prints, "222/236", reaches that
 // printing and only printings carrying both, in every game whose cards print
 // a total.
 func TestNumberWithTotalReachesItsPrintingInEveryGame(t *testing.T) {
-	var ran int
-	for game, envVar := range gameDatastores {
-		path := os.Getenv(envVar)
-		if path == "" {
-			continue
-		}
-		f, err := os.Open(path)
-		if err != nil {
-			t.Logf("%s: %v", game, err)
-			continue
-		}
-		loaded, err := matcher.Open(game, f)
-		f.Close()
-		if err != nil {
-			t.Errorf("%s: %v", game, err)
-			continue
-		}
-		ran++
-
+	t.Parallel()
+	for game := range gameDatastores {
 		t.Run(string(game), func(t *testing.T) {
-			ds := testSite.newDatastore(loaded, time.Now())
+			t.Parallel()
+			ds := gameDatastore(t, game)
 
 			var checked int
 			for _, uuid := range ds.backend.GetUUIDs() {
@@ -241,10 +224,6 @@ func TestNumberWithTotalReachesItsPrintingInEveryGame(t *testing.T) {
 			t.Logf("%-14s %d numbers with a total checked", game, checked)
 		})
 	}
-
-	if ran == 0 {
-		t.Skip("no non-Magic datastore paths in the environment")
-	}
 }
 
 // A number typed the way its card prints it, "INFO-EN067", reaches that
@@ -262,27 +241,11 @@ func TestPrintedNumberReachesItsPrintingInEveryGame(t *testing.T) {
 		"onepiece": {"OP03-003": "Izo"},
 	}
 
-	var ran int
-	for game, envVar := range gameDatastores {
-		path := os.Getenv(envVar)
-		if path == "" {
-			continue
-		}
-		f, err := os.Open(path)
-		if err != nil {
-			t.Logf("%s: %v", game, err)
-			continue
-		}
-		loaded, err := matcher.Open(game, f)
-		f.Close()
-		if err != nil {
-			t.Errorf("%s: %v", game, err)
-			continue
-		}
-		ran++
-
+	t.Parallel()
+	for game := range gameDatastores {
 		t.Run(string(game), func(t *testing.T) {
-			ds := testSite.newDatastore(loaded, time.Now())
+			t.Parallel()
+			ds := gameDatastore(t, game)
 
 			for query, name := range examples[game] {
 				_, hits := searchHits(t, ds, query)
@@ -331,10 +294,6 @@ func TestPrintedNumberReachesItsPrintingInEveryGame(t *testing.T) {
 			t.Logf("%-14s %d printed numbers checked", game, checked)
 		})
 	}
-
-	if ran == 0 {
-		t.Skip("no non-Magic datastore paths in the environment")
-	}
 }
 
 // searchHits runs a query and returns the keys it reaches with their cards.
@@ -358,6 +317,7 @@ func searchHits(t *testing.T, ds *datastore, query string) ([]string, []*matcher
 // padded the way Pokemon pads it or not, unless a card is named by it:
 // Yu-Gi-Oh's "7", or a name holds the words: "skyscraper 2".
 func TestBareNumberInEveryGame(t *testing.T) {
+	t.Parallel()
 	// The cn: query each number reaches what, or "" for a name.
 	examples := map[matcher.Game]map[string]string{
 		"pokemon": {"017": "cn:17", "17": "cn:17", "#123": "cn:123", "charizard 4": "charizard cn:4"},
@@ -365,27 +325,10 @@ func TestBareNumberInEveryGame(t *testing.T) {
 		"yugioh":  {"7": "", "skyscraper 2": ""},
 		"gundam":  {"ptolemaios 2": "", "gundam 02": ""},
 	}
-	var ran int
 	for game, queries := range examples {
-		path := os.Getenv(gameDatastores[game])
-		if path == "" {
-			continue
-		}
-		f, err := os.Open(path)
-		if err != nil {
-			t.Logf("%s: %v", game, err)
-			continue
-		}
-		loaded, err := matcher.Open(game, f)
-		f.Close()
-		if err != nil {
-			t.Errorf("%s: %v", game, err)
-			continue
-		}
-		ran++
-
 		t.Run(string(game), func(t *testing.T) {
-			ds := testSite.newDatastore(loaded, time.Now())
+			t.Parallel()
+			ds := gameDatastore(t, game)
 			checkBareNumbersAgreeWithSeed(t, ds)
 			checkNumberedNamesStayNames(t, ds)
 			for query, as := range queries {
@@ -411,9 +354,5 @@ func TestBareNumberInEveryGame(t *testing.T) {
 				}
 			}
 		})
-	}
-
-	if ran == 0 {
-		t.Skip("no non-Magic datastore paths in the environment")
 	}
 }

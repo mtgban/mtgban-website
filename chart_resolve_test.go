@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"slices"
 	"strconv"
 	"testing"
@@ -307,26 +306,11 @@ func TestTCGSubTypeForCardGenericNames(t *testing.T) {
 // told apart by the card each variant maps to, in every game whose datastore
 // is at hand; a product matcher does not know keeps the product name.
 func TestNonMagicPrintingLabelsEachPrinting(t *testing.T) {
-	var ran int
-	for game, envVar := range gameDatastores {
-		path := os.Getenv(envVar)
-		if path == "" {
-			continue
-		}
-		f, err := os.Open(path)
-		if err != nil {
-			t.Errorf("%s: %v", game, err)
-			continue
-		}
-		b, err := matcher.Open(game, f)
-		f.Close()
-		if err != nil {
-			t.Errorf("%s: %v", game, err)
-			continue
-		}
-		ran++
-
+	t.Parallel()
+	for game := range gameDatastores {
 		t.Run(string(game), func(t *testing.T) {
+			t.Parallel()
+			b := gameDatastore(t, game).backend
 			name, products := productsSharingAName(b)
 			if len(products) < 2 {
 				t.Skip("no card printed under two products")
@@ -353,9 +337,6 @@ func TestNonMagicPrintingLabelsEachPrinting(t *testing.T) {
 				t.Errorf("unknown product: search id/label = %q/%q, want none/%q", unknown.SearchID, unknown.Label, name)
 			}
 		})
-	}
-	if ran == 0 {
-		t.Skip("no non-Magic datastore configured")
 	}
 }
 

@@ -4,12 +4,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // A number can carry a slash - Flesh and Blood numbers a double-faced card
@@ -29,24 +26,10 @@ func TestCardRedirectReadsAnEscapedSlash(t *testing.T) {
 	}
 }
 
-// The same against the datastore that numbers this way, where one is at
-// hand. Opening it is slow, so this runs only when asked for by name:
-//
-//	FLESHANDBLOOD_PATH=... go test -run SplitNumbersAgainstTheGameThatHasThem
+// The same against the datastore that numbers this way, where one is at hand.
 func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
-	path := os.Getenv("FLESHANDBLOOD_PATH")
-	if path == "" {
-		t.Skip("set FLESHANDBLOOD_PATH to check this against the game that numbers this way")
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		t.Skip("opening the datastore:", err)
-	}
-	defer f.Close()
-	b, err := matcher.Open("fleshandblood", f)
-	if err != nil {
-		t.Skip("loading the datastore:", err)
-	}
+	t.Parallel()
+	b := gameDatastore(t, "fleshandblood").backend
 
 	// A private site, not testSite: CardRedirect below must resolve
 	// against this datastore, not whatever testSite has loaded.
