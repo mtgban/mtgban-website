@@ -56,6 +56,7 @@ var sleepersLanguages = []string{
 	"Arabic",
 	"Dwarvish",
 	"Hebrew",
+	"Klingon",
 	"Latin",
 	"Phyrexian",
 	"Quenya",
