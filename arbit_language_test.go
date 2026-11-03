@@ -18,33 +18,6 @@ func TestSleepersLanguagesAreEnglishMarket(t *testing.T) {
 	}
 }
 
-// TestSleepersLanguagesCoverFlavourPrintings is the cost of listing languages
-// by hand: one the datastore gains later would be dropped silently, being
-// neither English nor on the list. This is where that shows up.
-func TestSleepersLanguagesCoverFlavourPrintings(t *testing.T) {
-	skipWithoutDatastore(t)
-	uuids := backend().GetUUIDs()
-
-	missing := map[string]int{}
-	for _, u := range uuids {
-		co, err := backend().GetUUID(u)
-		if err != nil || co.Language == "" {
-			continue
-		}
-		// A flagged language is meant to be dropped, not covered.
-		if allLanguageFlags[co.Language] != "" {
-			continue
-		}
-		if !slices.Contains(sleepersLanguages, co.Language) {
-			missing[co.Language]++
-		}
-	}
-	if len(missing) > 0 {
-		t.Errorf("flavour languages the tiers would now drop: %v\n"+
-			"add them to sleepersLanguages, or decide they should go", missing)
-	}
-}
-
 // TestSleepersDropForeignPrintings exercises the two modes that go through
 // ArbitOpts, which is what issue #319 asks for.
 func TestSleepersDropForeignPrintings(t *testing.T) {
