@@ -34,7 +34,7 @@ func TestUploadResolvesCardmarketIDFromThePublishedSnapshot(t *testing.T) {
 		{"Fixture Cardmarket Card", "1"},
 	})
 	sellers := []mtgban.Seller{mkmShelf("MKMTrend", map[string]string{"FIXTUREMKM-1": "265854"})}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
 	// A mark a rebuild would not carry, so "was it rebuilt" is answerable
 	// without timing anything. It is published as a snapshot of its own:
@@ -42,13 +42,13 @@ func TestUploadResolvesCardmarketIDFromThePublishedSnapshot(t *testing.T) {
 	marked := *currentPrices()
 	marked.mkmIDs = maps.Clone(marked.mkmIDs)
 	marked.mkmIDs["sentinel"] = "kept"
-	pricesPtr.Store(&marked)
+	testSite.pricesPtr.Store(&marked)
 
 	// A buylist-only publish, the way a buylist load does it: the sellers,
 	// and the map, are carried across. The withPrices above restores it.
 	vendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "CK", Shorthand: "CK"})
 	vendors := []mtgban.Vendor{vendor}
-	pricesPtr.Store(withVendors(currentPrices(), vendors))
+	testSite.pricesPtr.Store(withVendors(currentPrices(), vendors))
 	if got := currentPrices().mkmIDs["sentinel"]; got != "kept" {
 		t.Errorf("a buylist publish rebuilt the map: sentinel = %q", got)
 	}
@@ -76,14 +76,14 @@ func TestUploadResolvesCardmarketIDFromThePublishedSnapshot(t *testing.T) {
 func TestMKMIDIndexFollowsItsShelves(t *testing.T) {
 	shelf := mkmShelf("MKMTrend", map[string]string{"uuid-aaa": "100"})
 	other := mkmShelf("CK", map[string]string{"uuid-aaa": "ck-1"})
-	withPrices(t, []mtgban.Seller{shelf}, GetVendors())
+	withPrices(t, []mtgban.Seller{shelf}, currentPrices().vendors)
 	marked := *currentPrices()
 	marked.mkmIDs = maps.Clone(marked.mkmIDs)
 	marked.mkmIDs["sentinel"] = "kept"
-	pricesPtr.Store(&marked)
+	testSite.pricesPtr.Store(&marked)
 
 	// Another store published: a new slice, the same shelf.
-	withPrices(t, []mtgban.Seller{shelf, other}, GetVendors())
+	withPrices(t, []mtgban.Seller{shelf, other}, currentPrices().vendors)
 	if got := currentPrices().mkmIDs.Resolve("sentinel"); got != "kept" {
 		t.Errorf("a publish of another store rebuilt the map: sentinel = %q", got)
 	}
@@ -92,7 +92,7 @@ func TestMKMIDIndexFollowsItsShelves(t *testing.T) {
 	}
 
 	// The shelf published again: its map is new.
-	withPrices(t, []mtgban.Seller{mkmShelf("MKMTrend", map[string]string{"uuid-bbb": "200"}), other}, GetVendors())
+	withPrices(t, []mtgban.Seller{mkmShelf("MKMTrend", map[string]string{"uuid-bbb": "200"}), other}, currentPrices().vendors)
 	if got := currentPrices().mkmIDs.Resolve("sentinel"); got != "" {
 		t.Errorf("a new shelf kept the old map: sentinel = %q", got)
 	}
@@ -104,7 +104,7 @@ func TestMKMIDIndexFollowsItsShelves(t *testing.T) {
 	}
 
 	// Dropped: the map goes with it.
-	withPrices(t, []mtgban.Seller{other}, GetVendors())
+	withPrices(t, []mtgban.Seller{other}, currentPrices().vendors)
 	if ids := currentPrices().mkmIDs; ids != nil {
 		t.Errorf("no shelf, yet a map of %d ids", len(ids))
 	}

@@ -75,7 +75,7 @@ func TestRealStoreKeepsRowCondition(t *testing.T) {
 // The set the fix keys on: every loaded index, and nothing else.
 func TestFlatPriceSourcesAreTheIndexes(t *testing.T) {
 	var flat, priced int
-	for _, seller := range GetSellers() {
+	for _, seller := range currentPrices().sellers {
 		if seller == nil {
 			continue
 		}

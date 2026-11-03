@@ -61,12 +61,12 @@ func TestAlertStorePricesSkipsIndexBlockedAndOtherKind(t *testing.T) {
 func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 	alertTestStores(t)
 	net := mtgban.BuylistRecord{"card-1": {{Conditions: "NM", BuyPrice: 15}}}
-	vendors := append(slices.Clip(GetVendors()),
+	vendors := append(slices.Clip(currentPrices().vendors),
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "TCGDirectNet", Name: "TCG Direct (net)"}),
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "CKBLLast", Name: "Card Kingdom (last)"}),
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "ABUCredit", Name: "ABU Games (credit)"}),
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "MKMBL", Name: "Cardmarket", CountryFlag: "EU"}))
-	withPrices(t, GetSellers(), vendors)
+	withPrices(t, currentPrices().sellers, vendors)
 	for _, s := range alertStorePrices(currentPrices(), "card-1", false, alerts.SideBuylist, nil) {
 		if s.PickedOnly != slices.Contains([]string{"TCGDirectNet", "CKBLLast", "ABUCredit", "MKMBL"}, s.Shorthand) {
 			t.Fatalf("%s PickedOnly = %v", s.Shorthand, s.PickedOnly)
@@ -74,16 +74,16 @@ func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 	}
 	vendors = append(vendors,
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "ABUCreditSealed", Name: "ABU Games (credit)", SealedMode: true}))
-	withPrices(t, GetSellers(), vendors)
+	withPrices(t, currentPrices().sellers, vendors)
 	for _, s := range alertStorePrices(currentPrices(), "card-1", true, alerts.SideBuylist, nil) {
 		if s.PickedOnly != (s.Shorthand == "ABUCreditSealed") {
 			t.Fatalf("sealed %s PickedOnly = %v", s.Shorthand, s.PickedOnly)
 		}
 	}
-	sellers := append(slices.Clip(GetSellers()),
+	sellers := append(slices.Clip(currentPrices().sellers),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"card-1": {{Conditions: "NM", Price: 18}}},
 			mtgban.ScraperInfo{Shorthand: "MKMLow", Name: "Cardmarket", CountryFlag: "EU"}))
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 	for _, s := range alertStorePrices(currentPrices(), "card-1", false, alerts.SideRetail, nil) {
 		if s.PickedOnly {
 			t.Fatalf("retail %s PickedOnly, want every seller watched", s.Shorthand)

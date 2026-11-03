@@ -158,7 +158,7 @@ func TestSearchSellersCarryTCGListings(t *testing.T) {
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "TCGplayer", Shorthand: tcgListingsStore, NoQuantityInventory: true, InventoryTimestamp: &now}),
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Other Store", Shorthand: "OS", InventoryTimestamp: &now}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 	setTestTCGListings(t, map[string]*tcgListings{
 		"complete": {Sellers: [5]int32{51}, Copies: [5]int32{83}, Total: 60},
 	})

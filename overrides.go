@@ -194,7 +194,7 @@ func (s *site) reloadOverriddenScrapers(shorthands map[string]struct{}) {
 				if _, ok := shorthands[shorthand]; ok {
 					go func(bucket simplecloud.Reader, game matcher.Game, name, kind, shorthand string) {
 						defer recoverJob("override reload " + name + "/" + kind + "/" + shorthand)
-						err := loadScraperWithRetry(bucket, game, name, kind, shorthand)
+						err := s.loadScraperWithRetry(bucket, game, name, kind, shorthand)
 						if errors.Is(err, errDroppedDump) {
 							log.Printf("override reload %s/%s/%s: %v", name, kind, shorthand, err)
 							return

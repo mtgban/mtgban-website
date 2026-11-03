@@ -15,9 +15,9 @@ import (
 // dropped by storeSeedUUIDs, defeating the point of the test). Restores
 // whatever was registered before once the test ends, via keepPrices: these
 // publish the same process-wide snapshot every real scraper load does.
-func registerTestVendor(t *testing.T, shorthand string, uuids []string) {
+func registerTestVendor(t *testing.T, s *site, shorthand string, uuids []string) {
 	t.Helper()
-	keepPrices(t)
+	keepSitePrices(t, s)
 
 	now := time.Now()
 	bl := mtgban.BuylistRecord{}
@@ -27,14 +27,14 @@ func registerTestVendor(t *testing.T, shorthand string, uuids []string) {
 	vendor := mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{
 		Name: shorthand, Shorthand: shorthand, BuylistTimestamp: &now,
 	})
-	if err := updateVendors(vendor); err != nil {
+	if err := s.updateVendors(vendor); err != nil {
 		t.Fatalf("registering vendor %s: %v", shorthand, err)
 	}
 }
 
-func registerTestSeller(t *testing.T, shorthand string, uuids []string) {
+func registerTestSeller(t *testing.T, s *site, shorthand string, uuids []string) {
 	t.Helper()
-	keepPrices(t)
+	keepSitePrices(t, s)
 
 	now := time.Now()
 	inv := mtgban.InventoryRecord{}
@@ -44,7 +44,7 @@ func registerTestSeller(t *testing.T, shorthand string, uuids []string) {
 	seller := mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{
 		Name: shorthand, Shorthand: shorthand, InventoryTimestamp: &now,
 	})
-	if err := updateSellers(seller); err != nil {
+	if err := s.updateSellers(seller); err != nil {
 		t.Fatalf("registering seller %s: %v", shorthand, err)
 	}
 }
@@ -94,12 +94,12 @@ func fixtureStoreSite(t *testing.T) (*site, []string) {
 // number filter already seeds an empty query.
 func TestPlainStoreQuerySeedsFromTheStoreItself(t *testing.T) {
 	s, uuids := fixtureStoreSite(t)
-	registerTestVendor(t, "TEST", uuids)
+	registerTestVendor(t, s, "TEST", uuids)
 	ds := s.datastore()
 
 	for _, query := range []string{`vendor:TEST`, `store:TEST`} {
 		t.Run(query, func(t *testing.T) {
-			results, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, currentPrices(), query, nil, nil, nil))
+			results, err := searchAndFilter(ds, s.prices(), parseSearchOptionsNG(ds.backend, s.prices(), query, nil, nil, nil))
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -114,12 +114,12 @@ func TestPlainStoreQuerySeedsFromTheStoreItself(t *testing.T) {
 // from a buylist.
 func TestPlainSellerQuerySeedsFromTheSellerItself(t *testing.T) {
 	s, uuids := fixtureStoreSite(t)
-	registerTestSeller(t, "TESTSELL", uuids)
+	registerTestSeller(t, s, "TESTSELL", uuids)
 	ds := s.datastore()
 
 	for _, query := range []string{`seller:TESTSELL`, `store:TESTSELL`} {
 		t.Run(query, func(t *testing.T) {
-			results, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, currentPrices(), query, nil, nil, nil))
+			results, err := searchAndFilter(ds, s.prices(), parseSearchOptionsNG(ds.backend, s.prices(), query, nil, nil, nil))
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -160,7 +160,7 @@ func TestNegatedStoreQueryDoesNotSeed(t *testing.T) {
 	if len(uuids) < 6 {
 		t.Skip("datastore doesn't hold enough plain cards for this test")
 	}
-	registerTestVendor(t, "TEST", uuids)
+	registerTestVendor(t, testSite, "TEST", uuids)
 
 	config := parseSearchOptionsNG(backend(), currentPrices(), `-vendor:TEST`, nil, nil, nil)
 	seeded, ok := storeSeedUUIDs(backend(), currentPrices(), config)
@@ -188,7 +188,7 @@ func TestStoreQuerySeedsAlongsideACompanionPostFilter(t *testing.T) {
 	if len(uuids) < 6 {
 		t.Skip("datastore doesn't hold enough plain cards for this test")
 	}
-	registerTestVendor(t, "TEST", uuids)
+	registerTestVendor(t, testSite, "TEST", uuids)
 
 	for _, query := range []string{
 		`vendor:TEST qty>5`,
@@ -222,8 +222,8 @@ func TestStoreQuerySeedsWithASecondStoreFilterPresent(t *testing.T) {
 	if len(uuids) < 6 {
 		t.Skip("datastore doesn't hold enough plain cards for this test")
 	}
-	registerTestVendor(t, "TEST", uuids)
-	registerTestSeller(t, "OTHER", uuids)
+	registerTestVendor(t, testSite, "TEST", uuids)
+	registerTestSeller(t, testSite, "OTHER", uuids)
 
 	config := parseSearchOptionsNG(backend(), currentPrices(), `vendor:TEST seller:OTHER`, nil, nil, nil)
 	if len(config.PostFilters) != 2 {
@@ -256,7 +256,7 @@ func TestStoreQueryDefersToAnEditionFilterAlreadySeeding(t *testing.T) {
 	if len(uuids) < 6 {
 		t.Skip("datastore doesn't hold enough plain cards for this test")
 	}
-	registerTestVendor(t, "TEST", uuids)
+	registerTestVendor(t, testSite, "TEST", uuids)
 
 	results, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), `s:LEA vendor:TEST`, nil, nil, nil))
 	if err != nil {
@@ -280,7 +280,7 @@ func TestStoreQueryWithSearchTextIsUnaffectedByTheSeed(t *testing.T) {
 	if len(uuids) < 6 {
 		t.Skip("datastore doesn't hold enough plain cards for this test")
 	}
-	registerTestVendor(t, "TEST", uuids)
+	registerTestVendor(t, testSite, "TEST", uuids)
 
 	co, err := backend().GetUUID(uuids[0])
 	if err != nil {
@@ -328,8 +328,8 @@ func TestStoreQueryUnionsACommaJoinedList(t *testing.T) {
 	if len(uuidsA) < 3 || len(uuidsB) < 3 {
 		t.Skip("datastore doesn't hold enough plain cards for this test")
 	}
-	registerTestVendor(t, "STOREA", uuidsA)
-	registerTestVendor(t, "STOREB", uuidsB)
+	registerTestVendor(t, testSite, "STOREA", uuidsA)
+	registerTestVendor(t, testSite, "STOREB", uuidsB)
 
 	results, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), `vendor:STOREA,STOREB`, nil, nil, nil))
 	if err != nil {

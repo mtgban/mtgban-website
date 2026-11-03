@@ -789,18 +789,6 @@ func errorResponse(w http.ResponseWriter, status int, msg string) {
 	}{Error: msg})
 }
 
-// findSellerInventory is the published snapshot's sellerInventory, for a
-// caller not handed one.
-func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
-	return currentPrices().sellerInventory(shorthand)
-}
-
-// findVendorBuylist is the published snapshot's vendorBuylist, for a caller
-// not handed one.
-func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
-	return currentPrices().vendorBuylist(shorthand)
-}
-
 // Look up a seller with its name and return its inventory
 func findSellerInventoryByName(p *prices, name string, sealed bool) (mtgban.InventoryRecord, error) {
 	for _, seller := range p.sellers {
@@ -1767,18 +1755,6 @@ func getTCGSimulationIQR(p *prices, productID string) float64 {
 		return 0
 	}
 	return entries[0].ExtraValues["iqr"]
-}
-
-// scraperName is the published snapshot's scraperName, for a caller not
-// handed one.
-func scraperName(shorthand string) string {
-	return currentPrices().scraperName(shorthand)
-}
-
-// isSealedScraper is the published snapshot's isSealedScraper, for a caller
-// not handed one.
-func isSealedScraper(shorthand string) bool {
-	return currentPrices().isSealedScraper(shorthand)
 }
 
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically

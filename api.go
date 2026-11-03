@@ -872,7 +872,7 @@ func (s *site) LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 	for kind, list := range scrapersConfig {
 		ok := false
 		for _, shorthand := range list {
-			err := loadScraperWithRetry(DataBucket, Config().Game, name, kind, shorthand)
+			err := s.loadScraperWithRetry(DataBucket, Config().Game, name, kind, shorthand)
 			if errors.Is(err, errDroppedDump) {
 				skipped = append(skipped, fmt.Sprintf("%s/%s: %s", kind, shorthand, err))
 				continue
@@ -889,7 +889,7 @@ func (s *site) LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	updateScraperIndexStore(name, scrapersConfig)
+	s.updateScraperIndexStore(name, scrapersConfig)
 	// Whatever did load is news to the alerts, failures or not.
 	s.pokeAlerts(loaded...)
 

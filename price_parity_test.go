@@ -230,7 +230,7 @@ func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
 			MetadataOnly: true, QuantityPriority: true,
 		}),
 	}
-	withPrices(t, GetSellers(), vendors)
+	withPrices(t, currentPrices().sellers, vendors)
 
 	config := parseSearchOptionsNG(backend(), currentPrices(), regular, nil, nil, nil)
 	found := searchVendors(currentPrices(), []string{regular}, config)
@@ -259,7 +259,7 @@ func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
 			Name: "Fake Index Vendor", Shorthand: "FAKEIDX", MetadataOnly: true,
 		}),
 	}
-	withPrices(t, GetSellers(), vendors)
+	withPrices(t, currentPrices().sellers, vendors)
 
 	found := map[string]map[mtgban.Condition][]SearchEntry{
 		regular: {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitCount}}},
@@ -391,7 +391,7 @@ func TestZeroPricedListings(t *testing.T) {
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Zero Store", Shorthand: "ZEROA"}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
 	check := func(t *testing.T, api map[string]map[string]*BanPrice) {
 		t.Helper()
@@ -562,26 +562,26 @@ func TestApiEnabledStores(t *testing.T) {
 	sealedSeller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{
 		Name: "Parity Sealed", Shorthand: "PARITYSEALED", SealedMode: true,
 	})
-	sellers := append(GetSellers(), sealedSeller)
-	withPrices(t, sellers, GetVendors())
+	sellers := append(currentPrices().sellers, sealedSeller)
+	withPrices(t, sellers, currentPrices().vendors)
 
 	euVendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{
 		Name: "Parity EU", Shorthand: "PARITYEU", CountryFlag: "EU",
 	})
-	vendors := append(GetVendors(), euVendor)
-	withPrices(t, GetSellers(), vendors)
+	vendors := append(currentPrices().vendors, euVendor)
+	withPrices(t, currentPrices().sellers, vendors)
 
 	euIndexSeller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{
 		Name: "Parity EU Index", Shorthand: "PARITYEUIDX", CountryFlag: "EU", MetadataOnly: true,
 	})
-	withIndexSeller := append(slices.Clone(GetSellers()), euIndexSeller)
-	withPrices(t, withIndexSeller, GetVendors())
+	withIndexSeller := append(slices.Clone(currentPrices().sellers), euIndexSeller)
+	withPrices(t, withIndexSeller, currentPrices().vendors)
 
 	euIndexVendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{
 		Name: "Parity EU Vendor Index", Shorthand: "PARITYEUVIDX", CountryFlag: "EU", MetadataOnly: true,
 	})
-	withIndexVendor := append(slices.Clone(GetVendors()), euIndexVendor)
-	withPrices(t, GetSellers(), withIndexVendor)
+	withIndexVendor := append(slices.Clone(currentPrices().vendors), euIndexVendor)
+	withPrices(t, currentPrices().sellers, withIndexVendor)
 
 	got = enabled("BASE_ACCESS")
 	if !slices.Contains(got, "PARITYA") {

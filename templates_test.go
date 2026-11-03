@@ -423,7 +423,7 @@ func TestStoreFactorOptionsSkipsIndexes(t *testing.T) {
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "IDX", Name: "Index", MetadataOnly: true}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
 	var list []struct {
 		K string `json:"k"`
@@ -443,7 +443,7 @@ func TestStoreFactorOptionsSealedLast(t *testing.T) {
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCG", Name: "TCGplayer"}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
 	var list []struct {
 		K string `json:"k"`

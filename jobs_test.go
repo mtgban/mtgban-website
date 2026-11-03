@@ -49,7 +49,7 @@ func TestTrackedRecordsRunsAndPanics(t *testing.T) {
 // setTestVendors serves vendors for the test.
 func setTestVendors(t *testing.T, vendors ...mtgban.Vendor) {
 	t.Helper()
-	withPrices(t, GetSellers(), vendors)
+	withPrices(t, currentPrices().sellers, vendors)
 }
 
 // TestSetAnalysisReport flags an analysis on the empty datastore, and on a

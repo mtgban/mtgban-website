@@ -32,7 +32,7 @@ func TestUploadResolvesTCGSKUFromThePublishedSnapshot(t *testing.T) {
 	})
 
 	sellers := []mtgban.Seller{tcgShelf("TCGPlayer", [][3]string{{"FIXTURETCG-1", "7001", "SP"}})}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
 	// A mark a rebuild would not carry, so "was it rebuilt" is answerable
 	// without timing anything. It is published as a snapshot of its own:
@@ -40,13 +40,13 @@ func TestUploadResolvesTCGSKUFromThePublishedSnapshot(t *testing.T) {
 	marked := *currentPrices()
 	marked.tcgSKUs = maps.Clone(marked.tcgSKUs)
 	marked.tcgSKUs["sentinel"] = tcgskuparser.SKU{UUID: "kept", Condition: "HP"}
-	pricesPtr.Store(&marked)
+	testSite.pricesPtr.Store(&marked)
 
 	// A buylist-only publish, the way a buylist load does it: the sellers,
 	// and the index, are carried across. The withPrices above restores it.
 	vendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "CK", Shorthand: "CK"})
 	vendors := []mtgban.Vendor{vendor}
-	pricesPtr.Store(withVendors(currentPrices(), vendors))
+	testSite.pricesPtr.Store(withVendors(currentPrices(), vendors))
 	if got := currentPrices().tcgSKUs.Resolve("sentinel"); got != "kept" {
 		t.Errorf("a buylist publish rebuilt the index: sentinel = %q", got)
 	}
@@ -80,14 +80,14 @@ func TestUploadResolvesTCGSKUFromThePublishedSnapshot(t *testing.T) {
 func TestTCGSKUIndexFollowsItsSellers(t *testing.T) {
 	singles := tcgShelf("TCGPlayer", [][3]string{{"uuid-aaa", "100", "NM"}})
 	other := tcgShelf("CK", [][3]string{{"uuid-aaa", "ck-1", "NM"}})
-	withPrices(t, []mtgban.Seller{singles}, GetVendors())
+	withPrices(t, []mtgban.Seller{singles}, currentPrices().vendors)
 	marked := *currentPrices()
 	marked.tcgSKUs = maps.Clone(marked.tcgSKUs)
 	marked.tcgSKUs["sentinel"] = tcgskuparser.SKU{UUID: "kept"}
-	pricesPtr.Store(&marked)
+	testSite.pricesPtr.Store(&marked)
 
 	// Another store published: a new slice, the same TCGplayer seller.
-	withPrices(t, []mtgban.Seller{singles, other}, GetVendors())
+	withPrices(t, []mtgban.Seller{singles, other}, currentPrices().vendors)
 	if got := currentPrices().tcgSKUs.Resolve("sentinel"); got != "kept" {
 		t.Errorf("a publish of another store rebuilt the index: sentinel = %q", got)
 	}
@@ -96,7 +96,7 @@ func TestTCGSKUIndexFollowsItsSellers(t *testing.T) {
 	}
 
 	// The TCGplayer seller published again: its index is new.
-	withPrices(t, []mtgban.Seller{tcgShelf("TCGPlayer", [][3]string{{"uuid-bbb", "200", "NM"}}), other}, GetVendors())
+	withPrices(t, []mtgban.Seller{tcgShelf("TCGPlayer", [][3]string{{"uuid-bbb", "200", "NM"}}), other}, currentPrices().vendors)
 	if got := currentPrices().tcgSKUs.Resolve("sentinel"); got != "" {
 		t.Errorf("a new TCGplayer seller kept the old index: sentinel = %q", got)
 	}
@@ -108,7 +108,7 @@ func TestTCGSKUIndexFollowsItsSellers(t *testing.T) {
 	}
 
 	// Dropped: the index goes with it.
-	withPrices(t, []mtgban.Seller{other}, GetVendors())
+	withPrices(t, []mtgban.Seller{other}, currentPrices().vendors)
 	if idx := currentPrices().tcgSKUs; idx != nil {
 		t.Errorf("no TCGplayer seller, yet an index of %d SKUs", len(idx))
 	}

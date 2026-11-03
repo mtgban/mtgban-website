@@ -6,36 +6,51 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
-// withPrices publishes sellers and vendors as the served snapshot, keeping
-// the dumps listing, and puts the snapshot it replaced back when the test
-// ends. It publishes the way a load does, newPrices then one Store, but
-// without scrapersMu, which a test may hold.
+// withPrices publishes sellers and vendors as testSite's served snapshot,
+// keeping the dumps listing, and puts the snapshot it replaced back when
+// the test ends.
 func withPrices(tb testing.TB, sellers []mtgban.Seller, vendors []mtgban.Vendor) {
 	tb.Helper()
-	prev := currentPrices()
-	tb.Cleanup(func() { pricesPtr.Store(prev) })
-	pricesPtr.Store(newPrices(prev, sellers, vendors, prev.scrapers))
+	sitePrices(tb, testSite, sellers, vendors)
 }
 
-// keepPrices puts the snapshot served now back when the test ends, for a
-// test that registers its stores through updateSellers or updateVendors.
+// sitePrices publishes sellers and vendors as s's served snapshot, keeping
+// its dumps listing, and puts the snapshot it replaced back when the test
+// ends. It publishes the way a load does, newPrices then one Store, but
+// without scrapersMu, which a test may hold.
+func sitePrices(tb testing.TB, s *site, sellers []mtgban.Seller, vendors []mtgban.Vendor) {
+	tb.Helper()
+	prev := s.prices()
+	tb.Cleanup(func() { s.pricesPtr.Store(prev) })
+	s.pricesPtr.Store(newPrices(prev, sellers, vendors, prev.scrapers))
+}
+
+// keepPrices puts the snapshot testSite serves now back when the test ends,
+// for a test that registers its stores through updateSellers or
+// updateVendors.
 func keepPrices(tb testing.TB) {
 	tb.Helper()
-	prev := currentPrices()
-	tb.Cleanup(func() { pricesPtr.Store(prev) })
+	keepSitePrices(tb, testSite)
 }
 
-// withScraperIndex publishes idx as the dumps listing, an empty one for
-// nil, keeping both sides, and puts the snapshot it replaced back when the
-// test ends.
+// keepSitePrices is keepPrices for a site of the test's own.
+func keepSitePrices(tb testing.TB, s *site) {
+	tb.Helper()
+	prev := s.prices()
+	tb.Cleanup(func() { s.pricesPtr.Store(prev) })
+}
+
+// withScraperIndex publishes idx as testSite's dumps listing, an empty one
+// for nil, keeping both sides, and puts the snapshot it replaced back when
+// the test ends.
 func withScraperIndex(tb testing.TB, idx *scraperIndex) {
 	tb.Helper()
 	if idx == nil {
 		idx = newScraperIndex()
 	}
-	prev := currentPrices()
-	tb.Cleanup(func() { pricesPtr.Store(prev) })
+	prev := testSite.prices()
+	tb.Cleanup(func() { testSite.pricesPtr.Store(prev) })
 	next := *prev
 	next.scrapers = *idx
-	pricesPtr.Store(&next)
+	testSite.pricesPtr.Store(&next)
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 
 	"github.com/mtgban/mtgban-website/internal/infrastructure"
+	"github.com/mtgban/mtgban-website/internal/sessionstore"
 )
 
 var NameToBeFound string
@@ -32,6 +33,7 @@ func TestMain(m *testing.M) {
 	Config().DatastorePath = "allprintings5.json"
 	Config().Game = DefaultGame
 	testSite = newSite()
+	Sessions = sessionstore.New(sessionHooks(testSite))
 
 	// Tests written against fixtures build their own site, so this lets them
 	// run - under -race included - without the real datastore load; the
@@ -57,7 +59,7 @@ func TestMain(m *testing.M) {
 		Config().BucketKeys = map[string]infrastructure.BucketKey{dumpsBucket: {AccessKey: keyID, AccessSecret: appKey}}
 		bucket, err := openDumpsBucket(context.Background())
 		if err == nil {
-			err = loadScrapersNG(bucket, nil)
+			err = testSite.loadScrapersNG(bucket, nil)
 		}
 		if err != nil {
 			log.Println("loadScrapersNG skipped:", err)

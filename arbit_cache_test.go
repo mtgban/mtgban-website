@@ -169,7 +169,7 @@ func TestArbitCacheKeysDirectStock(t *testing.T) {
 // after one view has filled whatever they keep. It needs stores loaded,
 // which TestMain does from a B2 key pair in the environment.
 func BenchmarkArbitPages(b *testing.B) {
-	if len(GetSellers()) == 0 {
+	if len(currentPrices().sellers) == 0 {
 		b.Skip("no stores loaded; B2_KEY_ID and B2_APP_KEY load them")
 	}
 	readyToRender(b)

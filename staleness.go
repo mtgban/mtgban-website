@@ -155,11 +155,11 @@ func pastDrop(ts *time.Time, now time.Time) bool {
 // dropStaleStores stops serving every seller and vendor whose data is past
 // DropAfter, until a fresh load brings it back. Session stores keep their
 // own lifetime.
-func dropStaleStores(now time.Time) {
-	for _, store := range takeStaleStores(now) {
+func (s *site) dropStaleStores(now time.Time) {
+	for _, store := range s.takeStaleStores(now) {
 		switch strings.ToUpper(store.info.Shorthand) {
 		case "CK", "CKBLLAST":
-			rebuildCKSignals(currentPrices())
+			rebuildCKSignals(s.prices())
 			return
 		}
 	}
@@ -167,10 +167,10 @@ func dropStaleStores(now time.Time) {
 
 // takeStaleStores publishes the snapshots without the stores past DropAfter,
 // records them, and returns them.
-func takeStaleStores(now time.Time) []droppedStore {
-	sessions := lockAskedSnapshots()
-	defer scrapersMu.Unlock()
-	p := currentPrices()
+func (s *site) takeStaleStores(now time.Time) []droppedStore {
+	sessions := s.lockAskedSnapshots()
+	defer s.scrapersMu.Unlock()
+	p := s.prices()
 
 	// A real store counts as left on its side only with a date within
 	// DropAfter: an undated one has no age to be fresh by.
@@ -224,7 +224,7 @@ func takeStaleStores(now time.Time) []droppedStore {
 	}
 	sellers := withoutStores(p.sellers, oldSellers)
 	vendors := withoutStores(p.vendors, oldVendors)
-	pricesPtr.Store(newPrices(p, sellers, vendors, p.scrapers))
+	s.pricesPtr.Store(newPrices(p, sellers, vendors, p.scrapers))
 
 	record := map[string]droppedStore{}
 	prev := droppedStoresPtr.Load()
@@ -244,9 +244,9 @@ func takeStaleStores(now time.Time) []droppedStore {
 // alarm's rows, was published from an upload. Sessions takes its lock before
 // scrapersMu (see dropSessionScraper), so it is asked first, and asked
 // again when a publish swaps the snapshot meanwhile.
-func lockAskedSnapshots() map[string]bool {
+func (s *site) lockAskedSnapshots() map[string]bool {
 	for {
-		p := currentPrices()
+		p := s.prices()
 		sessions := map[string]bool{}
 		for _, seller := range p.sellers {
 			info := seller.Info()
@@ -257,11 +257,11 @@ func lockAskedSnapshots() map[string]bool {
 			sessions[info.Shorthand+"/"+sessionstore.Buylist] = Sessions.Is(sessionstore.Buylist, info.Shorthand)
 		}
 
-		scrapersMu.Lock()
-		if currentPrices() == p {
+		s.scrapersMu.Lock()
+		if s.prices() == p {
 			return sessions
 		}
-		scrapersMu.Unlock()
+		s.scrapersMu.Unlock()
 	}
 }
 
@@ -356,10 +356,10 @@ func droppedStoresOf(p *prices, kind string) []droppedStore {
 // seller's and vendor's staleness against staleAlarmState and announces the
 // rows that changed, the drops included. Session stores
 // (internal/sessionstore) are skipped, like the dashboard's own banner.
-func checkStaleness() {
+func (s *site) checkStaleness() {
 	now := time.Now()
-	dropStaleStores(now)
-	p := currentPrices()
+	s.dropStaleStores(now)
+	p := s.prices()
 
 	staleAlarmState.mu.Lock()
 	defer staleAlarmState.mu.Unlock()

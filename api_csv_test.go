@@ -35,7 +35,7 @@ func TestSimplePrice2CSVTCGSKU(t *testing.T) {
 	}
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(
 		inventory, mtgban.ScraperInfo{Shorthand: "TCGPlayer"})}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
 	pm := map[string]map[string]*BanPrice{
 		id: {"TCGPlayer": &BanPrice{Regular: 1.0}},
@@ -92,7 +92,7 @@ func TestCSVCondQtyIndexing(t *testing.T) {
 		sellers = append(sellers, mtgban.NewSellerFromInventory(
 			mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: sh}))
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
 	// Two distinct non-foil, non-sealed cards so condition codes map cleanly to
 	// labels (no " Foil" suffix) and Rarity is present.
@@ -172,7 +172,7 @@ func TestUUID2BuylistCSV(t *testing.T) {
 		mtgban.NewVendorFromBuylist(ck, mtgban.ScraperInfo{Shorthand: "CK"}),
 		mtgban.NewVendorFromBuylist(scg, mtgban.ScraperInfo{Shorthand: "SCG"}),
 	}
-	withPrices(t, GetSellers(), vendors)
+	withPrices(t, currentPrices().sellers, vendors)
 
 	ids := []string{"a", "b", "c", "a"}
 	for _, tc := range []struct {

@@ -239,12 +239,15 @@ commit to this repo can complete on its own.
 
 ## Critical invariants — do not break these
 
-1. **Atomic-pointer snapshots.** Sellers/vendors and other hot caches are held
-   in `atomic.Pointer` and read via `GetSellers()`/`GetVendors()`. Never mutate
-   a returned slice/map in place. To change data, build a new value and publish
-   it through the existing `updateSellers()`/`updateVendors()` (which also
-   validate that the dataset hasn't regressed) — keep that validation. The
-   card datastore follows the same pattern one level up: `site` (site.go)
+1. **Atomic-pointer snapshots.** The loaded sellers and vendors, the indexes
+   over them and the caches built from them are one `prices` value (load.go)
+   that `site` owns in `pricesPtr`. An entry point reads it once with
+   `s.prices()` where it starts and hands `p *prices` down (ADR-0003 rule 3);
+   nothing below reads the site. Never mutate a returned slice/map in place.
+   To change data, build a new value and publish it through the site's
+   `updateSellers`/`updateVendors` (which also validate that the dataset
+   hasn't regressed) — keep that validation. The card datastore follows the
+   same pattern: `site` (site.go)
    owns it in `ds atomic.Pointer[datastore]`, pre-stored empty by `newSite()`
    so `s.datastore()`/`s.backend()` are never nil; code below an entry point
    reads the datastore only through the `b`/`ds` it was handed, never from

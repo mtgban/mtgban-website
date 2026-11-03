@@ -213,7 +213,7 @@ func seedArbitScraper(t *testing.T, shorthand string, sealed bool) {
 			Name: "Filter Test", Shorthand: shorthand, SealedMode: sealed,
 		}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 }
 
 // TestArbitFilterOptionsRouteBySealedMode pins which of legit/stable a
@@ -346,7 +346,7 @@ func seedVolatileSealed(t *testing.T, productID string) {
 		mtgban.NewSellerFromInventory(probe, mtgban.ScraperInfo{Name: "Sealed Probe", Shorthand: "SEALPRB", SealedMode: true}),
 		mtgban.NewSellerFromInventory(sim, mtgban.ScraperInfo{Name: "TCG Low Sim", Shorthand: "TCGLowSim", SealedMode: true, MetadataOnly: true}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 }
 
 // renderGlobal runs one global comparison from the given source the way the

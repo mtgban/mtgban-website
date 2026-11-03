@@ -28,7 +28,7 @@ func keepScrapers(t *testing.T) {
 	var noSellers []mtgban.Seller
 	var noVendors []mtgban.Vendor
 	withPrices(t, noSellers, noVendors)
-	Sessions = sessionstore.New(sessionHooks())
+	Sessions = sessionstore.New(sessionHooks(testSite))
 	t.Cleanup(func() {
 		Sessions = prevSessions
 	})
@@ -100,7 +100,7 @@ func TestPublishAndRemoveSessionStore(t *testing.T) {
 	if report.Entries != 3 {
 		t.Errorf("report = %+v, want 3 listed", report)
 	}
-	inv, err := findSellerInventory("ZZS")
+	inv, err := currentPrices().sellerInventory("ZZS")
 	if err != nil || len(inv) != 3 {
 		t.Fatalf("the site serves %d cards for ZZS (err %v), want 3", len(inv), err)
 	}
@@ -112,7 +112,7 @@ func TestPublishAndRemoveSessionStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("publishing again: %s", err)
 	}
-	inv, _ = findSellerInventory("ZZS")
+	inv, _ = currentPrices().sellerInventory("ZZS")
 	if len(inv) != 1 {
 		t.Errorf("the site serves %d cards for ZZS after the second publish, want 1", len(inv))
 	}
@@ -122,7 +122,7 @@ func TestPublishAndRemoveSessionStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("publishing the buylist: %s", err)
 	}
-	bl, err := findVendorBuylist("ZZS")
+	bl, err := currentPrices().vendorBuylist("ZZS")
 	if err != nil || len(bl) != 2 {
 		t.Fatalf("the site buys %d cards for ZZS (err %v), want 2", len(bl), err)
 	}
@@ -131,11 +131,11 @@ func TestPublishAndRemoveSessionStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("removing: %s", err)
 	}
-	_, err = findSellerInventory("ZZS")
+	_, err = currentPrices().sellerInventory("ZZS")
 	if err == nil {
 		t.Error("ZZS still sells after being removed")
 	}
-	_, err = findVendorBuylist("ZZS")
+	_, err = currentPrices().vendorBuylist("ZZS")
 	if err != nil {
 		t.Error("removing the retail side took the buylist with it")
 	}
@@ -151,8 +151,8 @@ func TestPublishAndRemoveSessionStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("removing the buylist: %s", err)
 	}
-	if len(GetVendors()) != 0 {
-		t.Errorf("%d vendors still serve, want none", len(GetVendors()))
+	if len(currentPrices().vendors) != 0 {
+		t.Errorf("%d vendors still serve, want none", len(currentPrices().vendors))
 	}
 }
 
@@ -166,7 +166,7 @@ func TestPublishSessionStoreRefusesARealStore(t *testing.T) {
 	withScraperIndex(t, buildScraperIndex(map[string]map[string][]string{
 		"cardkingdom": {"retail": {"CK"}, "buylist": {"CK"}},
 	}))
-	err := updateSellers(inventoryOf("ZZREAL", 5, time.Now()))
+	err := testSite.updateSellers(inventoryOf("ZZREAL", 5, time.Now()))
 	if err != nil {
 		t.Fatalf("loading a real seller: %s", err)
 	}
@@ -188,7 +188,7 @@ func TestPublishSessionStoreRefusesARealStore(t *testing.T) {
 			t.Errorf("%s/%s registered as a session store", tt.kind, tt.shorthand)
 		}
 	}
-	inv, _ := findSellerInventory("ZZREAL")
+	inv, _ := currentPrices().sellerInventory("ZZREAL")
 	if len(inv) != 5 {
 		t.Errorf("the real seller serves %d cards after the refusals, want its 5", len(inv))
 	}
@@ -203,7 +203,7 @@ func TestPublishSessionStoreRefusesARealStore(t *testing.T) {
 	if err != nil {
 		t.Errorf("removing it: %s", err)
 	}
-	_, err = findSellerInventory("ZZREAL")
+	_, err = currentPrices().sellerInventory("ZZREAL")
 	if err != nil {
 		t.Error("removing the session buylist took the real seller with it")
 	}
@@ -233,7 +233,7 @@ func TestSessionStoreYieldsToTheConfig(t *testing.T) {
 	if err == nil {
 		t.Error("published over a store the config now claims")
 	}
-	_, err = findSellerInventory("ZZS")
+	_, err = currentPrices().sellerInventory("ZZS")
 	if err != nil {
 		t.Error("the claimed store stopped serving")
 	}
@@ -317,7 +317,7 @@ func TestAdminRemovesASessionStore(t *testing.T) {
 	if !strings.Contains(location, "ZZS+removed") && !strings.Contains(location, "ZZS%20removed") {
 		t.Errorf("redirected to %q, want the page told ZZS was removed", location)
 	}
-	_, err = findSellerInventory("ZZS")
+	_, err = currentPrices().sellerInventory("ZZS")
 	if err == nil {
 		t.Error("ZZS still serves after the dashboard removed it")
 	}
@@ -410,7 +410,7 @@ func TestUploadPublishesAStoreWhenGranted(t *testing.T) {
 		t.Error("the page does not show the publish confirmation")
 	}
 
-	bl, err := findVendorBuylist("ZZS")
+	bl, err := currentPrices().vendorBuylist("ZZS")
 	if err != nil {
 		t.Fatal("the buylist is not served")
 	}
@@ -418,7 +418,7 @@ func TestUploadPublishesAStoreWhenGranted(t *testing.T) {
 		t.Errorf("the buylist holds %+v", bl)
 	}
 	var info mtgban.ScraperInfo
-	for _, vendor := range GetVendors() {
+	for _, vendor := range currentPrices().vendors {
 		if vendor.Info().Shorthand == "ZZS" {
 			info = vendor.Info()
 		}
@@ -436,7 +436,7 @@ func TestUploadPublishesAStoreWhenGranted(t *testing.T) {
 	if strings.Contains(rec.Body.String(), "Published") {
 		t.Error("a request without UploadPublish shows a publish confirmation")
 	}
-	_, err = findVendorBuylist("ZZT")
+	_, err = currentPrices().vendorBuylist("ZZT")
 	if err == nil {
 		t.Error("a request without UploadPublish published a store")
 	}
@@ -493,7 +493,7 @@ func TestUploadPublishGateReadsItsOwnGrant(t *testing.T) {
 	if strings.Contains(rec.Body.String(), "Published") {
 		t.Error("Admin alone published a store")
 	}
-	_, err := findSellerInventory("ZZG1")
+	_, err := currentPrices().sellerInventory("ZZG1")
 	if err == nil {
 		t.Error("Admin alone published a store")
 	}
@@ -501,7 +501,7 @@ func TestUploadPublishGateReadsItsOwnGrant(t *testing.T) {
 	forged := url.Values{"UserEmail": {"admin@example.com"}, "UserTier": {"Test"}, "UploadPublish": {"true"},
 		"Expires": {"9999999999"}, "Signature": {"forged"}}
 	post(base64.StdEncoding.EncodeToString([]byte(forged.Encode())), "ZZG3")
-	_, err = findSellerInventory("ZZG3")
+	_, err = currentPrices().sellerInventory("ZZG3")
 	if err == nil {
 		t.Error("a forged UploadPublish published a store")
 	}
@@ -510,7 +510,7 @@ func TestUploadPublishGateReadsItsOwnGrant(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "Published") {
 		t.Fatal("the page does not show a publish confirmation")
 	}
-	_, err = findSellerInventory("ZZG2")
+	_, err = currentPrices().sellerInventory("ZZG2")
 	if err != nil {
 		t.Error("UploadPublish did not publish a store")
 	}

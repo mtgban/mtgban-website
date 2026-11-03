@@ -147,7 +147,7 @@ func TestDidYouMeanKeepsAStore(t *testing.T) {
 	if got, _ := searchSuggestions(ds, currentPrices(), query, config, nil, nil, false); got != "murder s:mkm" {
 		t.Fatalf("%q with no such store: did-you-mean %q, want murder s:mkm", query, got)
 	}
-	registerTestSeller(t, "MKM", somePlainCardUUIDs(t, 1))
+	registerTestSeller(t, testSite, "MKM", somePlainCardUUIDs(t, 1))
 	for _, query := range []string{query, "murder store:empty:mkm"} {
 		config := parseSearchOptionsNG(ds.backend, currentPrices(), query, nil, nil, nil)
 		if got, _ := searchSuggestions(ds, currentPrices(), query, config, nil, nil, false); got != "" {

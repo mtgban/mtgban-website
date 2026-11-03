@@ -63,15 +63,15 @@ func TestLoadFromCloudLoadsEveryDumpAStoreLists(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
 	}
-	if len(GetSellers()) != 1 || GetSellers()[0].Info().Shorthand != "CK" {
-		t.Errorf("sellers after load: %+v", GetSellers())
+	if len(currentPrices().sellers) != 1 || currentPrices().sellers[0].Info().Shorthand != "CK" {
+		t.Errorf("sellers after load: %+v", currentPrices().sellers)
 	}
-	if len(GetVendors()) != 1 || GetVendors()[0].Info().Shorthand != "CK" {
-		t.Errorf("vendors after load: %+v", GetVendors())
+	if len(currentPrices().vendors) != 1 || currentPrices().vendors[0].Info().Shorthand != "CK" {
+		t.Errorf("vendors after load: %+v", currentPrices().vendors)
 	}
-	store, ok := scraperStoreOf("CK")
+	store, ok := currentPrices().storeOf("CK")
 	if !ok || store != "cardkingdom" {
-		t.Errorf("scraperStoreOf(CK) = %q, %v, want cardkingdom, true", store, ok)
+		t.Errorf("currentPrices().storeOf(CK) = %q, %v, want cardkingdom, true", store, ok)
 	}
 }
 
@@ -121,13 +121,13 @@ func TestLoadFromCloudUpdatesTheIndexToWhatItJustListed(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
 	}
-	_, ok := scraperStoreOf("CKOLD")
+	_, ok := currentPrices().storeOf("CKOLD")
 	if ok {
 		t.Error("CKOLD, no longer listed, is still indexed")
 	}
-	store, ok := scraperStoreOf("CK")
+	store, ok := currentPrices().storeOf("CK")
 	if !ok || store != "cardkingdom" {
-		t.Errorf("scraperStoreOf(CK) = %q, %v, want cardkingdom, true", store, ok)
+		t.Errorf("currentPrices().storeOf(CK) = %q, %v, want cardkingdom, true", store, ok)
 	}
 }
 
@@ -171,8 +171,8 @@ func TestLoadFromCloudReportsADroppedDumpAsSkipped(t *testing.T) {
 			if w.Code != tc.status || !strings.Contains(w.Body.String(), tc.skipped+errDroppedDump.Error()) {
 				t.Errorf("status = %d, body = %s, want %d naming %q", w.Code, w.Body.String(), tc.status, tc.skipped)
 			}
-			if len(GetSellers()) != tc.sellers || len(GetVendors()) != tc.vendors {
-				t.Errorf("served %d sellers and %d vendors, want %d and %d", len(GetSellers()), len(GetVendors()), tc.sellers, tc.vendors)
+			if len(currentPrices().sellers) != tc.sellers || len(currentPrices().vendors) != tc.vendors {
+				t.Errorf("served %d sellers and %d vendors, want %d and %d", len(currentPrices().sellers), len(currentPrices().vendors), tc.sellers, tc.vendors)
 			}
 
 			// The notice goes out from a goroutine of its own
@@ -210,7 +210,7 @@ func TestLoadFromCloudPostsARefusalOnce(t *testing.T) {
 
 	now := time.Now()
 	vendors := []mtgban.Vendor{buylistOf("CK", 300, now.Add(-time.Hour))}
-	withPrices(t, GetSellers(), vendors)
+	withPrices(t, currentPrices().sellers, vendors)
 	writeSellerDump(t, filepath.Join("magic", "cardkingdom", "retail", "CK.json.xz"), inventoryOf("CK", 3, now))
 	writeVendorDump(t, filepath.Join("magic", "cardkingdom", "buylist", "CK.json.xz"), buylistOf("CK", 3, now))
 
@@ -235,9 +235,9 @@ func TestOverrideReloadPostsARefusalOnce(t *testing.T) {
 
 	now := time.Now()
 	vendors := []mtgban.Vendor{buylistOf("CK", 300, now.Add(-time.Hour))}
-	withPrices(t, GetSellers(), vendors)
+	withPrices(t, currentPrices().sellers, vendors)
 	writeVendorDump(t, filepath.Join("magic", "cardkingdom", "buylist", "CK.json.xz"), buylistOf("CK", 3, now))
-	updateScraperIndexStore("cardkingdom", map[string][]string{"buylist": {"CK"}})
+	testSite.updateScraperIndexStore("cardkingdom", map[string][]string{"buylist": {"CK"}})
 
 	testSite.reloadOverriddenScrapers(map[string]struct{}{"CK": {}})
 
@@ -245,8 +245,8 @@ func TestOverrideReloadPostsARefusalOnce(t *testing.T) {
 	if len(got) != 1 || got[0] != "@here override reload cardkingdom/buylist/CK: new buylist is missing too many entries" {
 		t.Errorf("posts = %q, want the one override notice naming the refusal", got)
 	}
-	if len(GetVendors()[0].Buylist()) != 300 {
-		t.Errorf("served buylist has %d entries, want the old 300", len(GetVendors()[0].Buylist()))
+	if len(currentPrices().vendors[0].Buylist()) != 300 {
+		t.Errorf("served buylist has %d entries, want the old 300", len(currentPrices().vendors[0].Buylist()))
 	}
 }
 

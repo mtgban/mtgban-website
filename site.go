@@ -8,10 +8,12 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/internal/dsreload"
@@ -26,10 +28,16 @@ import (
 // the palette and offline services they read, the datastore loader and the
 // reload tracker.
 type site struct {
-	ds      atomic.Pointer[datastore]
-	palette *palette.Service
-	offline *offlineapi.Service
-	reloads dsreload.Tracker
+	ds atomic.Pointer[datastore]
+	// pricesPtr holds the published prices snapshot, nil until the first
+	// publish; prices() serves emptyPrices until then. scrapersMu
+	// serializes its writers, so concurrent publishes do not lose each
+	// other's changes during the read-build-publish cycle.
+	pricesPtr  atomic.Pointer[prices]
+	scrapersMu sync.Mutex
+	palette    *palette.Service
+	offline    *offlineapi.Service
+	reloads    dsreload.Tracker
 
 	// alerts is the price alerts service; openDBs attaches its store.
 	alerts *alerts.Service
@@ -74,8 +82,8 @@ func newSite() *site {
 		FinishNames:  finishNames,
 		Snapshot:     func() *palette.Snapshot { return s.datastore().palette },
 
-		Sellers:      GetSellers,
-		Vendors:      GetVendors,
+		Sellers:      func() []mtgban.Seller { return s.prices().sellers },
+		Vendors:      func() []mtgban.Vendor { return s.prices().vendors },
 		HiddenStores: requestBlocklists,
 	}
 
@@ -141,10 +149,10 @@ func newSite() *site {
 			return sellers, vendors
 		},
 
-		Sellers: GetSellers,
-		Vendors: GetVendors,
+		Sellers: func() []mtgban.Seller { return s.prices().sellers },
+		Vendors: func() []mtgban.Vendor { return s.prices().vendors },
 
-		ScraperName:       scraperName,
+		ScraperName:       func(shorthand string) string { return s.prices().scraperName(shorthand) },
 		CardObjectSources: cardobject2sources,
 		FinishNames:       finishNames,
 		Finishes:          s.palette.FinishList,
@@ -204,10 +212,15 @@ func (s *site) datastore() *datastore {
 	return s.ds.Load()
 }
 
-// prices returns the served price snapshot: the process's one snapshot,
-// read once per unit of work where it starts and handed down.
+// prices returns the served price snapshot, or the empty one before the
+// first publish: read once per unit of work where it starts and handed
+// down. Never nil.
 func (s *site) prices() *prices {
-	return currentPrices()
+	p := s.pricesPtr.Load()
+	if p == nil {
+		return emptyPrices
+	}
+	return p
 }
 
 func (s *site) backend() *matcher.Backend {

@@ -247,23 +247,23 @@ func TestStoreFactorsRankOffers(t *testing.T) {
 // registerFactorStore files a throwaway seller and vendor under shorthand,
 // both quoting the same card, with a credit multiplier so the vendor's row
 // carries a credit the factor can scale. Restored once the test ends.
-func registerFactorStore(t *testing.T, shorthand, uuid string, retail, buy float64) {
+func registerFactorStore(t *testing.T, s *site, shorthand, uuid string, retail, buy float64) {
 	t.Helper()
-	keepPrices(t)
+	keepSitePrices(t, s)
 
 	now := time.Now()
 	inv := mtgban.InventoryRecord{uuid: {{Price: retail, Conditions: "NM"}}}
 	seller := mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{
 		Name: shorthand, Shorthand: shorthand, InventoryTimestamp: &now,
 	})
-	if err := updateSellers(seller); err != nil {
+	if err := s.updateSellers(seller); err != nil {
 		t.Fatalf("registering seller %s: %v", shorthand, err)
 	}
 	bl := mtgban.BuylistRecord{uuid: {{BuyPrice: buy, Conditions: "NM"}}}
 	vendor := mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{
 		Name: shorthand, Shorthand: shorthand, BuylistTimestamp: &now, CreditMultiplier: 1.3,
 	})
-	if err := updateVendors(vendor); err != nil {
+	if err := s.updateVendors(vendor); err != nil {
 		t.Fatalf("registering vendor %s: %v", shorthand, err)
 	}
 }
@@ -275,15 +275,15 @@ func registerFactorStore(t *testing.T, shorthand, uuid string, retail, buy float
 func TestStoreFactorsLeavePriceFiltersOnTheQuotedPrice(t *testing.T) {
 	s := fixtureSite(t, fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}}), nil, nil)
 	uuid := "FIXTUREA-1"
-	registerFactorStore(t, "TESTFACT", uuid, 5.5, 5)
+	registerFactorStore(t, s, "TESTFACT", uuid, 5.5, 5)
 
 	ds := s.datastore()
 	search := func(query, cookie string) searchResults {
 		r := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query), nil)
 		r.AddCookie(&http.Cookie{Name: storeFactorsCookie, Value: cookie})
-		config := parseSearchOptionsNG(ds.backend, currentPrices(), query, nil, nil, nil)
-		result := runSearch(r, ds, currentPrices(), config)
-		result.sellers, result.vendors = collectOffers(ds.backend, currentPrices(), r, config, result.keys)
+		config := parseSearchOptionsNG(ds.backend, s.prices(), query, nil, nil, nil)
+		result := runSearch(r, ds, s.prices(), config)
+		result.sellers, result.vendors = collectOffers(ds.backend, s.prices(), r, config, result.keys)
 		applyStoreFactors(result, readStoreFactors(r))
 		return result
 	}

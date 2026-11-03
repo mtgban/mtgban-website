@@ -27,30 +27,30 @@ func storeIndexFixture(t testing.TB) {
 func TestStoreIndexMatchesTheScans(t *testing.T) {
 	storeIndexFixture(t)
 
-	if got := scraperName("CK"); got != "Card Kingdom" {
-		t.Errorf("scraperName(CK) = %q, want the first seller", got)
+	if got := currentPrices().scraperName("CK"); got != "Card Kingdom" {
+		t.Errorf("currentPrices().scraperName(CK) = %q, want the first seller", got)
 	}
-	if got := scraperName("ABU"); got != "ABU Games" {
-		t.Errorf("scraperName(ABU) = %q, want the vendor", got)
+	if got := currentPrices().scraperName("ABU"); got != "ABU Games" {
+		t.Errorf("currentPrices().scraperName(ABU) = %q, want the vendor", got)
 	}
-	if got := scraperName("ck"); got != "" {
-		t.Errorf("scraperName(ck) = %q, want nothing: the name lookup is exact", got)
+	if got := currentPrices().scraperName("ck"); got != "" {
+		t.Errorf("currentPrices().scraperName(ck) = %q, want nothing: the name lookup is exact", got)
 	}
-	if !isSealedScraper("CKSealed") || isSealedScraper("CK") || isSealedScraper("cksealed") {
+	if !currentPrices().isSealedScraper("CKSealed") || currentPrices().isSealedScraper("CK") || currentPrices().isSealedScraper("cksealed") {
 		t.Error("isSealedScraper should match the exact shorthand only")
 	}
-	inv, err := findSellerInventory("ck")
+	inv, err := currentPrices().sellerInventory("ck")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := inv["a"]; !ok {
-		t.Error("findSellerInventory(ck) should fold case and return the first CK seller")
+		t.Error("currentPrices().sellerInventory(ck) should fold case and return the first CK seller")
 	}
-	if _, err := findVendorBuylist("abu"); err != nil {
-		t.Errorf("findVendorBuylist(abu) = %v, want the vendor", err)
+	if _, err := currentPrices().vendorBuylist("abu"); err != nil {
+		t.Errorf("currentPrices().vendorBuylist(abu) = %v, want the vendor", err)
 	}
-	if _, err := findVendorBuylist("CKSealed"); err == nil {
-		t.Error("findVendorBuylist(CKSealed) should not find a seller")
+	if _, err := currentPrices().vendorBuylist("CKSealed"); err == nil {
+		t.Error("currentPrices().vendorBuylist(CKSealed) should not find a seller")
 	}
 }
 
@@ -61,23 +61,23 @@ func TestStoreIndexCaseOnlyCollision(t *testing.T) {
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"first": nil}, mtgban.ScraperInfo{Shorthand: "Ck", Name: "Mixed Case"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"second": nil}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Upper Case", SealedMode: true}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
-	if got := scraperName("CK"); got != "Upper Case" {
-		t.Errorf("scraperName(CK) = %q, want the exact match listed second", got)
+	if got := currentPrices().scraperName("CK"); got != "Upper Case" {
+		t.Errorf("currentPrices().scraperName(CK) = %q, want the exact match listed second", got)
 	}
-	if got := scraperName("Ck"); got != "Mixed Case" {
-		t.Errorf("scraperName(Ck) = %q, want the exact match listed first", got)
+	if got := currentPrices().scraperName("Ck"); got != "Mixed Case" {
+		t.Errorf("currentPrices().scraperName(Ck) = %q, want the exact match listed first", got)
 	}
-	if !isSealedScraper("CK") || isSealedScraper("Ck") {
+	if !currentPrices().isSealedScraper("CK") || currentPrices().isSealedScraper("Ck") {
 		t.Error("isSealedScraper should tell the two apart")
 	}
-	inv, err := findSellerInventory("ck")
+	inv, err := currentPrices().sellerInventory("ck")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := inv["first"]; !ok {
-		t.Error("findSellerInventory(ck) should fold to the first listed")
+		t.Error("currentPrices().sellerInventory(ck) should fold to the first listed")
 	}
 }
 
@@ -85,25 +85,25 @@ func TestStoreIndexCaseOnlyCollision(t *testing.T) {
 // and one that drops a store takes it out of the index.
 func TestStoreIndexFollowsTheSnapshot(t *testing.T) {
 	storeIndexFixture(t)
-	if _, err := findSellerInventory("TCG"); err == nil {
+	if _, err := currentPrices().sellerInventory("TCG"); err == nil {
 		t.Fatal("TCG should not be loaded yet")
 	}
 
-	withTCG := append(slices.Clone(GetSellers()), mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCG", Name: "TCGplayer"}))
-	withPrices(t, withTCG, GetVendors())
-	if got := scraperName("TCG"); got != "TCGplayer" {
-		t.Errorf("after a new snapshot, scraperName(TCG) = %q", got)
+	withTCG := append(slices.Clone(currentPrices().sellers), mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCG", Name: "TCGplayer"}))
+	withPrices(t, withTCG, currentPrices().vendors)
+	if got := currentPrices().scraperName("TCG"); got != "TCGplayer" {
+		t.Errorf("after a new snapshot, currentPrices().scraperName(TCG) = %q", got)
 	}
 
 	withoutTCG := slices.Clone(withTCG[:len(withTCG)-1])
-	withPrices(t, withoutTCG, GetVendors())
-	if got := scraperName("TCG"); got != "" {
-		t.Errorf("after a snapshot without it, scraperName(TCG) = %q", got)
+	withPrices(t, withoutTCG, currentPrices().vendors)
+	if got := currentPrices().scraperName("TCG"); got != "" {
+		t.Errorf("after a snapshot without it, currentPrices().scraperName(TCG) = %q", got)
 	}
 
 	withPrices(t, nil, nil)
-	if got := scraperName("CK"); got != "" {
-		t.Errorf("with no snapshot, scraperName(CK) = %q", got)
+	if got := currentPrices().scraperName("CK"); got != "" {
+		t.Errorf("with no snapshot, currentPrices().scraperName(CK) = %q", got)
 	}
 }
 
@@ -122,10 +122,10 @@ func BenchmarkScraperName(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		if scraperName("V39") == "" {
+		if currentPrices().scraperName("V39") == "" {
 			b.Fatal("V39 not found")
 		}
-		if _, err := findSellerInventory("s59"); err != nil {
+		if _, err := currentPrices().sellerInventory("s59"); err != nil {
 			b.Fatal(err)
 		}
 	}
