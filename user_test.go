@@ -500,9 +500,15 @@ func TestDiscordHandleStopsAtTheContext(t *testing.T) {
 	defer cancel()
 	start := time.Now()
 	_, err := discordHandle(ctx, "90")
+	elapsed := time.Since(start)
 	close(release)
-	if err == nil || time.Since(start) > time.Second {
-		t.Fatalf("err %v after %v, want a timeout", err, time.Since(start))
+	if err == nil || elapsed > time.Second {
+		t.Fatalf("err %v after %v, want a timeout", err, elapsed)
+	}
+	// The lookup outlives the call; join it, from the flight or the cache,
+	// before the cleanup swaps the seam back under it.
+	if got, err := discordHandle(context.Background(), "90"); err != nil || got != "@elmo" {
+		t.Errorf("joined lookup = %q, %v; want @elmo", got, err)
 	}
 }
 
