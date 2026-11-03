@@ -266,7 +266,7 @@ var magicStub = scraperStub{
 
 func TestStoreFamiliesFromTheServedScrapers(t *testing.T) {
 	stubScrapers(t, magicStub)
-	implied, selectable := storeFamilies()
+	implied, selectable := storeFamilies(currentPrices())
 	// The tcg_* keys merge into one family, named by the price list.
 	if len(implied) != 1 || implied[0].Key != "tcg" || implied[0].Name != "TCGplayer" || !slices.Equal(implied[0].Shorthands, []string{"SYP", "TCGLow", "TCGMarket"}) {
 		t.Errorf("implied %+v", implied)
@@ -308,7 +308,7 @@ func TestFamilyName(t *testing.T) {
 
 func TestStoreFamiliesEmptyWithNothingServed(t *testing.T) {
 	stubScrapers(t, scraperStub{config: magicStub.config})
-	implied, selectable := storeFamilies()
+	implied, selectable := storeFamilies(currentPrices())
 	if len(implied) != 0 || len(selectable) != 0 {
 		t.Errorf("implied %+v selectable %+v", implied, selectable)
 	}
@@ -405,7 +405,7 @@ func TestAPIStoresServesTheFamilies(t *testing.T) {
 	t.Cleanup(func() { Config().Game = savedGame })
 	Config().Game = "magic"
 	rec := httptest.NewRecorder()
-	APIStores(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+	testSite.APIStores(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d", rec.Code)
 	}
@@ -446,7 +446,7 @@ func TestAPIStoresEmptyListsAreArrays(t *testing.T) {
 	// Loaded, but nothing the scraper config names.
 	stubScrapers(t, scraperStub{sellers: []string{"GN"}, vendors: []string{"GN"}})
 	rec := httptest.NewRecorder()
-	APIStores(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+	testSite.APIStores(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
 	if body := rec.Body.String(); !strings.Contains(body, `"implied":[]`) || !strings.Contains(body, `"stores":[]`) {
 		t.Errorf("body %s", body)
 	}
@@ -456,7 +456,7 @@ func TestAPIStoresIsUnavailableWhileLoading(t *testing.T) {
 	for _, stub := range []scraperStub{{}, {config: magicStub.config, sellers: magicStub.sellers}, {config: magicStub.config, vendors: magicStub.vendors}} {
 		stubScrapers(t, stub)
 		rec := httptest.NewRecorder()
-		APIStores(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+		testSite.APIStores(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Errorf("status %d", rec.Code)
 		}
@@ -472,7 +472,7 @@ func TestAPIStoresIsUnavailableWhileLoading(t *testing.T) {
 func TestAPIStoresIsGetOnly(t *testing.T) {
 	stubScrapers(t, magicStub)
 	rec := httptest.NewRecorder()
-	APIStores(rec, httptest.NewRequest(http.MethodPost, "/api-plans/stores.json", nil))
+	testSite.APIStores(rec, httptest.NewRequest(http.MethodPost, "/api-plans/stores.json", nil))
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("status %d", rec.Code)
 	}

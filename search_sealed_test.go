@@ -7,7 +7,7 @@ import (
 // sealedSearch runs a query the way the sealed tab does, fallback and all.
 func sealedSearch(t *testing.T, query string) []string {
 	t.Helper()
-	config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil)
 	config.SearchMode = "sealed"
 
 	keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)

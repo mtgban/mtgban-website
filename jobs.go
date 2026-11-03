@@ -103,7 +103,7 @@ func (s *site) scheduleCrons() *cron.Cron {
 	}
 	ckJob := tracked(jobCKSignals, s.refreshCKSignals)
 	c.Schedule(ckSchedule, cron.FuncJob(func() {
-		if !ckAvailable() {
+		if !ckAvailable(s.prices()) {
 			return
 		}
 		backgroundJobs.Schedule(jobCKSignals, ckSchedule.Next)

@@ -588,6 +588,12 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	ds := s.datastore()
 	p := s.prices()
 	b := ds.backend
+	// Until the stores load every API answer would be empty; a 503 makes
+	// clients retry rather than cache blank prices
+	if isAPI && (len(p.sellers) == 0 || len(p.vendors) == 0) {
+		errorResponse(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+		return
+	}
 	// The API middleware checks a ?sig= and lets a request without one
 	// through unchecked, so a cookie counts only once it is checked here.
 	sig := r.FormValue("sig")
@@ -683,10 +689,10 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	miscSearchOpts := readSearchMiscOpts(r)
 	// The export reads a number alone as the page does; the API keeps it the
 	// product id its callers send.
-	config := parseSearchPage(ds, query, isSealed, isAPI, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	config := parseSearchPage(ds, p, query, isSealed, isAPI, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	// The export links carry the sticky bar as its own parameter rather
 	// than spliced into the path, so the csv holds the rows the page did.
-	applySearchScope(&config, scopeFilters(ds, strings.TrimSpace(r.FormValue("scope")), isSealed, isAPI))
+	applySearchScope(&config, scopeFilters(ds, p, strings.TrimSpace(r.FormValue("scope")), isSealed, isAPI))
 	if isSealed {
 		config.SearchMode = "sealed"
 		// v2 keeps an id the request asks for
@@ -731,7 +737,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	demoFilter := func(name string, forSeller bool) []FilterStoreElem {
 		return []FilterStoreElem{{
 			Name:          name,
-			Values:        fixupStoreCodeNG(strings.Join(Config().Stores.APIDemoStores, ",")),
+			Values:        fixupStoreCodeNG(p, strings.Join(Config().Stores.APIDemoStores, ",")),
 			OnlyForSeller: forSeller,
 			OnlyForVendor: !forSeller,
 		}}
@@ -741,11 +747,11 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 		sellers, vendors := apiEnabledStores(p, storesOpt)
 		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
 			Name:          "seller",
-			Values:        fixupStoreCodeNG(strings.Join(sellers, ",")),
+			Values:        fixupStoreCodeNG(p, strings.Join(sellers, ",")),
 			OnlyForSeller: true,
 		}, FilterStoreElem{
 			Name:          "vendor",
-			Values:        fixupStoreCodeNG(strings.Join(vendors, ",")),
+			Values:        fixupStoreCodeNG(p, strings.Join(vendors, ",")),
 			OnlyForVendor: true,
 		})
 	}

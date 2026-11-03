@@ -34,7 +34,7 @@ func alertTestStores(t *testing.T) {
 
 func TestAlertStorePricesSkipsIndexBlockedAndOtherKind(t *testing.T) {
 	alertTestStores(t)
-	got := alertStorePrices("card-1", false, alerts.SideBuylist, []string{"SCG"})
+	got := alertStorePrices(currentPrices(), "card-1", false, alerts.SideBuylist, []string{"SCG"})
 	if len(got) != 2 || got[0].Shorthand != "CK" || got[1].Shorthand != "ABU" {
 		t.Fatalf("stores = %+v, want CK and ABU", got)
 	}
@@ -44,15 +44,15 @@ func TestAlertStorePricesSkipsIndexBlockedAndOtherKind(t *testing.T) {
 	if got[0].Prices["NM"] != 12 {
 		t.Fatalf("CK NM = %v, want 12", got[0].Prices["NM"])
 	}
-	all := alertStorePrices("card-1", false, alerts.SideBuylist, nil)
+	all := alertStorePrices(currentPrices(), "card-1", false, alerts.SideBuylist, nil)
 	if len(all) != 3 || all[1].Shorthand != "SCG" || all[1].Prices["NM"] != 14 {
 		t.Fatalf("stores = %+v, want SCG's offer, which carries no quantity", all)
 	}
-	sealed := alertStorePrices("card-1", true, alerts.SideBuylist, nil)
+	sealed := alertStorePrices(currentPrices(), "card-1", true, alerts.SideBuylist, nil)
 	if len(sealed) != 1 || sealed[0].Shorthand != "ABUSealed" {
 		t.Fatalf("sealed stores = %+v, want ABUSealed only", sealed)
 	}
-	retail := alertStorePrices("card-1", false, alerts.SideRetail, nil)
+	retail := alertStorePrices(currentPrices(), "card-1", false, alerts.SideRetail, nil)
 	if len(retail) != 1 || retail[0].Prices["HP"] != 8 {
 		t.Fatalf("retail = %+v", retail)
 	}
@@ -67,7 +67,7 @@ func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "ABUCredit", Name: "ABU Games (credit)"}),
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "MKMBL", Name: "Cardmarket", CountryFlag: "EU"}))
 	withPrices(t, GetSellers(), vendors)
-	for _, s := range alertStorePrices("card-1", false, alerts.SideBuylist, nil) {
+	for _, s := range alertStorePrices(currentPrices(), "card-1", false, alerts.SideBuylist, nil) {
 		if s.PickedOnly != slices.Contains([]string{"TCGDirectNet", "CKBLLast", "ABUCredit", "MKMBL"}, s.Shorthand) {
 			t.Fatalf("%s PickedOnly = %v", s.Shorthand, s.PickedOnly)
 		}
@@ -75,7 +75,7 @@ func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 	vendors = append(vendors,
 		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "ABUCreditSealed", Name: "ABU Games (credit)", SealedMode: true}))
 	withPrices(t, GetSellers(), vendors)
-	for _, s := range alertStorePrices("card-1", true, alerts.SideBuylist, nil) {
+	for _, s := range alertStorePrices(currentPrices(), "card-1", true, alerts.SideBuylist, nil) {
 		if s.PickedOnly != (s.Shorthand == "ABUCreditSealed") {
 			t.Fatalf("sealed %s PickedOnly = %v", s.Shorthand, s.PickedOnly)
 		}
@@ -84,7 +84,7 @@ func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"card-1": {{Conditions: "NM", Price: 18}}},
 			mtgban.ScraperInfo{Shorthand: "MKMLow", Name: "Cardmarket", CountryFlag: "EU"}))
 	withPrices(t, sellers, GetVendors())
-	for _, s := range alertStorePrices("card-1", false, alerts.SideRetail, nil) {
+	for _, s := range alertStorePrices(currentPrices(), "card-1", false, alerts.SideRetail, nil) {
 		if s.PickedOnly {
 			t.Fatalf("retail %s PickedOnly, want every seller watched", s.Shorthand)
 		}

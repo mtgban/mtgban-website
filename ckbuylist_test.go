@@ -547,7 +547,7 @@ func TestRebuildCKSignals(t *testing.T) {
 	setTestCKInputs(t, mtgban.InventoryRecord{"plain": {{Price: 9}}},
 		&ckHistorySnapshot{Today: today, Yesterday: today.AddDate(0, 0, -1), Products: products})
 
-	rebuildCKSignals()
+	rebuildCKSignals(currentPrices())
 	// plain is at a new high only, which is no sell.
 	for cardID, want := range map[string]string{"a": "wait", "new": "sell", "plain": "", "cheap": "", "off": ""} {
 		got := ckSignalForCard(ckTestCard(cardID))
@@ -572,21 +572,21 @@ func TestRebuildCKSignals(t *testing.T) {
 	if got := ckSignalForCard(ckTestCard("a")); got.State != "wait" {
 		t.Errorf("before the rebuild: got %+v, want the wait still", got)
 	}
-	rebuildCKSignals()
+	rebuildCKSignals(currentPrices())
 	if got := ckSignalForCard(ckTestCard("a")); got.State != "" {
 		t.Errorf("no history: got %+v, want no state", got)
 	}
 
 	// Loaded the day before, the history cannot see a halving.
 	ckHistoryPtr.Store(&ckHistorySnapshot{Today: today.AddDate(0, 0, -1), Yesterday: today.AddDate(0, 0, -2), Products: products})
-	rebuildCKSignals()
+	rebuildCKSignals(currentPrices())
 	if got := ckSignalForCard(ckTestCard("a")); got.State != "" {
 		t.Errorf("history from the day before: got %+v, want no state", got)
 	}
 
 	// Without odds nothing is colored; the facts still show.
 	ckOddsPtr.Store(nil)
-	rebuildCKSignals()
+	rebuildCKSignals(currentPrices())
 	if got := ckSignalForCard(ckTestCard("new")); got.State != "" || got.Facts != "|CK stock|1" {
 		t.Errorf("no odds: got %+v, want the facts only", got)
 	}
@@ -699,7 +699,7 @@ func TestRebuildCKPauses(t *testing.T) {
 		Products: map[string]ckHistory{"333": paused, "334": paused, "555": paused, "666": paused, "777": paused},
 	})
 
-	rebuildCKSignals()
+	rebuildCKSignals(currentPrices())
 	// Paused 4 days: back within a month 88%, and every decile above SCG's 8.
 	got := ckSignalForCard(ckTestCard("p"))
 	if got.PauseLabel != "Paused 4d" || !got.PauseWait || got.State != "" ||
@@ -790,7 +790,7 @@ func TestCardFilterOnCK(t *testing.T) {
 		Today: today, Yesterday: today.AddDate(0, 0, -1),
 		Products: map[string]ckHistory{"2": {StockYesterday: 3, HasStockYesterday: true}},
 	})
-	rebuildCKSignals()
+	rebuildCKSignals(currentPrices())
 
 	for _, tc := range []struct {
 		card         string
@@ -823,7 +823,7 @@ func TestCKWorkNeedsCKBuylist(t *testing.T) {
 	ckSignalsPtr.Store(nil)
 
 	(&site{}).refreshCKSignals()
-	rebuildCKSignals()
+	rebuildCKSignals(currentPrices())
 	if ckSignalsPtr.Load() != nil {
 		t.Error("built CK signals without a CK buylist")
 	}

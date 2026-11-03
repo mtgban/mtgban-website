@@ -187,6 +187,10 @@ type settingsModalVars struct {
 	// search
 	SellerKeys []string
 	VendorKeys []string
+	// StoreNames names every store the tabs list by shorthand, and
+	// StoreFactorOptions is the search tab's store-factor editor data
+	StoreNames         map[string]string
+	StoreFactorOptions string
 	// Which of SellerKeys and VendorKeys trade sealed product
 	SealedStores  map[string]bool
 	ListingLocked bool
@@ -254,6 +258,8 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 	}
 	v.SellerKeys, v.VendorKeys = searchSettingsKeys(p)
 	v.SealedStores = p.sealedStores()
+	v.StoreNames = p.storeNames()
+	v.StoreFactorOptions = storeFactorOptions(p, v.SellerKeys, v.VendorKeys)
 
 	up := uploadSettingsKeys(p, sig)
 	v.UploadAltKeys = up.AltKeys

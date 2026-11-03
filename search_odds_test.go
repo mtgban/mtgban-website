@@ -35,7 +35,7 @@ func productWithVariableCards(t *testing.T) *matcher.CardObject {
 			if err != nil {
 				continue
 			}
-			config := parseSearchOptionsNG(backend(), `variable:"`+co.Name+`"`, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), currentPrices(), `variable:"`+co.Name+`"`, nil, nil, nil)
 			found, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 			if err != nil || !containsSingles(backend(), found) {
 				continue
@@ -65,7 +65,7 @@ func TestDropOddsAnswerTheVariableReadingOnly(t *testing.T) {
 	}
 
 	for _, mode := range []string{ContentsAll, ContentsFixed} {
-		config := parseSearchOptionsNG(backend(), mode+`:"`+co.Name+`"`, nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), mode+`:"`+co.Name+`"`, nil, nil, nil)
 		if odds := dropOdds(backend(), config); odds != nil {
 			t.Errorf("the %s reading carries odds for %d cards", mode, len(odds))
 		}
@@ -74,7 +74,7 @@ func TestDropOddsAnswerTheVariableReadingOnly(t *testing.T) {
 		t.Error("an ordinary search carries odds")
 	}
 
-	config := parseSearchOptionsNG(backend(), `variable:"`+co.Name+`"`, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), `variable:"`+co.Name+`"`, nil, nil, nil)
 	odds := dropOdds(backend(), config)
 	if len(odds) == 0 {
 		t.Fatalf("%s opens into nothing", co.Name)
@@ -143,7 +143,7 @@ func TestVariableReadingShowsAndSortsByDropRate(t *testing.T) {
 		t.Skip("this datastore has no product whose variable reading holds cards")
 	}
 	query := `variable:"` + co.Name + `"`
-	odds := dropOdds(backend(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+	odds := dropOdds(backend(), parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil))
 
 	page := httptest.NewRecorder()
 	testSite.Search(page, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query)+"&sort=odds", nil))
@@ -269,7 +269,7 @@ func TestDropRateShowsOnlyOnTheBuyersSide(t *testing.T) {
 		t.Skip("this datastore has no product whose variable reading holds cards")
 	}
 	query := `variable:"` + co.Name + `"`
-	odds := dropOdds(backend(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+	odds := dropOdds(backend(), parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil))
 
 	page := httptest.NewRecorder()
 	testSite.Search(page, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query), nil))
@@ -328,7 +328,7 @@ func TestDropRateDoesNotBorrowACKBadgeOrAFixLink(t *testing.T) {
 		t.Skip("this datastore has no product whose variable reading holds cards")
 	}
 	query := `variable:"` + co.Name + `"`
-	odds := dropOdds(backend(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+	odds := dropOdds(backend(), parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil))
 
 	page := httptest.NewRecorder()
 	testSite.Search(page, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query), nil))

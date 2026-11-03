@@ -96,14 +96,14 @@
                 <select name="ref" id="ref" aria-label="Reference seller" onchange="window.checkSleepersCompare && checkSleepersCompare()">
                     <option value="" disabled selected>Reference seller...</option>
                     {{range .SellerKeys}}
-                        <option value="{{.}}">{{scraper_name .}}</option>
+                        <option value="{{.}}">{{index $.StoreNames .}}</option>
                     {{end}}
                 </select>
                 <span class="m-sleep-vs">VS</span>
                 <select name="target" id="target" aria-label="Target seller" onchange="window.checkSleepersCompare && checkSleepersCompare()">
                     <option value="" disabled selected>Target seller...</option>
                     {{range .SellerKeys}}
-                        <option value="{{.}}">{{scraper_name .}}</option>
+                        <option value="{{.}}">{{index $.StoreNames .}}</option>
                     {{end}}
                 </select>
                 <button type="submit" class="m-sleep-gap-go" id="sleepers-comp-go" disabled>Compare</button>

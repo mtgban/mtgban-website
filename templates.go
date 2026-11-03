@@ -273,10 +273,6 @@ var funcMap = template.FuncMap{
 		n, _ := strconv.ParseFloat(s, 64)
 		return fmt.Sprintf("$ %0.2f", n)
 	},
-	"scraper_name": func(s string) string {
-		return scraperName(s)
-	},
-	"store_factor_options": storeFactorOptions,
 	"strip_edition": func(name, edition string, sealed bool) string {
 		if !sealed || edition == "" {
 			return name
@@ -409,9 +405,6 @@ var funcMap = template.FuncMap{
 		}
 		return fitCode(badge, code)
 	},
-	"cart_load":        cartLoadFor,
-	"cart_load_arbit":  cartLoadForArbit,
-	"cart_sends":       cartSendsFor,
 	"cart_stores_in":   cartStoresIn,
 	"cart_bookmarklet": cartBookmarklet,
 	"isSussy": func(m map[string]float64, s string) bool {
@@ -577,7 +570,6 @@ var funcMap = template.FuncMap{
 	"palette_newspaper_targets": sync.OnceValue(func() template.JS { return palette.NewspaperTargetsJSON(paletteNewspaperPages()) }),
 	"palette_sleepers_targets":  sync.OnceValue(palette.SleepersTargetsJSON),
 	"palette_arbit_targets":     sync.OnceValue(palette.ArbitTargetsJSON),
-	"guide_stores":              guideStoresJSON,
 	"usd":                       formatUSD,
 	"plural":                    plural,
 	"api_plans_json":            apiPlansJSON,

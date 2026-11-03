@@ -285,6 +285,10 @@ type OptimizedUploadEntry struct {
 	// The UUID of the card
 	CardID string
 
+	// Sends is the row's send menu on the buylist page: the splits whose
+	// cart takes the card, with each one's offer
+	Sends []cartSend
+
 	// Condition as found in the source data
 	Condition mtgban.Condition
 
@@ -449,15 +453,17 @@ type UploadVars struct {
 	RemoteLinkURL        string
 	TotalQuantity        int
 	Optimized            map[string][]OptimizedUploadEntry
-	OptimizedKeys        []string
-	IgnorePrices         bool
-	OptimizedTotals      map[string]float64
-	OptimizedQuantities  map[string]int
-	HighestTotal         float64
-	MissingCounts        map[string]int
-	MissingPrices        map[string]float64
-	ResultPrices         map[string]map[string]float64
-	UploadQuery          string
+	// CartLoads is each split's cart button, by store key
+	CartLoads           map[string]cartLoad
+	OptimizedKeys       []string
+	IgnorePrices        bool
+	OptimizedTotals     map[string]float64
+	OptimizedQuantities map[string]int
+	HighestTotal        float64
+	MissingCounts       map[string]int
+	MissingPrices       map[string]float64
+	ResultPrices        map[string]map[string]float64
+	UploadQuery         string
 	// Original link of a remote-URL upload, so the results header can
 	// point back at the source
 	UploadSourceURL string
@@ -585,6 +591,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.EnabledSealedVendors = selected.tickedSealedVendors
 	pageVars.IndexAllKeys = UploadIndexKeysPublic
 	pageVars.SealedIndexAllKeys = selected.sealedIndexes
+	pageVars.StoreNames = p.storeNames()
 	pageVars.EnabledIndexes = selected.enabledIndexKeys
 	pageVars.EnabledSealedIndexes = selected.enabledSealedIndexKeys
 
@@ -785,7 +792,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.CanFilterByPrice = st.priceSource == ""
 	}
 
-	fillUploadResults(&pageVars.UploadVars, b, ds.editions.ReprintParents, st, ids, prices, rows, uploadedData)
+	fillUploadResults(&pageVars.UploadVars, b, p, ds.editions.ReprintParents, st, ids, prices, rows, uploadedData)
 
 	// Logs
 	user := GetParamFromSig(sig, "UserEmail")
@@ -869,7 +876,23 @@ func uploadMetadata(b *matcher.Backend, p *prices, st uploadSettings, uploadedDa
 // fillUploadResults sorts the rows and the optimizer's picks, and lays them
 // out on the page: the tabs, the opened products' sections, the totals row
 // and the optimizer's sections.
-func fillUploadResults(pageVars *UploadVars, b *matcher.Backend, reprintParents map[string]string, st uploadSettings, ids uploadIDs, prices uploadPrices, rows uploadRows, uploadedData []UploadEntry) {
+// fillCarts gives each split its cart button and, on the buylist page, each
+// row its send menu over keys, the page's stores in their order.
+func (v *UploadVars) fillCarts(p *prices, keys []string) {
+	v.CartLoads = map[string]cartLoad{}
+	for key, entries := range v.Optimized {
+		v.CartLoads[key] = cartLoadFor(p, key, v.IsBuylist, entries)
+		if !v.IsBuylist {
+			continue
+		}
+		for i := range entries {
+			offerKey := entries[i].CardID + string(entries[i].Condition)
+			entries[i].Sends = cartSendsFor(p, keys, v.ResultPrices[offerKey], entries[i])
+		}
+	}
+}
+
+func fillUploadResults(pageVars *UploadVars, b *matcher.Backend, p *prices, reprintParents map[string]string, st uploadSettings, ids uploadIDs, prices uploadPrices, rows uploadRows, uploadedData []UploadEntry) {
 	sortResults(b, reprintParents, uploadedData, rows.optimizedResults, st.sorting)
 
 	// Split sorted entries into singles, sealed, and not-found for the tabbed view
@@ -909,6 +932,7 @@ func fillUploadResults(pageVars *UploadVars, b *matcher.Backend, reprintParents 
 		// and only a separate symbol should link out to the alternate source.
 		pageVars.IgnorePrices = st.skipPrices
 		pageVars.Optimized = rows.optimizedResults
+		pageVars.fillCarts(p, prices.enabledStores)
 		// Only the stores that render a results section, in display order,
 		// so that the template can link each section to the previous/next one
 		for _, key := range activeTotalStores {

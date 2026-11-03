@@ -51,8 +51,8 @@ func liveAlertSender(send bool) alerts.DiscordSender {
 }
 
 // alertStoreLabel is the store name, or its shorthand when it is not loaded.
-func alertStoreLabel(shorthand string) string {
-	name := scraperName(shorthand)
+func alertStoreLabel(p *prices, shorthand string) string {
+	name := p.scraperName(shorthand)
 	if name != "" {
 		return name
 	}

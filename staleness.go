@@ -159,7 +159,7 @@ func dropStaleStores(now time.Time) {
 	for _, store := range takeStaleStores(now) {
 		switch strings.ToUpper(store.info.Shorthand) {
 		case "CK", "CKBLLAST":
-			rebuildCKSignals()
+			rebuildCKSignals(currentPrices())
 			return
 		}
 	}
@@ -300,11 +300,13 @@ func freshestStore[S interface{ Info() mtgban.ScraperInfo }](stores []S, kind st
 }
 
 // servedStore reports whether the snapshots serve shorthand on kind's side.
-func servedStore(kind, shorthand string) bool {
+func servedStore(p *prices, kind, shorthand string) bool {
 	if kind == sessionstore.Retail {
-		return slices.ContainsFunc(GetSellers(), func(s mtgban.Seller) bool { return s.Info().Shorthand == shorthand })
+		_, found := p.index.seller[shorthand]
+		return found
 	}
-	return slices.ContainsFunc(GetVendors(), func(v mtgban.Vendor) bool { return v.Info().Shorthand == shorthand })
+	_, found := p.index.vendor[shorthand]
+	return found
 }
 
 // droppedEntries is how many entries kind's store under shorthand had when
@@ -335,7 +337,7 @@ func droppedDump(kind, shorthand string, ts *time.Time, now time.Time) bool {
 
 // droppedStoresOf is kind's side of the dropped stores not served again, by
 // shorthand.
-func droppedStoresOf(kind string) []droppedStore {
+func droppedStoresOf(p *prices, kind string) []droppedStore {
 	record := droppedStoresPtr.Load()
 	if record == nil {
 		return nil
@@ -343,7 +345,7 @@ func droppedStoresOf(kind string) []droppedStore {
 	var out []droppedStore
 	for _, key := range slices.Sorted(maps.Keys(*record)) {
 		store := (*record)[key]
-		if store.kind == kind && !servedStore(kind, store.info.Shorthand) {
+		if store.kind == kind && !servedStore(p, kind, store.info.Shorthand) {
 			out = append(out, store)
 		}
 	}
@@ -357,29 +359,30 @@ func droppedStoresOf(kind string) []droppedStore {
 func checkStaleness() {
 	now := time.Now()
 	dropStaleStores(now)
+	p := currentPrices()
 
 	staleAlarmState.mu.Lock()
 	defer staleAlarmState.mu.Unlock()
 
 	var changes []staleChange
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		info := seller.Info()
 		if Sessions.Is(sessionstore.Retail, info.Shorthand) {
 			continue
 		}
-		changes = appendStaleChange(changes, info.Shorthand+"/"+sessionstore.Retail, sessionstore.Retail, info.Shorthand, info.InventoryTimestamp, now)
-		changes = appendKeptChange(changes, info.Shorthand+"/"+sessionstore.Retail, sessionstore.Retail, info.Shorthand, info.InventoryTimestamp, now)
+		changes = appendStaleChange(changes, p, info.Shorthand+"/"+sessionstore.Retail, sessionstore.Retail, info.Shorthand, info.InventoryTimestamp, now)
+		changes = appendKeptChange(changes, p, info.Shorthand+"/"+sessionstore.Retail, sessionstore.Retail, info.Shorthand, info.InventoryTimestamp, now)
 	}
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		info := vendor.Info()
 		if Sessions.Is(sessionstore.Buylist, info.Shorthand) {
 			continue
 		}
-		changes = appendStaleChange(changes, info.Shorthand+"/"+sessionstore.Buylist, sessionstore.Buylist, info.Shorthand, info.BuylistTimestamp, now)
-		changes = appendKeptChange(changes, info.Shorthand+"/"+sessionstore.Buylist, sessionstore.Buylist, info.Shorthand, info.BuylistTimestamp, now)
+		changes = appendStaleChange(changes, p, info.Shorthand+"/"+sessionstore.Buylist, sessionstore.Buylist, info.Shorthand, info.BuylistTimestamp, now)
+		changes = appendKeptChange(changes, p, info.Shorthand+"/"+sessionstore.Buylist, sessionstore.Buylist, info.Shorthand, info.BuylistTimestamp, now)
 	}
 	for _, kind := range []string{sessionstore.Retail, sessionstore.Buylist} {
-		changes = appendDropChanges(changes, kind, now)
+		changes = appendDropChanges(changes, p, kind, now)
 	}
 	announceStaleChanges(changes)
 	checkStrayPrices()
@@ -388,7 +391,7 @@ func checkStaleness() {
 // appendDropChanges announces each of kind's dropped stores once when it
 // stops being served, and once when a fresh load serves it again. Callers
 // must hold staleAlarmState.mu.
-func appendDropChanges(changes []staleChange, kind string, now time.Time) []staleChange {
+func appendDropChanges(changes []staleChange, p *prices, kind string, now time.Time) []staleChange {
 	record := droppedStoresPtr.Load()
 	if record == nil {
 		return changes
@@ -399,8 +402,8 @@ func appendDropChanges(changes []staleChange, kind string, now time.Time) []stal
 			continue
 		}
 		alarmKey := "dropped/" + key
-		label := staleLabel(kind, store.info.Shorthand)
-		switch classifyStaleTransition(staleAlarmState.stale[alarmKey], !servedStore(kind, store.info.Shorthand)) {
+		label := staleLabel(p, kind, store.info.Shorthand)
+		switch classifyStaleTransition(staleAlarmState.stale[alarmKey], !servedStore(p, kind, store.info.Shorthand)) {
 		case becameStale:
 			line := label + " is no longer served, not updated in " + staleAge(store.updated, now)
 			// Its return is announced as served again, not also as fresh again
@@ -415,11 +418,11 @@ func appendDropChanges(changes []staleChange, kind string, now time.Time) []stal
 // appendKeptChange announces, with @here, a served store past DropAfter:
 // after dropStaleStores, only the last store on its side is one. Callers
 // must hold staleAlarmState.mu.
-func appendKeptChange(changes []staleChange, key, kind, shorthand string, ts *time.Time, now time.Time) []staleChange {
+func appendKeptChange(changes []staleChange, p *prices, key, kind, shorthand string, ts *time.Time, now time.Time) []staleChange {
 	alarmKey := "kept/" + key
 	switch classifyStaleTransition(staleAlarmState.stale[alarmKey], pastDrop(ts, now)) {
 	case becameStale:
-		line := "@here " + staleLabel(kind, shorthand) + " is still served, not updated in " + staleAge(*ts, now) + ": it is the last " + kind + " store left"
+		line := "@here " + staleLabel(p, kind, shorthand) + " is still served, not updated in " + staleAge(*ts, now) + ": it is the last " + kind + " store left"
 		return append(changes, staleChange{key: alarmKey, stale: true, line: line})
 	case staleRecovered:
 		// Its fresh load is announced on its own row
@@ -439,16 +442,16 @@ type staleChange struct {
 
 // appendStaleChange appends the row to changes if its staleness differs
 // from the last one announced. Callers must hold staleAlarmState.mu.
-func appendStaleChange(changes []staleChange, key, kind, shorthand string, ts *time.Time, now time.Time) []staleChange {
+func appendStaleChange(changes []staleChange, p *prices, key, kind, shorthand string, ts *time.Time, now time.Time) []staleChange {
 	switch classifyStaleTransition(staleAlarmState.stale[key], isStale(ts, now)) {
 	case becameStale:
-		line := staleLabel(kind, shorthand) + " has no update time"
+		line := staleLabel(p, kind, shorthand) + " has no update time"
 		if ts != nil {
-			line = staleLabel(kind, shorthand) + " has not updated in " + staleAge(*ts, now)
+			line = staleLabel(p, kind, shorthand) + " has not updated in " + staleAge(*ts, now)
 		}
 		return append(changes, staleChange{key: key, stale: true, line: line})
 	case staleRecovered:
-		return append(changes, staleChange{key: key, stale: false, line: staleLabel(kind, shorthand) + " is fresh again"})
+		return append(changes, staleChange{key: key, stale: false, line: staleLabel(p, kind, shorthand) + " is fresh again"})
 	}
 	return changes
 }
@@ -480,8 +483,8 @@ func announceStaleChanges(changes []staleChange) {
 
 // staleLabel names a row for the alarm message: game, store (or "unknown
 // store"), kind and shorthand.
-func staleLabel(kind, shorthand string) string {
-	store, ok := scraperStoreOf(shorthand)
+func staleLabel(p *prices, kind, shorthand string) string {
+	store, ok := p.storeOf(shorthand)
 	if !ok {
 		store = "unknown store"
 	}

@@ -69,7 +69,7 @@ func TestVariableIsTheContentsWithoutTheFixedList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	config := parseSearchOptionsNG(backend(), `variable:"`+co.Name+`"`, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), `variable:"`+co.Name+`"`, nil, nil, nil)
 
 	var holdsContents, dropsTheDeck bool
 	for _, filter := range config.CardFilters {
@@ -108,7 +108,7 @@ func TestEachReadingNamesItselfAndItsProduct(t *testing.T) {
 	}
 
 	for _, want := range []string{ContentsAll, ContentsFixed, ContentsVariable} {
-		config := parseSearchOptionsNG(backend(), want+`:"`+co.Name+`"`, nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), want+`:"`+co.Name+`"`, nil, nil, nil)
 		if config.ContentsProduct != co.UUID {
 			t.Errorf("%s: names %q, want %q", want, config.ContentsProduct, co.UUID)
 		}
@@ -118,7 +118,7 @@ func TestEachReadingNamesItselfAndItsProduct(t *testing.T) {
 	}
 
 	// Asking for what is not in a product is asking for none of the three.
-	negated := parseSearchOptionsNG(backend(), `-contents:"`+co.Name+`"`, nil, nil, nil)
+	negated := parseSearchOptionsNG(backend(), currentPrices(), `-contents:"`+co.Name+`"`, nil, nil, nil)
 	if negated.ContentsProduct != "" {
 		t.Errorf("a negated query offers a switch over %q", negated.ContentsProduct)
 	}
@@ -155,7 +155,7 @@ func TestAWrapperAnswersWithProductsNotCards(t *testing.T) {
 		t.Skip("this datastore has no product that only wraps another")
 	}
 
-	config := parseSearchOptionsNG(backend(), `contents:"`+wrapper+`"`, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), `contents:"`+wrapper+`"`, nil, nil, nil)
 	found, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 	if err != nil || len(found) == 0 {
 		t.Skipf("%s finds nothing at all: %v", wrapper, err)
@@ -341,7 +341,7 @@ func TestVariableNamesSeveralProductsExcludesEachOnesGuaranteedCards(t *testing.
 	}
 
 	query := `variable:"` + a.Name + `","` + b.Name + `"`
-	config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil)
 	if config.ContentsProduct != "" || config.ContentsMode != "" {
 		t.Errorf("naming two products still offers a switch over %q", config.ContentsProduct)
 	}

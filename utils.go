@@ -802,8 +802,8 @@ func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
 }
 
 // Look up a seller with its name and return its inventory
-func findSellerInventoryByName(name string, sealed bool) (mtgban.InventoryRecord, error) {
-	for _, seller := range GetSellers() {
+func findSellerInventoryByName(p *prices, name string, sealed bool) (mtgban.InventoryRecord, error) {
+	for _, seller := range p.sellers {
 		if seller.Info().SealedMode == sealed && strings.EqualFold(seller.Info().Name, name) {
 			return seller.Inventory(), nil
 		}
@@ -812,8 +812,8 @@ func findSellerInventoryByName(name string, sealed bool) (mtgban.InventoryRecord
 }
 
 // Look up a vendor with its name and return its inventory
-func findVendorBuylistByName(name string, sealed bool) (mtgban.BuylistRecord, error) {
-	for _, vendor := range GetVendors() {
+func findVendorBuylistByName(p *prices, name string, sealed bool) (mtgban.BuylistRecord, error) {
+	for _, vendor := range p.vendors {
 		if vendor.Info().SealedMode == sealed && strings.EqualFold(vendor.Info().Name, name) {
 			return vendor.Buylist(), nil
 		}
@@ -1564,8 +1564,8 @@ func isSecureRequest(r *http.Request) bool {
 // serve real answers (the same predicate /healthz uses). Cacheable endpoints
 // must not let degraded warmup responses into caches: an empty payload with
 // a public max-age poisons every client behind the CDN for its lifetime.
-func dataReady(b *matcher.Backend) bool {
-	return len(b.GetUUIDs()) != 0 && len(GetSellers()) != 0 && len(GetVendors()) != 0
+func dataReady(b *matcher.Backend, p *prices) bool {
+	return len(b.GetUUIDs()) != 0 && len(p.sellers) != 0 && len(p.vendors) != 0
 }
 
 // storeEligible reports whether a store may appear in a price surface under

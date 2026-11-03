@@ -277,6 +277,13 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		}
 	}
 
+	// Until the stores load the stores list and every price answer would
+	// be empty; a 503 makes clients retry rather than cache a blank one
+	if len(p.sellers) == 0 || len(p.vendors) == 0 {
+		errorResponse(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
+		return
+	}
+
 	enabledSellers, enabledVendors := apiEnabledStores(p, storesOpt)
 
 	// Endpoint for retrieving the stores shorthands, and in v2 what each is

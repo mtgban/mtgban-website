@@ -36,7 +36,7 @@ func TestCardLinkResolvesToItsPrinting(t *testing.T) {
 
 		card := uuid2card(backend(), currentPrices(), uuids[i], false, nil)
 		query := linkQuery(t, card.SearchURL)
-		keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+		keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil))
 		if err != nil {
 			t.Errorf("%s #%s: %v", co.SetCode, co.Number, err)
 			continue

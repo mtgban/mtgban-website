@@ -13,12 +13,16 @@ type GuideVars struct {
 	// /api/palette/promos.json serves them, so the promo table names each
 	// type by its label from the first paint.
 	GuidePromos template.JS
+	// GuideStores is every registered store with its role markers, for the
+	// store-shorthand reference.
+	GuideStores template.JS
 }
 
 func (s *site) Guide(w http.ResponseWriter, r *http.Request) {
 	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "Guide", sig)
 	pageVars.GuidePromos = template.JS("[]")
+	pageVars.GuideStores = guideStoresJSON(s.prices())
 	promos := s.datastore().palette.PromosJSON()
 	if len(promos) > 0 {
 		pageVars.GuidePromos = template.JS(promos)
@@ -41,8 +45,7 @@ type GuideStore struct {
 // markers, sorted by display name and then by shorthand. The full set is
 // emitted whatever the tier, which only gates results, but for the stores
 // only the price API serves, which no site search reaches.
-func guideStoresJSON() template.JS {
-	p := currentPrices()
+func guideStoresJSON(p *prices) template.JS {
 	stores := map[string]*GuideStore{}
 
 	ensure := func(name, shorthand string, sealed bool) *GuideStore {

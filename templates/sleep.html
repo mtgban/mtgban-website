@@ -126,7 +126,7 @@
                 <select name="ref" id="ref" onchange="window.checkSleepersCompare && checkSleepersCompare()">
                     <option value="" disabled selected>Pick a reference...</option>
                     {{range .SellerKeys}}
-                        <option value="{{.}}">{{scraper_name .}}</option>
+                        <option value="{{.}}">{{index $.StoreNames .}}</option>
                     {{end}}
                 </select>
                 <div class="sleepers-comp-vs-divider">VS</div>
@@ -134,7 +134,7 @@
                 <select name="target" id="target" onchange="window.checkSleepersCompare && checkSleepersCompare()">
                     <option value="" disabled selected>Pick where to buy...</option>
                     {{range .SellerKeys}}
-                        <option value="{{.}}">{{scraper_name .}}</option>
+                        <option value="{{.}}">{{index $.StoreNames .}}</option>
                     {{end}}
                 </select>
                 <button type="submit" class="sleepers-comp-go" id="sleepers-comp-go" disabled>Compare</button>

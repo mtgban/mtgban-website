@@ -387,7 +387,7 @@ func TestBuylistDetailTint(t *testing.T) {
 }
 
 func TestStoreFactorOptions(t *testing.T) {
-	got := storeFactorOptions([]string{"TCG", "CK"}, []string{"CK", "ABU"})
+	got := storeFactorOptions(currentPrices(), []string{"TCG", "CK"}, []string{"CK", "ABU"})
 	var list []struct {
 		K string `json:"k"`
 		N string `json:"n"`
@@ -414,8 +414,8 @@ func TestStoreFactorOptions(t *testing.T) {
 	if list[0].K != "ABU" || list[1].K != "CK" || list[2].K != "TCG" {
 		t.Errorf("order %s, want ABU, CK, TCG", got)
 	}
-	if storeFactorOptions(nil, nil) != "[]" {
-		t.Errorf("empty is %q, want []", storeFactorOptions(nil, nil))
+	if storeFactorOptions(currentPrices(), nil, nil) != "[]" {
+		t.Errorf("empty is %q, want []", storeFactorOptions(currentPrices(), nil, nil))
 	}
 }
 
@@ -428,7 +428,7 @@ func TestStoreFactorOptionsSkipsIndexes(t *testing.T) {
 	var list []struct {
 		K string `json:"k"`
 	}
-	got := storeFactorOptions([]string{"IDX", "CK"}, nil)
+	got := storeFactorOptions(currentPrices(), []string{"IDX", "CK"}, nil)
 	if err := json.Unmarshal([]byte(got), &list); err != nil {
 		t.Fatalf("not JSON: %v\n%s", err, got)
 	}
@@ -449,7 +449,7 @@ func TestStoreFactorOptionsSealedLast(t *testing.T) {
 		K string `json:"k"`
 		S bool   `json:"s"`
 	}
-	got := storeFactorOptions([]string{"CKSealed", "TCG", "CK"}, nil)
+	got := storeFactorOptions(currentPrices(), []string{"CKSealed", "TCG", "CK"}, nil)
 	if err := json.Unmarshal([]byte(got), &list); err != nil {
 		t.Fatalf("not JSON: %v\n%s", err, got)
 	}

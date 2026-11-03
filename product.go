@@ -807,9 +807,9 @@ func loadTCGCatalog(path string) (map[string]tcgcatalog.Entry, *tcgcatalog.Categ
 // it: a run on the empty datastore held before the first load, or, where the
 // site serves CK's buylist, no P90 at all, which Good and the other
 // stores' green offers need.
-func setAnalysisReport(datastoreLoadedAt time.Time, infos map[string]mtgban.InventoryRecord) (string, string) {
+func setAnalysisReport(p *prices, datastoreLoadedAt time.Time, infos map[string]mtgban.InventoryRecord) (string, string) {
 	var result, problem string
-	if ckAvailable() {
+	if ckAvailable(p) {
 		p90s := len(infos["goodP90"])
 		result = fmt.Sprintf("%d P90s, %d 90d highs, %d new highs", p90s, len(infos["hotlist"]), len(infos["newhigh"]))
 		if p90s == 0 {
@@ -825,13 +825,14 @@ func setAnalysisReport(datastoreLoadedAt time.Time, infos map[string]mtgban.Inve
 func (s *site) runSealedAnalysis() {
 	ds := s.datastore()
 	b := ds.backend
+	p := s.prices()
 	log.Println("Running set analysis")
 
-	tcgInventory, _ := findSellerInventory("TCGLow")
-	tcgMarket, _ := findSellerInventory("TCGMarket")
-	tcgDirect, _ := findSellerInventory("TCGDirect")
-	ckBuylist, _ := findVendorBuylist("CK")
-	directNetBuylist, _ := findVendorBuylist("TCGDirectNet")
+	tcgInventory, _ := p.sellerInventory("TCGLow")
+	tcgMarket, _ := p.sellerInventory("TCGMarket")
+	tcgDirect, _ := p.sellerInventory("TCGDirect")
+	ckBuylist, _ := p.vendorBuylist("CK")
+	directNetBuylist, _ := p.vendorBuylist("TCGDirectNet")
 
 	reprintsKeys, reprintsMap := getReprintsGlobal(b, tcgInventory, tcgMarket)
 	reprintsPtr.Store(&reprintsSnapshot{Keys: reprintsKeys, Map: reprintsMap})
@@ -839,7 +840,7 @@ func (s *site) runSealedAnalysis() {
 	infos := map[string]mtgban.InventoryRecord{}
 
 	runRawSetValue(b, infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
-	for label, record := range buylistMetrics(b, "CK", map[string]buylistReducer{
+	for label, record := range buylistMetrics(b, p, "CK", map[string]buylistReducer{
 		"hotlist": hotlistReducer,
 		"newhigh": newHighReducer,
 		"highest": highestBuylistPrice,
@@ -849,10 +850,10 @@ func (s *site) runSealedAnalysis() {
 	}
 
 	infosPtr.Store(&infos)
-	result, problem := setAnalysisReport(ds.loadedAt, infos)
+	result, problem := setAnalysisReport(p, ds.loadedAt, infos)
 	backgroundJobs.Report(jobSetAnalysis, result, problem)
 	// The new highs are one of the inputs of CK's buylist signals.
-	rebuildCKSignals()
+	rebuildCKSignals(p)
 
 	// Index TCGplayer's own identifiers for every product, used to report
 	// values TCGplayer always recognizes in exported CSVs. A missing dump
@@ -924,8 +925,8 @@ const ckAtHighTip = "Card Kingdom is paying its highest price of the last 90 day
 // buylistMetrics computes multiple per-card buylist metrics in a single pass:
 // one aggregate query covers the whole 90-day window, then every card runs
 // through every reducer. The result is keyed by the same labels passed in.
-func buylistMetrics(b *matcher.Backend, store string, reducers map[string]buylistReducer) map[string]mtgban.InventoryRecord {
-	bl, err := findVendorBuylist(store)
+func buylistMetrics(b *matcher.Backend, p *prices, store string, reducers map[string]buylistReducer) map[string]mtgban.InventoryRecord {
+	bl, err := p.vendorBuylist(store)
 	if err != nil {
 		return nil
 	}

@@ -25,7 +25,7 @@ func colorBackend(game matcher.Game, cards map[string][]string) *matcher.Backend
 // keptBy parses the query the way the search does and lists the cards its
 // filters keep.
 func keptBy(b *matcher.Backend, query string) []string {
-	config := parseSearchOptionsNG(b, query, nil, nil, nil)
+	config := parseSearchOptionsNG(b, currentPrices(), query, nil, nil, nil)
 	var kept []string
 	for _, uuid := range b.AllUUIDs {
 		skip := shouldSkipCardNG(b, currentPrices(), uuid, config.CardFilters)
@@ -117,7 +117,7 @@ func TestColorFilterReadsEachGamesNames(t *testing.T) {
 func TestIdentityIsAColorIdentityAlias(t *testing.T) {
 	b := colorBackend(matcher.GameMagic, nil)
 	for _, query := range []string{"ci:wu", "identity:wu"} {
-		config := parseSearchOptionsNG(b, query, nil, nil, nil)
+		config := parseSearchOptionsNG(b, currentPrices(), query, nil, nil, nil)
 		var names []string
 		for _, filter := range config.CardFilters {
 			names = append(names, filter.Name)

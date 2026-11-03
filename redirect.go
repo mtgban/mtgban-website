@@ -19,6 +19,7 @@ func localRedirect(w http.ResponseWriter, r *http.Request, path string, v url.Va
 
 func (s *site) Redirect(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
+	p := s.prices()
 	path := strings.TrimPrefix(r.URL.Path, "/go/")
 	fields := strings.Split(path, "/")
 
@@ -43,9 +44,9 @@ func (s *site) Redirect(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if kind == "r" || kind == "i" {
-			inv, err := findSellerInventory(store)
+			inv, err := p.sellerInventory(store)
 			if err != nil {
-				inv, err = findSellerInventoryByName(store, co.Sealed)
+				inv, err = findSellerInventoryByName(p, store, co.Sealed)
 				if err != nil {
 					http.NotFound(w, r)
 					return
@@ -58,9 +59,9 @@ func (s *site) Redirect(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		} else if kind == "b" {
-			bl, err := findVendorBuylist(store)
+			bl, err := p.vendorBuylist(store)
 			if err != nil {
-				bl, err = findVendorBuylistByName(store, co.Sealed)
+				bl, err = findVendorBuylistByName(p, store, co.Sealed)
 				if err != nil {
 					http.NotFound(w, r)
 					return

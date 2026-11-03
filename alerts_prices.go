@@ -21,7 +21,7 @@ var alertPickedOnlyStores = []string{"TCGDirectNet", "CKBLLast", "ABUCredit", "A
 // or singles) outside the blocklist, so an alert can watch a store not
 // offering the card yet; those carry no prices. Quantity is not asked:
 // SCG and CSI publish none on their buylists.
-func alertStorePrices(cardID string, sealed bool, side alerts.Side, blocklist []string) []alerts.StorePrice {
+func alertStorePrices(p *prices, cardID string, sealed bool, side alerts.Side, blocklist []string) []alerts.StorePrice {
 	var out []alerts.StorePrice
 	add := func(info mtgban.ScraperInfo, entries []mtgban.GenericEntry) {
 		if info.MetadataOnly || info.SealedMode != sealed || slices.Contains(blocklist, info.Shorthand) {
@@ -37,13 +37,13 @@ func alertStorePrices(cardID string, sealed bool, side alerts.Side, blocklist []
 			}
 		}
 		out = append(out, alerts.StorePrice{
-			Shorthand: info.Shorthand, Name: scraperName(info.Shorthand), Prices: prices,
+			Shorthand: info.Shorthand, Name: p.scraperName(info.Shorthand), Prices: prices,
 			PickedOnly: slices.Contains(alertPickedOnlyStores, info.Shorthand) ||
 				side == alerts.SideBuylist && info.CountryFlag != "",
 		})
 	}
 	if side == alerts.SideRetail {
-		for _, seller := range GetSellers() {
+		for _, seller := range p.sellers {
 			entries := seller.Inventory()[cardID]
 			generic := make([]mtgban.GenericEntry, len(entries))
 			for i := range entries {
@@ -53,7 +53,7 @@ func alertStorePrices(cardID string, sealed bool, side alerts.Side, blocklist []
 		}
 		return out
 	}
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		entries := vendor.Buylist()[cardID]
 		generic := make([]mtgban.GenericEntry, len(entries))
 		for i := range entries {

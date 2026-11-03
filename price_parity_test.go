@@ -100,7 +100,7 @@ func TestPriceParityRetail(t *testing.T) {
 	seedParityScrapers(t, regular, foil)
 
 	cardIDs := []string{regular, foil}
-	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), regular, nil, nil, nil)
 	found := searchSellers(currentPrices(), cardIDs, config)
 
 	api := getSellerPrices(backend(), currentPrices(), "", []string{"PARITYA", "PARITYIDX"}, "", cardIDs, "", true, true, false, "")
@@ -168,7 +168,7 @@ func TestWalkRepeatedIds(t *testing.T) {
 	seedParityScrapers(t, regular, foil)
 
 	cardIDs := []string{regular, regular, regular, regular}
-	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), regular, nil, nil, nil)
 
 	found := searchSellers(currentPrices(), cardIDs, config)
 	for _, cond := range []mtgban.Condition{mtgban.NM, mtgban.SP, mtgban.PO} {
@@ -190,7 +190,7 @@ func TestPriceParityBuylist(t *testing.T) {
 	seedParityScrapers(t, regular, foil)
 
 	cardIDs := []string{regular}
-	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), regular, nil, nil, nil)
 	found := searchVendors(currentPrices(), cardIDs, config)
 
 	api := getVendorPrices(backend(), currentPrices(), "", []string{"PARITYV"}, "", cardIDs, "", true, true, false, "")
@@ -232,7 +232,7 @@ func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
 	}
 	withPrices(t, GetSellers(), vendors)
 
-	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), regular, nil, nil, nil)
 	found := searchVendors(currentPrices(), []string{regular}, config)
 
 	var got bool
@@ -617,7 +617,10 @@ func TestStoresFilterNarrowsBothWays(t *testing.T) {
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Singles", Shorthand: "SINGLES1"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Sealed", Shorthand: "SEALED1", SealedMode: true}),
 	}
-	withPrices(t, sellers, GetVendors())
+	// A vendor too, or the handler answers 503 as not loaded; the list
+	// names each shorthand once, so the singles store's buylist adds none
+	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Singles", Shorthand: "SINGLES1"})}
+	withPrices(t, sellers, vendors)
 
 	for filter, want := range map[string]string{"sealed": `["SEALED1"]`, "singles": `["SINGLES1"]`} {
 		rec := httptest.NewRecorder()
@@ -630,7 +633,7 @@ func TestStoresFilterNarrowsBothWays(t *testing.T) {
 
 	// A key whose scope holds no sealed store gets an empty list, not null.
 	singles := sellers[:1]
-	withPrices(t, singles, GetVendors())
+	withPrices(t, singles, vendors)
 	rec := httptest.NewRecorder()
 	testSite.PriceAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgban/stores.json?filter=sealed", nil))
 	got := strings.TrimSpace(rec.Body.String())

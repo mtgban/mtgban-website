@@ -116,12 +116,6 @@ func TestOptionalFieldsCoverAPIFields(t *testing.T) {
 }
 
 func TestEnforceAPISigningDoesNotNeedServerURL(t *testing.T) {
-	// enforceAPISigning only checks these are non-empty, and the stub next
-	// handler never reads them, so a stub store each is enough.
-	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	withPrices(t, sellers, vendors)
-
 	withSigMode(t, false, true)
 
 	withAPIUserSecret(t, "golden@example.com", goldenSecret)
@@ -145,12 +139,6 @@ func TestEnforceAPISigningDoesNotNeedServerURL(t *testing.T) {
 // golden blob: accepted when valid, refused when tampered, and refused when
 // Expires is unparseable even though the signature over it is good.
 func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
-	// enforceAPISigning only checks these are non-empty, and the stub next
-	// handler never reads them, so a stub store each is enough.
-	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	withPrices(t, sellers, vendors)
-
 	withSigMode(t, false, true)
 
 	withAPIUserSecret(t, "golden@example.com", goldenSecret)
@@ -226,16 +214,52 @@ func TestEnforceAPISigningRefusesWithAStatus(t *testing.T) {
 	}
 
 	APIRateLimiter = ratelimit.NewLimiter(1000, 1000)
-	var noSellers []mtgban.Seller
-	withPrices(t, noSellers, GetVendors())
-	check("not ready", serve("/api/load/cardkingdom?sig=x"), http.StatusServiceUnavailable)
-
-	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	withPrices(t, sellers, vendors)
 	check("undecodable", serve("/api/load/cardkingdom?sig=not-base64!"), http.StatusUnauthorized)
 	check("unsigned load", serve("/api/load/cardkingdom"), http.StatusUnauthorized)
 
 	APIRateLimiter = ratelimit.NewLimiter(0, 0)
 	check("limited", serve("/api/load/cardkingdom"), http.StatusTooManyRequests)
+}
+
+// Until the stores load a price request, and the stores list with it,
+// answers 503 with a JSON error, so a client retries rather than caching a
+// blank answer; the middleware itself lets the request through, so
+// /api/load/ and the sets and finishes lists work before the first load.
+func TestPriceAPIsRefuseUntilStoresLoad(t *testing.T) {
+	prevLimiter := APIRateLimiter
+	t.Cleanup(func() {
+		APIRateLimiter = prevLimiter
+	})
+	APIRateLimiter = ratelimit.NewLimiter(1000, 1000)
+	withSigMode(t, false, false)
+	var noSellers []mtgban.Seller
+	withPrices(t, noSellers, currentPrices().vendors)
+
+	for _, tc := range []struct {
+		name    string
+		handler http.HandlerFunc
+		target  string
+	}{
+		{"v1 prices", testSite.PriceAPI, "/api/mtgban/retail/4ED.json"},
+		{"v2 prices", testSite.PriceAPIv2, "/api/v2/retail/4ED.json"},
+		{"v1 stores", testSite.PriceAPI, "/api/mtgban/stores.json"},
+		{"v2 stores", testSite.PriceAPIv2, "/api/v2/stores.json"},
+		{"search", testSite.SearchAPI, "/api/v2/search/retail/card.json"},
+	} {
+		req := httptest.NewRequest("GET", tc.target, nil)
+		req.RemoteAddr = "192.0.2.92:1234"
+		rec := httptest.NewRecorder()
+		enforceAPISigning(tc.handler).ServeHTTP(rec, req)
+		if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), `"error":`) {
+			t.Errorf("%s: %d %q, want 503 and a JSON error", tc.name, rec.Code, rec.Body.String())
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/mtgban/sets.json", nil)
+	req.RemoteAddr = "192.0.2.92:1234"
+	enforceAPISigning(http.HandlerFunc(testSite.PriceAPI)).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("sets.json before the first load: %d %q, want 200", rec.Code, rec.Body.String())
+	}
 }

@@ -446,6 +446,7 @@ func TestSettingsBodyDrawsStoreFactors(t *testing.T) {
 	v := settingsModalVars{
 		Tabs: []string{"search"}, TabNames: settingsTabNames,
 		SellerKeys: []string{"CK", "TCG"}, VendorKeys: []string{"CK"},
+		StoreFactorOptions: storeFactorOptions(currentPrices(), []string{"CK", "TCG"}, []string{"CK"}),
 	}
 	if err := tmpl.ExecuteTemplate(&buf, baseName, v); err != nil {
 		t.Fatal(err)
@@ -489,4 +490,23 @@ func gridCells(body, id string) string {
 		return ""
 	}
 	return m[1]
+}
+
+// The search tab's store-factor editor gets its stores from the modal's
+// data, filled from the snapshot the handler read, not from a template func.
+func TestSettingsModalCarriesStoreFactorOptions(t *testing.T) {
+	signingEnabled(t, true)
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Factor Shop", Shorthand: "ZZFACT"}),
+	}, nil)
+	body := fetchSettingsModal(t, grantSig(t, "Search"))
+	if !strings.Contains(body, `id="settings-store-factors" data-stores="`) {
+		t.Fatal("no store adjustments container")
+	}
+	for _, quoted := range []string{`"k":"ZZFACT"`, `&#34;k&#34;:&#34;ZZFACT&#34;`, `&quot;k&quot;:&quot;ZZFACT&quot;`} {
+		if strings.Contains(body, quoted) {
+			return
+		}
+	}
+	t.Errorf("data-stores does not carry ZZFACT:\n%s", gridCells(body, "settings-store-factors"))
 }

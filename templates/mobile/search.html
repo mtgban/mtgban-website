@@ -797,7 +797,7 @@
                         <select class="m-settings-select" id="m-set-sellers-priority" aria-label="Preferred retail store">
                             <option value="" selected>Default</option>
                             {{range $i, $key := .SellerKeys}}
-                            <option value="{{$key}}">{{scraper_name $key}}</option>
+                            <option value="{{$key}}">{{index $.StoreNames $key}}</option>
                             {{end}}
                         </select>
                     </div>
@@ -806,7 +806,7 @@
                         <select class="m-settings-select" id="m-set-vendors-priority" aria-label="Preferred buylist store">
                             <option value="" selected>Default</option>
                             {{range $i, $key := .VendorKeys}}
-                            <option value="{{$key}}">{{scraper_name $key}}</option>
+                            <option value="{{$key}}">{{index $.StoreNames $key}}</option>
                             {{end}}
                         </select>
                     </div>
@@ -817,7 +817,7 @@
             <div class="m-settings-section">
                 <div class="m-settings-label">Store adjustments</div>
                 <div class="m-settings-hint">Percent off a store's retail, and what its credit is worth to you in percent of face.</div>
-                <div class="store-factors" id="m-set-store-factors" data-stores="{{store_factor_options .SellerKeys .VendorKeys}}"></div>
+                <div class="store-factors" id="m-set-store-factors" data-stores="{{.StoreFactorOptions}}"></div>
             </div>
 
             {{/* Display Options */}}
@@ -875,7 +875,7 @@
                     <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
                         {{range $key := $keys}}{{if not (index $.SealedStores $key)}}
-                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        <label><input type="checkbox" name="{{$key}}"> {{index $.StoreNames $key}}</label>
                         {{end}}{{end}}
                     </div>
                     {{end}}
@@ -883,7 +883,7 @@
                     <h5 class="m-settings-subgroup-label">Sealed</h5>
                     <div class="m-settings-checks">
                         {{range $key := $keys}}{{if (index $.SealedStores $key)}}
-                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        <label><input type="checkbox" name="{{$key}}"> {{index $.StoreNames $key}}</label>
                         {{end}}{{end}}
                     </div>
                     {{end}}
@@ -910,7 +910,7 @@
                     <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
                         {{range $key := $keys}}{{if not (index $.SealedStores $key)}}
-                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        <label><input type="checkbox" name="{{$key}}"> {{index $.StoreNames $key}}</label>
                         {{end}}{{end}}
                     </div>
                     {{end}}
@@ -918,7 +918,7 @@
                     <h5 class="m-settings-subgroup-label">Sealed</h5>
                     <div class="m-settings-checks">
                         {{range $key := $keys}}{{if (index $.SealedStores $key)}}
-                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        <label><input type="checkbox" name="{{$key}}"> {{index $.StoreNames $key}}</label>
                         {{end}}{{end}}
                     </div>
                     {{end}}

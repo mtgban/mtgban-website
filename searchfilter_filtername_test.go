@@ -43,7 +43,7 @@ func TestSetFilterNamesNothing(t *testing.T) {
 
 	// The parse asks it too: the words stay in the query rather than
 	// becoming an edition filter no printing is in.
-	config := parseSearchOptionsNG(backend(), "S:P Little Knight", nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), "S:P Little Knight", nil, nil, nil)
 	for _, filter := range config.CardFilters {
 		if filter.Name == "edition" {
 			t.Errorf("S:P was read as an edition filter %v", filter.Values)
@@ -112,7 +112,7 @@ func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
 					queries = append(queries, genQuery(co))
 				}
 				for _, query := range queries {
-					keys, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
+					keys, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, currentPrices(), query, nil, nil, nil))
 					if err != nil {
 						t.Errorf("%q does not run: %v", query, err)
 						continue

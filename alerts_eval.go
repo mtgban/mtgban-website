@@ -13,10 +13,12 @@ import (
 // evaluator; PerRun binds them to the site's data at the start of each run.
 func (s *site) alertEvalDeps() alerts.EvalDeps {
 	return alerts.EvalDeps{
-		Allowance: alertAllowance, StoreLabel: alertStoreLabel, Log: log.Printf,
-		Report: func(summary, problem string) { backgroundJobs.Report(jobAlerts, summary, problem) },
+		Allowance: alertAllowance, Log: log.Printf,
+		StoreLabel: func(shorthand string) string { return alertStoreLabel(s.prices(), shorthand) },
+		Report:     func(summary, problem string) { backgroundJobs.Report(jobAlerts, summary, problem) },
 		PerRun: func(d alerts.EvalDeps) alerts.EvalDeps {
 			b := s.backend()
+			p := s.prices()
 			// Indexed once per run rather than once per user per alert.
 			idx := indexGrants(PatreonGrants())
 			d.Deliverers = []alerts.Deliverer{
@@ -29,12 +31,13 @@ func (s *site) alertEvalDeps() alerts.EvalDeps {
 			}
 			d.ChannelFor = s.alerts.Store().ChannelFor
 			d.Channels = alertChannels
-			d.Ready = func() bool { return s.pricesLoaded.Load() && alertsReady(b) }
+			d.Ready = func() bool { return s.pricesLoaded.Load() && alertsReady(b, p) }
+			d.StoreLabel = func(shorthand string) string { return alertStoreLabel(p, shorthand) }
 			d.Values = func(userHash, tier string) url.Values {
 				return aclValuesWith(ACL(), idx, userHash, tier)
 			}
 			d.Prices = func(cardID string, side alerts.Side, v url.Values) []alerts.StorePrice {
-				return alertVisiblePrices(b, cardID, side, v)
+				return alertVisiblePrices(b, p, cardID, side, v)
 			}
 			d.Resolve = func(cardID string) (alerts.Card, bool, bool) { return alertCardSnapshot(b, cardID) }
 			d.Game = string(Config().Game)
@@ -77,8 +80,8 @@ func (s *site) pokeAlerts(kinds ...string) {
 }
 
 // alertsReady is the datastore in and at least one market side loaded.
-func alertsReady(b *matcher.Backend) bool {
-	return alertsReadyFrom(len(b.GetUUIDs()), len(GetSellers()), len(GetVendors()))
+func alertsReady(b *matcher.Backend, p *prices) bool {
+	return alertsReadyFrom(len(b.GetUUIDs()), len(p.sellers), len(p.vendors))
 }
 
 // alertsReadyFrom is alertsReady on counts, for tests.

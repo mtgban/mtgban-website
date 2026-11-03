@@ -69,14 +69,14 @@ func TestSetAnalysisReport(t *testing.T) {
 		{"no P90s", loaded, map[string]mtgban.InventoryRecord{}, "0 P90s, 0 90d highs, 0 new highs", "found no P90s"},
 		{"before the datastore", time.Time{}, map[string]mtgban.InventoryRecord{}, "0 P90s, 0 90d highs, 0 new highs", "ran before the datastore loaded"},
 	} {
-		result, problem := setAnalysisReport(tc.loadedAt, tc.infos)
+		result, problem := setAnalysisReport(currentPrices(), tc.loadedAt, tc.infos)
 		if result != tc.result || problem != tc.probl {
 			t.Errorf("%s: got %q, %q, want %q, %q", tc.name, result, problem, tc.result, tc.probl)
 		}
 	}
 
 	setTestVendors(t, buylistOf("SCG", 1, time.Now()))
-	if result, problem := setAnalysisReport(loaded, nil); result != "" || problem != "" {
+	if result, problem := setAnalysisReport(currentPrices(), loaded, nil); result != "" || problem != "" {
 		t.Errorf("no CK buylist, no P90s: got %q, %q, want nothing", result, problem)
 	}
 }

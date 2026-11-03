@@ -134,7 +134,7 @@ func TestPopularVoteAPIRecordsTheResolvedKey(t *testing.T) {
 func ambiguousQuery(t *testing.T, ds *datastore) string {
 	t.Helper()
 	for _, q := range []string{"bolt", "lotus", "dragon", "angel", "goblin"} {
-		uuids, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, q, nil, nil, nil))
+		uuids, err := searchAndFilter(ds, currentPrices(), parseSearchOptionsNG(ds.backend, currentPrices(), q, nil, nil, nil))
 		if err != nil {
 			continue
 		}

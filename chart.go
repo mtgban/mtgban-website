@@ -580,10 +580,10 @@ type snapshotPriceFunc func(card *matcher.CardObject, config DatasetConfig, date
 // Two scrapers can feed one dataset, so a card and dataset can be visited more
 // than once. The later visit is the one that counts: the upsert dedupes keeping
 // the last row.
-func walkSnapshotPrices(b *matcher.Backend, start time.Time, visit snapshotPriceFunc) {
+func walkSnapshotPrices(b *matcher.Backend, p *prices, start time.Time, visit snapshotPriceFunc) {
 	// Collect retail prices from sellers. A store published from an upload
 	// lives in memory only, whatever dataset its shorthand happens to name.
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		if Sessions.Is(sessionstore.Retail, seller.Info().Shorthand) {
 			continue
 		}
@@ -620,7 +620,7 @@ func walkSnapshotPrices(b *matcher.Backend, start time.Time, visit snapshotPrice
 	}
 
 	// Collect buylist prices from vendors
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		if Sessions.Is(sessionstore.Buylist, vendor.Info().Shorthand) {
 			continue
 		}
@@ -653,7 +653,7 @@ func walkSnapshotPrices(b *matcher.Backend, start time.Time, visit snapshotPrice
 // stashMagicTimeseries takes a Magic deployment's snapshot into the long prices
 // table, under the ban_id of each card's magicID. A printing with no
 // variant row yet gets one from ResolveMagicBanID.
-func stashMagicTimeseries(ctx context.Context, b *matcher.Backend, start time.Time) {
+func stashMagicTimeseries(ctx context.Context, b *matcher.Backend, p *prices, start time.Time) {
 	// A miss costs a round-trip to file the variant, so warm the cache first.
 	if err := warmVariantCache(ctx); err != nil {
 		ServerNotify("timeseries", fmt.Sprintf("snapshot aborted, could not warm the variant cache: %s", err))
@@ -666,7 +666,7 @@ func stashMagicTimeseries(ctx context.Context, b *matcher.Backend, start time.Ti
 	// resolver then filed counts as new, whether minted or adopted.
 	failed := map[string]error{}
 	var minted int
-	snapshot := collectMagicSnapshot(b, start, func(id string, alias timeseries.MagicVariant) (int64, error) {
+	snapshot := collectMagicSnapshot(b, p, start, func(id string, alias timeseries.MagicVariant) (int64, error) {
 		err, seen := failed[id]
 		if seen {
 			return 0, err
@@ -692,9 +692,9 @@ func stashMagicTimeseries(ctx context.Context, b *matcher.Backend, start time.Ti
 // collectMagicSnapshot walks the served scrapers into long price rows, keyed on
 // the ban_id banIDFor gives each card's id. A Magic snapshot keeps its
 // TCGplayer series, since the tcgcsv ingest covers only other games.
-func collectMagicSnapshot(b *matcher.Backend, start time.Time, banIDFor func(id string, alias timeseries.MagicVariant) (int64, error)) longSnapshot {
+func collectMagicSnapshot(b *matcher.Backend, p *prices, start time.Time, banIDFor func(id string, alias timeseries.MagicVariant) (int64, error)) longSnapshot {
 	snapshot := longSnapshot{magic: true}
-	walkSnapshotPrices(b, start, snapshot.magicVisitor(banIDFor))
+	walkSnapshotPrices(b, p, start, snapshot.magicVisitor(banIDFor))
 	return snapshot
 }
 
@@ -726,7 +726,7 @@ func (s *longSnapshot) magicVisitor(banIDFor func(id string, alias timeseries.Ma
 //
 // The TCGplayer series are left out when the tcgcsv ingest already covers this
 // game; see tcgcsvOwnedProviders.
-func stashNonMagicTimeseries(ctx context.Context, b *matcher.Backend, start time.Time) {
+func stashNonMagicTimeseries(ctx context.Context, b *matcher.Backend, p *prices, start time.Time) {
 	// Every ban_id below is resolved from this cache, so a cold one is not a
 	// slow snapshot, it is an empty one.
 	if err := warmVariantCache(ctx); err != nil {
@@ -739,7 +739,7 @@ func stashNonMagicTimeseries(ctx context.Context, b *matcher.Backend, start time
 	// batch before the upsert, since the prices table's FK needs the row.
 	categoryID := GetTCGCategoryID()
 	missing := map[timeseries.TCGVariant]int64{}
-	snapshot := collectNonMagicSnapshot(b, start, func(co *matcher.CardObject) int64 {
+	snapshot := collectNonMagicSnapshot(b, p, start, func(co *matcher.CardObject) int64 {
 		if banID := cachedBanIDForCard(co); banID != 0 {
 			return banID
 		}
@@ -867,9 +867,9 @@ func ingestedLately(categoryID int) bool {
 // The resolver runs only for a price the snapshot will store: the real one
 // files a variant for every card it misses, and a price declined to the
 // ingest or to a missing provider id should not file one.
-func collectNonMagicSnapshot(b *matcher.Backend, start time.Time, banIDFor func(*matcher.CardObject) int64) longSnapshot {
+func collectNonMagicSnapshot(b *matcher.Backend, p *prices, start time.Time, banIDFor func(*matcher.CardObject) int64) longSnapshot {
 	snapshot := newNonMagicSnapshot()
-	walkSnapshotPrices(b, start, func(card *matcher.CardObject, config DatasetConfig, date string, price float64) {
+	walkSnapshotPrices(b, p, start, func(card *matcher.CardObject, config DatasetConfig, date string, price float64) {
 		var banID int64
 		if snapshot.stores(config) {
 			banID = banIDFor(card)
@@ -1058,16 +1058,17 @@ func (s *site) stashInTimeseries() {
 	}
 
 	b := s.backend()
+	p := s.prices()
 	start := time.Now()
 	ServerNotify("timeseries", "Taking snapshot...")
 
 	// Magic keys its variants on the mtgjson uuid, every other game on a
 	// TCGplayer product.
 	if datastoreGame() != DefaultGame {
-		stashNonMagicTimeseries(context.Background(), b, start)
+		stashNonMagicTimeseries(context.Background(), b, p, start)
 		return
 	}
-	stashMagicTimeseries(context.Background(), b, start)
+	stashMagicTimeseries(context.Background(), b, p, start)
 }
 
 // variantCacheScope is the slice of the shared variants table this process can

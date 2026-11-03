@@ -198,6 +198,8 @@ func TestUnpackableSealedCountsOnlyDecklists(t *testing.T) {
 // renderUpload runs the upload page the way the server does, so the action is
 // exercised rather than only parsed.
 func renderUpload(t *testing.T, pageVars PageVars) string {
+	// The cart buttons and send menus fillUploadResults hands the page
+	pageVars.fillCarts(currentPrices(), pageVars.ScraperKeys)
 	t.Helper()
 	baseName, files := renderTemplateFiles("upload.html", false)
 	tmpl, err := tmplparse.ParseFiles(baseName, files, funcMap)

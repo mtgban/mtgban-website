@@ -91,7 +91,7 @@
             <label class="settings-field-row">
                 <span>Alternate price source</span>
                 <select id="opt-altPrice" data-cookie="UploadAltPrice">
-                    {{range $.UploadAltKeys}}{{$name := scraper_name .}}{{if $name}}
+                    {{range $.UploadAltKeys}}{{$name := index $.StoreNames .}}{{if $name}}
                     <option value="{{.}}">{{$name}}</option>
                     {{end}}{{end}}
                 </select>
@@ -127,12 +127,12 @@
                 <span>Reference seller (singles)</span>
                 <select id="opt-customseller" data-cookie="UploadCustomBuyer">
                     <optgroup label="Index">
-                        {{range $.UploadAltKeys}}{{$name := scraper_name .}}{{if $name}}
+                        {{range $.UploadAltKeys}}{{$name := index $.StoreNames .}}{{if $name}}
                         <option value="{{.}}" {{if eq . "TCGLow"}}selected{{end}}>{{$name}}</option>
                         {{end}}{{end}}
                     </optgroup>
                     <optgroup label="Retailers">
-                        {{range $.UploadSellerKeys}}{{$name := scraper_name .}}{{if $name}}
+                        {{range $.UploadSellerKeys}}{{$name := index $.StoreNames .}}{{if $name}}
                         <option value="{{.}}">{{$name}}</option>
                         {{end}}{{end}}
                     </optgroup>
@@ -141,7 +141,7 @@
             <label class="settings-field-row">
                 <span>Reference seller (sealed)</span>
                 <select id="opt-customsealedseller" data-cookie="UploadCustomSealedBuyer">
-                    {{range $.UploadSealedSellerKeys}}{{$name := scraper_name .}}{{if $name}}
+                    {{range $.UploadSealedSellerKeys}}{{$name := index $.StoreNames .}}{{if $name}}
                     <option value="{{.}}" {{if eq . "TCGSealed"}}selected{{end}}>{{$name}}</option>
                     {{end}}{{end}}
                 </select>

@@ -231,7 +231,7 @@ func TestCartRows(t *testing.T) {
 		{"CKSealed", false, ""},
 		{"CKGraded", false, ""},
 	} {
-		got := cartRows(cartItems(tc.key, tc.buylist, entries), entries)
+		got := cartRows(cartItems(currentPrices(), tc.key, tc.buylist, entries), entries)
 		if got != tc.want {
 			t.Errorf("%s rows = %q, want %q", tc.key, got, tc.want)
 		}
@@ -249,22 +249,22 @@ func TestCartRows(t *testing.T) {
 
 	// The button carries each row's id in row order, for the page to rebuild
 	// its list from the rows left ticked
-	got := cartLoadFor("ABUScans", false, entries)
+	got := cartLoadFor(currentPrices(), "ABUScans", false, entries)
 	if got.Items != "301,,,301,,,402,," {
 		t.Errorf("ABUScans items = %q", got.Items)
 	}
 
 	// An id the loader would drop stays out, and the others keep their rows
-	got = cartLoadFor("ABUGames", true, []OptimizedUploadEntry{{CardID: "card-f", Quantity: 1}, {CardID: "card-a", Quantity: 1}})
+	got = cartLoadFor(currentPrices(), "ABUGames", true, []OptimizedUploadEntry{{CardID: "card-f", Quantity: 1}, {CardID: "card-a", Quantity: 1}})
 	if got.Items != ",101" || !strings.Contains(got.Link, "#ban=101:1&") || !strings.HasSuffix(got.Link, "&skip=1") {
 		t.Errorf("ABUGames with a bad id = %+v", got)
 	}
 
-	got = cartLoadFor("MKM", true, entries)
+	got = cartLoadFor(currentPrices(), "MKM", true, entries)
 	if got.Link != "" {
 		t.Errorf("a store the bookmarklet does not fill got a button: %+v", got)
 	}
-	got = cartLoadFor("SCGRetail", false, entries)
+	got = cartLoadFor(currentPrices(), "SCGRetail", false, entries)
 	if got.Link != "" {
 		t.Errorf("SCG's retail side, which has its own import, got a button: %+v", got)
 	}
@@ -386,7 +386,7 @@ func TestCartSendMenu(t *testing.T) {
 	stubCartStores(t)
 	keys := []string{"MKM", "ABUGames", "CSI", "ABUGames", "SCG"}
 	prices := map[string]float64{"ABUGames": 3, "CSI": 2.5, "SCG": 2, "MKM": 9}
-	sends := cartSendsFor(keys, prices, OptimizedUploadEntry{CardID: "card-a", Quantity: 2})
+	sends := cartSendsFor(currentPrices(), keys, prices, OptimizedUploadEntry{CardID: "card-a", Quantity: 2})
 	var got []string
 	for _, send := range sends {
 		got = append(got, send.Store+" "+strconv.FormatFloat(send.Price, 'f', -1, 64)+" "+send.Link)
@@ -808,7 +808,7 @@ func TestCartLoadAffiliates(t *testing.T) {
 		// A store with no affiliate query keeps its plain page
 		{"ABUGames", true, "https://abugames.com/cartview/buylist#ban="},
 	} {
-		got := cartLoadFor(tc.key, tc.buylist, entries).Link
+		got := cartLoadFor(currentPrices(), tc.key, tc.buylist, entries).Link
 		if !strings.HasPrefix(got, tc.want) {
 			t.Errorf("%s link = %q, want it to start %q", tc.key, got, tc.want)
 		}
