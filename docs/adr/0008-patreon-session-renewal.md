@@ -149,7 +149,9 @@ without the reader.
   nothing, and a database that cannot say re-signs as the lease would.
   An older one, or a poked one, is renewed from Patreon, and re-signed
   whenever that renewal does not come, for want of a session or an
-  answer. A grant
+  answer, after the same read, since a resting session is not asked at
+  the lease; a session found unable ever to renew is no logout, and
+  re-signs without it. A grant
   that stops naming a tier keeps the one it gave until Patreon is
   asked, since only the pledge can say what follows it. Renewal off
   (`after_days` 0) re-signs nothing. A start or a deploy stamps nothing, and
