@@ -530,9 +530,9 @@ func (s *site) cacheNewspaperWith(b *matcher.Backend) {
 
 	newspaperUUIDs := map[string]struct{}{}
 
-	game, found := gameMap[Config().Game]
+	game, found := gameMap[b.Game]
 	if !found {
-		log.Printf("newspaper: %q is missing from gameMap, not caching", Config().Game)
+		log.Printf("newspaper: %q is missing from gameMap, not caching", b.Game)
 		return
 	}
 

@@ -1343,7 +1343,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 			// every hit to nothing. Drop it and let the game's own default
 			// take the query, the way an unrecognised mode is already
 			// dropped by the search itself.
-			if config.SearchMode == "scryfall" && Config().Game != DefaultGame {
+			if config.SearchMode == "scryfall" && b.Game != DefaultGame {
 				config.SearchMode = ""
 			}
 		case "skip":
@@ -2111,7 +2111,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 	// Last, so the modes parsed out of the query above win, and so the checks
 	// above that read an unset mode - the Scryfall "|" syntax, the bare
 	// "<set> <number>" shorthand - still see the state they were written for.
-	if config.SearchMode == "" && Config().Game != DefaultGame {
+	if config.SearchMode == "" && b.Game != DefaultGame {
 		config.SearchMode = "any"
 		config.DefaultMode = true
 	}

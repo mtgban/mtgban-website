@@ -594,7 +594,7 @@ func onStore(u *url.URL, trigger string) bool {
 // differently about any of them.
 func checkForLinks(b *matcher.Backend, mGuildID, mContent string) *discordgo.MessageEmbed {
 	// Only for the main discord and only for the main game
-	if mGuildID != discordGuildID() || Config().Game != DefaultGame {
+	if mGuildID != discordGuildID() || b.Game != DefaultGame {
 		return nil
 	}
 

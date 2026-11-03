@@ -71,7 +71,7 @@ func newSite() *site {
 	// Pre-stored before the first load, so s.ds is never nil: nil numbers,
 	// names and palette keep the pre-load answers scan, 204 and no-store.
 	s.ds.Store(&datastore{
-		backend:  &matcher.Backend{},
+		backend:  &matcher.Backend{Game: datastoreGame()},
 		editions: &editionsSnapshot{},
 	})
 

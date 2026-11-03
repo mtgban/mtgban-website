@@ -23,6 +23,7 @@ import (
 // after the set, so the palette lists have something of this load's own.
 func fixtureBackend(setCode, setName, releaseDate string, cards [][2]string) *matcher.Backend {
 	b := &matcher.Backend{
+		Game:  DefaultGame,
 		Sets:  map[string]*matcher.Set{},
 		UUIDs: map[string]*matcher.CardObject{},
 	}

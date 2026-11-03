@@ -1042,7 +1042,7 @@ func uuid2card(b *matcher.Backend, p *prices, cardID string, preferFlavorName bo
 	var rarityColor template.CSS
 	keyrune, setSymbol := keyruneForCardSet(b, cardID)
 	if keyrune == "" {
-		rarityColor = colorRarityMap[Config().Game][matcher.RarityName(co.Rarity)]
+		rarityColor = colorRarityMap[b.Game][matcher.RarityName(co.Rarity)]
 	}
 
 	var hotlistStore string
