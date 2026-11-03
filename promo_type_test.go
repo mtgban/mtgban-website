@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,7 +17,14 @@ func promoTypeCards(t *testing.T) (plain, chipped string) {
 	t.Helper()
 	for _, uuid := range backend().GetUUIDs() {
 		co, err := backend().GetUUID(uuid)
-		if err != nil || co.Sealed {
+		if err != nil || co.Sealed || len(co.PromoTypes) == 0 {
+			continue
+		}
+		// Building every card takes seconds, and only a nonfoil printing with
+		// an alt-foil promo type can show a chip: the altFoilTags branch in
+		// uuid2card, which this has to stay in step with.
+		chippable := !co.Foil && !co.Etched && slices.ContainsFunc(co.PromoTypes, isAltFoilTag)
+		if plain != "" && !chippable {
 			continue
 		}
 		card := uuid2card(backend(), currentPrices(), uuid, false, nil)
@@ -31,6 +39,10 @@ func promoTypeCards(t *testing.T) (plain, chipped string) {
 		}
 	}
 	return plain, chipped
+}
+
+func isAltFoilTag(promoType string) bool {
+	return slices.Contains(altFoilTags, promoType)
 }
 
 // A promo type already shown as its own chip - the alt-foil styling that
