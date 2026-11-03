@@ -140,12 +140,12 @@ guard, and the root package runs in 3 s, or 31 s under `-race`.
   an empty one, which only their own tests pass.
 - Two sites could now share a process, but more than the datastore still
   assumes one. Moving the rest is Phase D:
-  - `Config`: some `Config.Game` readers already hold a `b` whose `Game`
-    would do, and the FuncMap's `game`, `game_title`, `game_badge`,
-    `card_back`, `bantool_run_name`, the two settings paths and texts
-    (`datasets_text` and `infrastructure_text` read `Config()` through
-    `Datasets()` and `infrastructureFile()`, and the process-wide
-    `datasetsPtr`/`infrastructurePtr`) and `load_partner` read `Config()`
+  - `Config`: a function handed a `b` reads its `Game`; the other
+    `Config.Game` readers, and the FuncMap's `game`, `game_title`,
+    `game_badge`, `card_back`, `bantool_run_name`, the two settings paths
+    and texts (`datasets_text` and `infrastructure_text` read `Config()`
+    through `Datasets()` and `infrastructureFile()`, and the process-wide
+    `datasetsPtr`/`infrastructurePtr`) and `load_partner`, read `Config()`
     or `Affiliates()` at render, which go into page data the same way the
     store funcs did;
   - the session stores: `Sessions` is one registry, bound to the site in
