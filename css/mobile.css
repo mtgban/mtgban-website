@@ -457,6 +457,15 @@ body.mobile:has(.m-home) .m-nav-home {
     margin-bottom: 0.75em;
 }
 
+/* Account and Guide, either side of the theme toggle and sized like it */
+.m-home-icon-btn {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    color: var(--greytext);
+}
+.m-home-icon-btn svg { width: 20px; height: 20px; }
+
 .m-home-login-btn {
     padding: 0.5em 1.2em;
     font-size: 0.8rem;

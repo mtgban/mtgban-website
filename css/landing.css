@@ -301,6 +301,20 @@
 .landing-login-row {
     display: flex; gap: 8px; align-items: center;
 }
+/* Account and Guide, either side of the theme toggle and sized like it */
+.landing-icon-btn {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-sm, 6px);
+    color: var(--greytext);
+    transition: background 0.12s, color 0.12s;
+}
+.landing-icon-btn:hover {
+    background: var(--surface-3, var(--navbackground));
+    color: var(--normal);
+    text-decoration: none;
+}
+.landing-icon-btn svg { width: 20px; height: 20px; }
 .landing-login-btn {
     padding: 8px 20px; border-radius: 10px;
     font-size: 13px; font-weight: 600;

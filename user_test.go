@@ -801,6 +801,28 @@ func TestNavbarAccountIconFromTheNav(t *testing.T) {
 	}
 }
 
+// The home page's login row has Account and Guide either side of the theme
+// toggle, on both layouts.
+func TestHomeLoginRowFlanksTheThemeToggle(t *testing.T) {
+	for _, mobile := range []bool{false, true} {
+		pv := genPageNav(testSite, nil, "Home", "")
+		pv.IsMobile = mobile
+		out := renderPage(t, "home.html", mobile, pv)
+		// The phone's navbar has a theme toggle of its own: read the row alone.
+		row := out[strings.Index(out, `login-row">`):]
+		row = row[:strings.Index(row, `</div>`)]
+		account := strings.Index(row, `title="Account"><i data-lucide="user-round">`)
+		theme := strings.Index(row, `class="ban-theme-toggle"`)
+		guide := strings.Index(row, `title="Guide"><i data-lucide="circle-question-mark">`)
+		if account < 0 || theme < 0 || guide < 0 || account > theme || theme > guide {
+			t.Errorf("mobile=%v: Account at %d, theme toggle at %d, Guide at %d", mobile, account, theme, guide)
+		}
+		if strings.Count(row, `class="ban-theme-toggle"`) != 1 {
+			t.Errorf("mobile=%v: the row draws the theme toggle %d times", mobile, strings.Count(row, `class="ban-theme-toggle"`))
+		}
+	}
+}
+
 // The Account page shows the backpacks a tier gets once the backpack's
 // size has clamped them, not the number the ACL asked for, and a size
 // held to the most a backpack takes.
