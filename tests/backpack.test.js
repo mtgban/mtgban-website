@@ -39,7 +39,7 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], navMenu = false, sort, fetch, signedIn = false } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], navMenu = false, sort, fetch, signedIn = false, timers } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
     if (active) m.mtgban_backpack_active = String(active);
@@ -112,9 +112,11 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
         const row = btn.closest('.result-header'); if (!row) return null;
         return { id: row.getAttribute('data-card-id'), name: row.getAttribute('data-card-name'), set: 'S', edition: 'Set', number: '7', finishTag: '', finishClass: '', img: '', cw: false, t: Date.now() };
     } };
-    new Function('window', 'document', 'localStorage', 'sessionStorage', 'ListStorage',
+    // A test passing timers runs the page's timeouts itself, not the clock.
+    const later = timers ? (fn, ms) => { timers.push({ fn, ms }); } : setTimeout;
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'ListStorage', 'setTimeout',
         listStorage + '; window.ListStorage = ListStorage; ' + source)(
-        window, document, localStorage, sessionStorage, undefined);
+        window, document, localStorage, sessionStorage, undefined, later);
     const stored = () => JSON.parse(m.mtgban_backpack);
     const pendingIds = () => (sm.mtgban_backpack_pending_clear === undefined ? undefined : JSON.parse(sm.mtgban_backpack_pending_clear));
     return {
@@ -1721,6 +1723,17 @@ describe('sorting the panel', () => {
     const reverse = () => ids['backpack-sort-dir'].click();
     const tick = () => new Promise((r) => setTimeout(r, 0));
     const json = (data, status = 200) => Promise.resolve({ ok: status === 200, status, json: () => Promise.resolve(data) });
+    // Runs the page's timeouts as they come, returning how long each asked for.
+    const runTimers = async (timers) => {
+        const waits = [];
+        while (timers.length) {
+            const { fn, ms } = timers.shift();
+            waits.push(ms);
+            fn();
+            await tick(); await tick();
+        }
+        return waits;
+    };
 
     test('the panel opens newest first, as before', () => {
         const p = page({ store });
@@ -1824,11 +1837,13 @@ describe('sorting the panel', () => {
             if (calls.length === 2 && !limited) { limited = true; return json({}, 429); }
             return json({});
         };
-        const p = page({ store: many, fetch, sort: { by: 'buylist', dir: 'desc' } });
+        const timers = [];
+        const p = page({ store: many, fetch, sort: { by: 'buylist', dir: 'desc' }, timers });
         p.nav.click();
         await tick(); await tick();
         expect(ids['backpack-sort-note'].textContent).toBe('Loading prices 1/2…');
-        await new Promise((r) => setTimeout(r, 2000));
+        const waits = await runTimers(timers);
+        expect(waits).toEqual([400, 1200, 0]);
         expect(calls).toEqual([50, 10, 10]);
         expect(ids['backpack-sort-note'].hidden).toBe(true);
     });
@@ -1837,10 +1852,12 @@ describe('sorting the panel', () => {
         const many = Array.from({ length: 60 }, (_, i) => ({ id: 'id-' + i, name: 'C' + i, qty: 1, t: i, m: i }));
         const calls = [];
         const fetch = (url) => { calls.push(decodeURIComponent(url.slice('/data/prices/'.length)).split(',').length); return json({}); };
-        const p = page({ store: many, fetch, sort: { by: 'retail', dir: 'desc' } });
+        const timers = [];
+        const p = page({ store: many, fetch, sort: { by: 'retail', dir: 'desc' }, timers });
         p.nav.click();
         p.window.Backpack.close();
-        await new Promise((r) => setTimeout(r, 600));
+        await tick(); await tick();
+        await runTimers(timers);
         expect(calls).toEqual([50]);
         p.nav.click();
         await tick(); await tick(); await tick();

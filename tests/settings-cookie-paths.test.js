@@ -93,6 +93,9 @@ function bodyFixture() {
 
 // Loads settings.js on pathname with the browser's cookies, opens the
 // modal, and resolves once the body has loaded.
+// What the modal does on a click or on opening runs on promises and timeouts of no delay.
+const settle = async () => { for (let i = 0; i < 5; i++) await new Promise(r => setTimeout(r, 0)); };
+
 async function openModal({ pathname, cookie, values }) {
     const writes = [];
     const fetches = [];
@@ -139,12 +142,12 @@ async function openModal({ pathname, cookie, values }) {
 
     // The document is in when the loader runs settings.js, which sets up at once
     window.openSettings('arbit');
-    await new Promise(r => setTimeout(r, 10));
+    await settle();
 
     const find = sel => root.querySelector(sel);
     const save = async () => {
         saveBtn.listeners.click.forEach(fn => fn());
-        await new Promise(r => setTimeout(r, 10));
+        await settle();
     };
     return { find, save, writes, fetches, modalBody, window };
 }
