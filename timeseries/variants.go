@@ -515,12 +515,15 @@ func (v VariantInfo) IsMagic() bool { return v.MtgjsonUUID != "" }
 func (c *Client) LookupVariant(ctx context.Context, banID int64) (VariantInfo, bool, error) {
 	// The warm pass read this exact row; ask it before crossing the network.
 	// A miss - a variant minted since the warm, or a client that never warmed -
-	// falls through to the query.
-	if v, ok := c.variants.variant(banID); ok {
+	// falls through to the query, as does a Magic row the warm read with no
+	// mtgban_id, which an adopt may have filed since. That costs a ban: chart
+	// one primary-key read per Magic row until the mtgban_id backfill runs.
+	v, ok := c.variants.variant(banID)
+	if ok && (!v.IsMagic() || v.MtgbanID != "") {
 		return v, true, nil
 	}
 
-	v := VariantInfo{BanID: banID}
+	v = VariantInfo{BanID: banID}
 	var mtgbanID, uuid, subType sql.NullString
 	var catID, prodID sql.NullInt64
 	err := c.db.QueryRowContext(ctx, `

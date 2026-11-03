@@ -31,6 +31,14 @@ func TestLookupVariantAnswersFromTheWarmedMap(t *testing.T) {
 		t.Errorf("warmed lookup = %+v, want %+v", got, want)
 	}
 
+	// A Magic row the warm read with no id asks the server, which knows any
+	// id an adopt filed since.
+	adoptable := VariantInfo{BanID: 13457, MtgjsonUUID: "7c3ea479-e463-58e7-b1b0-b217c77dae79", IsAlt: true}
+	c.variants.publish(&variantIndex{byBanID: map[int64]VariantInfo{want.BanID: want, adoptable.BanID: adoptable}})
+	if _, ok, err := c.LookupVariant(context.Background(), adoptable.BanID); ok || err == nil {
+		t.Errorf("lookup of a row with no id = %v/%v, want it to reach the server and fail", ok, err)
+	}
+
 	// A ban_id minted since the warm still reaches the server, and says so when
 	// there is none.
 	if _, ok, err := c.LookupVariant(context.Background(), 99999); ok || err == nil {
