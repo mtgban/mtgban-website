@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -144,7 +145,7 @@ func TestGetMoxDeckStalledBodyTimesOut(t *testing.T) {
 	defer srv.Close()
 
 	saved := client
-	client = mtgban.NewHTTPClient(mtgban.WithHTTPTimeout(200*time.Millisecond), mtgban.WithHTTPRetries(0))
+	client = mtgban.NewHTTPClient(mtgban.WithHTTPTimeout(20*time.Millisecond), mtgban.WithHTTPRetries(0))
 	t.Cleanup(func() { client = saved })
 
 	start := time.Now()
@@ -154,7 +155,7 @@ func TestGetMoxDeckStalledBodyTimesOut(t *testing.T) {
 	}
 	elapsed := time.Since(start)
 	if elapsed > 2*time.Second {
-		t.Fatalf("stalled body took %v to fail, want about the 200ms timeout", elapsed)
+		t.Fatalf("stalled body took %v to fail, want about the 20ms timeout", elapsed)
 	}
 }
 
@@ -188,27 +189,28 @@ func TestGetMoxDeckServerErrorIsNotRetried(t *testing.T) {
 // A collection whose every page answers well inside the client's timeout
 // still stops at the one deadline the whole walk shares.
 func TestCollectionWalkSharesOneDeadline(t *testing.T) {
+	var pages atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("pageNumber") == "0" {
 			w.Write([]byte(`{"totalResults":10000}`))
 			return
 		}
-		time.Sleep(50 * time.Millisecond)
+		pages.Add(1)
+		time.Sleep(time.Millisecond)
 		w.Write([]byte(`{"data":[{"game":"arena"}]}`))
 	}))
 	defer srv.Close()
 
 	saved := collectionTimeout
-	collectionTimeout = 300 * time.Millisecond
+	collectionTimeout = 20 * time.Millisecond
 	t.Cleanup(func() { collectionTimeout = saved })
 
-	start := time.Now()
 	_, err := getMoxCollection(context.Background(), srv.URL, 1000)
 	if err == nil {
-		t.Fatal("a 101-page walk finished inside a 300ms deadline")
+		t.Fatal("a 101-page walk finished inside a 20ms deadline")
 	}
-	elapsed := time.Since(start)
-	if elapsed > 2*time.Second {
-		t.Fatalf("walk took %v to fail, want about the 300ms deadline", elapsed)
+	// A deadline per page would let every page through
+	if got := pages.Load(); got >= 101 {
+		t.Fatalf("the walk fetched all %d pages, want the deadline to cut it", got)
 	}
 }

@@ -325,15 +325,16 @@ func TestSendSTARTTLSHangsAgainstImplicitTLSListener(t *testing.T) {
 	host, port := hostPort(t, ln.Addr())
 	s := &SMTP{Host: host, Port: port, From: "MTGBAN <no-reply@mtgban.com>"}
 	start := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	const deadline = 20 * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
 	_, err = s.Send(ctx, Message{To: "ann@example.com", Subject: "subject", Text: "text"})
 	elapsed := time.Since(start)
 	if err == nil {
 		t.Fatal("expected a STARTTLS sender to fail against an implicit TLS listener")
 	}
-	if elapsed < 2*time.Second || elapsed > 4*time.Second {
-		t.Errorf("elapsed=%s, want it to run to the ~2s deadline", elapsed)
+	if elapsed < deadline || elapsed > 2*time.Second {
+		t.Errorf("elapsed=%s, want it to run to the %s deadline", elapsed, deadline)
 	}
 	t.Logf("elapsed=%s err=%v", elapsed, err)
 }
@@ -344,7 +345,7 @@ func TestSendSTARTTLSHangsAgainstImplicitTLSListener(t *testing.T) {
 // callers (request contexts, the unbounded daily reminders context).
 func TestSendBoundsDialWhenContextHasNoDeadline(t *testing.T) {
 	orig := sendFallbackTimeout
-	sendFallbackTimeout = 300 * time.Millisecond
+	sendFallbackTimeout = 20 * time.Millisecond
 	t.Cleanup(func() { sendFallbackTimeout = orig })
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
