@@ -1717,9 +1717,7 @@ func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T
 	}
 
 	page.TotalIndex = (len(slice) + maxResults - 1) / maxResults
-	if page.TotalIndex > maxTotalResults/maxResults {
-		page.TotalIndex = maxTotalResults / maxResults
-	}
+	page.TotalIndex = min(page.TotalIndex, (maxTotalResults+maxResults-1)/maxResults)
 
 	// Make sure there is at least one page
 	if page.TotalIndex < 1 {
