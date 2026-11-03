@@ -87,6 +87,11 @@ func WithBaseURL(u string) ClientOption {
 	return func(c *Client) { c.baseURL = strings.TrimSuffix(u, "/") }
 }
 
+// WithThrottle sets the least time between requests; zero sends them at once.
+func WithThrottle(d time.Duration) ClientOption {
+	return func(c *Client) { c.throttle = d }
+}
+
 // NewClient builds a client from cfg. A blank User-Agent falls back to a
 // descriptive default; tcgcsv.com blocks generic agents.
 func NewClient(cfg Config, opts ...ClientOption) *Client {

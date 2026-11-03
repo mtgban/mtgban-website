@@ -115,7 +115,7 @@ func fakeService(t *testing.T, fake *fakeTCGCSV, store Store) (*Service, *[]stri
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.client = tcgcsv.NewClient(cfg, tcgcsv.WithBaseURL(srv.URL))
+	svc.client = tcgcsv.NewClient(cfg, tcgcsv.WithBaseURL(srv.URL), tcgcsv.WithThrottle(0))
 	return svc, &notified
 }
 
