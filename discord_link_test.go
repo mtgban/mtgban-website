@@ -142,6 +142,7 @@ func manapoolLinkPrintings() map[string]map[string]bool {
 // reads exactly like a population that does not hold it. Some 300k lookups,
 // about three seconds beside the datastore's own load.
 func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
+	t.Parallel()
 	skipWithoutDatastore(t)
 
 	shared := tcgplayerSharedProductIDs()
