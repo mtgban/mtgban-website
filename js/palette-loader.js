@@ -61,7 +61,11 @@
         // The palette builds its overlay as its script runs, so the
         // stylesheet has to be in place before any script executes.
         loading = stylesheet('/css/command-palette.css').then(function () {
-            return Promise.all(scripts.map(script));
+            var runs = scripts.map(script);
+            // The palette runs without the others, and once it ran a retry
+            // would run it twice, so only its own failure is one
+            runs.slice(0, -1).forEach(function (run) { run.catch(failed); });
+            return runs[runs.length - 1];
         }).catch(function (err) {
             loading = null;
             throw err;
@@ -79,21 +83,24 @@
         return !(el && el.isContentEditable);
     }
 
+    function failed(err) {
+        if (window.console) window.console.error('command palette: ' + err.message);
+    }
+
     function onKeydown(e) {
         if (!wanted(e) || window.innerWidth < 768) return;
         e.preventDefault();
-        document.removeEventListener('keydown', onKeydown);
+        // A press while the files load is the browser's no more than the first
+        if (loading) return;
         // A Ctrl+K matched by keyCode alone (a non-Latin layout) replays as 'k'
         var replay = new KeyboardEvent('keydown', {
             key: e.key === '/' ? '/' : 'k', keyCode: e.keyCode,
             ctrlKey: e.ctrlKey, metaKey: e.metaKey, bubbles: true, cancelable: true
         });
         load().then(function () {
+            document.removeEventListener('keydown', onKeydown);
             document.dispatchEvent(replay);
-        }, function (err) {
-            document.addEventListener('keydown', onKeydown);
-            if (window.console) window.console.error('command palette: ' + err.message);
-        });
+        }, failed);
     }
 
     document.addEventListener('keydown', onKeydown);
