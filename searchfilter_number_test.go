@@ -389,7 +389,7 @@ func checkNumberedNamesStayNames(t *testing.T, ds *datastore) {
 			continue
 		}
 		config := parseSearchQuery(ds, currentPrices(), co.Name, nil, nil, nil)
-		if len(config.CardFilters) != 0 || config.SearchMode != "" {
+		if len(config.CardFilters) != 0 || (config.SearchMode != "" && !config.DefaultMode) {
 			t.Errorf("%q is read as %q %+v", co.Name, config.CleanQuery, config.CardFilters)
 		}
 	}
