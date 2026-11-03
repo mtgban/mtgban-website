@@ -91,7 +91,7 @@ func TestEmptyScopeStaysOutOfTheURL(t *testing.T) {
 					SearchRan:   true,
 					SearchQuery: "s:M19 bolt",
 					SearchScope: scope,
-					DidYouMean:  "Lightning Bolt",
+					DidYouMean:  []string{"Lightning Bolt"},
 					AltSearches: []suggest.AltSearch{{Query: "bolt", Label: "without s:M19"}},
 				},
 			})

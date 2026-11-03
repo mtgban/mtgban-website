@@ -263,13 +263,15 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 }
 
 // searchSuggestions adapts a parsed search that found nothing into the
-// suggest package's inputs. The did-you-mean is a whole query: the closest
-// name, the collector number read off the words, and the filters typed,
-// each read under the key that finds cards (see rekeyFilters). packs holds
-// the reader's backpacks, by on: value.
-func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchConfig, pinned []FilterElem, packs map[string]map[string]bool, sealed bool) (string, []suggest.AltSearch) {
+// suggest package's inputs. Each did-you-mean is a whole query: one of the
+// closest names, the collector number read off the words, and the filters
+// typed, each read under the key that finds that name's cards (see
+// rekeyFilters). The ones a filter rekeyed for come first, since that
+// proves they find cards, nearest first among them. packs holds the
+// reader's backpacks, by on: value.
+func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchConfig, pinned []FilterElem, packs map[string]map[string]bool, sealed bool) ([]string, []suggest.AltSearch) {
 	if config.SearchMode == "hashing" {
-		return "", nil
+		return nil, nil
 	}
 	b := ds.backend
 	alts := suggest.Build(suggest.Params{
@@ -281,23 +283,32 @@ func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchC
 		Backend:        b,
 	})
 
-	name := suggest.Closest(b, config.CleanQuery, sealed)
-	corrected := name != ""
+	names := suggest.Closest(b, config.CleanQuery, sealed)
+	corrected := len(names) != 0
 	if !corrected {
-		name = config.CleanQuery
+		names = []string{config.CleanQuery}
 	}
-	var query []string
-	if name != "" {
-		query = append(query, quoteIfFilter(name))
+	var queries, asTyped []string
+	for _, name := range names {
+		var query []string
+		if name != "" {
+			query = append(query, quoteIfFilter(name))
+		}
+		if config.NumberTerms != "" {
+			query = append(query, config.NumberTerms)
+		}
+		filters, rekeyed := rekeyFilters(ds, p, query, config.AppliedFilters, pinned, packs, sealed)
+		whole := strings.Join(append(query, filters...), " ")
+		if rekeyed {
+			queries = append(queries, whole)
+		} else {
+			asTyped = append(asTyped, whole)
+		}
 	}
-	if config.NumberTerms != "" {
-		query = append(query, config.NumberTerms)
+	if !corrected && len(queries) == 0 {
+		return nil, alts
 	}
-	filters, rekeyed := rekeyFilters(ds, p, query, config.AppliedFilters, pinned, packs, sealed)
-	if !corrected && !rekeyed {
-		return "", alts
-	}
-	return strings.Join(append(query, filters...), " "), alts
+	return append(queries, asTyped...), alts
 }
 
 // searchFallback re-reads a search whose name matched nothing, in the order a
@@ -512,7 +523,7 @@ type SearchVars struct {
 	CanFixSearch bool
 
 	// Suggestions shown when a search returns no results
-	DidYouMean         string
+	DidYouMean         []string
 	AltSearches        []suggest.AltSearch
 	CanDownloadCSV     bool
 	DefaultTab         string

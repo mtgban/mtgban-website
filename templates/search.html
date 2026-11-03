@@ -221,7 +221,7 @@
                 <div class="search-suggestions">
                     {{if .DidYouMean}}
                         <p class="search-suggestion-didyoumean">
-                            Did you mean <a href="?q={{.DidYouMean}}{{with .SearchScope}}&scope={{.}}{{end}}">{{.DidYouMean}}</a>?
+                            Did you mean {{range $i, $q := .DidYouMean}}{{if $i}} or {{end}}<a href="?q={{$q}}{{with $.SearchScope}}&scope={{.}}{{end}}">{{$q}}</a>{{end}}?
                         </p>
                     {{end}}
                     {{if .AltSearches}}

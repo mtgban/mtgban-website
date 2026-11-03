@@ -129,7 +129,7 @@ func TestSearchScopeRendersInSuggestions(t *testing.T) {
 		SearchVars: SearchVars{
 			Notices:    []string{NoCardsMessage},
 			SearchRan:  true,
-			DidYouMean: "Fountain of Renewal",
+			DidYouMean: []string{"Fountain of Renewal", "Fountain of Youth"},
 			AltSearches: []suggest.AltSearch{
 				{Query: "Fountain sdfsdfsdf Renewal", Label: "without s:M19"},
 				{Query: "s:M19 Fountain sdfsdfsdf Renewal", Label: "without cns:235"},

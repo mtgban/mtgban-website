@@ -406,7 +406,7 @@ func TestShowAllAndSuggestionsQuoteFilterLikeName(t *testing.T) {
 	}) {
 		t.Errorf("no quoted bare-name suggestion in %+v", alts)
 	}
-	if strings.Contains(didYouMean, `"`) {
+	if strings.Contains(strings.Join(didYouMean, " "), `"`) {
 		t.Errorf("did-you-mean read the quotes: %q", didYouMean)
 	}
 }
