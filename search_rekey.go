@@ -32,8 +32,10 @@ import (
 // maxRekeyValues values. The query is searched once, without the filters
 // tried, and the cards it finds are walked once: what the rest of the
 // query finds for a filter is the cards every other filter tried keeps.
-// A walk of the datastore follows for each filter a key stands in for.
-func rekeyFilters(ds *datastore, p *prices, name, filters []string, pinned []FilterElem, packs map[string]map[string]bool, sealed bool) ([]string, bool) {
+// A walk of the datastore follows for each filter a key stands in for; its
+// answer depends on the filter alone, so reads keeps it by the filter as
+// typed for the next name a did-you-mean tries.
+func rekeyFilters(ds *datastore, p *prices, name, filters []string, pinned []FilterElem, packs map[string]map[string]bool, sealed bool, reads map[string]bool) ([]string, bool) {
 	if len(filters) > maxRekeyFilters {
 		return filters, false
 	}
@@ -175,7 +177,12 @@ func rekeyFilters(ds *datastore, p *prices, name, filters []string, pinned []Fil
 			}
 			// Asked only of a filter some key would stand in for: the
 			// walk covers the whole datastore when the value names nothing.
-			if t.typed == nil || !readsAnywhere(ds, p, t.typed.filter[0], t.key, sealed) {
+			anywhere, asked := reads[filters[t.index]]
+			if t.typed != nil && !asked {
+				anywhere = readsAnywhere(ds, p, t.typed.filter[0], t.key, sealed)
+				reads[filters[t.index]] = anywhere
+			}
+			if t.typed == nil || !anywhere {
 				out[t.index] = c.token
 				rekeyed = true
 			}
