@@ -310,9 +310,9 @@ test('a preset the cap drops far ahead of the clock stays dropped when a stale d
     const first = await reconcileArbitPresets(list, []);
     expect(first.find((p) => p.id === 'p_0').del).toBe(true);
     // Later, a delete frees a slot and a device that never synced still holds p_0
-    await new Promise((r) => setTimeout(r, 20));
-    const afterDelete = first.filter((p) => p.id !== 'p_5').concat([{ id: 'p_5', del: true, savedAt: Date.now() }]);
-    const second = await reconcileArbitPresets([list[0], { id: 'p_gone', del: true, savedAt: Date.now() }], afterDelete);
+    const later = Date.now() + 20;
+    const afterDelete = first.filter((p) => p.id !== 'p_5').concat([{ id: 'p_5', del: true, savedAt: later }]);
+    const second = await reconcileArbitPresets([list[0], { id: 'p_gone', del: true, savedAt: later }], afterDelete);
     expect(second.filter((p) => !p.del).map((p) => p.id)).not.toContain('p_0');
     // A delete and a save both ahead come out the same; the delete wins
     const third = await reconcileArbitPresets(
@@ -391,12 +391,16 @@ test('stamps ahead of the server\'s clock count as made now, on hydrate and in a
 // syncDevice loads user-state.js on a device whose clock runs skew ahead
 // of a server shared with other devices, lets its sync and any write it
 // schedules run, and returns the requests it sent.
+// How far a test has moved the clock on, past what has really elapsed.
+let clockAhead = 0;
+const clock = () => Date.now() + clockAhead;
+
 async function syncDevice(server, device) {
-    const FakeDate = { now: () => Date.now() + device.skew, parse: Date.parse };
+    const FakeDate = { now: () => clock() + device.skew, parse: Date.parse };
     const storage = { getItem: (k) => (k in device.m ? device.m[k] : null), setItem: (k, v) => { device.m[k] = String(v); }, removeItem: (k) => { delete device.m[k]; } };
     const sent = [];
     const reply = (status, body) => Promise.resolve({
-        status, ok: status === 200, headers: { get: (h) => (h === 'Date' ? new Date().toUTCString() : null) },
+        status, ok: status === 200, headers: { get: (h) => (h === 'Date' ? new Date(clock()).toUTCString() : null) },
         json: () => Promise.resolve(body),
     });
     const state = () => ({ version: server.version, favorites: [], recents: [], preferences: Object.assign({}, server.preferences) });
@@ -433,15 +437,19 @@ test('a device an hour fast that saved before its first sync leaves the server o
 
     // 1.5 s on, as in the review, past the header's whole second: A syncs
     // again, then B applies other filters, and they hold on both devices
-    await new Promise((r) => setTimeout(r, 1500));
-    await syncDevice(server, a);
-    expect(JSON.parse(a.m.mtgban_arbit_filters).arbit.q).toBe('f=1&minsell=2');
-    b.m.mtgban_userstate_dirty = '1';
-    b.m.mtgban_arbit_filters = JSON.stringify({ arbit: { q: 'f=1&minsell=9', t: Date.now() } });
-    await syncDevice(server, b);
-    expect(JSON.parse(server.preferences.mtgban_arbit_filters).arbit.q).toBe('f=1&minsell=9');
-    await syncDevice(server, a);
-    expect(JSON.parse(a.m.mtgban_arbit_filters).arbit.q).toBe('f=1&minsell=9');
+    clockAhead = 1500;
+    try {
+        await syncDevice(server, a);
+        expect(JSON.parse(a.m.mtgban_arbit_filters).arbit.q).toBe('f=1&minsell=2');
+        b.m.mtgban_userstate_dirty = '1';
+        b.m.mtgban_arbit_filters = JSON.stringify({ arbit: { q: 'f=1&minsell=9', t: clock() } });
+        await syncDevice(server, b);
+        expect(JSON.parse(server.preferences.mtgban_arbit_filters).arbit.q).toBe('f=1&minsell=9');
+        await syncDevice(server, a);
+        expect(JSON.parse(a.m.mtgban_arbit_filters).arbit.q).toBe('f=1&minsell=9');
+    } finally {
+        clockAhead = 0;
+    }
 });
 
 test('a preset the cap drops stays dropped against its own stamp up to the tolerance ahead', async () => {
