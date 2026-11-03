@@ -80,6 +80,26 @@ func cleanUser(t *testing.T, s *Store, h string) {
 	t.Cleanup(clean)
 }
 
+// waitForBlocked waits until Postgres shows a query waiting on holder's locks,
+// and fails the test with why when none does.
+func waitForBlocked(t *testing.T, s *Store, holder *sql.Tx, why string) {
+	t.Helper()
+	var pid int
+	must(t, holder.QueryRow(`SELECT pg_backend_pid()`).Scan(&pid))
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		var waiting int
+		must(t, s.db.QueryRow(`SELECT count(*) FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))`, pid).Scan(&waiting))
+		if waiting > 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal(why)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
@@ -492,11 +512,7 @@ func TestReserveMailKeepsTheCeiling(t *testing.T) {
 		_, ok, err := s.ReserveMail(ctx, h, now, 3)
 		result <- ok && err == nil
 	}()
-	select {
-	case <-result:
-		t.Fatal("reservation did not wait for the one holding the lock")
-	case <-time.After(200 * time.Millisecond):
-	}
+	waitForBlocked(t, s, other, "reservation did not wait for the one holding the lock")
 	_, err = other.Exec(`INSERT INTO alert_mails (user_hash, sent_at) VALUES ($1, $2)`, h, now)
 	must(t, err)
 	must(t, other.Commit())
@@ -1579,11 +1595,7 @@ func TestDisableAndParkWaitsForAConfirm(t *testing.T) {
 		_, err := s.DisableAndPark(ctx, h, ChannelEmail, SourcePatreon, "pat@example.com", ReasonBounced, ParkBounced, now)
 		result <- err
 	}()
-	select {
-	case err := <-result:
-		t.Fatalf("park did not wait for the confirm: %v", err)
-	case <-time.After(200 * time.Millisecond):
-	}
+	waitForBlocked(t, s, confirm, "park did not wait for the confirm")
 	must(t, confirm.Commit())
 	must(t, <-result)
 	if st := alertStatus(t, s, h, created.ID); st != StatusActive {
@@ -1616,11 +1628,7 @@ func TestStageEmailWaitsForAConfirm(t *testing.T) {
 		_, _, err := s.StageEmail(ctx, h, "b@example.com")
 		result <- err
 	}()
-	select {
-	case err := <-result:
-		t.Fatalf("stage did not wait for the confirm: %v", err)
-	case <-time.After(200 * time.Millisecond):
-	}
+	waitForBlocked(t, s, confirm, "stage did not wait for the confirm")
 	must(t, confirm.Commit())
 	must(t, <-result)
 	chans, err := s.Channels(ctx, h)
@@ -1666,11 +1674,7 @@ func TestParkForNoAddressWaitsForAConfirm(t *testing.T) {
 		_, err := s.ParkForNoAddress(ctx, h, created.ID, created.UpdatedAt, State{Status: StatusUndeliverable, AboveArmed: true, BelowArmed: true, LastError: ParkNoAddress})
 		result <- err
 	}()
-	select {
-	case err := <-result:
-		t.Fatalf("park did not wait for the confirm: %v", err)
-	case <-time.After(200 * time.Millisecond):
-	}
+	waitForBlocked(t, s, confirm, "park did not wait for the confirm")
 	must(t, confirm.Commit())
 	must(t, <-result)
 	if st := alertStatus(t, s, h, created.ID); st != StatusActive {
@@ -1707,11 +1711,7 @@ func TestUnsubscribeEmailIsOneStep(t *testing.T) {
 	must(t, lockUser(ctx, enable, h))
 	result := make(chan error, 1)
 	go func() { result <- s.UnsubscribeEmail(ctx, h, now) }()
-	select {
-	case err := <-result:
-		t.Fatalf("unsubscribe did not wait: %v", err)
-	case <-time.After(200 * time.Millisecond):
-	}
+	waitForBlocked(t, s, enable, "unsubscribe did not wait")
 	must(t, enable.Commit())
 	must(t, <-result)
 	chans, err := s.Channels(ctx, h)
@@ -1814,7 +1814,7 @@ func TestUpsertChannelRestoresParkedEmailAlerts(t *testing.T) {
 	go func() {
 		result <- s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "pat@example.com", Source: SourcePatreon, VerifiedAt: &now})
 	}()
-	time.Sleep(200 * time.Millisecond)
+	waitForBlocked(t, s, other, "it did not wait")
 	chans, err := s.Channels(ctx, h)
 	if err != nil || len(chans) != 1 {
 		t.Fatalf("wrote while another write held the user's lock: %+v %v", chans, err)
@@ -1847,7 +1847,7 @@ func TestUpsertChannelWaitsOnTheAddressLock(t *testing.T) {
 	go func() {
 		result <- s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: addr, Source: SourcePatreon, VerifiedAt: &now})
 	}()
-	time.Sleep(200 * time.Millisecond)
+	waitForBlocked(t, s, complaint, "it did not wait")
 	chans, err := s.Channels(ctx, h)
 	if err != nil || len(chans) != 0 {
 		t.Fatalf("wrote while a complaint held the address's lock: %+v %v", chans, err)
@@ -1892,7 +1892,7 @@ func TestLaterCommitTakesTheLaterClaimDB(t *testing.T) {
 		api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"`+b+`"}`, testCaller("a@b.com", "Legacy")))
 		done <- w
 	}()
-	time.Sleep(200 * time.Millisecond)
+	waitForBlocked(t, s, other, "it did not wait")
 	var aAt time.Time
 	must(t, other.QueryRowContext(ctx, `
 		INSERT INTO alert_confirm_sends (user_hash, address, sent_at) VALUES ($1, $2, clock_timestamp()) RETURNING sent_at`, h, a).Scan(&aAt))
@@ -1980,7 +1980,7 @@ func TestStageEmailClaimsAndStagesTogether(t *testing.T) {
 		_, _, err := s.StageEmail(ctx, h, addr)
 		result <- err
 	}()
-	time.Sleep(200 * time.Millisecond)
+	waitForBlocked(t, s, other, "it did not wait")
 	var claims int
 	must(t, s.db.QueryRowContext(ctx, `SELECT count(*) FROM alert_confirm_sends WHERE address = $1`, addr).Scan(&claims))
 	if claims != 0 {
@@ -2029,7 +2029,7 @@ func TestMarkOverAllowanceKeepsALatePause(t *testing.T) {
 			moved, err := step.run()
 			done <- result{moved, err}
 		}()
-		time.Sleep(200 * time.Millisecond)
+		waitForBlocked(t, s, pause, "it did not wait")
 		must(t, pause.Commit())
 		r := <-done
 		must(t, r.err)
@@ -2062,11 +2062,7 @@ func TestCreateWithinWaitsForAnotherCreate(t *testing.T) {
 		_, dup, err := s.CreateWithin(ctx, sample(h), 5)
 		done <- result{dup, err}
 	}()
-	select {
-	case r := <-done:
-		t.Fatalf("create did not wait for the other: %+v", r)
-	case <-time.After(200 * time.Millisecond):
-	}
+	waitForBlocked(t, s, first, "create did not wait for the other")
 	must(t, first.Commit())
 	r := <-done
 	if r.err != nil || r.dup != made.ID {
