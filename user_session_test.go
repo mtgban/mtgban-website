@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -74,14 +75,22 @@ func TestRefreshNowRenewsTheBrowsersOwnSession(t *testing.T) {
 // Pressed twice at once, it asks Patreon once: the lease holds the second off.
 func TestRefreshNowTwiceAtOnceAsksPatreonOnce(t *testing.T) {
 	rig := newRenewalRig(t, renewalBlock)
-	rig.stub.delay = 300 * time.Millisecond
 	session := rig.session("")
 	young := rig.sig("Legacy", 1*day)
 
+	other := make(chan struct{})
+	rig.stub.beforeToken = func() { holdUntil(t, other) }
 	recs := make([]*httptest.ResponseRecorder, 2)
+	var finished atomic.Int32
 	var wg sync.WaitGroup
 	for i := range recs {
-		wg.Go(func() { recs[i] = rig.account("refresh", browser(young, session)...) })
+		wg.Go(func() {
+			recs[i] = rig.account("refresh", browser(young, session)...)
+			// The refresh answers once the other press has been turned away
+			if finished.Add(1) == 1 {
+				close(other)
+			}
+		})
 	}
 	wg.Wait()
 

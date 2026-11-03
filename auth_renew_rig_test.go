@@ -50,11 +50,12 @@ type patreonStub struct {
 
 	// A canned answer replaces the real one for its endpoint
 	token, identity, member *stubAnswer
-	// delay is how long the token answer takes; beforeToken runs before it
-	delay       time.Duration
+	// beforeToken runs before the token answer
 	beforeToken func()
-	// identityDelay is how long the identity answer takes
-	identityDelay time.Duration
+	// timeOutIdentity answers the identity lookup as its deadline passing
+	timeOutIdentity bool
+	// What the last token and identity calls had left of their deadlines
+	tokenLeft, identityLeft time.Duration
 
 	mu            sync.Mutex
 	live          string   // the refresh token Patreon honours
@@ -116,13 +117,12 @@ func (p *patreonStub) serveToken(w http.ResponseWriter, r *http.Request) {
 	presented := r.PostForm.Get("refresh_token")
 	p.mu.Lock()
 	p.refreshes = append(p.refreshes, presented)
-	canned, delay, before := p.token, p.delay, p.beforeToken
+	canned, before := p.token, p.beforeToken
 	p.mu.Unlock()
 
 	if before != nil {
 		before()
 	}
-	time.Sleep(delay)
 	// A reader that gave up on the answer did not get the new token
 	if r.Context().Err() != nil {
 		return
@@ -150,12 +150,8 @@ func (p *patreonStub) serveToken(w http.ResponseWriter, r *http.Request) {
 func (p *patreonStub) serveIdentity(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	p.identityCalls++
-	canned, delay := p.identity, p.identityDelay
+	canned := p.identity
 	p.mu.Unlock()
-	time.Sleep(delay)
-	if r.Context().Err() != nil {
-		return
-	}
 	if canned != nil {
 		reply(w, *canned)
 		return
@@ -206,23 +202,37 @@ func (p *patreonStub) serveMember(w http.ResponseWriter) {
 
 // viaStub sends every request to the stub, whatever address it names.
 type viaStub struct {
-	server *httptest.Server
+	stub *patreonStub
 }
 
 func (v viaStub) RoundTrip(req *http.Request) (*http.Response, error) {
-	target, err := url.Parse(v.server.URL)
+	target, err := url.Parse(v.stub.server.URL)
 	if err != nil {
 		return nil, err
+	}
+	deadline, _ := req.Context().Deadline()
+	v.stub.mu.Lock()
+	timeOut := false
+	switch {
+	case strings.Contains(req.URL.Path, "/token"):
+		v.stub.tokenLeft = time.Until(deadline)
+	case strings.Contains(req.URL.Path, "/identity"):
+		v.stub.identityLeft = time.Until(deadline)
+		timeOut = v.stub.timeOutIdentity
+	}
+	v.stub.mu.Unlock()
+	if timeOut {
+		return nil, context.DeadlineExceeded
 	}
 	req = req.Clone(req.Context())
 	req.URL.Scheme = target.Scheme
 	req.URL.Host = target.Host
-	return v.server.Client().Transport.RoundTrip(req)
+	return v.stub.server.Client().Transport.RoundTrip(req)
 }
 
 // reach is req with a context whose Patreon calls go to the stub.
 func (p *patreonStub) reach(req *http.Request) *http.Request {
-	client := &http.Client{Transport: viaStub{p.server}}
+	client := &http.Client{Transport: viaStub{p}}
 	return req.WithContext(context.WithValue(req.Context(), oauth2.HTTPClient, client))
 }
 
