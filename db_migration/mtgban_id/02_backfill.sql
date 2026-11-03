@@ -7,7 +7,6 @@
 --   psql -v apply=1 -f 02_backfill.sql    commit
 --
 -- More than 5000 unmatched rows raises unless -v force=1 is given.
--- Not yet run on production.
 -- Re-running is safe: a row already holding its id matches nothing to set.
 
 \set ON_ERROR_STOP on

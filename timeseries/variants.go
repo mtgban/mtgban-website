@@ -517,7 +517,7 @@ func (c *Client) LookupVariant(ctx context.Context, banID int64) (VariantInfo, b
 	// A miss - a variant minted since the warm, or a client that never warmed -
 	// falls through to the query, as does a Magic row the warm read with no
 	// mtgban_id, which an adopt may have filed since. That costs a ban: chart
-	// one primary-key read per Magic row until the mtgban_id backfill runs.
+	// one primary-key read for a Magic row still without one.
 	v, ok := c.variants.variant(banID)
 	if ok && (!v.IsMagic() || v.MtgbanID != "") {
 		return v, true, nil
