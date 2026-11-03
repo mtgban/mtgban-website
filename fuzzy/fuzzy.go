@@ -4,15 +4,19 @@ package fuzzy
 
 import "strings"
 
-// Levenshtein returns the edit distance between a and b, stopping early
-// and returning limit+1 as soon as the distance is guaranteed to exceed
-// limit. Comparison is byte-wise, which is enough for typo detection.
-func Levenshtein(a, b string, limit int) int {
+// Distance returns the edit distance between a and b, counting an
+// insertion, a deletion, a substitution or a swap of two adjacent letters
+// as one edit each (optimal string alignment), so a typo like "swapm"
+// sits one edit from "swamp" rather than two. It stops early and returns
+// limit+1 as soon as the distance is guaranteed to exceed limit.
+// Comparison is byte-wise, which is enough for typo detection.
+func Distance(a, b string, limit int) int {
 	la, lb := len(a), len(b)
 	if la-lb > limit || lb-la > limit {
 		return limit + 1
 	}
 
+	prev2 := make([]int, lb+1)
 	prev := make([]int, lb+1)
 	curr := make([]int, lb+1)
 	for j := 0; j <= lb; j++ {
@@ -28,6 +32,9 @@ func Levenshtein(a, b string, limit int) int {
 				cost = 0
 			}
 			curr[j] = min(prev[j]+1, curr[j-1]+1, prev[j-1]+cost)
+			if i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1] {
+				curr[j] = min(curr[j], prev2[j-2]+1)
+			}
 			if curr[j] < rowMin {
 				rowMin = curr[j]
 			}
@@ -36,7 +43,7 @@ func Levenshtein(a, b string, limit int) int {
 		if rowMin > limit {
 			return limit + 1
 		}
-		prev, curr = curr, prev
+		prev2, prev, curr = prev, curr, prev2
 	}
 	return prev[lb]
 }
@@ -63,7 +70,7 @@ func Closest(query string, candidates []string) string {
 		if lower == query {
 			return ""
 		}
-		if dist := Levenshtein(query, lower, limit); dist < bestDist {
+		if dist := Distance(query, lower, limit); dist < bestDist {
 			bestDist = dist
 			best = candidate
 		}

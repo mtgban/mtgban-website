@@ -1040,7 +1040,7 @@ staleness alarm's map and messages, from 15 minutes after startup.
 | `cardconduit/` | CardConduit bulk-estimate POST client |
 | `banprice/` | Wire types for the price API — `Price`, `ConditionTags` — in the exact JSON shape `api_banprice.go` and the templates share |
 | `collectr/` | Client for Collectr showcase pages (product listings, Magic + Lorcana categories) |
-| `fuzzy/` | Levenshtein-distance string similarity powering "did you mean" suggestions |
+| `fuzzy/` | Edit-distance string similarity (adjacent swaps count once) powering "did you mean" suggestions |
 | `observability/` | Postgres page-visit recorder backing the admin usage dashboard, plus the search-votes table behind the popular-searches ranking |
 | `tcgcsv/` | Client for tcgcsv.com's category→group→product/price hierarchy, used to ingest non-Magic prices. The daily-archive reader stays here but every date answers 403 upstream; `ErrArchiveUnavailable` is how callers learn that |
 | `tcgcsvd/` | tcgcsv ingest service: library + `cmd/tcgcsvd` binary. Daily/products/backfill jobs take a cross-process Postgres advisory lock so a standalone process and the website's own crons never crawl tcgcsv.com at once (`tcgcsvd/README.md`). With the archives withdrawn, the per-group daily price files are the only source and backfill falls back to the current snapshot (`docs/tcgcsv-archive-withdrawal.md`) |
