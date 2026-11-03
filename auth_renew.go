@@ -153,19 +153,19 @@ func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Value
 	default:
 		// Old enough to renew, but with no session to renew from
 		if cfg.AfterDays > 0 && signed && cookieBorne {
-			return s.resignStale(w, r, values, ends, now), false
+			return s.resignStale(w, r, values, ends, now, false), false
 		}
 		return "", false
 	}
 	if !renewalEnabled() {
-		return s.resignStale(w, r, values, ends, now), false
+		return s.resignStale(w, r, values, ends, now, false), false
 	}
 	sig, outcome := s.renewSignature(w, r, values, 0, cause)
 	if outcome == renewalGone || outcome == renewalSessionGone {
 		return "", false
 	}
 	if outcome == renewalNotRenewed || outcome == renewalEnded {
-		return s.resignStale(w, r, values, ends, now), false
+		return s.resignStale(w, r, values, ends, now, outcome == renewalEnded), false
 	}
 	return sig, outcome == renewalRefused
 }
@@ -197,8 +197,10 @@ func sessionGone(w http.ResponseWriter, r *http.Request, email, cause string) bo
 
 // resignStale re-signs the signature here (remintSignature) when the access
 // table or the reader's grant changed after it was issued and it has not run
-// out, and returns it; "" when nothing asks for it.
-func (s *site) resignStale(w http.ResponseWriter, r *http.Request, values url.Values, ends, now time.Time) string {
+// out, and returns it; "" when nothing asks for it or the session the
+// browser names is gone (sessionGone). ended says a renewal found that
+// session can never renew, which is no logout, so its edits still re-sign.
+func (s *site) resignStale(w http.ResponseWriter, r *http.Request, values url.Values, ends, now time.Time, ended bool) string {
 	email := values.Get("UserEmail")
 	if email == "" || !now.Before(ends) {
 		return ""
@@ -206,6 +208,11 @@ func (s *site) resignStale(w http.ResponseWriter, r *http.Request, values url.Va
 	// No window: a poke renews from Patreon, which did not
 	cause := Pokes.Wants(userstate.HashEmail(email), values.Get("Signature"), ends.Add(-DefaultSignatureDuration), now, 0)
 	if cause != "acl" && cause != "grant" {
+		return ""
+	}
+	// A resting session is not asked at the lease, so a logout racing this
+	// request would be undone by the re-sign
+	if !ended && sessionGone(w, r, email, cause) {
 		return ""
 	}
 	return s.remintSignature(w, r, values, ends, cause)

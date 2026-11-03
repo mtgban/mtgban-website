@@ -859,6 +859,34 @@ func TestSigningRenewalStopsWhenItsSessionIsGoneBeforeTheLease(t *testing.T) {
 	}
 }
 
+// Nor while the session rests, when the lease does not ask the database: the
+// re-sign for an edit asks it first, and finds the logout.
+func TestSigningRenewalStopsWhenARestingSessionIsGone(t *testing.T) {
+	for _, edit := range []string{"acl", "grant"} {
+		t.Run(edit, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			pokes := freshPokes(t)
+			session := rig.session("")
+			old := rig.sig("Legacy", 9*day)
+			switch edit {
+			case "acl":
+				pokes.StampACL(time.Now())
+			case "grant":
+				pokes.StampGrant(rig.hash, time.Now(), DefaultSignatureDuration)
+			}
+			restingSessions.rest(session, "", time.Now().Add(time.Hour), time.Now())
+			logout := httptest.NewRecorder()
+			rig.site.Home(logout, rig.request(http.MethodGet, "/?errmsg=logout", browser(old, session)...))
+
+			req := rig.request(http.MethodGet, "/limited", browser(old, session)...)
+			rig.wantSessionDropped(rig.serve(req, false), req, old)
+			if !strings.Contains(rig.logged.String(), "cause="+edit+" verdict=session gone") {
+				t.Errorf("admin log %q does not say the session was gone", rig.logged.String())
+			}
+		})
+	}
+}
+
 // A logout is not undone by the re-sign a young signature gets for an edit
 // either: a request still holding the session it ended clears that cookie and
 // sets no signature.
