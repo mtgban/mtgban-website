@@ -306,6 +306,45 @@ test('UserStateSync.flush with nothing queued keeps dirty until the write in fli
     expect(m.mtgban_userstate_dirty).toBe('1');
 });
 
+test('a write that lands keeps dirty while a flush chained after it is still to send', async () => {
+    const m = {};
+    class Storage {
+        getItem(k) { return k in m ? m[k] : null; }
+        setItem(k, v) { m[k] = String(v); }
+        removeItem(k) { delete m[k]; }
+    }
+    const storage = new Storage();
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const window = { addEventListener() {}, Storage, localStorage: storage };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
+    const lands = [];
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PATCH') {
+            return new Promise((r) => { lands.push(() => r({ status: 200, ok: true, headers: { get: () => null }, json: () => Promise.resolve({ version: 1 }) })); });
+        }
+        return Promise.resolve({ status: 401, ok: false, headers: { get: () => null }, json: () => Promise.resolve(null) });
+    };
+    const timers = [];
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
+        window, document, storage, session, fetch, realListStorage(), (fn) => timers.push(fn), () => {});
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    storage.setItem('mtgban_favorites', JSON.stringify([{ id: 'x', name: 'X', query: 'q' }]));
+    timers[timers.length - 1]();
+    for (let i = 0; i < 10; i++) await turn();
+    // The next debounce fires with the first write still in flight.
+    storage.setItem('mtgban_recent_searches', JSON.stringify([{ q: 'bolt', t: 1 }]));
+    timers[timers.length - 1]();
+    for (let i = 0; i < 10; i++) await turn();
+    expect(lands.length).toBe(1);
+    lands[0]();
+    for (let i = 0; i < 10; i++) await turn();
+    expect(lands.length).toBe(2);
+    expect(m.mtgban_userstate_dirty).toBe('1');
+    lands[1]();
+    for (let i = 0; i < 10; i++) await turn();
+    expect(m.mtgban_userstate_dirty).toBe('0');
+});
+
 test('a flush that throws does not stop the next one from sending', async () => {
     const m = {};
     class Storage {

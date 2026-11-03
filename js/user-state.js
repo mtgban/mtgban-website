@@ -341,7 +341,7 @@
         var allOk = true;
         // Chain sequentially, after the writes already in flight, so version
         // stays consistent and dirty clears only once those have landed too.
-        inflight = sections.reduce(function(p, section) {
+        var chain = sections.reduce(function(p, section) {
             return p.then(function() {
                 return patchSection(section);
             }).catch(function() {
@@ -351,10 +351,12 @@
                 if (!ok) { allOk = false; pending[section] = true; }
             });
         }, inflight).then(function() {
-            // Clear dirty only if everything synced and no new writes were scheduled.
-            if (allOk && !timer && Object.keys(pending).length === 0) markClean();
+            // Clear dirty only if everything synced and no new writes were
+            // scheduled, or chained after these: a later flush took pending.
+            if (allOk && inflight === chain && !timer && Object.keys(pending).length === 0) markClean();
         });
-        return inflight;
+        inflight = chain;
+        return chain;
     }
 
     // UserStateSync.flush writes what is queued now and settles once it and
