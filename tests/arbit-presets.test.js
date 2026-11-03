@@ -17,7 +17,7 @@ function fakeStorage(initial = {}) {
 const ARBIT = {
     source: 'CK', query: 'f=1', cookie: 'ArbitFilters', sort: '',
     ignored: ['syp', 'stocks', 'legit', 'stable', 'tradable', 'decklists'],
-    defaults: { minsell: '0', minbuy: '0', minspread: '10', mindiff: '0', minqty: '0', minprof: '0', rl: '0', abu4h: '0' },
+    defaults: { minsell: '0', minbuy: '0', minspread: '10', mindiff: '0', minqty: '0', minprof: '0', rl: '0', abu4h: '0', nocollector: '0', nooversize: '0', notoken: '0' },
 };
 
 // sameSiteURL (utils.js) as it answers for this site's own query URLs

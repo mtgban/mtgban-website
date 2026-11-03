@@ -222,6 +222,52 @@ func TestArbitNoCollector(t *testing.T) {
 	}
 }
 
+// TestArbitNoOversizeNoToken pins the two options to the same printings
+// search's not:oversize and not:token drop, each on top of the other.
+func TestArbitNoOversizeNoToken(t *testing.T) {
+	oversize := &matcher.CardObject{Card: matcher.Card{IsOversized: true}}
+	token := &matcher.CardObject{Card: matcher.Card{Layout: "token"}}
+	card := &matcher.CardObject{Card: matcher.Card{Layout: "normal"}}
+	for _, tt := range []struct {
+		query string
+		drops map[*matcher.CardObject]bool
+	}{
+		{"nooversize=1", map[*matcher.CardObject]bool{oversize: true, token: false, card: false}},
+		{"notoken=1", map[*matcher.CardObject]bool{oversize: false, token: true, card: false}},
+		{"nooversize=1&notoken=1", map[*matcher.CardObject]bool{oversize: true, token: true, card: false}},
+	} {
+		for _, m := range []arbitMode{{}, {Global: true}, {Reverse: true}} {
+			opts, _ := parseArbitQuery(t, tt.query).apply(backend(), currentPrices(), m)
+			if opts.CustomCardFilter == nil {
+				t.Fatalf("%s sets no card filter in %+v", tt.query, m)
+			}
+			for co, want := range tt.drops {
+				_, skip := opts.CustomCardFilter(co)
+				if skip != want {
+					t.Errorf("%s in %+v drops %+v: %v, want %v", tt.query, m, co.Card, skip, want)
+				}
+			}
+		}
+		sealed, _ := parseArbitQuery(t, tt.query).apply(backend(), currentPrices(), arbitMode{Sealed: true})
+		if sealed.CustomCardFilter != nil {
+			t.Errorf("%s filters a sealed source", tt.query)
+		}
+	}
+
+	// The options chain onto the finish pick's filter, set before them
+	opts, _ := parseArbitQuery(t, "finish=foil&notoken=1").apply(backend(), currentPrices(), arbitMode{})
+	for co, want := range map[*matcher.CardObject]bool{
+		{Card: matcher.Card{Layout: "token", Finish: "foil"}}:  true,
+		{Card: matcher.Card{Layout: "normal", Finish: ""}}:     true,
+		{Card: matcher.Card{Layout: "normal", Finish: "foil"}}: false,
+	} {
+		_, skip := opts.CustomCardFilter(co)
+		if skip != want {
+			t.Errorf("finish=foil&notoken=1 drops %+v: %v, want %v", co.Card, skip, want)
+		}
+	}
+}
+
 func TestArbitApplyPicks(t *testing.T) {
 	st := parseArbitQuery(t, "cond=NM,SP,MP,PO&rarity=mythic,rare&finish=etched")
 	opts, _ := st.apply(rarityBackend(matcher.GameMagic, testArbitOffer.Rarities, nil), currentPrices(), arbitMode{})
