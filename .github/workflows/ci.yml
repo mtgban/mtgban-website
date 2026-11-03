@@ -136,7 +136,7 @@ jobs:
           pipx install b2
           mkdir -p game-datastores/
           for game in lorcana riftbound onepiece pokemon yugioh fleshandblood gundam palworld; do
-            "$HOME/.local/bin/b2" file download --no-progress "b2://mtgban-datastore/$game/$game.json.xz" "game-datastores/$game.json.xz"
+            b2 file download --no-progress "b2://mtgban-datastore/$game/$game.json.xz" "game-datastores/$game.json.xz"
             xz -d "game-datastores/$game.json.xz"
             echo "$(echo "$game" | tr '[:lower:]' '[:upper:]')_PATH=$PWD/game-datastores/$game.json" >> "$GITHUB_ENV"
           done
