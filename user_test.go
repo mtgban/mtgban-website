@@ -776,22 +776,27 @@ func TestUserPageRendersOnMobileBase(t *testing.T) {
 	}
 }
 
-// The Links strip draws Account from the nav's own entry, which every reader
-// has, signed in or not, and carries its data-tool so a layout that pinned it
-// to the bar can rebuild it.
-func TestNavbarLinksAccountFromTheNav(t *testing.T) {
-	const button = `class="tools-quick-btn" href="/user" title="Account" data-tool="account"`
+// The navbar's utility bar draws Account from the nav's own entry, which
+// every reader has, signed in or not, between the backpack and the guide.
+func TestNavbarAccountIconFromTheNav(t *testing.T) {
+	const button = `class="nav2-icon-btn" href="/user" title="Account"`
 	for _, sig := range []string{"", tierSig("Pioneer")} {
 		pv := genPageNav(testSite, nil, "Search", sig)
-		if out := renderPage(t, "search.html", false, pv); !strings.Contains(out, button) {
-			t.Errorf("sig %q: the Links strip lacks the Account button", sig)
+		out := renderPage(t, "search.html", false, pv)
+		at := strings.Index(out, button)
+		if at < 0 {
+			t.Errorf("sig %q: the utility bar lacks the Account button", sig)
+			continue
+		}
+		if strings.Index(out, `id="nav-backpack"`) > at || strings.Index(out, `title="Guide"`) < at {
+			t.Errorf("sig %q: Account is not between the backpack and the guide", sig)
 		}
 	}
 
 	pv := genPageNav(testSite, nil, "Search", "")
 	pv.Nav = slices.DeleteFunc(pv.Nav, func(n NavElem) bool { return n.Name == "Account" })
 	if out := renderPage(t, "search.html", false, pv); strings.Contains(out, `title="Account"`) {
-		t.Error("the Links strip links Account for a nav without it")
+		t.Error("the utility bar links Account for a nav without it")
 	}
 }
 
