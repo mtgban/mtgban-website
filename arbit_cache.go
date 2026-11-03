@@ -129,7 +129,8 @@ func (p *prices) arbitRows(b *matcher.Backend, view arbitView, opts *mtgban.Arbi
 		c.mu.Lock()
 		entry.done = true
 		if c.entries[key] == entry {
-			entry.held = len(rows)
+			// An empty comparison counts too, or its views pile up unbounded
+			entry.held = max(1, len(rows))
 			c.held += entry.held
 			c.evict()
 		}

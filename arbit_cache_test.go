@@ -119,6 +119,25 @@ func TestArbitCacheKeepsBudget(t *testing.T) {
 	}
 }
 
+// TestArbitCacheCountsEmptyComparisons holds a comparison with no rows
+// against the budget too, so views that find nothing do not pile up.
+func TestArbitCacheCountsEmptyComparisons(t *testing.T) {
+	b := fixtureBackend("FIXA", "Fixture Arbit", "2024-01-01", [][2]string{{"Fixture Arbit", "1"}})
+	seller := mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "SEL"})
+	vendor := fixtureBuys("VEN", nil)
+	withPrices(t, []mtgban.Seller{seller}, []mtgban.Vendor{vendor})
+	p := currentPrices()
+	p.arbit.budget = 2
+	opts := &mtgban.ArbitOpts{MinSpread: MinSpread}
+
+	for _, filters := range []string{"a", "b", "c", "d"} {
+		p.arbitRows(b, arbitView{filters: filters}, opts, seller, vendor)
+	}
+	if len(p.arbit.entries) != 2 || p.arbit.held != 2 {
+		t.Errorf("held %d rows in %d empty comparisons, want 2 in 2", p.arbit.held, len(p.arbit.entries))
+	}
+}
+
 // TestArbitEngineKey shares one key between states that differ only in
 // limits the row filter applies, and not between states the engine sees
 // differently.
