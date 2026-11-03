@@ -1006,13 +1006,13 @@ func adminGrantRevoke(r *http.Request, pageVars *PageVars) {
 	// table rendered below and stays gone after a restart.
 	revokeEmail := strings.ToLower(strings.TrimSpace(r.PostFormValue("revokeEmail")))
 	if revokeEmail != "" {
-		idx := slices.IndexFunc(PatreonGrants(), func(person PatreonGrant) bool {
+		grants := PatreonGrants()
+		idx := slices.IndexFunc(grants, func(person PatreonGrant) bool {
 			return strings.EqualFold(person.Email, revokeEmail)
 		})
 		if idx < 0 {
 			pageVars.WarningMessage = "no grant found for " + revokeEmail
 		} else {
-			grants := PatreonGrants()
 			removed := grants[idx]
 
 			err := saveGrants(r.Context(), slices.Delete(slices.Clone(grants), idx, idx+1))
