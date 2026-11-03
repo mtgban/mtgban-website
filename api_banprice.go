@@ -514,9 +514,9 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	} else if strings.HasSuffix(urlPath, ".csv") {
 		var err error
 		if out.Retail != nil {
-			err = BanPrice2CSV(b, w, out.Retail, nil)
+			err = BanPrice2CSV(b, p, w, out.Retail, nil)
 		} else if out.Buylist != nil {
-			err = BanPrice2CSV(b, w, out.Buylist, nil)
+			err = BanPrice2CSV(b, p, w, out.Buylist, nil)
 		}
 		if err != nil {
 			log.Println(err)
@@ -534,10 +534,10 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 // former func-value call both allocated a closure per call and forced the
 // freshly copied CardObject to escape to the heap, dominating full-dump
 // allocations.
-func getIDFromMode(b *matcher.Backend, mode string, co *matcher.CardObject) string {
+func getIDFromMode(b *matcher.Backend, p *prices, mode string, co *matcher.CardObject) string {
 	switch mode {
 	case "tcg":
-		return findTCGproductID(b, co.UUID)
+		return findTCGproductID(b, p, co.UUID)
 	case "scryfall":
 		return co.Identifiers["scryfallId"]
 	case "mtgjson":
@@ -627,7 +627,7 @@ func apiSearchConfig(b *matcher.Backend, uuids, enabledStores []string, filterBy
 // zero base price drops the store; each grade keeps its best price and its
 // total copies, through setGrade like the entry loop. INDEX rows are
 // metadata prices whose underlying grade is always NM.
-func banPricesFromRows(b *matcher.Backend, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
+func banPricesFromRows(b *matcher.Backend, p *prices, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
 	// Rows carry neither MetadataOnly (the vendor qty rule needs it: sealed
 	// metadata vendors keep their grade bucket, so INDEX membership is not
 	// a reliable proxy) nor the raw scraper name (SearchEntry.ScraperName
@@ -637,13 +637,13 @@ func banPricesFromRows(b *matcher.Backend, cardIDs []string, found map[string]ma
 	if vendorSide {
 		indexStores = map[string]bool{}
 		names = map[string]string{}
-		for _, vendor := range GetVendors() {
+		for _, vendor := range p.vendors {
 			indexStores[vendor.Info().Shorthand] = vendor.Info().MetadataOnly
 			names[vendor.Info().Shorthand] = vendor.Info().Name
 		}
 	} else {
 		names = map[string]string{}
-		for _, seller := range GetSellers() {
+		for _, seller := range p.sellers {
 			names[seller.Info().Shorthand] = seller.Info().Name
 		}
 	}
@@ -658,7 +658,7 @@ func banPricesFromRows(b *matcher.Backend, cardIDs []string, found map[string]ma
 		if err != nil {
 			continue
 		}
-		id := getIDFromMode(b, idMode, co)
+		id := getIDFromMode(b, p, idMode, co)
 		if id == "" {
 			continue
 		}
@@ -772,7 +772,7 @@ func getSellerPrices(b *matcher.Backend, p *prices, mode string, enabledStores [
 		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
 		cardIDs := filterUUIDs(b, p, config.UUIDs, config.CardFilters)
-		return banPricesFromRows(b, cardIDs, searchSellers(p, cardIDs, config), mode, tagName, qty, conds, false)
+		return banPricesFromRows(b, p, cardIDs, searchSellers(p, cardIDs, config), mode, tagName, qty, conds, false)
 	}
 
 	var finishFilter []string
@@ -857,7 +857,7 @@ func processEntry[T mtgban.GenericEntry](b *matcher.Backend, p *prices, out map[
 	if err != nil {
 		return
 	}
-	id := getIDFromMode(b, idMode, co)
+	id := getIDFromMode(b, p, idMode, co)
 	if id == "" {
 		return
 	}
@@ -1022,7 +1022,7 @@ func getVendorPrices(b *matcher.Backend, p *prices, mode string, enabledStores [
 		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
 		cardIDs := filterUUIDs(b, p, config.UUIDs, config.CardFilters)
-		return banPricesFromRows(b, cardIDs, searchVendors(p, cardIDs, config), mode, tagName, qty, conds, true)
+		return banPricesFromRows(b, p, cardIDs, searchVendors(p, cardIDs, config), mode, tagName, qty, conds, true)
 	}
 
 	var finishFilter []string
@@ -1070,17 +1070,17 @@ func getVendorPrices(b *matcher.Backend, p *prices, mode string, enabledStores [
 
 // BanPrice2CSV is a convenience wrapper around SimplePrice2CSV that
 // writes directly to an http.ResponseWriter.
-func BanPrice2CSV(b *matcher.Backend, httpWriter http.ResponseWriter, pm map[string]map[string]*BanPrice, sorted []string) error {
+func BanPrice2CSV(b *matcher.Backend, p *prices, httpWriter http.ResponseWriter, pm map[string]map[string]*BanPrice, sorted []string) error {
 	httpWriter.Header().Set("Content-Type", "text/csv")
 	w := csv.NewWriter(httpWriter)
-	return SimplePrice2CSV(b, w, pm, nil, sorted, false)
+	return SimplePrice2CSV(b, p, w, pm, nil, sorted, false)
 }
 
 // SimplePrice2CSV converts price data to CSV. When uploadedData is provided,
 // each row corresponds to an uploaded entry and includes Loaded columns.
 // When uploadedData is nil, rows are derived from the price map keys (using
 // sorted for ordering if non-nil).
-func SimplePrice2CSV(b *matcher.Backend, w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedData []UploadEntry, sorted []string, preferFlavor bool) error {
+func SimplePrice2CSV(b *matcher.Backend, p *prices, w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedData []UploadEntry, sorted []string, preferFlavor bool) error {
 	var allScrapers []string
 	var allIndexes []string
 	for id := range pm {
@@ -1089,14 +1089,14 @@ func SimplePrice2CSV(b *matcher.Backend, w *csv.Writer, pm map[string]map[string
 				continue
 			}
 
-			for _, scraper := range GetSellers() {
+			for _, scraper := range p.sellers {
 				if scraper.Info().Shorthand == scraperKey && scraper.Info().MetadataOnly {
 					if !slices.Contains(allIndexes, scraperKey) {
 						allIndexes = append(allIndexes, scraperKey)
 					}
 				}
 			}
-			for _, scraper := range GetVendors() {
+			for _, scraper := range p.vendors {
 				if scraper.Info().Shorthand == scraperKey && scraper.Info().MetadataOnly {
 					if !slices.Contains(allIndexes, scraperKey) {
 						allIndexes = append(allIndexes, scraperKey)
@@ -1112,7 +1112,7 @@ func SimplePrice2CSV(b *matcher.Backend, w *csv.Writer, pm map[string]map[string
 
 	allScraperNames := make([]string, len(allScrapers))
 	for i, key := range allScrapers {
-		name := scraperName(key)
+		name := p.scraperName(key)
 		if name == "" {
 			name = key
 		}
@@ -1150,7 +1150,7 @@ func SimplePrice2CSV(b *matcher.Backend, w *csv.Writer, pm map[string]map[string
 
 			condition := uploadedData[j].OriginalCondition
 
-			record, err := priceRowToCSV(b, pm, id, allScrapers, allIndexes, condition, preferFlavor, true)
+			record, err := priceRowToCSV(b, p, pm, id, allScrapers, allIndexes, condition, preferFlavor, true)
 			if err != nil {
 				continue
 			}
@@ -1178,7 +1178,7 @@ func SimplePrice2CSV(b *matcher.Backend, w *csv.Writer, pm map[string]map[string
 			}
 		}
 		for _, id := range sorted {
-			record, err := priceRowToCSV(b, pm, id, allScrapers, allIndexes, "", preferFlavor, false)
+			record, err := priceRowToCSV(b, p, pm, id, allScrapers, allIndexes, "", preferFlavor, false)
 			if err != nil {
 				continue
 			}
@@ -1193,7 +1193,7 @@ func SimplePrice2CSV(b *matcher.Backend, w *csv.Writer, pm map[string]map[string
 	return w.Error()
 }
 
-func priceRowToCSV(b *matcher.Backend, pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition mtgban.Condition, preferFlavor, withSKU bool) ([]string, error) {
+func priceRowToCSV(b *matcher.Backend, p *prices, pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition mtgban.Condition, preferFlavor, withSKU bool) ([]string, error) {
 	co, err := b.GetUUID(id)
 	if err != nil {
 		uuid := externalUUID(b, id)
@@ -1241,7 +1241,7 @@ func priceRowToCSV(b *matcher.Backend, pm map[string]map[string]*BanPrice, id st
 
 	record := []string{displayID}
 	if withSKU {
-		record = append(record, uuid2TCGSKU(id, co.Sealed, condition))
+		record = append(record, uuid2TCGSKU(p, id, co.Sealed, condition))
 	}
 	record = append(record, cardName, co.SetCode, co.Edition, co.Number, finish)
 	record = append(record, prices...)

@@ -76,6 +76,7 @@ type SleepVars struct {
 func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
+	p := s.prices()
 	sig := verifiedSignature(r)
 
 	pageVars := genPageNav(s, r, "Sleepers", sig)
@@ -98,7 +99,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	}
 	skipEditions = append(skipEditions, playtestEditions...)
 
-	pageVars.SellerKeys = filterSellers(func(info mtgban.ScraperInfo) bool {
+	pageVars.SellerKeys = p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		return !info.SealedMode && !slices.Contains(blocklistRetail, info.Shorthand)
 	})
 
@@ -123,7 +124,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "bulk":
 		pageVars.Subtitle = "Bulk me up"
 
-		tiers = getBulks(b, skipEditions)
+		tiers = getBulks(b, p, skipEditions)
 
 	case "reprint":
 		pageVars.Subtitle = "Long time no reprint"
@@ -132,19 +133,19 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "mismatch":
 		pageVars.Subtitle = "Market Mismatch"
 
-		tiers = getTiers(b, s.prices(), blocklistRetail, blocklistBuylist, skipEditions)
+		tiers = getTiers(b, p, blocklistRetail, blocklistBuylist, skipEditions)
 	case "gap":
 		pageVars.Subtitle = "Ocean Gap"
 
 		ref, target := r.FormValue("ref"), r.FormValue("target")
-		tiers = getGap(b, blocklistRetail, ref, target, skipEditions)
+		tiers = getGap(b, p, blocklistRetail, ref, target, skipEditions)
 	case "hotlist":
 		pageVars.Subtitle = "Highest buylist growth"
 
-		tiers = getHotlist(b, skipEditions)
+		tiers = getHotlist(b, p, skipEditions)
 	}
 
-	sleepers, err := sleepersLayout(b, tiers)
+	sleepers, err := sleepersLayout(b, p, tiers)
 	if err != nil {
 		ServerNotify("sleep", "unable to generate sleepers: "+err.Error())
 
@@ -162,7 +163,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	pageVars.Metadata = map[string]GenericCard{}
 	for _, cardIDs := range sleepers {
 		for _, cardID := range cardIDs {
-			pageVars.Metadata.add(b, cardID, preferFlavor)
+			pageVars.Metadata.add(b, p, cardID, preferFlavor)
 		}
 	}
 
@@ -185,12 +186,12 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getBulks(b *matcher.Backend, skipEditions []string) map[string]int {
-	inv, err := findSellerInventory("TCGLow")
+func getBulks(b *matcher.Backend, p *prices, skipEditions []string) map[string]int {
+	inv, err := p.sellerInventory("TCGLow")
 	if err != nil {
 		return nil
 	}
-	bl, err := findVendorBuylist("CK")
+	bl, err := p.vendorBuylist("CK")
 	if err != nil {
 		return nil
 	}
@@ -273,10 +274,10 @@ func getBulks(b *matcher.Backend, skipEditions []string) map[string]int {
 	return tiers
 }
 
-func getHotlist(b *matcher.Backend, skipEditions []string) map[string]int {
+func getHotlist(b *matcher.Backend, p *prices, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
 
-	bl, _ := findVendorBuylist("CK")
+	bl, _ := p.vendorBuylist("CK")
 
 	// Skip bad editions
 	skipEditions = append(skipEditions, "30A", "PTK", "CED", "CEI")
@@ -520,14 +521,14 @@ func (c *sleeperCache) hits(b *matcher.Backend, pairs []sleeperPair) [][]string 
 	return out
 }
 
-func getGap(b *matcher.Backend, blocklistRetail []string, ref, target string, skipEditions []string) map[string]int {
+func getGap(b *matcher.Backend, p *prices, blocklistRetail []string, ref, target string, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
 
 	log.Println("Sleepers comparing", ref, "with", target)
 
 	var referenceSeller mtgban.Seller
 	var targetSeller mtgban.Seller
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		if seller.Info().SealedMode ||
 			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
 			continue
@@ -559,7 +560,7 @@ func getGap(b *matcher.Backend, blocklistRetail []string, ref, target string, sk
 
 	mismatch := mtgban.Mismatch(b, opts, referenceSeller, targetSeller)
 
-	marketCheck, _ := findSellerInventory("TCGMarket")
+	marketCheck, _ := p.sellerInventory("TCGMarket")
 
 	// Filter out entries that are invalid
 	for i := range mismatch {
@@ -602,7 +603,7 @@ func noOversize(co *matcher.CardObject) (float64, bool) {
 }
 
 // Return a map of letter : []cardId from a map of cardId : amount
-func sleepersLayout(b *matcher.Backend, tiers map[string]int) (map[string][]string, error) {
+func sleepersLayout(b *matcher.Backend, p *prices, tiers map[string]int) (map[string][]string, error) {
 	results := []Sleeper{}
 	for c := range tiers {
 		co, err := b.GetUUID(c)
@@ -664,7 +665,7 @@ func sleepersLayout(b *matcher.Backend, tiers map[string]int) (map[string][]stri
 	}
 
 	// Sort sleepers by price
-	inv, err := findSellerInventory("TCGLow")
+	inv, err := p.sellerInventory("TCGLow")
 	if err != nil {
 		return nil, err
 	}

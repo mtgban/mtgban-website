@@ -79,7 +79,7 @@ func fakeSession(t *testing.T, discord *fakeDiscord) *discordgo.Session {
 }
 
 // lastSoldFetch is the type of site.fetchLastSold.
-type lastSoldFetch = func(context.Context, *matcher.Backend, string, bool) ([]tcgplayer.LatestSalesData, error)
+type lastSoldFetch = func(context.Context, *matcher.Backend, *prices, string, bool) ([]tcgplayer.LatestSalesData, error)
 
 // lastSoldSite is a site holding one English card, whose $$ lookup fetches
 // through fetch. It loads a seller and a vendor too: until some are, the
@@ -115,7 +115,7 @@ func lastSoldLookup() *discordgo.MessageCreate {
 // shared its error, fields and channel.
 func TestLastSoldEditsTheSalesIn(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		s := lastSoldSite(t, func(context.Context, *matcher.Backend, string, bool) ([]tcgplayer.LatestSalesData, error) {
+		s := lastSoldSite(t, func(context.Context, *matcher.Backend, *prices, string, bool) ([]tcgplayer.LatestSalesData, error) {
 			return []tcgplayer.LatestSalesData{{
 				Language:      "English",
 				PurchasePrice: 4.5,
@@ -143,7 +143,7 @@ func TestLastSoldEditsTheSalesIn(t *testing.T) {
 // nothing once release is closed, whatever its context says: one still
 // running after the handler has stopped waiting for it.
 func fetchOnRelease(release <-chan struct{}, calls *int) lastSoldFetch {
-	return func(context.Context, *matcher.Backend, string, bool) ([]tcgplayer.LatestSalesData, error) {
+	return func(context.Context, *matcher.Backend, *prices, string, bool) ([]tcgplayer.LatestSalesData, error) {
 		*calls++
 		<-release
 		return nil, nil

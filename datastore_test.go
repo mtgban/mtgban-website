@@ -173,7 +173,7 @@ func TestCardRowKeepsItsDatastoreAcrossAReload(t *testing.T) {
 	a := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}})
 	a.Sets["FIXTUREA"].Symbol = "https://example.test/fixturea.webp"
 	a.UUIDs["FIXTUREA-1"].Identifiers = map[string]string{"tcgplayerProductId": "4242"}
-	card := uuid2card(a, "FIXTUREA-1", false, nil)
+	card := uuid2card(a, currentPrices(), "FIXTUREA-1", false, nil)
 
 	metadata := map[string]GenericCard{"FIXTUREA-1": card}
 	search := PageVars{
@@ -221,5 +221,33 @@ func TestEmptyDatastoreServesPaletteListsUncached(t *testing.T) {
 			t.Errorf("before the first load a palette list answered %q, %s",
 				rec.Header().Get("Cache-Control"), rec.Body.Bytes())
 		}
+	}
+}
+
+// The card builder reads the snapshot it is handed, not the published one:
+// a snapshot whose SYP, Stocks and TCGplayer stores the published one lacks
+// shows in the card, and the published one shows none of it.
+func TestCardBuilderReadsTheSnapshotItIsHanded(t *testing.T) {
+	b := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}})
+	withPrices(t, []mtgban.Seller{}, []mtgban.Vendor{})
+
+	syp := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{
+		"FIXTUREA-1": {{BuyPrice: 1, Conditions: "NM"}},
+	}, mtgban.ScraperInfo{Shorthand: "SYP"})
+	stocks := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		"FIXTUREA-1": {{Price: 1, Conditions: "NM", URL: "https://example.test/stocks"}},
+	}, mtgban.ScraperInfo{Shorthand: "STKS"})
+	tcgLow := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		"FIXTUREA-1": {{Price: 1, Conditions: "NM", OriginalID: "4242"}},
+	}, mtgban.ScraperInfo{Shorthand: "TCGLow"})
+	p := newPrices(nil, []mtgban.Seller{stocks, tcgLow}, []mtgban.Vendor{syp}, scraperIndex{})
+
+	card := uuid2card(b, p, "FIXTUREA-1", false, nil)
+	if !card.SypList || card.StocksURL != "https://example.test/stocks" || card.TCGId != "4242" {
+		t.Errorf("handed a snapshot, the card read elsewhere: syp %v, stocks %q, tcg id %q", card.SypList, card.StocksURL, card.TCGId)
+	}
+	plain := uuid2card(b, currentPrices(), "FIXTUREA-1", false, nil)
+	if plain.SypList || plain.StocksURL != "" || plain.TCGId != "" {
+		t.Errorf("handed the published snapshot, the card read the other: syp %v, stocks %q, tcg id %q", plain.SypList, plain.StocksURL, plain.TCGId)
 	}
 }

@@ -32,13 +32,13 @@ import (
 
 var ErrMissingTCGId = errors.New("tcg id not found")
 
-func getLastSold(ctx context.Context, b *matcher.Backend, cardID string, anyLang bool) ([]tcgplayer.LatestSalesData, error) {
+func getLastSold(ctx context.Context, b *matcher.Backend, p *prices, cardID string, anyLang bool) ([]tcgplayer.LatestSalesData, error) {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return nil, err
 	}
 
-	tcgID := findTCGproductID(b, cardID)
+	tcgID := findTCGproductID(b, p, cardID)
 	if tcgID == "" {
 		return nil, ErrMissingTCGId
 	}
@@ -50,7 +50,7 @@ func getLastSold(ctx context.Context, b *matcher.Backend, cardID string, anyLang
 
 	// If we got an empty response, try again with all the possible languages
 	if len(latestSales) == 0 && !anyLang {
-		return getLastSold(ctx, b, cardID, true)
+		return getLastSold(ctx, b, p, cardID, true)
 	}
 
 	return latestSales, nil
@@ -68,6 +68,7 @@ func getDecklist(b *matcher.Backend, uuid string) ([]string, error) {
 // TCGHandler serves a card's sealed product decklist as a TCGplayer CSV.
 func (s *site) TCGHandler(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
+	p := s.prices()
 	w.Header().Set("Content-Type", "application/json")
 
 	cardID := strings.TrimPrefix(r.URL.Path, "/search/decklist/tcgplayer/")
@@ -83,16 +84,16 @@ func (s *site) TCGHandler(w http.ResponseWriter, r *http.Request) {
 	setCSVDownloadHeaders(w, co.Name+".csv")
 
 	csvWriter := csv.NewWriter(w)
-	err = UUID2TCGCSV(b, csvWriter, data, nil, nil)
+	err = UUID2TCGCSV(b, p, csvWriter, data, nil, nil)
 	if err != nil {
 		dropDownloadHeaders(w)
 		errorResponse(w, http.StatusInternalServerError, err.Error())
 	}
 }
 
-func UUID2CKCSV(w *csv.Writer, ids, qtys []string) error {
+func UUID2CKCSV(p *prices, w *csv.Writer, ids, qtys []string) error {
 	header := []string{"Title", "Edition", "Foil", "Quantity"}
-	return uuid2BuylistCSV(w, ids, qtys, "CK", header, func(entry mtgban.BuylistEntry, quantity string) []string {
+	return uuid2BuylistCSV(p, w, ids, qtys, "CK", header, func(entry mtgban.BuylistEntry, quantity string) []string {
 		name, found := entry.CustomFields["CKTitle"]
 		if !found {
 			return nil
@@ -101,9 +102,9 @@ func UUID2CKCSV(w *csv.Writer, ids, qtys []string) error {
 	})
 }
 
-func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
+func UUID2SCGCSV(p *prices, w *csv.Writer, ids, qtys []string) error {
 	header := []string{"quantity", "productid", "name", "set_name", "language", "finish"}
-	return uuid2BuylistCSV(w, ids, qtys, "SCG", header, func(entry mtgban.BuylistEntry, quantity string) []string {
+	return uuid2BuylistCSV(p, w, ids, qtys, "SCG", header, func(entry mtgban.BuylistEntry, quantity string) []string {
 		fields := entry.CustomFields
 		return []string{quantity, entry.InstanceID, fields["SCGName"], fields["SCGEdition"], fields["SCGLanguage"], fields["SCGFinish"]}
 	})
@@ -112,8 +113,8 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 // uuid2BuylistCSV writes a row for each id the vendor buys, as row renders
 // its first buylist entry and quantity; a nil row skips the card. Quantities
 // default to 1, for a "0" or when qtys is not the size of ids.
-func uuid2BuylistCSV(w *csv.Writer, ids, qtys []string, vendor string, header []string, row func(mtgban.BuylistEntry, string) []string) error {
-	buylist, err := findVendorBuylist(vendor)
+func uuid2BuylistCSV(p *prices, w *csv.Writer, ids, qtys []string, vendor string, header []string, row func(mtgban.BuylistEntry, string) []string) error {
+	buylist, err := p.vendorBuylist(vendor)
 	if err != nil {
 		return err
 	}
@@ -146,7 +147,7 @@ func uuid2BuylistCSV(w *csv.Writer, ids, qtys []string, vendor string, header []
 	return nil
 }
 
-func SCGRetailRedirect(ctx context.Context, b *matcher.Backend, ids, qtys, conds []string) (string, error) {
+func SCGRetailRedirect(ctx context.Context, b *matcher.Backend, p *prices, ids, qtys, conds []string) (string, error) {
 	if len(qtys) != len(ids) || len(conds) != len(ids) {
 		return "", errors.New("mismatched card, quantity and condition lists")
 	}
@@ -156,7 +157,7 @@ func SCGRetailRedirect(ctx context.Context, b *matcher.Backend, ids, qtys, conds
 		if err != nil {
 			continue
 		}
-		sku := findInstanceID("SCG", hash, mtgban.Condition(conds[i]))
+		sku := findInstanceID(p, "SCG", hash, mtgban.Condition(conds[i]))
 
 		data.WriteString(qtys[i])
 		data.WriteString(" ")
@@ -277,14 +278,14 @@ func mergeCSVRows(ids, qtys, conds []string) []csvRow {
 // (our names don't always match theirs exactly, see commit 1e39d5d). Cards
 // missing from the catalog keep these columns blank - TCGplayer skips the
 // check when they're empty.
-func UUID2TCGCSV(b *matcher.Backend, w *csv.Writer, ids, qtys, conds []string) error {
-	market, err := findSellerInventory("TCGPlayer")
+func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds []string) error {
+	market, err := p.sellerInventory("TCGPlayer")
 	if err != nil {
 		return err
 	}
-	direct, _ := findSellerInventory("TCGDirectLow")
-	low, _ := findSellerInventory("TCGLow")
-	sealed, _ := findSellerInventory("TCGSealed")
+	direct, _ := p.sellerInventory("TCGDirectLow")
+	low, _ := p.sellerInventory("TCGLow")
+	sealed, _ := p.sellerInventory("TCGSealed")
 
 	// TCGplayer's own identifiers, from the catalog dump
 	productLine, tcgProducts := GetTCGCatalog()
@@ -305,13 +306,13 @@ func UUID2TCGCSV(b *matcher.Backend, w *csv.Writer, ids, qtys, conds []string) e
 
 		var tcgSkuID string
 		if co.Sealed {
-			tcgSkuID = findInstanceID("TCGSealed", id, cond)
+			tcgSkuID = findInstanceID(p, "TCGSealed", id, cond)
 			for _, entry := range sealed[id] {
 				prices[0] = entry.Price
 				break
 			}
 		} else {
-			tcgSkuID = findInstanceID("TCGPlayer", id, cond)
+			tcgSkuID = findInstanceID(p, "TCGPlayer", id, cond)
 			for j, inv := range []mtgban.InventoryRecord{market, direct, low} {
 				for _, entry := range inv[id] {
 					if entry.Conditions == cond {
@@ -327,7 +328,7 @@ func UUID2TCGCSV(b *matcher.Backend, w *csv.Writer, ids, qtys, conds []string) e
 			condLong += " Foil"
 		}
 
-		tcgEntry := tcgProducts[findTCGproductID(b, id)]
+		tcgEntry := tcgProducts[findTCGproductID(b, p, id)]
 
 		record := make([]string, 0, len(tcgcsvHeader))
 		record = append(record, tcgSkuID)
@@ -360,6 +361,7 @@ func UUID2TCGCSV(b *matcher.Backend, w *csv.Writer, ids, qtys, conds []string) e
 // MKMHandler serves a card's sealed product decklist as a Cardmarket CSV.
 func (s *site) MKMHandler(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
+	p := s.prices()
 	w.Header().Set("Content-Type", "application/json")
 
 	cardID := strings.TrimPrefix(r.URL.Path, "/search/decklist/cardmarket/")
@@ -375,7 +377,7 @@ func (s *site) MKMHandler(w http.ResponseWriter, r *http.Request) {
 	setCSVDownloadHeaders(w, co.Name+".csv")
 
 	csvWriter := csv.NewWriter(w)
-	err = UUID2MKMCSV(b, csvWriter, data, nil, nil)
+	err = UUID2MKMCSV(b, p, csvWriter, data, nil, nil)
 	if err != nil {
 		dropDownloadHeaders(w)
 		errorResponse(w, http.StatusInternalServerError, err.Error())
@@ -418,9 +420,9 @@ var mkmConditionMap = map[mtgban.Condition]string{
 // If absent, quantity will be computed on the fly and entries will be merged
 // in a single entry (tcgplayer does not support csv operations with identical
 // items) and conditions will be set to NM.
-func UUID2MKMCSV(b *matcher.Backend, w *csv.Writer, ids, qtys, conds []string) error {
-	trend, _ := findSellerInventory("MKMTrend")
-	low, _ := findSellerInventory("MKMLow")
+func UUID2MKMCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds []string) error {
+	trend, _ := p.sellerInventory("MKMTrend")
+	low, _ := p.sellerInventory("MKMLow")
 
 	err := w.Write(mkmcsvHeader)
 	if err != nil {
@@ -435,9 +437,9 @@ func UUID2MKMCSV(b *matcher.Backend, w *csv.Writer, ids, qtys, conds []string) e
 			continue
 		}
 
-		mkmID := findOriginalID("MKMTrend", id)
+		mkmID := findOriginalID(p, "MKMTrend", id)
 		if mkmID == "" {
-			mkmID = findOriginalID("MKMLow", id)
+			mkmID = findOriginalID(p, "MKMLow", id)
 		}
 
 		var price float64
@@ -767,7 +769,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 			retailV2 = sellerSearchV2(b, p, idOpt, allKeys, cfg, isSealed)
 		} else {
 			foundSellers = searchSellers(p, allKeys, cfg)
-			out.Retail = banPricesFromRows(b, allKeys, foundSellers, idOpt, tagName, true, true, false)
+			out.Retail = banPricesFromRows(b, p, allKeys, foundSellers, idOpt, tagName, true, true, false)
 		}
 	}
 	if isBuylist && canBuylist {
@@ -779,7 +781,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 			buylistV2 = vendorSearchV2(b, p, idOpt, allKeys, cfg, isSealed)
 		} else {
 			foundVendors = searchVendors(p, allKeys, cfg)
-			out.Buylist = banPricesFromRows(b, allKeys, foundVendors, idOpt, tagName, true, true, true)
+			out.Buylist = banPricesFromRows(b, p, allKeys, foundVendors, idOpt, tagName, true, true, true)
 		}
 	}
 
@@ -815,12 +817,12 @@ func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datasto
 	setCSVDownloadHeaders(w, "ban_search.csv")
 	var results map[string]map[string]*BanPrice
 	if retail {
-		results = banPricesFromRows(b, result.keys, result.sellers, "", tagName, true, true, false)
+		results = banPricesFromRows(b, p, result.keys, result.sellers, "", tagName, true, true, false)
 	} else if buylist {
-		results = banPricesFromRows(b, result.keys, result.vendors, "", tagName, true, true, true)
+		results = banPricesFromRows(b, p, result.keys, result.vendors, "", tagName, true, true, true)
 	}
 
-	err := BanPrice2CSV(b, w, results, result.keys)
+	err := BanPrice2CSV(b, p, w, results, result.keys)
 	if err != nil {
 		dropDownloadHeaders(w)
 		UserNotify("search", err.Error())

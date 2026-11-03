@@ -731,7 +731,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	result.sellers, result.vendors = collectOffers(b, p, r, config, shown.keys)
 	applyStoreFactors(result, readStoreFactors(r))
 
-	pageVars.Metadata, pageVars.Printings = searchMetadata(ds, shown.keys, preferFlavor)
+	pageVars.Metadata, pageVars.Printings = searchMetadata(ds, p, shown.keys, preferFlavor)
 
 	// Optionally sort according to price
 	if !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores" {
@@ -778,7 +778,7 @@ func searchTitle(title string, charting, sealed, editions bool) string {
 // searchMetadata reads what the page shows of each card on it: its details,
 // and its printings row for the sidebar. It does not use cardMetadata.add,
 // because ChartID is set before the card is stored.
-func searchMetadata(ds *datastore, keys []string, preferFlavor bool) (cardMetadata, map[string]string) {
+func searchMetadata(ds *datastore, p *prices, keys []string, preferFlavor bool) (cardMetadata, map[string]string) {
 	b := ds.backend
 	metadata := cardMetadata{}
 	printings := map[string]string{}
@@ -791,7 +791,7 @@ func searchMetadata(ds *datastore, keys []string, preferFlavor bool) (cardMetada
 		}
 		// Only the search page says how likely each product is to open the
 		// card, so only it hands uuid2card the datastore's odds.
-		card := uuid2card(b, cardID, preferFlavor, ds.odds)
+		card := uuid2card(b, p, cardID, preferFlavor, ds.odds)
 		// Search results chart cards, so upgrade the chart handle to the cached
 		// ban:<id> here rather than inside uuid2card, which also feeds pages
 		// that never chart.
@@ -1550,7 +1550,7 @@ func rebuildIndexRows(pageVars *SearchVars, metadata cardMetadata, b *matcher.Ba
 			})
 		}
 
-		if hasEV && !cautioned && getTCGSimulationIQR(cardID) > IQRThreshold {
+		if hasEV && !cautioned && getTCGSimulationIQR(p, cardID) > IQRThreshold {
 			pageVars.Notices = append(pageVars.Notices, "CAUTION - This search includes products with a high IQR, please check the FAQs to understand how it may impact the computed values")
 			cautioned = true
 		}

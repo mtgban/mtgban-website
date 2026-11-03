@@ -1146,6 +1146,7 @@ type NewsVars struct {
 func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
+	p := s.prices()
 	sig := verifiedSignature(r)
 
 	pageVars := genPageNav(s, r, "Newspaper", sig)
@@ -1218,7 +1219,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.ScraperShort = "SYP"
 		pageVars.Metadata = map[string]GenericCard{}
 
-		syp, err := findVendorBuylist("SYP")
+		syp, err := p.vendorBuylist("SYP")
 		if err != nil {
 			pageVars.InfoMessage = "SYP not configured yet"
 			render(w, "syp.html", pageVars)
@@ -1295,7 +1296,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 		// runs to tens of thousands of cards and all the template reads are
 		// keyed by the paginated entries.
 		for _, entry := range arbit {
-			pageVars.Metadata.add(b, entry.CardID, preferFlavor)
+			pageVars.Metadata.add(b, p, entry.CardID, preferFlavor)
 		}
 
 		// The HasNo* flags and the name were how this list asked arbit.html
@@ -1441,7 +1442,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
 
 	for _, result := range pageVars.Table {
-		c := uuid2card(b, result.UUID, preferFlavor, nil)
+		c := uuid2card(b, p, result.UUID, preferFlavor, nil)
 		pageVars.Cards = append(pageVars.Cards, c)
 		pageVars.CardHashes = append(pageVars.CardHashes, result.UUID)
 	}

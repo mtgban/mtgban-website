@@ -47,9 +47,9 @@ func v2CardmarketShelves(sealed bool) []string {
 // it, since the datastore's Cardmarket ids are incomplete. The shelves come
 // from the one sellers snapshot handed in, so one response keys every card
 // from the same shelves.
-func v2Keyer(b *matcher.Backend, mode string, sealed bool, sellers []mtgban.Seller) func(*matcher.CardObject) string {
+func v2Keyer(b *matcher.Backend, p *prices, mode string, sealed bool, sellers []mtgban.Seller) func(*matcher.CardObject) string {
 	if mode != "mkm" {
-		return func(co *matcher.CardObject) string { return getIDFromMode(b, mode, co) }
+		return func(co *matcher.CardObject) string { return getIDFromMode(b, p, mode, co) }
 	}
 	var shelves []mtgban.InventoryRecord
 	for _, name := range v2CardmarketShelves(sealed) {
@@ -66,7 +66,7 @@ func v2Keyer(b *matcher.Backend, mode string, sealed bool, sellers []mtgban.Sell
 				return entries[0].OriginalID
 			}
 		}
-		return getIDFromMode(b, mode, co)
+		return getIDFromMode(b, p, mode, co)
 	}
 }
 
@@ -187,15 +187,15 @@ func vendorSectionV2(b *matcher.Backend, p *prices, mode string, enabledStores [
 
 // searchSectionV2 is a section over the cards a search found, deduplicated,
 // keyed off the sellers snapshot handed in.
-func searchSectionV2(b *matcher.Backend, mode string, cardIDs []string, sealed bool, sellers []mtgban.Seller) *v2Section {
-	return &v2Section{keyOf: v2Keyer(b, mode, sealed, sellers), cardIDs: dedupeKeys(cardIDs), filtered: true}
+func searchSectionV2(b *matcher.Backend, p *prices, mode string, cardIDs []string, sealed bool, sellers []mtgban.Seller) *v2Section {
+	return &v2Section{keyOf: v2Keyer(b, p, mode, sealed, sellers), cardIDs: dedupeKeys(cardIDs), filtered: true}
 }
 
 // sellerSearchV2 is the retail section of a v2 search: the cards it found,
 // with every entry the search's store, condition and price filters keep.
 func sellerSearchV2(b *matcher.Backend, p *prices, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
 	sellers := p.sellers
-	section := searchSectionV2(b, mode, cardIDs, sealed, sellers)
+	section := searchSectionV2(b, p, mode, cardIDs, sealed, sellers)
 	for _, seller := range sellers {
 		if shouldSkipStoreNG(seller, config.StoreFilters) {
 			continue
@@ -221,7 +221,7 @@ func sellerSearchV2(b *matcher.Backend, p *prices, mode string, cardIDs []string
 
 // vendorSearchV2 is the buylist section of a v2 search.
 func vendorSearchV2(b *matcher.Backend, p *prices, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
-	section := searchSectionV2(b, mode, cardIDs, sealed, p.sellers)
+	section := searchSectionV2(b, p, mode, cardIDs, sealed, p.sellers)
 	for _, vendor := range p.vendors {
 		if shouldSkipStoreNG(vendor, config.StoreFilters) {
 			continue
@@ -246,7 +246,7 @@ func vendorSearchV2(b *matcher.Backend, p *prices, mode string, cardIDs []string
 }
 
 func newV2Section(b *matcher.Backend, p *prices, mode, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool, sellers []mtgban.Seller) *v2Section {
-	section := &v2Section{keyOf: v2Keyer(b, mode, sealed, sellers)}
+	section := &v2Section{keyOf: v2Keyer(b, p, mode, sealed, sellers)}
 	section.cardIDs, section.filtered = v2Cards(b, p, filterByEdition, filterByHash, filterByFinish, sealed)
 	if filterByFinish != "" && !section.filtered {
 		section.finishFilter = fixupFinishNG(filterByFinish)

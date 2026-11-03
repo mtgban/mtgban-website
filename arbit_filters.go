@@ -463,7 +463,7 @@ func previewSample(entries []mtgban.ArbitEntry, limits arbitRowFilter, noQuantit
 
 // apply builds the options one comparison runs with, and the filter its
 // rows go through after.
-func (st arbitState) apply(b *matcher.Backend, m arbitMode) (*mtgban.ArbitOpts, arbitRowFilter) {
+func (st arbitState) apply(b *matcher.Backend, p *prices, m arbitMode) (*mtgban.ArbitOpts, arbitRowFilter) {
 	l := st.limits(m)
 	opts := &mtgban.ArbitOpts{
 		MinSpread:             l.MinSpread - shownStep,
@@ -510,7 +510,7 @@ func (st arbitState) apply(b *matcher.Backend, m arbitMode) (*mtgban.ArbitOpts, 
 	applied := st.applied(m)
 	for _, key := range FilterOptKeys {
 		if applied[key] && FilterOptConfig[key].Func != nil {
-			FilterOptConfig[key].Func(opts)
+			FilterOptConfig[key].Func(p, opts)
 		}
 	}
 	return opts, arbitRowFilter{limits: l, global: m.Global}

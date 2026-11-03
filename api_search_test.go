@@ -887,7 +887,7 @@ func TestSearchAPIReadsANumberAfterAName(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ids[getIDFromMode(ds.backend, "mtgjson", co)] = true
+		ids[getIDFromMode(ds.backend, currentPrices(), "mtgjson", co)] = true
 	}
 	got := slices.Sorted(maps.Keys(out.Retail))
 	if !slices.Equal(got, slices.Sorted(maps.Keys(ids))) {

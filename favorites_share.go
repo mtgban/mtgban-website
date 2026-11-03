@@ -105,7 +105,7 @@ func (s *site) favoritesShared(w http.ResponseWriter, r *http.Request, store sha
 			log.Println("favorites share:", err)
 			vars.SharedNotice, status = sharedErrorText, http.StatusInternalServerError
 		default:
-			vars.SharedRows = sharedRows(s.backend(), raw)
+			vars.SharedRows = sharedRows(s.backend(), s.prices(), raw)
 			vars.SharedCount = len(vars.SharedRows)
 		}
 	}
@@ -143,7 +143,7 @@ func (s *site) renderShared(w http.ResponseWriter, r *http.Request, status int, 
 // sharedListCap rows. Unreadable JSON is an empty list. A row whose id names
 // no card is dropped, and the rest are drawn from b: the owner's synced
 // text and art would reach every visitor, and Merge would copy them.
-func sharedRows(b *matcher.Backend, raw json.RawMessage) []sharedFavorite {
+func sharedRows(b *matcher.Backend, p *prices, raw json.RawMessage) []sharedFavorite {
 	var all []sharedEntry
 	err := json.Unmarshal(raw, &all)
 	if err != nil {
@@ -180,15 +180,15 @@ func sharedRows(b *matcher.Backend, raw json.RawMessage) []sharedFavorite {
 	}
 	rows := make([]sharedFavorite, 0, len(live))
 	for _, e := range live {
-		rows = append(rows, sharedCard(b, e.ID))
+		rows = append(rows, sharedCard(b, p, e.ID))
 	}
 	return rows
 }
 
 // sharedCard is the row for a card id the way search shows the card, and
 // the query its result links to.
-func sharedCard(b *matcher.Backend, id string) sharedFavorite {
-	card := uuid2card(b, id, false, nil)
+func sharedCard(b *matcher.Backend, p *prices, id string) sharedFavorite {
+	card := uuid2card(b, p, id, false, nil)
 	co, _ := b.GetUUID(id)
 	treatments := make([]string, 0, len(card.Treatments))
 	for _, promoType := range card.Treatments {

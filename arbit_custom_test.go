@@ -145,7 +145,7 @@ func TestNewCustomBuylistVendor(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vendor := newCustomBuylistVendor(backend(), tt.rule, tt.source)
+			vendor := newCustomBuylistVendor(backend(), currentPrices(), tt.rule, tt.source)
 			if tt.want == nil {
 				if vendor != nil {
 					t.Fatalf("got a vendor without a reference: %v", vendor.Info())
