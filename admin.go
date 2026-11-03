@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -191,7 +192,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	adminPageTable(&pageVars)
 
-	adminGrantAdd(r, &pageVars)
+	adminGrantSave(r, &pageVars)
 
 	adminGrantRevoke(r, &pageVars)
 
@@ -903,61 +904,98 @@ func adminPageTable(pageVars *PageVars) {
 	pageVars.Tables = append(pageVars.Tables, pageTable)
 }
 
-// adminGrantAdd saves the Patreon grant the quick-add form posted, unless its
-// email, tier or overrides are invalid or the person already has one.
-func adminGrantAdd(r *http.Request, pageVars *PageVars) {
-	// -- People: quick-add a Patreon grant --
-	// Reuses the config editor's persistence: the amended config is written
-	// to the config source and swapped in memory, so the grant survives
+// adminGrantSave saves the Patreon grant a People form posted: a new one
+// from the quick-add form, or the row updateEmail names rewritten with the
+// row's fields. Nothing is saved when the email, tier or overrides are
+// invalid, or another person already holds the email.
+func adminGrantSave(r *http.Request, pageVars *PageVars) {
+	// -- People: add or edit a Patreon grant --
+	// Reuses the config editor's persistence: the amended list is written to
+	// the grants source and swapped in memory, so the change survives
 	// restarts and shows in the table below immediately.
-	grantEmail := strings.ToLower(strings.TrimSpace(r.PostFormValue("grantEmail")))
-	if grantEmail != "" {
-		grantTier := r.PostFormValue("grantTier")
-		newGrant := PatreonGrant{
-			Category: strings.TrimSpace(r.PostFormValue("grantCategory")),
-			Email:    grantEmail,
-			Name:     strings.TrimSpace(r.PostFormValue("grantName")),
-			Tier:     grantTier,
-		}
+	was := strings.ToLower(strings.TrimSpace(r.PostFormValue("updateEmail")))
+	if was == "" && strings.TrimSpace(r.PostFormValue("grantEmail")) == "" {
+		return
+	}
 
-		var overridesErr error
-		raw := strings.TrimSpace(r.PostFormValue("grantOverrides"))
-		if raw != "" {
-			overridesErr = json.Unmarshal([]byte(raw), &newGrant.Overrides)
-		}
+	grants := PatreonGrants()
+	idx := -1
+	if was != "" {
+		idx = slices.IndexFunc(grants, func(person PatreonGrant) bool {
+			return strings.EqualFold(person.Email, was)
+		})
+	}
+	grant, warning := grantFromForm(r)
+	holder := slices.IndexFunc(grants, func(person PatreonGrant) bool {
+		return strings.EqualFold(person.Email, grant.Email)
+	})
 
-		duplicate := false
-		for _, person := range PatreonGrants() {
-			if strings.EqualFold(person.Email, grantEmail) {
-				duplicate = true
-				break
-			}
+	switch {
+	case was != "" && idx < 0:
+		pageVars.WarningMessage = "no grant found for " + was
+	case warning != "":
+		pageVars.WarningMessage = warning
+	case holder >= 0 && holder != idx:
+		pageVars.WarningMessage = grant.Email + " already has a grant"
+	case idx >= 0 && sameGrant(grants[idx], grant):
+		pageVars.InfoMessage = "No changes to the grant for " + grant.Email
+	case idx >= 0:
+		next := slices.Clone(grants)
+		next[idx] = grant
+		err := saveGrants(r.Context(), next)
+		if err != nil {
+			log.Println(err)
+			pageVars.WarningMessage = err.Error()
+		} else {
+			pageVars.InfoMessage = fmt.Sprintf("Updated the grant for %s: %s tier", grant.Email, grant.Tier)
+			LogPages["Admin"].Printf("Grant updated: %+v -> %+v", grants[idx], grant)
 		}
-		_, tierExists := ACL()[grantTier]
-		emptyFeature, emptyKey, emptyFound := emptyOption(newGrant.Overrides)
-
-		switch {
-		case !strings.Contains(grantEmail, "@"):
-			pageVars.WarningMessage = "invalid grant email: " + grantEmail
-		case duplicate:
-			pageVars.WarningMessage = grantEmail + " already has a grant"
-		case !tierExists:
-			pageVars.WarningMessage = "unknown tier: " + grantTier
-		case overridesErr != nil:
-			pageVars.WarningMessage = "invalid overrides JSON: " + overridesErr.Error()
-		case emptyFound:
-			pageVars.WarningMessage = fmt.Sprintf("override %s.%s is an empty string; remove the key, or use none for AlertChannels", emptyFeature, emptyKey)
-		default:
-			err := saveGrants(r.Context(), append(slices.Clone(PatreonGrants()), newGrant))
-			if err != nil {
-				log.Println(err)
-				pageVars.WarningMessage = err.Error()
-			} else {
-				pageVars.InfoMessage = fmt.Sprintf("Granted %s tier to %s", newGrant.Tier, newGrant.Email)
-				LogPages["Admin"].Printf("Grant added: %+v", newGrant)
-			}
+	default:
+		err := saveGrants(r.Context(), append(slices.Clone(grants), grant))
+		if err != nil {
+			log.Println(err)
+			pageVars.WarningMessage = err.Error()
+		} else {
+			pageVars.InfoMessage = fmt.Sprintf("Granted %s tier to %s", grant.Tier, grant.Email)
+			LogPages["Admin"].Printf("Grant added: %+v", grant)
 		}
 	}
+}
+
+// grantFromForm reads the grant a People form posted and says what is wrong
+// with it, or nothing when it can be saved as it is.
+func grantFromForm(r *http.Request) (PatreonGrant, string) {
+	grant := PatreonGrant{
+		Category: strings.TrimSpace(r.PostFormValue("grantCategory")),
+		Email:    strings.ToLower(strings.TrimSpace(r.PostFormValue("grantEmail"))),
+		Name:     strings.TrimSpace(r.PostFormValue("grantName")),
+		Tier:     r.PostFormValue("grantTier"),
+	}
+	if !strings.Contains(grant.Email, "@") {
+		return grant, "invalid grant email: " + grant.Email
+	}
+	_, tierExists := ACL()[grant.Tier]
+	if !tierExists {
+		return grant, "unknown tier: " + grant.Tier
+	}
+	raw := strings.TrimSpace(r.PostFormValue("grantOverrides"))
+	if raw != "" {
+		err := json.Unmarshal([]byte(raw), &grant.Overrides)
+		if err != nil {
+			return grant, "invalid overrides JSON: " + err.Error()
+		}
+	}
+	feature, key, empty := emptyOption(grant.Overrides)
+	if empty {
+		return grant, fmt.Sprintf("override %s.%s is an empty string; remove the key, or use none for AlertChannels", feature, key)
+	}
+	return grant, ""
+}
+
+// sameGrant reports whether a and b hold the same fields, Overrides included.
+func sameGrant(a, b PatreonGrant) bool {
+	return a.Category == b.Category && a.Email == b.Email && a.Name == b.Name && a.Tier == b.Tier &&
+		maps.EqualFunc(a.Overrides, b.Overrides, maps.Equal)
 }
 
 // adminGrantRevoke removes the Patreon grant of the person the request names.

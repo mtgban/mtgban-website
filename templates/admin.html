@@ -227,9 +227,9 @@
                 <span class="count">{{len (index .Tables 3)}} users</span>
             </div>
             <form method="POST" action="admin?page=people" class="admin-grant-form">
+                <input type="text" name="grantCategory" placeholder="category">
                 <input type="email" name="grantEmail" placeholder="email" required>
                 <input type="text" name="grantName" placeholder="name">
-                <input type="text" name="grantCategory" placeholder="category">
                 <select name="grantTier">
                     {{range .Tiers}}
                         <option value="{{.}}">{{.}}</option>
@@ -239,18 +239,40 @@
                 <input type="submit" value="Add Grant">
             </form>
             <div class="admin-table-wrap">
-            <table class="table-data admin-table">
+            <table class="table-data admin-table admin-grants">
                 <thead><tr><th>#</th><th>Category</th><th>Email</th><th>Name</th><th>Tier</th><th>Overrides</th><th></th></tr></thead>
                 <tbody>
+                {{/* Every cell of a row is a field of the row's own save form,
+                     which sits in its last cell: a table cannot hold a form
+                     around a row, so the fields name it by id instead. */}}
                 {{range $row := index .Tables 3}}
-                    <tr>
+                    <tr class="admin-grant-row">
                         <td class="admin-mono">{{index $row 0}}</td>
-                        <td>{{index $row 1}}</td>
-                        <td class="admin-mono">{{index $row 2}}</td>
-                        <td>{{index $row 3}}</td>
-                        <td>{{index $row 4}}</td>
-                        <td class="admin-mono">{{index $row 5}}</td>
-                        <td class="admin-grant-remove-cell">
+                        <td><input form="admin-grant-{{index $row 0}}" type="text" name="grantCategory" value="{{index $row 1}}" placeholder="category"></td>
+                        <td><input form="admin-grant-{{index $row 0}}" type="email" name="grantEmail" value="{{index $row 2}}" class="admin-mono" required></td>
+                        <td><input form="admin-grant-{{index $row 0}}" type="text" name="grantName" value="{{index $row 3}}" placeholder="name"></td>
+                        <td>
+                            {{/* A tier the ACL no longer has is still the row's
+                                 own: listed as its selection, so a Save posts it
+                                 and is refused, rather than the first tier. */}}
+                            {{$tier := index $row 4}}
+                            {{$known := false}}
+                            {{range $.Tiers}}{{if eq . $tier}}{{$known = true}}{{end}}{{end}}
+                            <select form="admin-grant-{{index $row 0}}" name="grantTier">
+                                {{if not $known}}
+                                    <option value="{{$tier}}" selected>{{$tier}} (not in ACL)</option>
+                                {{end}}
+                                {{range $.Tiers}}
+                                    <option value="{{.}}"{{if eq . $tier}} selected{{end}}>{{.}}</option>
+                                {{end}}
+                            </select>
+                        </td>
+                        <td><input form="admin-grant-{{index $row 0}}" type="text" name="grantOverrides" value="{{index $row 5}}" class="admin-mono" placeholder="none"></td>
+                        <td class="admin-grant-actions">
+                            <form method="POST" action="admin?page=people" id="admin-grant-{{index $row 0}}">
+                                <input type="hidden" name="updateEmail" value="{{index $row 2}}">
+                                <button type="submit" class="admin-grant-save" title="Save the changes to {{index $row 2}}">Save</button>
+                            </form>
                             <form method="POST" action="admin?page=people" onsubmit="return confirm('Remove the {{index $row 4}} grant for {{index $row 2}}?')">
                                 <input type="hidden" name="revokeEmail" value="{{index $row 2}}">
                                 <button type="submit" class="admin-grant-remove" title="Remove grant for {{index $row 2}}">✕</button>
@@ -261,6 +283,7 @@
                 </tbody>
             </table>
             </div>
+            <script type="text/javascript" src="/js/admin-people.js?hash={{.Hash}}" defer></script>
         </div>
         {{end}}
 
