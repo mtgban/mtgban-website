@@ -175,20 +175,10 @@ func TestLoadFromCloudReportsADroppedDumpAsSkipped(t *testing.T) {
 				t.Errorf("served %d sellers and %d vendors, want %d and %d", len(currentPrices().sellers), len(currentPrices().vendors), tc.sellers, tc.vendors)
 			}
 
-			// The notice goes out from a goroutine of its own
-			wait := time.After(5 * time.Second)
-			if tc.status == http.StatusConflict {
-				wait = time.After(500 * time.Millisecond)
-			}
-			notice, waiting := "", true
-			for waiting && notice == "" {
-				select {
-				case post := <-posts:
-					if strings.HasPrefix(post, "Server reloaded") {
-						notice = post
-					}
-				case <-wait:
-					waiting = false
+			var notice string
+			for _, post := range postsSent(t, posts) {
+				if strings.HasPrefix(post, "Server reloaded") {
+					notice = post
 				}
 			}
 			switch {
@@ -221,7 +211,7 @@ func TestLoadFromCloudPostsARefusalOnce(t *testing.T) {
 		t.Fatalf("status = %d, body = %s, want the refusal", w.Code, w.Body.String())
 	}
 
-	got := postsWithin(posts, time.Second)
+	got := postsSent(t, posts)
 	if len(got) != 1 || !strings.HasPrefix(got[0], "@here Server reloaded cardkingdom, 1 did not load: buylist/CK: new buylist is missing too many entries") {
 		t.Errorf("posts = %q, want the one reload notice naming the refusal", got)
 	}
@@ -241,7 +231,7 @@ func TestOverrideReloadPostsARefusalOnce(t *testing.T) {
 
 	testSite.reloadOverriddenScrapers(map[string]struct{}{"CK": {}})
 
-	got := postsWithin(posts, time.Second)
+	got := postsSent(t, posts)
 	if len(got) != 1 || got[0] != "@here override reload cardkingdom/buylist/CK: new buylist is missing too many entries" {
 		t.Errorf("posts = %q, want the one override notice naming the refusal", got)
 	}
@@ -250,16 +240,19 @@ func TestOverrideReloadPostsARefusalOnce(t *testing.T) {
 	}
 }
 
-// postsWithin collects what reaches the webhook for d. Notices go out from
-// goroutines of their own, in no set order.
-func postsWithin(posts <-chan string, d time.Duration) []string {
+// postsSent collects what reached the webhook once nothing is left to post.
+// Notices go out from goroutines of their own, in no set order, and the
+// webhook holds each post before it answers.
+func postsSent(t *testing.T, posts <-chan string) []string {
+	t.Helper()
+	waitForGoroutines(t, 0, "reloadOverriddenScrapers")
+	waitForGoroutines(t, 0, "serverPost")
 	var got []string
-	wait := time.After(d)
 	for {
 		select {
 		case post := <-posts:
 			got = append(got, post)
-		case <-wait:
+		default:
 			return got
 		}
 	}

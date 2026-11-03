@@ -496,7 +496,7 @@ func TestDiscordHandleStopsAtTheContext(t *testing.T) {
 		<-release
 		return &discordgo.User{Username: "elmo", Discriminator: "0"}, nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
 	start := time.Now()
 	_, err := discordHandle(ctx, "90")
@@ -534,7 +534,8 @@ func TestDiscordHandleCoalescesLookups(t *testing.T) {
 			}
 		})
 	}
-	time.Sleep(100 * time.Millisecond)
+	// One caller is inside the lookup once the other waits on its flight
+	waitForGoroutines(t, 1, "singleflight.(*Group).Do", "(*WaitGroup).Wait", "discordHandle")
 	close(release)
 	wg.Wait()
 	if n := calls.Load(); n != 1 {

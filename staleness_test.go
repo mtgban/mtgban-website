@@ -474,22 +474,55 @@ func TestAReturnAfterADropIsAnnouncedOnce(t *testing.T) {
 	}
 }
 
+// goroutinesIn counts the live goroutines whose stacks run through every one
+// of frames.
+func goroutinesIn(frames ...string) int {
+	buf := make([]byte, 1<<20)
+	n := runtime.Stack(buf, true)
+	for n == len(buf) {
+		buf = make([]byte, 2*len(buf))
+		n = runtime.Stack(buf, true)
+	}
+	var count int
+	for stack := range strings.SplitSeq(string(buf[:n]), "\n\n") {
+		if !slices.ContainsFunc(frames, func(frame string) bool { return !strings.Contains(stack, frame) }) {
+			count++
+		}
+	}
+	return count
+}
+
 // waitForStack waits until some goroutine's stack runs through every one of
 // frames, so a test can act once another goroutine is known to be blocked.
 func waitForStack(t *testing.T, frames ...string) {
 	t.Helper()
-	buf := make([]byte, 1<<20)
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		n := runtime.Stack(buf, true)
-		for _, stack := range strings.Split(string(buf[:n]), "\n\n") {
-			if !slices.ContainsFunc(frames, func(frame string) bool { return !strings.Contains(stack, frame) }) {
-				return
-			}
+		if goroutinesIn(frames...) > 0 {
+			return
 		}
 		time.Sleep(time.Millisecond)
 	}
 	t.Fatalf("no goroutine reached %q", frames)
+}
+
+// waitForGoroutines waits until exactly want goroutines' stacks run through
+// every one of frames. Past the deadline it fails the test but returns, for a
+// test that has something held to let go of.
+func waitForGoroutines(t *testing.T, want int, frames ...string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		got := goroutinesIn(frames...)
+		if got == want {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Errorf("%d goroutines in %q, want %d", got, frames, want)
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
 }
 
 // A drop announced to no one yet keeps the store's stale row as it was: if
