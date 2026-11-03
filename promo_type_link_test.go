@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -12,7 +13,7 @@ import (
 func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 	skipWithoutDatastore(t)
 	plain, chipped := promoTypeCards(t)
-	if plain == "" || chipped == "" {
+	if plain == "" {
 		t.Skip("this datastore has no printing carrying a promo type")
 	}
 
@@ -42,21 +43,26 @@ func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 // drawer the row's own onclick would trigger.
 func TestSearchTemplatesLinkPromoTypes(t *testing.T) {
 	skipWithoutDatastore(t)
-	_, chipped := promoTypeCards(t)
-	if chipped == "" {
-		t.Skip("this datastore has no printing with a treatment chip")
+	plain, chipped := promoTypeCards(t)
+	if plain == "" {
+		t.Skip("this datastore has no printing carrying a promo type")
 	}
-	card := uuid2card(backend(), currentPrices(), chipped, false, nil)
-	value := card.Treatments[0]
+	// A datastore with no chipped printing has the plain list checked instead.
+	uuid := plain
+	if chipped != "" {
+		uuid = chipped
+	}
+	card := uuid2card(backend(), currentPrices(), uuid, false, nil)
+	value := slices.Concat(card.Treatments, card.PromoTypes)[0]
 	label := promoTypeLabel(backend(), value)
 	pageVars := PageVars{
 		SearchVars: SearchVars{
 			SearchRan:   true,
-			AllKeys:     []string{chipped},
+			AllKeys:     []string{uuid},
 			SearchQuery: card.Name,
 		},
-		CardHashes: []string{chipped},
-		Metadata:   map[string]GenericCard{chipped: card},
+		CardHashes: []string{uuid},
+		Metadata:   map[string]GenericCard{uuid: card},
 	}
 
 	desktop := renderSearch(t, "search.html", pageVars)
