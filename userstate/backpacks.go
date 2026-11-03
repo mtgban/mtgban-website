@@ -36,13 +36,19 @@ func Backpacks(st State) []Backpack {
 	if err != nil {
 		entries = nil
 	}
+	type packCard struct {
+		pack int
+		id   string
+	}
 	cards := map[int][]string{}
+	held := map[packCard]bool{}
 	for _, e := range entries {
 		if e.ID == "" || !isLive(e.Del) {
 			continue
 		}
 		p := backpackPack(e.Pack)
-		if !slices.Contains(cards[p], e.ID) {
+		if !held[packCard{p, e.ID}] {
+			held[packCard{p, e.ID}] = true
 			cards[p] = append(cards[p], e.ID)
 		}
 	}
