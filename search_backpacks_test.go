@@ -132,7 +132,7 @@ func TestDidYouMeanKeepsABackpack(t *testing.T) {
 		config := parseSearchPage(ds, currentPrices(), tt.query, false, false, nil, nil, nil)
 		applyBackpacks(ds.backend, &config, packs)
 		got, _ := searchSuggestions(ds, currentPrices(), tt.query, config, nil, packs, false)
-		if got != tt.want {
+		if nearest(got) != tt.want {
 			t.Errorf("%q: did-you-mean %q, want %q", tt.query, got, tt.want)
 		}
 	}

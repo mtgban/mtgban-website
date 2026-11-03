@@ -2,7 +2,10 @@
 // "did you mean..." style suggestions.
 package fuzzy
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // Distance returns the edit distance between a and b, counting an
 // insertion, a deletion, a substitution or a swap of two adjacent letters
@@ -48,14 +51,18 @@ func Distance(a, b string, limit int) int {
 	return prev[lb]
 }
 
-// Closest returns the candidate closest to query under a tolerance that
-// scales with the query length. It returns an empty string when no
-// candidate is close enough, or when query exactly matches one of them
-// (a valid value needs no suggestion). Matching is case-insensitive.
-func Closest(query string, candidates []string) string {
+// MaxClosest caps how many names Closest returns.
+const MaxClosest = 3
+
+// Closest returns the candidates closest to query, nearest first and in
+// list order among equals, at most MaxClosest, under a tolerance that
+// scales with the query length. It returns nothing when no candidate is
+// close enough, or when query exactly matches one of them (a valid value
+// needs no suggestion). Matching is case-insensitive.
+func Closest(query string, candidates []string) []string {
 	query = strings.ToLower(strings.TrimSpace(query))
 	if len(query) < 3 {
-		return ""
+		return nil
 	}
 
 	limit := len(query) / 4
@@ -63,17 +70,25 @@ func Closest(query string, candidates []string) string {
 		limit = 2
 	}
 
-	best := ""
-	bestDist := limit + 1
+	type ranked struct {
+		name string
+		dist int
+	}
+	var near []ranked
 	for _, candidate := range candidates {
 		lower := strings.ToLower(candidate)
 		if lower == query {
-			return ""
+			return nil
 		}
-		if dist := Distance(query, lower, limit); dist < bestDist {
-			bestDist = dist
-			best = candidate
+		dist := Distance(query, lower, limit)
+		if dist <= limit {
+			near = append(near, ranked{candidate, dist})
 		}
 	}
-	return best
+	slices.SortStableFunc(near, func(a, b ranked) int { return a.dist - b.dist })
+	var out []string
+	for _, r := range near[:min(len(near), MaxClosest)] {
+		out = append(out, r.name)
+	}
+	return out
 }

@@ -633,7 +633,7 @@
             {{end}}
             {{if or .DidYouMean .AltSearches}}
                 {{if .DidYouMean}}
-                    <p class="m-no-results-hint">Did you mean <a href="?q={{.DidYouMean}}{{with .SearchScope}}&scope={{.}}{{end}}">{{.DidYouMean}}</a>?</p>
+                    <p class="m-no-results-hint">Did you mean {{range $i, $q := .DidYouMean}}{{if $i}} or {{end}}<a href="?q={{$q}}{{with $.SearchScope}}&scope={{.}}{{end}}">{{$q}}</a>{{end}}?</p>
                 {{end}}
                 {{if .AltSearches}}
                     <p class="m-no-results-hint">Try one of these:</p>

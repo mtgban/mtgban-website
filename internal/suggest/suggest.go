@@ -23,9 +23,10 @@ var sealedTypeKeywords = []string{
 	"tournament", "spellbook",
 }
 
-// Closest returns the canonical card (or sealed product) name in b closest
-// to query, used to power "did you mean..." suggestions.
-func Closest(b *matcher.Backend, query string, sealed bool) string {
+// Closest returns the canonical card (or sealed product) names in b
+// closest to query, nearest first, used to power "did you mean..."
+// suggestions.
+func Closest(b *matcher.Backend, query string, sealed bool) []string {
 	return fuzzy.Closest(query, b.Names(matcher.NameFormCanonical, sealed))
 }
 

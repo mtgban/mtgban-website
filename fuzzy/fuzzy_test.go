@@ -1,6 +1,9 @@
 package fuzzy
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestDistance(t *testing.T) {
 	big := 999
@@ -41,20 +44,21 @@ func TestDistance(t *testing.T) {
 }
 
 func TestClosest(t *testing.T) {
-	candidates := []string{"Lightning Bolt", "Lightning Helix", "Counterspell", "Island", "Snap", "Swamp"}
+	candidates := []string{"Lightning Bolt", "Lightning Helix", "Counterspell", "Island", "Snap", "Swab", "Swamp", "Swarm"}
 	cases := []struct {
 		query string
-		want  string
+		want  []string
 	}{
-		{"lightnig bolt", "Lightning Bolt"}, // single typo
-		{"counterspel", "Counterspell"},     // missing letter
-		{"swapm", "Swamp"},                  // swapped letters, over the earlier Snap
-		{"lightning bolt", ""},              // exact match, no suggestion
-		{"xyzzyqwerty", ""},                 // far from everything
-		{"ab", ""},                          // too short to disambiguate
+		{"lightnig bolt", []string{"Lightning Bolt"}},                     // single typo
+		{"counterspel", []string{"Counterspell"}},                         // missing letter
+		{"swapm", []string{"Swamp", "Swarm", "Snap"}},                     // the one-edit names in list order, then two edits, capped before Swab
+		{"lightning bolt", nil},                                           // exact match, no suggestion
+		{"lightning helx", []string{"Lightning Helix", "Lightning Bolt"}}, // one edit before three
+		{"xyzzyqwerty", nil},                                              // far from everything
+		{"ab", nil},                                                       // too short to disambiguate
 	}
 	for _, tc := range cases {
-		if got := Closest(tc.query, candidates); got != tc.want {
+		if got := Closest(tc.query, candidates); !slices.Equal(got, tc.want) {
 			t.Errorf("Closest(%q) = %q, want %q", tc.query, got, tc.want)
 		}
 	}
