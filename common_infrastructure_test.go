@@ -130,7 +130,7 @@ func TestSaveInfrastructureWritesThePath(t *testing.T) {
 	}
 }
 
-// The Infrastructure tab offers Update, and an editable editor, only when
+// The Infrastructure file offers Update, and an editable editor, only when
 // there is a file to save to, and shows the file alone, not the keys this
 // deployment's config overrides.
 func TestAdminInfrastructureEditor(t *testing.T) {
@@ -167,7 +167,7 @@ func TestAdminInfrastructureEditor(t *testing.T) {
 	}
 }
 
-// postInfrastructureEditor posts body to the Infrastructure tab's editor and
+// postInfrastructureEditor posts body to the Infrastructure file's editor and
 // returns the page it fills.
 func postInfrastructureEditor(body string) PageVars {
 	form := url.Values{"infrastructureTextArea": {body}}
