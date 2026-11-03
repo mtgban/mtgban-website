@@ -515,7 +515,20 @@ func (c *sleeperCache) hits(b *matcher.Backend, pairs []sleeperPair) [][]string 
 	out := make([][]string, len(pairs))
 	for i, entry := range held {
 		entry.once.Do(func() {
+			// A pair that panicked is not held empty: the next request asks again
+			finished := false
+			defer func() {
+				if finished {
+					return
+				}
+				c.mu.Lock()
+				if c.pairs[pairs[i]] == entry {
+					delete(c.pairs, pairs[i])
+				}
+				c.mu.Unlock()
+			}()
 			entry.cardIDs = pairs[i].cardIDs(b)
+			finished = true
 		})
 		out[i] = entry.cardIDs
 	}
