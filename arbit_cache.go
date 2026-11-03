@@ -124,6 +124,18 @@ func (p *prices) arbitRows(b *matcher.Backend, view arbitView, opts *mtgban.Arbi
 	c.mu.Unlock()
 
 	entry.once.Do(func() {
+		// A comparison that panicked is not held empty: the next request
+		// asks again
+		defer func() {
+			if entry.done {
+				return
+			}
+			c.mu.Lock()
+			if c.entries[key] == entry {
+				delete(c.entries, key)
+			}
+			c.mu.Unlock()
+		}()
 		rows := compareStores(b, opts, view.mode, source, scraper)
 		entry.rows = rows
 		c.mu.Lock()

@@ -138,6 +138,42 @@ func TestArbitCacheCountsEmptyComparisons(t *testing.T) {
 	}
 }
 
+// panickySeller is a seller whose inventory panics while panics is set.
+type panickySeller struct {
+	mtgban.Seller
+	panics bool
+}
+
+func (s *panickySeller) Inventory() mtgban.InventoryRecord {
+	if s.panics {
+		panic("inventory")
+	}
+	return s.Seller.Inventory()
+}
+
+// TestArbitCacheAsksAgainAfterAPanic does not hold a comparison that
+// panicked as one with no rows: the next request compares again.
+func TestArbitCacheAsksAgainAfterAPanic(t *testing.T) {
+	b := fixtureBackend("FIXA", "Fixture Arbit", "2024-01-01", [][2]string{{"Fixture Arbit", "1"}})
+	seller := &panickySeller{Seller: mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		"FIXA-1": {{Conditions: "NM", Price: 5, Quantity: 1}},
+	}, mtgban.ScraperInfo{Shorthand: "SEL"}), panics: true}
+	vendor := fixtureBuys("VEN", map[string]float64{"FIXA-1": 8})
+	withPrices(t, []mtgban.Seller{seller}, []mtgban.Vendor{vendor})
+	p := currentPrices()
+	opts := &mtgban.ArbitOpts{MinSpread: MinSpread}
+
+	func() {
+		defer func() { _ = recover() }()
+		p.arbitRows(b, arbitView{}, opts, seller, vendor)
+		t.Fatal("the comparison did not panic")
+	}()
+	seller.panics = false
+	if rows := p.arbitRows(b, arbitView{}, opts, seller, vendor); len(rows) != 1 {
+		t.Errorf("rows after a panic = %v, want FIXA-1 once", rows)
+	}
+}
+
 // TestArbitEngineKey shares one key between states that differ only in
 // limits the row filter applies, and not between states the engine sees
 // differently.

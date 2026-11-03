@@ -128,3 +128,30 @@ func BenchmarkSleepersMismatch(b *testing.B) {
 		}
 	}
 }
+
+// TestSleeperCacheAsksAgainAfterAPanic does not hold a pair that panicked
+// as one with no hits: the next request asks again.
+func TestSleeperCacheAsksAgainAfterAPanic(t *testing.T) {
+	b := fixtureBackend("FIXA", "Fixture Arbit", "2024-01-01", [][2]string{{"Fixture Arbit", "1"}})
+	seller := &panickySeller{Seller: mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		"FIXA-1": {{Conditions: "NM", Price: 5, Quantity: 1}},
+	}, mtgban.ScraperInfo{Shorthand: "SEL"}), panics: true}
+	vendor := fixtureBuys("VEN", map[string]float64{"FIXA-1": 8})
+	c := &sleeperCache{pairs: map[sleeperPair]*sleeperHits{}}
+	pairs := []sleeperPair{{seller: seller, vendor: vendor}}
+
+	func() {
+		defer func() { _ = recover() }()
+		c.hits(b, pairs)
+		t.Fatal("the pair did not panic")
+	}()
+	if len(c.pairs) != 0 {
+		t.Fatalf("%d pairs held after a panic, want none", len(c.pairs))
+	}
+	seller.panics = false
+	c.hits(b, pairs)
+	entry, found := c.pairs[pairs[0]]
+	if !found || entry.cardIDs == nil {
+		t.Errorf("the pair was not computed again after a panic: held %v", found)
+	}
+}
