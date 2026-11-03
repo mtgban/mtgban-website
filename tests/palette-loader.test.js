@@ -94,26 +94,46 @@ test('the guide page keeps its own copy of the guide data', async () => {
     ]);
 });
 
-test('a second press while loading neither loads twice nor replays twice', async () => {
+test('a second press while loading neither loads twice nor replays twice, nor reaches the browser', async () => {
     const p = page();
     p.press({ key: 'k', ctrlKey: true });
-    p.press({ key: 'k', ctrlKey: true });
+    expect(p.press({ key: 'k', ctrlKey: true }).defaultPrevented).toBe(true);
     expect(p.of('link', 'stylesheet')).toHaveLength(1);
+    p.of('link', 'stylesheet')[0].onload();
+    await p.settle();
+    p.of('script').forEach(s => s.onload());
+    await p.settle();
+    expect(p.of('script')).toHaveLength(3);
+    expect(p.dispatched).toHaveLength(1);
     expect(p.listeners.keydown).toHaveLength(0);
 });
 
-test('a script that fails to load hands the shortcut back', async () => {
+test('the palette script failing hands the shortcut back', async () => {
     const p = page();
     p.press({ key: 'k', ctrlKey: true });
     p.of('link', 'stylesheet')[0].onload();
     await p.settle();
-    p.of('script')[0].onerror();
+    p.of('script')[2].onerror();
     await p.settle();
     expect(p.dispatched).toHaveLength(0);
     expect(p.listeners.keydown).toHaveLength(1);
     // The next press starts over
     p.press({ key: 'k', ctrlKey: true });
     expect(p.of('link', 'stylesheet')).toHaveLength(2);
+});
+
+test('a helper script failing leaves the palette to run without it, once', async () => {
+    const p = page();
+    p.press({ key: 'k', ctrlKey: true });
+    p.of('link', 'stylesheet')[0].onload();
+    await p.settle();
+    const scripts = p.of('script');
+    scripts[1].onerror();
+    scripts[0].onload();
+    scripts[2].onload();
+    await p.settle();
+    expect(p.dispatched).toHaveLength(1);
+    expect(p.listeners.keydown).toHaveLength(0);
 });
 
 test('a stylesheet that fails to load is dropped and linked again on the next press', async () => {
