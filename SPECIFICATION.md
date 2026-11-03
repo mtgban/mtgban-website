@@ -177,16 +177,16 @@ Boot sequence (`main()`):
 
 The dominant pattern is **immutable snapshots behind atomic pointers**:
 
-- `pricesPtr` (`atomic.Pointer[prices]`, load.go): one value holding the
-  sellers, the vendors, the by-shorthand `storeIndex` over them, the
-  Cardmarket id map and TCGplayer SKU index over the retail side
-  (`internal/mkmidparser`, `internal/tcgskuparser`) and the dumps `scraperIndex`,
-  built whole by `newPrices`. Readers call
-  `GetSellers()`/`GetVendors()` or `currentStoreIndex()`; writers go
-  through `updateSellers()`/`updateVendors()` which validate (timestamp must
-  not regress; a new inventory/buylist under half the previous size is
-  rejected once the previous one held over 100 entries) and `.Store()` a new
-  value under `scrapersMu`. Zero-downtime reloads.
+- `site.pricesPtr` (`atomic.Pointer[prices]`, site.go; the type is in load.go):
+  one value holding the sellers, the vendors, the by-shorthand `storeIndex`
+  over them, the Cardmarket id map and TCGplayer SKU index over the retail
+  side (`internal/mkmidparser`, `internal/tcgskuparser`), the dumps
+  `scraperIndex` and the Sleepers and arbitrage caches, built whole by
+  `newPrices`. An entry point reads it once with `s.prices()` and hands
+  `p *prices` down; the site's `updateSellers`/`updateVendors` validate a
+  store (timestamp must not regress; a new inventory/buylist under half the
+  previous size is rejected once the previous one held over 100 entries) and
+  `.Store()` a new value under `site.scrapersMu`. Zero-downtime reloads.
 - Same pattern for newspaper page cache (`newspaperPagesPtr`), reprints
   (`reprintsPtr`), checkpoints (`checkpointsStore`, an
   `internal/bucketstore.Store[T]` — also an atomic-pointer swap, not a
@@ -974,7 +974,7 @@ uptime, memory via `go-osstat`, and disk via the platform-specific
 tab aggregates 30 days of `ObservabilityDB` telemetry, cached 5 minutes.
 
 Each row's store name comes from the scraper index's reverse lookup
-(`scraperStoreOf`). Every place the dashboard talks to GitHub (the
+(the snapshot's `storeOf`). Every place the dashboard talks to GitHub (the
 `refresh` dispatch and the busy check in front of it, and the `?logs=`
 redirect) names the target workflow through `newBantoolWorkflow(game,
 store)`, one helper with no Magic special case: `EventType`

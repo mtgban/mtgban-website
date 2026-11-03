@@ -498,8 +498,8 @@ func registerCountingSeller(t *testing.T, shorthand string, uuids []string) *ato
 		}),
 		reads: reads,
 	}
-	next := append(slices.Clone(GetSellers()), seller)
-	withPrices(t, next, GetVendors())
+	next := append(slices.Clone(currentPrices().sellers), seller)
+	withPrices(t, next, currentPrices().vendors)
 	return reads
 }
 

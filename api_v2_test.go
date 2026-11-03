@@ -44,7 +44,7 @@ func v2Backend() *matcher.Backend {
 // counts its copies but keeps no quantities, a sealed store, a buyer by condition,
 // a want-count index buyer and an index buyer. The listings scrape was capped
 // on the coldfoil.
-func seedV2Scrapers(t *testing.T) {
+func seedV2Scrapers(t *testing.T, s *site) {
 	t.Helper()
 	setTestTCGDirect(t, map[string]*tcgListings{
 		"lor-1": {Direct: [5]int32{7}, Copies: [5]int32{20, 5}},
@@ -88,7 +88,7 @@ func seedV2Scrapers(t *testing.T) {
 		mtgban.NewSellerFromInventory(mp, mtgban.ScraperInfo{Name: "Mana Pool", Shorthand: "MP", NoQuantityInventory: true}),
 		mtgban.NewSellerFromInventory(sealed, mtgban.ScraperInfo{Name: "Card Trader Sealed", Shorthand: "CTSealed", SealedMode: true}),
 	}
-	withPrices(t, sellers, GetVendors())
+	sitePrices(t, s, sellers, s.prices().vendors)
 
 	ck := mtgban.BuylistRecord{}
 	ck.Add("lor-1", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 0.5, Quantity: 4})
@@ -106,7 +106,7 @@ func seedV2Scrapers(t *testing.T) {
 		mtgban.NewVendorFromBuylist(syp, mtgban.ScraperInfo{Name: "TCG SYP", Shorthand: "SYP", MetadataOnly: true, QuantityPriority: true}),
 		mtgban.NewVendorFromBuylist(idx, mtgban.ScraperInfo{Name: "Index Buyer", Shorthand: "IDXV", MetadataOnly: true}),
 	}
-	withPrices(t, GetSellers(), vendors)
+	sitePrices(t, s, s.prices().sellers, vendors)
 }
 
 func wireOf(t *testing.T, v any) string {
@@ -122,7 +122,7 @@ func wireOf(t *testing.T, v any) string {
 // finish, merging the two nonfoil uuids condition by condition, and gives the same
 // answer from a full dump and from a request for the cards.
 func TestPriceAPIv2Prices(t *testing.T) {
-	seedV2Scrapers(t)
+	seedV2Scrapers(t, testSite)
 	b := v2Backend()
 	cards := []string{"lor-1", "lor-2", "lor-3"}
 	stores := []string{"CT", "MKMTrend", "MP", tcgDirectStore, tcgListingsStore, "CTSealed", "CK", "SYP", "IDXV"}
@@ -168,13 +168,13 @@ func TestPriceAPIv2Prices(t *testing.T) {
 // and leaves v1 as it was.
 func TestPriceAPIv2Route(t *testing.T) {
 	withSigMode(t, true, false)
-	seedV2Scrapers(t)
 	prevOverrides := Config().ScraperConfig.NameOverride
 	t.Cleanup(func() { Config().ScraperConfig.NameOverride = prevOverrides })
 	Config().ScraperConfig.NameOverride = map[string]string{"Card Trader": "CardTrader"}
 
 	s := newSite()
 	s.ds.Store(&datastore{backend: v2Backend()})
+	seedV2Scrapers(t, s)
 
 	get := func(handler http.HandlerFunc, url string, into any) {
 		t.Helper()
@@ -441,13 +441,13 @@ func TestPriceAPIv2CardmarketIDs(t *testing.T) {
 		mtgban.NewSellerFromInventory(ct, mtgban.ScraperInfo{Name: "Card Trader", Shorthand: "CT"}),
 		mtgban.NewSellerFromInventory(cts, mtgban.ScraperInfo{Name: "Card Trader Sealed", Shorthand: "CTSealed", SealedMode: true}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 	ck := mtgban.BuylistRecord{}
 	for _, uuid := range singles {
 		ck.Add(uuid, &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1})
 	}
 	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(ck, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK"})}
-	withPrices(t, GetSellers(), vendors)
+	withPrices(t, currentPrices().sellers, vendors)
 
 	ids := func(prices map[string]map[string]map[string][]banprice.Entry) []string {
 		var out []string
@@ -578,13 +578,13 @@ func TestWriteV2Response(t *testing.T) {
 // still gets the sealed dump and a single card.
 func TestPriceAPIDemoRefusesFullDumps(t *testing.T) {
 	withSigMode(t, false, true)
-	seedV2Scrapers(t)
 	prevDemo := Config().Stores.APIDemoStores
 	t.Cleanup(func() { Config().Stores.APIDemoStores = prevDemo })
 	Config().Stores.APIDemoStores = []string{"CT", "CK", "CTSealed"}
 
 	s := newSite()
 	s.ds.Store(&datastore{backend: v2Backend()})
+	seedV2Scrapers(t, s)
 
 	for path, served := range map[string]bool{
 		"all": false, "retail": false, "buylist": false,
@@ -624,9 +624,9 @@ func TestPriceAPIDemoRefusesFullDumps(t *testing.T) {
 // lists every product, and a singles one asked for sealed finds none.
 func TestPriceAPISealedIgnoresFinish(t *testing.T) {
 	withSigMode(t, true, false)
-	seedV2Scrapers(t)
 	s := newSite()
 	s.ds.Store(&datastore{backend: v2Backend()})
+	seedV2Scrapers(t, s)
 
 	retail := func(handler http.HandlerFunc, url string) string {
 		t.Helper()
@@ -659,9 +659,9 @@ func TestPriceAPISealedIgnoresFinish(t *testing.T) {
 // keeps the conditions it exports for a single store.
 func TestPriceAPIVendorFilterIgnoresCase(t *testing.T) {
 	withSigMode(t, true, false)
-	seedV2Scrapers(t)
 	s := newSite()
 	s.ds.Store(&datastore{backend: v2Backend()})
+	seedV2Scrapers(t, s)
 
 	for _, tc := range []struct {
 		url     string
@@ -689,7 +689,7 @@ func TestPriceAPIVendorFilterIgnoresCase(t *testing.T) {
 // both paths and whatever order the records are read in.
 func TestV1SharedIDKeepsTheBestPrice(t *testing.T) {
 	withSigMode(t, true, false)
-	seedV2Scrapers(t)
+	seedV2Scrapers(t, testSite)
 	b := v2Backend()
 
 	for _, tc := range []struct {

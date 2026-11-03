@@ -156,25 +156,25 @@ func TestUpdateAnswersTheInstall(t *testing.T) {
 	now := time.Now()
 	old := now.Add(-time.Hour)
 
-	err := updateVendors(buylistOf("ZZV", 500, now))
+	err := testSite.updateVendors(buylistOf("ZZV", 500, now))
 	if err != nil {
 		t.Fatalf("first registration refused: %s", err)
 	}
-	err = updateVendors(buylistOf("ZZV", 500, old))
+	err = testSite.updateVendors(buylistOf("ZZV", 500, old))
 	if err == nil {
 		t.Fatal("older buylist installed, want the refusal answered")
 	}
-	for _, vendor := range GetVendors() {
+	for _, vendor := range currentPrices().vendors {
 		if vendor.Info().Shorthand == "ZZV" && !vendor.Info().BuylistTimestamp.Equal(now) {
 			t.Error("refused buylist replaced the served one anyway")
 		}
 	}
 
-	err = updateSellers(inventoryOf("ZZS", 500, now))
+	err = testSite.updateSellers(inventoryOf("ZZS", 500, now))
 	if err != nil {
 		t.Fatalf("first registration refused: %s", err)
 	}
-	err = updateSellers(inventoryOf("ZZS", 0, now))
+	err = testSite.updateSellers(inventoryOf("ZZS", 0, now))
 	if err == nil {
 		t.Fatal("empty inventory installed, want the refusal answered")
 	}
@@ -317,26 +317,26 @@ func TestLoadScrapersNGFromLocalDirectory(t *testing.T) {
 	writeVendorDump(t, filepath.Join("magic", "cardkingdom", "buylist", "CK.json.xz"), buylistOf("CK", 3, now))
 	writeSellerDump(t, filepath.Join("magic", "abugames", "retail", "ABU.json.xz"), inventoryOf("ABU", 2, now))
 
-	err := loadScrapersNG(&simplecloud.FileBucket{}, nil)
+	err := testSite.loadScrapersNG(&simplecloud.FileBucket{}, nil)
 	if err != nil {
 		t.Fatalf("loadScrapersNG: %v", err)
 	}
 
-	sellers := GetSellers()
+	sellers := currentPrices().sellers
 	if len(sellers) != 2 {
 		t.Fatalf("got %d sellers, want 2: %+v", len(sellers), sellers)
 	}
-	vendors := GetVendors()
+	vendors := currentPrices().vendors
 	if len(vendors) != 1 || vendors[0].Info().Shorthand != "CK" {
 		t.Fatalf("got %d vendors, want 1 CK: %+v", len(vendors), vendors)
 	}
-	store, ok := scraperStoreOf("ABU")
+	store, ok := currentPrices().storeOf("ABU")
 	if !ok || store != "abugames" {
-		t.Errorf("scraperStoreOf(ABU) = %q, %v, want abugames, true", store, ok)
+		t.Errorf("currentPrices().storeOf(ABU) = %q, %v, want abugames, true", store, ok)
 	}
-	store, ok = scraperStoreOf("CK")
+	store, ok = currentPrices().storeOf("CK")
 	if !ok || store != "cardkingdom" {
-		t.Errorf("scraperStoreOf(CK) = %q, %v, want cardkingdom, true", store, ok)
+		t.Errorf("currentPrices().storeOf(CK) = %q, %v, want cardkingdom, true", store, ok)
 	}
 }
 
@@ -351,24 +351,24 @@ func TestLoadScrapersNGLoadsOnlyTheNamedStores(t *testing.T) {
 	writeSellerDump(t, filepath.Join("magic", "abugames", "retail", "ABU.json.xz"), inventoryOf("ABU", 2, now))
 	writeVendorDump(t, filepath.Join("magic", "abugames", "buylist", "ABU.json.xz"), buylistOf("ABU", 2, now))
 
-	err := loadScrapersNG(&simplecloud.FileBucket{}, []string{"cardkingdom", "nosuchstore"})
+	err := testSite.loadScrapersNG(&simplecloud.FileBucket{}, []string{"cardkingdom", "nosuchstore"})
 	if err != nil {
 		t.Fatalf("loadScrapersNG: %v", err)
 	}
 
-	sellers := GetSellers()
+	sellers := currentPrices().sellers
 	if len(sellers) != 1 || sellers[0].Info().Shorthand != "CK" {
 		t.Errorf("got %d sellers, want CK alone", len(sellers))
 	}
-	vendors := GetVendors()
+	vendors := currentPrices().vendors
 	if len(vendors) != 1 || vendors[0].Info().Shorthand != "CK" {
 		t.Errorf("got %d vendors, want CK alone", len(vendors))
 	}
-	stores := slices.Sorted(maps.Keys(scraperStoreConfig()))
+	stores := slices.Sorted(maps.Keys(currentPrices().scrapers.byStore))
 	if !slices.Equal(stores, []string{"cardkingdom"}) {
 		t.Errorf("indexed stores = %v, want [cardkingdom]", stores)
 	}
-	_, ok := scraperStoreOf("ABU")
+	_, ok := currentPrices().storeOf("ABU")
 	if ok {
 		t.Error("ABU, outside the store list, is indexed")
 	}
@@ -408,26 +408,26 @@ func TestLoadScrapersNGFromADumpsDirectory(t *testing.T) {
 	writeSellerDump(t, filepath.Join(dir, "magic", "cardkingdom", "retail", "CK.json.xz"), inventoryOf("CK", 3, now))
 	writeVendorDump(t, filepath.Join(dir, "magic", "abugames", "buylist", "ABU.json.xz"), buylistOf("ABU", 2, now))
 
-	err := loadScrapersNG(&simplecloud.FileBucket{Root: dir}, nil)
+	err := testSite.loadScrapersNG(&simplecloud.FileBucket{Root: dir}, nil)
 	if err != nil {
 		t.Fatalf("loadScrapersNG: %v", err)
 	}
 
-	sellers := GetSellers()
+	sellers := currentPrices().sellers
 	if len(sellers) != 1 || sellers[0].Info().Shorthand != "CK" {
 		t.Errorf("got %d sellers, want CK alone", len(sellers))
 	}
-	vendors := GetVendors()
+	vendors := currentPrices().vendors
 	if len(vendors) != 1 || vendors[0].Info().Shorthand != "ABU" {
 		t.Errorf("got %d vendors, want ABU alone", len(vendors))
 	}
-	store, ok := scraperStoreOf("CK")
+	store, ok := currentPrices().storeOf("CK")
 	if !ok || store != "cardkingdom" {
-		t.Errorf("scraperStoreOf(CK) = %q, %v, want cardkingdom, true", store, ok)
+		t.Errorf("currentPrices().storeOf(CK) = %q, %v, want cardkingdom, true", store, ok)
 	}
-	store, ok = scraperStoreOf("ABU")
+	store, ok = currentPrices().storeOf("ABU")
 	if !ok || store != "abugames" {
-		t.Errorf("scraperStoreOf(ABU) = %q, %v, want abugames, true", store, ok)
+		t.Errorf("currentPrices().storeOf(ABU) = %q, %v, want abugames, true", store, ok)
 	}
 }
 
@@ -442,9 +442,9 @@ func TestUpdateScraperIndexStoreReplacesOnlyThatStore(t *testing.T) {
 
 	// cardkingdom's fresh listing dropped CKBLLast and picked up a new
 	// retail-only shorthand.
-	updateScraperIndexStore("cardkingdom", map[string][]string{"retail": {"CK", "CKNew"}})
+	testSite.updateScraperIndexStore("cardkingdom", map[string][]string{"retail": {"CK", "CKNew"}})
 
-	idx := currentScraperIndex()
+	idx := (&currentPrices().scrapers)
 	if !slices.Equal(idx.byStore["cardkingdom"]["retail"], []string{"CK", "CKNew"}) {
 		t.Errorf("cardkingdom retail = %v, want [CK CKNew]", idx.byStore["cardkingdom"]["retail"])
 	}
@@ -473,14 +473,14 @@ func TestUpdateScraperIndexStoreLeavesASharedShorthandsOwnerAlone(t *testing.T) 
 		"abugames":   {"retail": {"ABU"}},
 	}))
 
-	updateScraperIndexStore("cardmarket", map[string][]string{"retail": {"MKMLow"}})
-	if got, want := currentScraperIndex().byShorthand["MKMLow"], "cardmarket"; got != want {
+	testSite.updateScraperIndexStore("cardmarket", map[string][]string{"retail": {"MKMLow"}})
+	if got, want := currentPrices().scrapers.byShorthand["MKMLow"], "cardmarket"; got != want {
 		t.Fatalf("byShorthand[MKMLow] = %q after cardmarket's own reload, want %q", got, want)
 	}
 
 	for i := range 5 {
-		updateScraperIndexStore("abugames", map[string][]string{"retail": {"ABU"}})
-		if got, want := currentScraperIndex().byShorthand["MKMLow"], "cardmarket"; got != want {
+		testSite.updateScraperIndexStore("abugames", map[string][]string{"retail": {"ABU"}})
+		if got, want := currentPrices().scrapers.byShorthand["MKMLow"], "cardmarket"; got != want {
 			t.Fatalf("byShorthand[MKMLow] = %q after abugames reload #%d, want %q unchanged", got, i, want)
 		}
 	}
@@ -506,12 +506,12 @@ func TestLoadScrapersNGLeavesOutADumpPastDropAfter(t *testing.T) {
 	writeVendorDump(t, filepath.Join(dir, "magic", "starcitygames", "buylist", "SCG.json.xz"), buylistOf("SCG", 3, time.Now()))
 	writeVendorDump(t, filepath.Join(dir, "magic", "abugames", "buylist", "ABU.json.xz"), buylistOf("ABU", 2, time.Now().Add(-8*24*time.Hour)))
 
-	err := loadScrapersNG(&simplecloud.FileBucket{Root: dir}, nil)
+	err := testSite.loadScrapersNG(&simplecloud.FileBucket{Root: dir}, nil)
 	if err != nil {
 		t.Fatalf("loadScrapersNG: %v", err)
 	}
-	if len(GetSellers()) != 1 || len(GetVendors()) != 1 || GetVendors()[0].Info().Shorthand != "SCG" {
-		t.Errorf("served %d sellers and %d vendors, want SCG alone, ABU's 8-day-old buylist left out", len(GetSellers()), len(GetVendors()))
+	if len(currentPrices().sellers) != 1 || len(currentPrices().vendors) != 1 || currentPrices().vendors[0].Info().Shorthand != "SCG" {
+		t.Errorf("served %d sellers and %d vendors, want SCG alone, ABU's 8-day-old buylist left out", len(currentPrices().sellers), len(currentPrices().vendors))
 	}
 }
 

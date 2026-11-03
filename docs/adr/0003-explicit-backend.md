@@ -31,7 +31,9 @@ Every change is reviewed against seven rules:
 1. **One owner, one writer.** `site.ds` (site.go) is the only live
    datastore. `newSite` pre-stores an empty one; after that only
    `loadDatastore` stores, single-flight through `internal/dsreload`, the
-   startup load included.
+   startup load included. `site.pricesPtr` is the only prices snapshot the
+   same way: `prices()` serves the empty one before the first publish, and
+   the site's writers publish under `scrapersMu`.
 2. **Read once per unit of work, where it starts.** A handler, cron run,
    Discord message or background job reads `s.datastore()` or `s.backend()`
    once and passes the result down. Startup code (`main`, `init`, `newSite`,
@@ -86,7 +88,9 @@ cached templates cannot take a FuncMap bound to one request's datastore.
 What a page needs from the datastore rides in its data, filled by the
 handler from the snapshot it read: `EditionEntry.Symbol`,
 `GenericCard.SetSymbol`, `PromoLabels` and `TCGId`, and
-`PageVars.DatastoreReload`.
+`PageVars.DatastoreReload`. The same holds for the prices snapshot:
+store names, the cart buttons and the guide's store list ride in
+`StoreNames`, `CartLoads`, each `Arbitrage`'s carts and `GuideStores`.
 
 ### Tests
 
@@ -138,8 +142,8 @@ guard, and the root package runs in 3 s, or 31 s under `-race`.
   assumes one. Moving the rest is Phase D:
   - `Config`: some `Config.Game` readers already hold a `b` whose `Game`
     would do;
-  - the prices snapshot (`pricesPtr`, `scrapersMu`, load.go)
-    and the session stores;
+  - the session stores: `Sessions` is one registry, bound to the site in
+    `main`;
   - the caches built from prices (newspaper, reprints, infos, TCG catalog,
     screener, popular searches): plain values that pin nothing, but can lag
     a reload by one refresh;

@@ -473,7 +473,7 @@ func TestGlobalDirectKeepsItsConditions(t *testing.T) {
 		mtgban.NewSellerFromInventory(shelf(10), mtgban.ScraperInfo{Name: "Filter Shop", Shorthand: "FILTSHOP"}),
 		mtgban.NewSellerFromInventory(shelf(40), mtgban.ScraperInfo{Name: "Direct", Shorthand: "TCGDirect"}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
 	// No TCG Market is loaded, which "only Legit" reads as every price
 	// being off
@@ -493,7 +493,7 @@ func TestArbitStoreLinksCarryState(t *testing.T) {
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Link Source", Shorthand: "LINKSRC"}),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Link Other", Shorthand: "LINKOTH"}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 	withSigMode(t, true, false)
 
 	render := func(query string) string {
@@ -713,7 +713,7 @@ func TestArbitApplyKeepsReverseTradable(t *testing.T) {
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Carry Source", Shorthand: "CARRYSRC"}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 	withSigMode(t, true, false)
 
 	r := httptest.NewRequest("GET", "/arbit?source=CARRYSRC", nil)
@@ -805,7 +805,7 @@ func TestGlobalPreviewCannotSteerItsSample(t *testing.T) {
 		mtgban.NewSellerFromInventory(probe, mtgban.ScraperInfo{Name: "Preview Index", Shorthand: "PREVIDX"}),
 		mtgban.NewSellerFromInventory(reference, mtgban.ScraperInfo{Name: "Preview Store", Shorthand: "PREVSTORE"}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 	withSigMode(t, true, false)
 
 	rows := func(query string) int {
@@ -893,7 +893,7 @@ func TestArbitBarShowsTheCarriedLimit(t *testing.T) {
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Carry Source", Shorthand: "CARRYSRC"}),
 	}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 	withSigMode(t, true, false)
 
 	r := httptest.NewRequest("GET", "/arbit?source=CARRYSRC", nil)

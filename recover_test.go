@@ -375,10 +375,10 @@ func TestOverrideReloadRecovers(t *testing.T) {
 		DataBucket = prevBucket
 	})
 	DataBucket = panicBucket{}
-	withScraperIndex(t, newScraperIndex())
-	updateScraperIndexStore("cardkingdom", map[string][]string{"retail": {"CK"}})
+	s := newSite()
+	s.updateScraperIndexStore("cardkingdom", map[string][]string{"retail": {"CK"}})
 
-	newSite().reloadOverriddenScrapers(map[string]struct{}{"CK": {}})
+	s.reloadOverriddenScrapers(map[string]struct{}{"CK": {}})
 
 	_, _, source := panicReport(t, posts)
 	if source != "source job: override reload cardkingdom/retail/CK" {

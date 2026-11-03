@@ -477,7 +477,7 @@ func TestSearchAPIKeyScopeMeetsBlockListsAsPrices(t *testing.T) {
 	// the price API and on search alike.
 	buys := mtgban.BuylistRecord{}
 	buys.Add(id, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 1})
-	withPrices(t, slices.Clone(GetSellers()), append(slices.Clone(GetVendors()),
+	withPrices(t, slices.Clone(currentPrices().sellers), append(slices.Clone(currentPrices().vendors),
 		mtgban.NewVendorFromBuylist(buys, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
 		mtgban.NewVendorFromBuylist(buys, mtgban.ScraperInfo{Shorthand: "SCG", Name: "Star City Games"})))
 	v2BuylistStores := func(body []byte) []string {

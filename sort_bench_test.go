@@ -89,7 +89,7 @@ func BenchmarkSortSetsByRetail(b *testing.B) {
 			Name: "Bench " + shorthand, Shorthand: shorthand,
 		}))
 	}
-	withPrices(b, sellers, GetVendors())
+	withPrices(b, sellers, currentPrices().vendors)
 
 	b.ReportAllocs()
 	for b.Loop() {
@@ -123,7 +123,7 @@ func BenchmarkSortSetsByBuylist(b *testing.B) {
 			Name: "Bench " + shorthand, Shorthand: shorthand,
 		}))
 	}
-	withPrices(b, sellers, GetVendors())
+	withPrices(b, sellers, currentPrices().vendors)
 	var vendors []mtgban.Vendor
 	for _, shorthand := range defaultVendorPriorityOpt {
 		bl := mtgban.BuylistRecord{}
@@ -136,7 +136,7 @@ func BenchmarkSortSetsByBuylist(b *testing.B) {
 			Name: "Bench " + shorthand, Shorthand: shorthand,
 		}))
 	}
-	withPrices(b, GetSellers(), vendors)
+	withPrices(b, currentPrices().sellers, vendors)
 
 	b.ReportAllocs()
 	for b.Loop() {

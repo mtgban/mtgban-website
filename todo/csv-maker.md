@@ -3,7 +3,7 @@
 > **2026-09-14 spot check:** nothing below is built yet (`csvmaker.go`,
 > `templates/csvmaker.html`, `js/csvmaker.js` — zero hits, and no `sheets`
 > section in `userstate`'s `validSections`). The machinery this plans to
-> reuse (`parseSearchOptionsNG`, `findSellerInventory`/`findVendorBuylist`,
+> reuse (`parseSearchOptionsNG`, the snapshot's `sellerInventory`/`vendorBuylist`,
 > `priceRowToCSV`) still exists with compatible signatures, so the plan below
 > is still buildable as written — this is a live, accurate, unstarted design
 > doc, not a stale one.
@@ -116,8 +116,8 @@ Both API handlers share one resolver:
 1. For each `q`: `parseSearchOptionsNG(q, blocklistRetail, blocklistBuylist,
    miscOpts)` → `searchAndFilter(config)` → uuids (respecting
    `MaxSearchTotalResults`). Concatenate, dedupe, cap total at 10,000 rows.
-2. Resolve the one source: `findSellerInventory(shorthand)` or
-   `findVendorBuylist(shorthand)` — a single map, probed once per uuid.
+2. Resolve the one source: `p.sellerInventory(shorthand)` or
+   `p.vendorBuylist(shorthand)` — a single map, probed once per uuid.
    This is the cheap path: no `getSellerPrices` dump machinery, no
    per-store fan-out.
 3. Row assembly mirrors `priceRowToCSV`'s identity columns (uuid → scryfall

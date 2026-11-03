@@ -691,7 +691,7 @@ func TestRebuildCKPauses(t *testing.T) {
 		// A credit list pays more, but not in cash.
 		vendor("ABUCredit", mtgban.BuylistRecord{"p": {{Conditions: "NM", BuyPrice: 12}}}),
 	}
-	withPrices(t, GetSellers(), vendors)
+	withPrices(t, currentPrices().sellers, vendors)
 	today := ckToday(time.Now())
 	paused := ckHistory{LastBuying: today.AddDate(0, 0, -5)}
 	setTestCKInputs(t, mtgban.InventoryRecord{}, &ckHistorySnapshot{
@@ -745,7 +745,7 @@ func TestLoadScraperRebuildsCKSignals(t *testing.T) {
 			mtgban.InventoryRecord{"a": {{Conditions: "NM", Quantity: stock, Price: 20}}}, info))
 	}
 	load := func(kind string) {
-		err := loadScraper(DataBucket, "magic", "cardkingdom", kind, "CK")
+		err := testSite.loadScraper(DataBucket, "magic", "cardkingdom", kind, "CK")
 		if err != nil {
 			t.Fatalf("load %s: %v", kind, err)
 		}
@@ -819,7 +819,7 @@ func TestCKWorkNeedsCKBuylist(t *testing.T) {
 		ckSignalsPtr.Store(prevSignals)
 	})
 	vendors := []mtgban.Vendor{buylistOf("SCG", 1, time.Now())}
-	withPrices(t, GetSellers(), vendors)
+	withPrices(t, currentPrices().sellers, vendors)
 	ckSignalsPtr.Store(nil)
 
 	(&site{}).refreshCKSignals()

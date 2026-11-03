@@ -307,7 +307,7 @@ func (s *site) adminActions(w http.ResponseWriter, r *http.Request, p *prices, p
 		v := url.Values{}
 		v.Set("msg", reload+" reloaded")
 		table := r.PostFormValue("table")
-		err := loadScraper(DataBucket, Config().Game, reload, table, r.PostFormValue("tag"))
+		err := s.loadScraper(DataBucket, Config().Game, reload, table, r.PostFormValue("tag"))
 		if err != nil {
 			v.Set("msg", "reload of "+reload+" error: "+err.Error())
 		} else {

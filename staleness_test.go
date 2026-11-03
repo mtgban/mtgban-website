@@ -108,7 +108,7 @@ func TestCheckStalenessTracksTransitionsOverRepeatedChecks(t *testing.T) {
 	var noVendors []mtgban.Vendor
 	withPrices(t, sellers, noVendors)
 
-	checkStaleness()
+	testSite.checkStaleness()
 	if !staleAlarmState.stale["ZZSTALE/retail"] {
 		t.Fatal("first check did not record ZZSTALE/retail as stale")
 	}
@@ -121,7 +121,7 @@ func TestCheckStalenessTracksTransitionsOverRepeatedChecks(t *testing.T) {
 
 	// A second check with nothing changed must not un-record the stale row,
 	// nor notify again while it stays stale.
-	checkStaleness()
+	testSite.checkStaleness()
 	if !staleAlarmState.stale["ZZSTALE/retail"] {
 		t.Fatal("second check lost ZZSTALE/retail's stale state")
 	}
@@ -132,8 +132,8 @@ func TestCheckStalenessTracksTransitionsOverRepeatedChecks(t *testing.T) {
 	// ZZSTALE loads fresh data: the next check must flip it back and notify
 	// exactly once more, for the recovery.
 	recovered := []mtgban.Seller{inventoryOf("ZZSTALE", 1, time.Now()), inventoryOf("ZZFRESH", 1, fresh)}
-	withPrices(t, recovered, GetVendors())
-	checkStaleness()
+	withPrices(t, recovered, currentPrices().vendors)
+	testSite.checkStaleness()
 	if staleAlarmState.stale["ZZSTALE/retail"] {
 		t.Fatal("check after a fresh load still reads ZZSTALE/retail as stale")
 	}
@@ -154,7 +154,7 @@ func TestCheckStalenessSkipsSessionStores(t *testing.T) {
 		Sessions = prevSessions
 	})
 	staleAlarmState.stale = map[string]bool{}
-	Sessions = sessionstore.New(sessionHooks())
+	Sessions = sessionstore.New(sessionHooks(testSite))
 
 	var notices []string
 	notifyStale = func(kind, message string) error {
@@ -175,9 +175,9 @@ func TestCheckStalenessSkipsSessionStores(t *testing.T) {
 	}
 	old := time.Now().Add(-72 * time.Hour)
 	sellers := []mtgban.Seller{inventoryOf("ZZUPLOAD", 1, old)}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
-	checkStaleness()
+	testSite.checkStaleness()
 	if len(notices) != 0 {
 		t.Errorf("a session store triggered the alarm: %v", notices)
 	}
@@ -213,7 +213,7 @@ func TestCheckStalenessAnnouncesOneCheckTogether(t *testing.T) {
 			return nil
 		})
 
-	checkStaleness()
+	testSite.checkStaleness()
 	if len(notices) != 1 || strings.Count(notices[0], "has not updated in") != 3 {
 		t.Errorf("notices = %q, want one message naming all three", notices)
 	}
@@ -233,13 +233,13 @@ func TestCheckStalenessRetriesARefusedAlarm(t *testing.T) {
 		return nil
 	})
 
-	checkStaleness()
+	testSite.checkStaleness()
 	if staleAlarmState.stale["ZZSTALE/retail"] {
 		t.Error("a refused alarm was recorded as announced")
 	}
 	refuse = false
-	checkStaleness()
-	checkStaleness()
+	testSite.checkStaleness()
+	testSite.checkStaleness()
 	if len(notices) != 2 || notices[0] != notices[1] {
 		t.Errorf("notices = %q, want the refused alarm posted once more, then quiet", notices)
 	}
@@ -265,7 +265,7 @@ func TestCheckStalenessSplitsWhatDoesNotFit(t *testing.T) {
 		return nil
 	})
 
-	checkStaleness()
+	testSite.checkStaleness()
 	if len(notices) != 2 || len(notices[0]) > staleMessageBudget {
 		t.Fatalf("posted %d messages, the first of %d bytes: want two, within %d", len(notices), len(notices[0]), staleMessageBudget)
 	}
@@ -300,7 +300,7 @@ func withDropState(t *testing.T, sellers []mtgban.Seller, vendors []mtgban.Vendo
 	withPrices(t, sellers, vendors)
 	droppedStoresPtr.Store(nil)
 	staleAlarmState.stale = map[string]bool{}
-	Sessions = sessionstore.New(sessionHooks())
+	Sessions = sessionstore.New(sessionHooks(testSite))
 
 	var notices []string
 	notifyStale = func(kind, message string) error {
@@ -311,10 +311,10 @@ func withDropState(t *testing.T, sellers []mtgban.Seller, vendors []mtgban.Vendo
 }
 
 func servedShorthands() (sellers, vendors []string) {
-	for _, seller := range GetSellers() {
+	for _, seller := range currentPrices().sellers {
 		sellers = append(sellers, seller.Info().Shorthand)
 	}
-	for _, vendor := range GetVendors() {
+	for _, vendor := range currentPrices().vendors {
 		vendors = append(vendors, vendor.Info().Shorthand)
 	}
 	return sellers, vendors
@@ -334,9 +334,9 @@ func TestDropStaleStoresStopsServingOnlyOldData(t *testing.T) {
 	}
 	// Publish served the session store anew; serve the back-dated copy.
 	sellers := []mtgban.Seller{inventoryOf("ZZOLD", 1, old), inventoryOf("ZZSTALE", 1, stale), inventoryOf("ZZUPLOAD", 1, old), undated}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
-	dropStaleStores(now)
+	testSite.dropStaleStores(now)
 
 	gotSellers, gotVendors := servedShorthands()
 	if !slices.Equal(gotSellers, []string{"ZZSTALE", "ZZUPLOAD", "ZZUNDATED"}) || !slices.Equal(gotVendors, []string{"ZZFRESHV"}) {
@@ -346,7 +346,7 @@ func TestDropStaleStoresStopsServingOnlyOldData(t *testing.T) {
 		t.Errorf("dropped retail = %v, want ZZOLD", got)
 	}
 
-	err = updateSellers(inventoryOf("ZZOLD", 1, now))
+	err = testSite.updateSellers(inventoryOf("ZZOLD", 1, now))
 	if err != nil {
 		t.Fatalf("a fresh load was refused: %s", err)
 	}
@@ -360,8 +360,8 @@ func TestDropStaleStoresStopsServingOnlyOldData(t *testing.T) {
 func TestCheckStalenessAnnouncesADropAndItsReturn(t *testing.T) {
 	notices := withDropState(t, []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}, nil)
 
-	checkStaleness()
-	checkStaleness()
+	testSite.checkStaleness()
+	testSite.checkStaleness()
 	if len(*notices) != 1 || !strings.Contains((*notices)[0], "(ZZOLD) is no longer served, not updated in 8d") {
 		t.Fatalf("after two checks: %q, want one drop notice", *notices)
 	}
@@ -373,8 +373,8 @@ func TestCheckStalenessAnnouncesADropAndItsReturn(t *testing.T) {
 	}
 
 	sellers := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
-	withPrices(t, sellers, GetVendors())
-	checkStaleness()
+	withPrices(t, sellers, currentPrices().vendors)
+	testSite.checkStaleness()
 	if len(*notices) != 2 || !strings.Contains((*notices)[1], "(ZZOLD) is served again") {
 		t.Errorf("after a fresh load: %q, want a served-again notice", *notices)
 	}
@@ -386,19 +386,19 @@ func TestDroppingCKClearsItsSignals(t *testing.T) {
 	signals := map[string]ckView{"uuid-0": {PauseLabel: "paused"}}
 	ckSignalsPtr.Store(&signals)
 
-	dropStaleStores(time.Now())
+	testSite.dropStaleStores(time.Now())
 	if ckSignalsPtr.Load() != nil {
 		t.Error("CK was dropped but its signals are still served")
 	}
 }
 
-// The sweep asks Sessions before taking scrapersMu: a session publish
+// The sweep asks Sessions before taking testSite.scrapersMu: a session publish
 // takes them the other way round, Sessions' lock and then, to install,
-// scrapersMu, so holding both in the opposite order can deadlock.
+// testSite.scrapersMu, so holding both in the opposite order can deadlock.
 func TestDropStaleStoresAsksSessionsBeforeLocking(t *testing.T) {
 	withDropState(t, []mtgban.Seller{inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}, nil)
 	entered, release := make(chan struct{}), make(chan struct{})
-	hooks := sessionHooks()
+	hooks := sessionHooks(testSite)
 	hooks.Install = func(string, mtgban.Scraper) error {
 		close(entered)
 		<-release
@@ -415,14 +415,14 @@ func TestDropStaleStoresAsksSessionsBeforeLocking(t *testing.T) {
 
 	swept := make(chan struct{})
 	go func() {
-		dropStaleStores(time.Now())
+		testSite.dropStaleStores(time.Now())
 		close(swept)
 	}()
 	// Wait for the sweep to block on Sessions, then see what it holds
 	waitForStack(t, "takeStaleStores", "sessionstore.(*Registry).Is(")
-	free := scrapersMu.TryLock()
+	free := testSite.scrapersMu.TryLock()
 	if free {
-		scrapersMu.Unlock()
+		testSite.scrapersMu.Unlock()
 	}
 	close(release)
 	err := <-published
@@ -431,7 +431,7 @@ func TestDropStaleStoresAsksSessionsBeforeLocking(t *testing.T) {
 	}
 	<-swept
 	if !free {
-		t.Error("the sweep held scrapersMu while waiting on Sessions")
+		t.Error("the sweep held testSite.scrapersMu while waiting on Sessions")
 	}
 }
 
@@ -440,15 +440,15 @@ func TestDropStaleStoresAsksSessionsBeforeLocking(t *testing.T) {
 func TestAStoreBackFromADropIsHeldToItsSize(t *testing.T) {
 	old := time.Now().Add(-8 * 24 * time.Hour)
 	withDropState(t, []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 200, old)}, []mtgban.Vendor{buylistOf("ZZFRESHV", 1, time.Now()), buylistOf("ZZOLDV", 200, old)})
-	dropStaleStores(time.Now())
+	testSite.dropStaleStores(time.Now())
 
-	if updateSellers(inventoryOf("ZZOLD", 10, time.Now())) == nil {
+	if testSite.updateSellers(inventoryOf("ZZOLD", 10, time.Now())) == nil {
 		t.Error("a store dropped with 200 entries came back with 10")
 	}
-	if updateVendors(buylistOf("ZZOLDV", 10, time.Now())) == nil {
+	if testSite.updateVendors(buylistOf("ZZOLDV", 10, time.Now())) == nil {
 		t.Error("a buylist dropped with 200 entries came back with 10")
 	}
-	err := updateSellers(inventoryOf("ZZOLD", 150, time.Now()))
+	err := testSite.updateSellers(inventoryOf("ZZOLD", 150, time.Now()))
 	if err != nil {
 		t.Errorf("a store dropped with 200 entries was refused back with 150: %s", err)
 	}
@@ -458,15 +458,15 @@ func TestAStoreBackFromADropIsHeldToItsSize(t *testing.T) {
 // return, as served again, not also as fresh again.
 func TestAReturnAfterADropIsAnnouncedOnce(t *testing.T) {
 	notices := withDropState(t, []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-3*24*time.Hour))}, nil)
-	checkStaleness()
+	testSite.checkStaleness()
 
 	sellers := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}
-	withPrices(t, sellers, GetVendors())
-	checkStaleness()
+	withPrices(t, sellers, currentPrices().vendors)
+	testSite.checkStaleness()
 
 	back := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
-	withPrices(t, back, GetVendors())
-	checkStaleness()
+	withPrices(t, back, currentPrices().vendors)
+	testSite.checkStaleness()
 
 	// One check's lines go out as one message
 	if len(*notices) != 3 || !strings.Contains((*notices)[2], "(ZZOLD) is served again") || strings.Contains((*notices)[2], "fresh again") {
@@ -496,20 +496,20 @@ func waitForStack(t *testing.T, frames ...string) {
 // the store is back by the next check, that row still says it is fresh.
 func TestARefusedDropLineKeepsTheStaleRow(t *testing.T) {
 	notices := withDropState(t, []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-3*24*time.Hour))}, nil)
-	checkStaleness()
+	testSite.checkStaleness()
 
 	sellers := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 	notifyStale = func(string, string) error { return errors.New("refused") }
-	checkStaleness()
+	testSite.checkStaleness()
 
 	notifyStale = func(kind, message string) error {
 		*notices = append(*notices, message)
 		return nil
 	}
 	back := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
-	withPrices(t, back, GetVendors())
-	checkStaleness()
+	withPrices(t, back, currentPrices().vendors)
+	testSite.checkStaleness()
 
 	if len(*notices) != 2 || !strings.Contains((*notices)[1], "(ZZOLD) is fresh again") {
 		t.Errorf("notices = %q, want stale and then fresh again", *notices)
@@ -530,12 +530,12 @@ func TestDropStaleStoresKeepsTheLastRealStoreBesideASessionStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("publishing the session store: %s", err)
 	}
-	sellers := append([]mtgban.Seller{inventoryOf("AAOLD", 1, now.Add(-8*24*time.Hour)), inventoryOf("AAOLDER", 1, now.Add(-9*24*time.Hour))}, GetSellers()...)
-	withPrices(t, sellers, GetVendors())
-	vendors := append([]mtgban.Vendor{buylistOf("AAOLDV", 1, now.Add(-8*24*time.Hour)), buylistOf("AAOLDERV", 1, now.Add(-9*24*time.Hour))}, GetVendors()...)
-	withPrices(t, GetSellers(), vendors)
+	sellers := append([]mtgban.Seller{inventoryOf("AAOLD", 1, now.Add(-8*24*time.Hour)), inventoryOf("AAOLDER", 1, now.Add(-9*24*time.Hour))}, currentPrices().sellers...)
+	withPrices(t, sellers, currentPrices().vendors)
+	vendors := append([]mtgban.Vendor{buylistOf("AAOLDV", 1, now.Add(-8*24*time.Hour)), buylistOf("AAOLDERV", 1, now.Add(-9*24*time.Hour))}, currentPrices().vendors...)
+	withPrices(t, currentPrices().sellers, vendors)
 
-	dropStaleStores(now)
+	testSite.dropStaleStores(now)
 
 	gotSellers, gotVendors := servedShorthands()
 	if !slices.Equal(gotSellers, []string{"AAOLD", "ZZUPLOAD"}) || !slices.Equal(gotVendors, []string{"AAOLDV", "ZZUPLOADV"}) {
@@ -552,7 +552,7 @@ func TestDropStaleStoresKeepsTheLastDatedStoreBesideAnUndatedOne(t *testing.T) {
 	undatedVendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{"uuid-0": {{BuyPrice: 1}}}, mtgban.ScraperInfo{Shorthand: "ZZUNDATEDV"})
 	withDropState(t, []mtgban.Seller{undatedSeller, inventoryOf("ZZOLD", 1, old)}, []mtgban.Vendor{undatedVendor, buylistOf("ZZOLDV", 1, old)})
 
-	dropStaleStores(now)
+	testSite.dropStaleStores(now)
 
 	gotSellers, gotVendors := servedShorthands()
 	if !slices.Equal(gotSellers, []string{"ZZUNDATED", "ZZOLD"}) || !slices.Equal(gotVendors, []string{"ZZUNDATEDV", "ZZOLDV"}) {
@@ -576,14 +576,14 @@ func TestDropStaleStoresAsksAgainAfterALoadMeanwhile(t *testing.T) {
 			now := time.Now()
 			withDropState(t, []mtgban.Seller{inventoryOf("ZZOLD", 1, now.Add(-8*24*time.Hour))}, nil)
 			entered, release := make(chan struct{}), make(chan struct{})
-			hooks := sessionHooks()
+			hooks := sessionHooks(testSite)
 			hooks.Install = func(kind string, scraper mtgban.Scraper) error {
 				close(entered)
 				<-release
 				if tc.real {
 					return nil
 				}
-				return installSessionScraper(kind, scraper)
+				return testSite.installSessionScraper(kind, scraper)
 			}
 			Sessions = sessionstore.New(hooks)
 
@@ -596,15 +596,15 @@ func TestDropStaleStoresAsksAgainAfterALoadMeanwhile(t *testing.T) {
 
 			swept := make(chan struct{})
 			go func() {
-				dropStaleStores(now)
+				testSite.dropStaleStores(now)
 				close(swept)
 			}()
 			waitForStack(t, "takeStaleStores", "sessionstore.(*Registry).Is(")
 			if tc.real {
-				scrapersMu.Lock()
-				sellers := append(GetSellers(), inventoryOf("ZZFRESH", 1, now))
-				withPrices(t, sellers, GetVendors())
-				scrapersMu.Unlock()
+				testSite.scrapersMu.Lock()
+				sellers := append(currentPrices().sellers, inventoryOf("ZZFRESH", 1, now))
+				withPrices(t, sellers, currentPrices().vendors)
+				testSite.scrapersMu.Unlock()
 			}
 			close(release)
 			err := <-published
@@ -629,8 +629,8 @@ func TestDropStaleStoresKeepsTheLastStoreOnASide(t *testing.T) {
 		[]mtgban.Seller{inventoryOf("ZZOLDER", 1, now.Add(-9*24*time.Hour)), inventoryOf("ZZOLD", 1, now.Add(-8*24*time.Hour))},
 		[]mtgban.Vendor{buylistOf("ZZOLDV", 1, now.Add(-8*24*time.Hour))})
 
-	checkStaleness()
-	checkStaleness()
+	testSite.checkStaleness()
+	testSite.checkStaleness()
 
 	gotSellers, gotVendors := servedShorthands()
 	if !slices.Equal(gotSellers, []string{"ZZOLD"}) || !slices.Equal(gotVendors, []string{"ZZOLDV"}) {
@@ -647,9 +647,9 @@ func TestDropStaleStoresKeepsTheLastStoreOnASide(t *testing.T) {
 	}
 
 	// A fresh store back on the side lets the kept one go
-	sellers := append(GetSellers(), inventoryOf("ZZFRESH", 1, now))
-	withPrices(t, sellers, GetVendors())
-	dropStaleStores(now)
+	sellers := append(currentPrices().sellers, inventoryOf("ZZFRESH", 1, now))
+	withPrices(t, sellers, currentPrices().vendors)
+	testSite.dropStaleStores(now)
 	gotSellers, _ = servedShorthands()
 	if !slices.Equal(gotSellers, []string{"ZZFRESH"}) {
 		t.Errorf("served sellers %v, want ZZFRESH alone", gotSellers)
@@ -666,14 +666,14 @@ func TestADroppedStoresOldDumpStaysOutOnReload(t *testing.T) {
 		[]mtgban.Seller{inventoryOf("ZZFRESH", 1, now), inventoryOf("ZZOLD", 1, old)},
 		[]mtgban.Vendor{buylistOf("ZZFRESHV", 1, now), buylistOf("ZZOLDV", 1, old)})
 	// Dropped two days from now, its dump is not yet past DropAfter today
-	dropStaleStores(now.Add(2 * 24 * time.Hour))
+	testSite.dropStaleStores(now.Add(2 * 24 * time.Hour))
 
 	for _, err := range []error{
-		updateSellers(inventoryOf("ZZOLD", 1, old)),
-		updateVendors(buylistOf("ZZOLDV", 1, old)),
-		updateSellers(inventoryOf("ZZOLD", 1, now.Add(-8*24*time.Hour))),
-		updateSellers(mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"uuid-0": {{Price: 1}}}, mtgban.ScraperInfo{Shorthand: "ZZOLD"})),
-		updateVendors(mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{"uuid-0": {{BuyPrice: 1}}}, mtgban.ScraperInfo{Shorthand: "ZZOLDV"})),
+		testSite.updateSellers(inventoryOf("ZZOLD", 1, old)),
+		testSite.updateVendors(buylistOf("ZZOLDV", 1, old)),
+		testSite.updateSellers(inventoryOf("ZZOLD", 1, now.Add(-8*24*time.Hour))),
+		testSite.updateSellers(mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"uuid-0": {{Price: 1}}}, mtgban.ScraperInfo{Shorthand: "ZZOLD"})),
+		testSite.updateVendors(mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{"uuid-0": {{BuyPrice: 1}}}, mtgban.ScraperInfo{Shorthand: "ZZOLDV"})),
 	} {
 		if !errors.Is(err, errDroppedDump) {
 			t.Errorf("an old dump was answered %v, want errDroppedDump", err)
@@ -684,7 +684,7 @@ func TestADroppedStoresOldDumpStaysOutOnReload(t *testing.T) {
 		t.Errorf("served sellers %v, vendors %v; want the old dumps left out", gotSellers, gotVendors)
 	}
 
-	err := updateSellers(inventoryOf("ZZOLD", 1, old.Add(time.Hour)))
+	err := testSite.updateSellers(inventoryOf("ZZOLD", 1, old.Add(time.Hour)))
 	if err != nil {
 		t.Fatalf("a newer dump was refused: %s", err)
 	}

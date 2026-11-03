@@ -16,7 +16,7 @@ func TestFailedExportIsNotADownload(t *testing.T) {
 	skipWithoutDatastore(t)
 	withSigMode(t, true, false)
 	// Every TCGplayer export fails without a TCGplayer seller.
-	_, err := findSellerInventory("TCGPlayer")
+	_, err := currentPrices().sellerInventory("TCGPlayer")
 	if err == nil {
 		t.Skip("a TCGplayer seller is loaded")
 	}

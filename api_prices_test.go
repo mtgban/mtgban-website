@@ -12,8 +12,8 @@ import (
 func TestBatchPricesReadsTheIdsFromThePath(t *testing.T) {
 	skipWithoutDatastore(t)
 	uuids := somePlainCardUUIDs(t, 2)
-	registerTestSeller(t, "ZZPRICES", uuids)
-	registerTestVendor(t, "ZZPRICES", uuids)
+	registerTestSeller(t, testSite, "ZZPRICES", uuids)
+	registerTestVendor(t, testSite, "ZZPRICES", uuids)
 
 	rec := httptest.NewRecorder()
 	testSite.BatchPricesAPI(rec, httptest.NewRequest(http.MethodGet, "/data/prices/"+strings.Join(uuids, ","), nil))

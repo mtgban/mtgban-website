@@ -88,7 +88,7 @@ func TestAdminLinksDoNotRemoveStoresOrMintKeys(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("a removestore link answered %d, want the page", rec.Code)
 	}
-	_, err = findSellerInventory("ZZS")
+	_, err = currentPrices().sellerInventory("ZZS")
 	if err != nil {
 		t.Error("a removestore link removed ZZS")
 	}

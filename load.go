@@ -11,8 +11,6 @@ import (
 	"path"
 	"slices"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
@@ -57,8 +55,8 @@ var DataBucket simplecloud.Reader
 // listed, and the Sleepers tiers' hits and the arbitrage comparisons
 // found so far. A writer builds the next one whole and publishes it in a
 // single Store, so a reader sees sides and indexes from the same publish.
-// Nothing in a published value is changed in place: the slices
-// GetSellers and GetVendors return are shared and read-only.
+// Nothing in a published value is changed in place: its slices and
+// maps are shared and read-only.
 type prices struct {
 	sellers  []mtgban.Seller
 	vendors  []mtgban.Vendor
@@ -74,28 +72,9 @@ type prices struct {
 	arbit *arbitCache
 }
 
-var (
-	// pricesPtr holds the published snapshot, nil until the first publish.
-	pricesPtr atomic.Pointer[prices]
-
-	// emptyPrices is served until then, so currentPrices is never nil
-	// whatever reads first.
-	emptyPrices = newPrices(nil, nil, nil, *newScraperIndex())
-
-	// Serializes writers so concurrent publishes don't lose each other's
-	// changes during the read-build-publish cycle.
-	scrapersMu sync.Mutex
-)
-
-// currentPrices returns the published snapshot, or the empty one before the
-// first publish. Never nil.
-func currentPrices() *prices {
-	p := pricesPtr.Load()
-	if p == nil {
-		return emptyPrices
-	}
-	return p
-}
+// emptyPrices is what a site serves before its first publish, so a reader
+// is never handed nil whatever reads first.
+var emptyPrices = newPrices(nil, nil, nil, *newScraperIndex())
 
 // newPrices builds the snapshot to publish from its parts, indexing the
 // stores by shorthand. The Cardmarket id map and the TCGplayer SKU index
@@ -153,18 +132,6 @@ func withVendors(p *prices, vendors []mtgban.Vendor) *prices {
 	next.sleepers = sleeperTiersFor(p, next)
 	next.arbit = arbitHeldFor(p, next)
 	return next
-}
-
-// GetSellers returns the current sellers snapshot. The returned slice is
-// shared and MUST NOT be modified by callers.
-func GetSellers() []mtgban.Seller {
-	return currentPrices().sellers
-}
-
-// GetVendors returns the current vendors snapshot. The returned slice is
-// shared and MUST NOT be modified by callers.
-func GetVendors() []mtgban.Vendor {
-	return currentPrices().vendors
 }
 
 // filterSellers is the shorthand of every loaded seller predicate keeps.
@@ -401,48 +368,30 @@ func buildScraperIndex(byStore map[string]map[string][]string) *scraperIndex {
 	return idx
 }
 
-// currentScraperIndex returns the published snapshot's scraperIndex, empty
-// before the first listing. Never nil.
-func currentScraperIndex() *scraperIndex {
-	return &currentPrices().scrapers
-}
-
 // publishScrapers publishes the snapshot with scrapers in place of the
 // listing it holds. Only loadScrapersNG (full replace) and
 // updateScraperIndexStore (single-store replace) call it, holding
 // scrapersMu.
-func publishScrapers(scrapers scraperIndex) {
-	next := *currentPrices()
+func (s *site) publishScrapers(scrapers scraperIndex) {
+	next := *s.prices()
 	next.scrapers = scrapers
-	pricesPtr.Store(&next)
-}
-
-// scraperStoreConfig returns the current store -> kind -> shorthands map.
-// Callers must not mutate it.
-func scraperStoreConfig() map[string]map[string][]string {
-	return currentScraperIndex().byStore
-}
-
-// scraperStoreOf is the published snapshot's storeOf, for a caller not
-// handed one: the dashboard's per-row "Id" column.
-func scraperStoreOf(shorthand string) (string, bool) {
-	return currentPrices().storeOf(shorthand)
+	s.pricesPtr.Store(&next)
 }
 
 // updateScraperIndexStore replaces store's entry in the published index
 // with kinds. It copies the current maps rather than rebuilding them, so
 // the store takes the shorthands it publishes and every other entry keeps
 // its owner. Serialized on scrapersMu.
-func updateScraperIndexStore(store string, kinds map[string][]string) {
-	scrapersMu.Lock()
-	defer scrapersMu.Unlock()
+func (s *site) updateScraperIndexStore(store string, kinds map[string][]string) {
+	s.scrapersMu.Lock()
+	defer s.scrapersMu.Unlock()
 
-	current := currentScraperIndex()
+	current := &s.prices().scrapers
 	next := newScraperIndex()
 	maps.Copy(next.byStore, current.byStore)
 	maps.Copy(next.byShorthand, current.byShorthand)
 	next.replaceStore(store, kinds)
-	publishScrapers(*next)
+	s.publishScrapers(*next)
 }
 
 // parseDumpKey parses a bucket key of the form
@@ -576,7 +525,7 @@ func (s *site) startScraperLoad(dumpsDir string, stores []string, datastoreLoade
 	DataBucket = bucket
 	go func() {
 		log.Println("Loading scrapers")
-		err := loadScrapersNG(bucket, stores)
+		err := s.loadScrapersNG(bucket, stores)
 		if err != nil {
 			log.Fatalln("error loading scrapers:", err)
 		}
@@ -606,7 +555,7 @@ func (s *site) startScraperLoad(dumpsDir string, stores []string, datastoreLoade
 
 // loadScrapersNG lists the dumps in bucket, publishes the index and loads
 // every dump. A non-empty stores narrows both to those stores.
-func loadScrapersNG(bucket simplecloud.Reader, stores []string) error {
+func (s *site) loadScrapersNG(bucket simplecloud.Reader, stores []string) error {
 	idx, err := listDumpsWithRetry(bucket, Config().Game, string(Config().Game)+"/")
 	if err != nil {
 		return fmt.Errorf("listing dumps: %w", err)
@@ -617,9 +566,9 @@ func loadScrapersNG(bucket simplecloud.Reader, stores []string) error {
 
 	// Publish before loading, so no reader sees every store as unknown
 	// during the load, and a concurrent /api/load isn't overwritten.
-	scrapersMu.Lock()
-	publishScrapers(*idx)
-	scrapersMu.Unlock()
+	s.scrapersMu.Lock()
+	s.publishScrapers(*idx)
+	s.scrapersMu.Unlock()
 
 	type scraperLoad struct {
 		name      string
@@ -651,7 +600,7 @@ func loadScrapersNG(bucket simplecloud.Reader, stores []string) error {
 	// the summary reports it and loadScraperWithRetry has already logged it.
 	mtgban.WorkerPool(context.Background(), scraperLoadConcurrency, loads,
 		func(ctx context.Context, load scraperLoad, results chan<- loadResult) error {
-			err := loadScraperWithRetry(bucket, Config().Game, load.name, load.kind, load.shorthand)
+			err := s.loadScraperWithRetry(bucket, Config().Game, load.name, load.kind, load.shorthand)
 			results <- loadResult{
 				entry: fmt.Sprintf("%s/%s/%s", load.name, load.kind, load.shorthand),
 				err:   err,
@@ -670,7 +619,7 @@ func loadScrapersNG(bucket simplecloud.Reader, stores []string) error {
 
 	// A dump already past DropAfter is not served even for the hour until
 	// the staleness job would drop it.
-	dropStaleStores(time.Now())
+	s.dropStaleStores(time.Now())
 
 	// No @here: at startup nothing has loaded yet, so an absent scraper is
 	// the ordinary state rather than news. Breakage worth waking someone for
@@ -706,7 +655,7 @@ func isTimeout(err error) bool {
 	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
-func loadScraperWithRetry(bucket simplecloud.Reader, game matcher.Game, name, kind, shorthand string) error {
+func (s *site) loadScraperWithRetry(bucket simplecloud.Reader, game matcher.Game, name, kind, shorthand string) error {
 	var lastErr error
 	for attempt := range scraperLoadRetries {
 		if attempt > 0 {
@@ -716,7 +665,7 @@ func loadScraperWithRetry(bucket simplecloud.Reader, game matcher.Game, name, ki
 			time.Sleep(delay)
 		}
 
-		lastErr = loadScraper(bucket, game, name, kind, shorthand)
+		lastErr = s.loadScraper(bucket, game, name, kind, shorthand)
 		if lastErr == nil {
 			return nil
 		}
@@ -729,7 +678,7 @@ func loadScraperWithRetry(bucket simplecloud.Reader, game matcher.Game, name, ki
 	return lastErr
 }
 
-func loadScraper(bucket simplecloud.Reader, game matcher.Game, name, kind, shorthand string) error {
+func (s *site) loadScraper(bucket simplecloud.Reader, game matcher.Game, name, kind, shorthand string) error {
 	key := path.Join(string(game), name, kind, shorthand) + "." + dumpFormat
 
 	log.Println("loading", key)
@@ -758,7 +707,7 @@ func loadScraper(bucket simplecloud.Reader, game matcher.Game, name, kind, short
 			reader.Close()
 			return err
 		}
-		installErr = updateSellers(scraper)
+		installErr = s.updateSellers(scraper)
 	case "buylist":
 		scraper, err := mtgban.ReadVendorFromJSON(reader)
 		if err != nil {
@@ -766,14 +715,14 @@ func loadScraper(bucket simplecloud.Reader, game matcher.Game, name, kind, short
 			reader.Close()
 			return err
 		}
-		installErr = updateVendors(scraper)
+		installErr = s.updateVendors(scraper)
 	}
 
 	cancel()
 	reader.Close()
 	// CK's buylist signals are computed from its buylist and stock.
 	if installErr == nil && strings.EqualFold(shorthand, "CK") {
-		rebuildCKSignals(currentPrices())
+		rebuildCKSignals(s.prices())
 	}
 	return installErr
 }
@@ -785,13 +734,13 @@ var errDroppedDump = errors.New("dump is undated, past DropAfter or no newer tha
 // updateSellers installs the seller over its registered slot, answering with
 // the refusal where buildNextSellers turns the swap down. It posts nothing:
 // the caller reports the answer, once, to whoever asked for the load.
-func updateSellers(scraper mtgban.Scraper) error {
+func (s *site) updateSellers(scraper mtgban.Scraper) error {
 	seller := applyInventoryOverrides(scraper.(mtgban.Seller))
 
-	scrapersMu.Lock()
-	defer scrapersMu.Unlock()
+	s.scrapersMu.Lock()
+	defer s.scrapersMu.Unlock()
 
-	p := currentPrices()
+	p := s.prices()
 	current := p.sellers
 
 	sellerIndex := -1
@@ -812,7 +761,7 @@ func updateSellers(scraper mtgban.Scraper) error {
 	if err != nil {
 		return err
 	}
-	pricesPtr.Store(newPrices(p, next, p.vendors, p.scrapers))
+	s.pricesPtr.Store(newPrices(p, next, p.vendors, p.scrapers))
 
 	log.Printf("%s inventory updated at position %d", scraper.Info().Shorthand, sellerIndex)
 	return nil
@@ -872,13 +821,13 @@ func buildNextSellers(current []mtgban.Seller, seller mtgban.Seller, i int) ([]m
 }
 
 // updateVendors is updateSellers for the buylist side.
-func updateVendors(scraper mtgban.Scraper) error {
+func (s *site) updateVendors(scraper mtgban.Scraper) error {
 	vendor := applyBuylistOverrides(scraper.(mtgban.Vendor))
 
-	scrapersMu.Lock()
-	defer scrapersMu.Unlock()
+	s.scrapersMu.Lock()
+	defer s.scrapersMu.Unlock()
 
-	p := currentPrices()
+	p := s.prices()
 	current := p.vendors
 
 	vendorIndex := -1
@@ -898,7 +847,7 @@ func updateVendors(scraper mtgban.Scraper) error {
 	if err != nil {
 		return err
 	}
-	pricesPtr.Store(withVendors(p, next))
+	s.pricesPtr.Store(withVendors(p, next))
 
 	log.Printf("%s buylist updated at position %d", scraper.Info().Shorthand, vendorIndex)
 	return nil

@@ -66,7 +66,7 @@ func fixtureSite(tb testing.TB, b *matcher.Backend, sellers []mtgban.Seller, ven
 	tb.Helper()
 	s := newSite()
 	s.ds.Store(s.newDatastore(b, time.Now()))
-	withPrices(tb, sellers, vendors)
+	sitePrices(tb, s, sellers, vendors)
 	return s
 }
 

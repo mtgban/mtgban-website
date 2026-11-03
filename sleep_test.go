@@ -16,7 +16,7 @@ func TestSleepersLayoutSkipsPlaytest(t *testing.T) {
 	skipWithoutDatastore(t)
 	playtest := backend().GetUUIDsInSet("CMB1")[0]
 	plain := somePlainCardUUIDs(t, 2)
-	registerTestSeller(t, "TCGLow", append(plain, playtest))
+	registerTestSeller(t, testSite, "TCGLow", append(plain, playtest))
 
 	sleepers, err := sleepersLayout(backend(), currentPrices(), map[string]int{playtest: 100, plain[0]: 50, plain[1]: 2})
 	if err != nil {
@@ -108,7 +108,7 @@ func TestSleeperTiersFollowPublishes(t *testing.T) {
 // has filled whatever it keeps. It needs stores loaded, which TestMain does
 // from a B2 key pair in the environment.
 func BenchmarkSleepersMismatch(b *testing.B) {
-	if len(GetSellers()) == 0 {
+	if len(currentPrices().sellers) == 0 {
 		b.Skip("no stores loaded; B2_KEY_ID and B2_APP_KEY load them")
 	}
 	readyToRender(b)

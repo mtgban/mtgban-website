@@ -155,7 +155,7 @@ func (s *site) scheduleCrons() *cron.Cron {
 	// Alarm on a store whose retail or buylist data has gone stale (see
 	// staleness.go); notifies only on the transition, so this can run
 	// often without repeating itself.
-	addJob("0 * * * *", jobStaleness, checkStaleness)
+	addJob("0 * * * *", jobStaleness, s.checkStaleness)
 	// And on a background job turning bad, the same way.
 	c.AddFunc("0 * * * *", recovered("cron checkJobHealth", checkJobHealth))
 

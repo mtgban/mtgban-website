@@ -41,7 +41,7 @@ func TestSearchLinksOnlyTheMarketplacesItCarries(t *testing.T) {
 			sellers = append(sellers, mtgban.NewSellerFromInventory(mtgban.InventoryRecord{},
 				mtgban.ScraperInfo{Name: family, Shorthand: family, Family: family, MetadataOnly: true}))
 		}
-		withPrices(t, sellers, GetVendors())
+		withPrices(t, sellers, currentPrices().vendors)
 
 		rec := httptest.NewRecorder()
 		testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(uuid), nil))

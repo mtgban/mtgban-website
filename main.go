@@ -26,6 +26,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/internal/infrastructure"
 	"github.com/mtgban/mtgban-website/internal/palette"
+	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -702,6 +703,7 @@ func main() {
 	loadRarityBadges()
 
 	s := newSite()
+	Sessions = sessionstore.New(sessionHooks(s))
 	s.alertsSend = *alertsSend
 
 	if maintenance.backfill || maintenance.daily || maintenance.products {

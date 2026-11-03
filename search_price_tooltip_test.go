@@ -60,7 +60,7 @@ func TestDirectPriceWarnsOnlyOverTwiceTheMarket(t *testing.T) {
 func TestRetailPriceCarriesOneTooltip(t *testing.T) {
 	// No TCGMarket price, so every Direct price of a dollar or more looks off.
 	var none []mtgban.Seller
-	withPrices(t, none, GetVendors())
+	withPrices(t, none, currentPrices().vendors)
 
 	const id = "card"
 	out := renderPage(t, "search.html", false, PageVars{
@@ -116,7 +116,7 @@ func TestDirectPriceWarning(t *testing.T) {
 // turns any other offer green.
 func TestBuylistPriceThatLooksOffIsNotBest(t *testing.T) {
 	var none []mtgban.Seller
-	withPrices(t, none, GetVendors())
+	withPrices(t, none, currentPrices().vendors)
 
 	const id = "card"
 	pv := PageVars{
@@ -154,7 +154,7 @@ func TestBuylistPriceThatLooksOffIsNotBest(t *testing.T) {
 // An adjusted retail price keeps one tooltip, now two lines, and is marked.
 func TestAdjustedRetailPriceTooltip(t *testing.T) {
 	var none []mtgban.Seller
-	withPrices(t, none, GetVendors())
+	withPrices(t, none, currentPrices().vendors)
 
 	const id = "card"
 	out := renderPage(t, "search.html", false, PageVars{
@@ -213,7 +213,7 @@ Store price $ 10.00, your 20% discount applied"`) {
 // the quoted number in the details.
 func TestAdjustedPricesOnMobile(t *testing.T) {
 	var none []mtgban.Seller
-	withPrices(t, none, GetVendors())
+	withPrices(t, none, currentPrices().vendors)
 
 	const id = "card"
 	out := renderPage(t, "search.html", true, PageVars{

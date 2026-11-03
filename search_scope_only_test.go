@@ -45,7 +45,7 @@ func searchWithStock(t *testing.T, stocked string, target string, cookies ...*ht
 	stock.Add(stocked, &mtgban.InventoryEntry{Conditions: "NM", Price: 1.5, Quantity: 1})
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(stock,
 		mtgban.ScraperInfo{Name: "CK", Shorthand: "CK"})}
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	for _, cookie := range cookies {

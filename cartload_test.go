@@ -674,7 +674,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 	sealed := func(short string, entry mtgban.InventoryEntry) mtgban.Seller {
 		return mtgban.NewSellerFromInventory(stock(entry), mtgban.ScraperInfo{Shorthand: short, SealedMode: true})
 	}
-	sellers := append(GetSellers(),
+	sellers := append(currentPrices().sellers,
 		sealed("IndexSealed", mtgban.InventoryEntry{Price: 100}),
 		sealed("TCGSealed", mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100, OriginalID: "500001", InstanceID: "600001"}),
 		sealed("CSISealed", mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100, OriginalID: "434191", InstanceID: "10753985"}),
@@ -683,7 +683,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		sealed("HASealed", mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100, OriginalID: "88001", InstanceID: "88002"}),
 		sealed("ABUSealed", mtgban.InventoryEntry{Price: 100, OriginalID: "abu-1"}),
 	)
-	withPrices(t, sellers, GetVendors())
+	withPrices(t, sellers, currentPrices().vendors)
 	sealedRows := []mtgban.ArbitEntry{{
 		CardID:         "box-a",
 		InventoryEntry: mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100},
