@@ -288,6 +288,7 @@ func TestPoolKeepsDecklistCopies(t *testing.T) {
 // did, for every product that has a decklist. A product that differs is a
 // data quirk to report, not a reason to loosen this.
 func TestContentsSeedMatchesFullWalk(t *testing.T) {
+	t.Parallel()
 	skipWithoutDatastore(t)
 	b := backend()
 
