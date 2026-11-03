@@ -288,14 +288,14 @@ func newRekeyCandidate(ds *datastore, key, value string, sealed bool) (rekeyCand
 // nonsenseValue parses into under the same key. A key that takes no
 // nonsense, as s: drops a set that is not one, reads its value.
 func newRekeyPart(ds *datastore, elem FilterElem, key string, sealed bool) *rekeyPart {
-	p := &rekeyPart{filter: []FilterElem{elem}}
+	part := &rekeyPart{filter: []FilterElem{elem}}
 	nonsense, ok := cardFilterOf(ds, key+nonsenseValue, sealed)
 	if ok {
-		p.nonsense = []FilterElem{nonsense}
+		part.nonsense = []FilterElem{nonsense}
 	} else {
-		p.readsValue = true
+		part.readsValue = true
 	}
-	return p
+	return part
 }
 
 // rekeyPart is one value a key is tried with, and what it did to the
