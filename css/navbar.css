@@ -323,11 +323,14 @@ body.light-theme .navbar-v2[data-tier="modern"] {
     background: transparent;
     color: var(--text-dim);
 }
-/* Inside the navbar the 7px padding would blow the hit/hover box up to
-   50×50, and the accent hover colour would set the gear apart from the
-   other utility icons; both go, so the gear matches the Guide ? icon. */
-.nav2-utility .ban-settings-btn { padding: 0; }
-.nav2-utility .ban-settings-btn:hover { color: var(--normal); }
+/* Inside the navbar, and docked in the Tools menu, the 7px padding would
+   blow the hit/hover box up to 50×50, and the accent hover colour would
+   set the gear apart from the other utility icons; both go, so the gear
+   matches the Guide ? icon. */
+.nav2-utility .ban-settings-btn,
+.tools-quick-dock .ban-settings-btn { padding: 0; }
+.nav2-utility .ban-settings-btn:hover,
+.tools-quick-dock .ban-settings-btn:hover { color: var(--normal); }
 
 /* ── Tools dropdown (mega menu) ───────────────────────────── */
 .nav2-tools-wrap {
@@ -342,8 +345,6 @@ body.light-theme .navbar-v2[data-tier="modern"] {
     top: calc(100% + 10px);
     right: 0;
     width: min(620px, 92vw);
-    max-height: 80vh;
-    overflow-y: auto;
     background: var(--surface-1);
     color: var(--normal);
     border: 1px solid var(--border-moderate);
@@ -390,14 +391,6 @@ body.light-theme .navbar-v2[data-tier="modern"] {
 }
 .light-theme .tools-quick { background: #eef0f3; }
 .dark-theme .tools-quick { background: #15181d; }
-.tools-quick-label {
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--greytext);
-    font-weight: 600;
-    margin-right: 6px;
-}
 .tools-quick-btn {
     display: inline-flex;
     align-items: center;
@@ -432,6 +425,41 @@ body.light-theme .navbar-v2[data-tier="modern"] {
     justify-content: center;
 }
 .tools-quick-spacer { flex: 1; }
+/* The bar's icons the reader dragged down here, squared off like the
+   theme toggle beside them; their titles name them. */
+.tools-quick-dock { display: contents; }
+.tools-quick-dock .nav2-backpack-wrap { display: flex; }
+.tools-quick-dock .nav2-icon-btn {
+    box-sizing: border-box;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    color: var(--activetext);
+}
+.tools-quick-dock .nav2-icon-btn:hover {
+    background: var(--surface-3);
+    border-color: var(--accent-border, rgba(91,141,239,0.3));
+    color: var(--normal);
+}
+[data-util].dragging { opacity: 0.4; }
+/* Where a dragged icon lands: the strip while it is on the bar, the bar
+   while it is in the strip. The bar's slot is drawn from the drag's start,
+   since with every icon docked there is nothing there to aim at. */
+.nav2-utility.undock-ready {
+    min-width: 36px;
+    min-height: 36px;
+    outline: 2px dashed var(--ainfo, #5b8def);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm, 6px);
+    opacity: 0.7;
+}
+.tools-quick.dock-target,
+.nav2-utility.undock-ready.dock-target {
+    outline: 2px dashed var(--ainfo, #5b8def);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm, 6px);
+    background: var(--accent-muted, rgba(91,141,239,0.12));
+    opacity: 1;
+}
 .tools-tile {
     display: flex;
     align-items: flex-start;

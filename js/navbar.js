@@ -106,6 +106,14 @@
 
     var dragged = null;
     var didDrag = false;
+    var utility = document.querySelector('.nav2-utility');
+    var dock = document.getElementById('tools-quick-dock');
+    var quick = dock && dock.closest('.tools-quick');
+    var draggedUtil = null;
+    // At 900px and narrower the sections are hidden, the Tools button and
+    // the strip with them, so the dock only holds while the bar is wide.
+    var narrow = window.matchMedia ? window.matchMedia('(max-width: 900px)') : null;
+    function isNarrow() { return !!(narrow && narrow.matches); }
 
     var STORAGE_KEY = 'mtgban_nav_layout_v1';
     function currentLayout() {
@@ -113,15 +121,28 @@
             sections: Array.from(navSections.querySelectorAll('.nav2-section-btn:not(.is-tools)'))
                 .map(function(b) { return b.getAttribute('data-tool'); }),
             grid: Array.from(grid.querySelectorAll('.tools-tile'))
-                .map(function(t) { return t.getAttribute('data-tool'); })
+                .map(function(t) { return t.getAttribute('data-tool'); }),
+            // Narrow, the icons are all on the bar whatever was saved: keep that.
+            dock: isNarrow() ? savedDock() : Array.from(dock ? dock.querySelectorAll('[data-util]') : [])
+                .map(function(u) { return u.getAttribute('data-util'); })
         };
+    }
+    // savedDock reads the saved dock list, less any entry that is not a
+    // name of the bar's shape: the names go into selectors, as in the
+    // restore script, and a saved list is written back from here.
+    function savedDock() {
+        try {
+            var saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+            if (!saved || !Array.isArray(saved.dock)) return [];
+            return saved.dock.filter(function(name) { return typeof name === 'string' && /^[a-z]+$/.test(name); });
+        } catch (e) { return []; }
     }
     function saveLayout() {
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(currentLayout())); } catch (e) {}
     }
     function clearIndicators() {
-        document.querySelectorAll('.drop-before, .drop-after, .swap-target, .promote-target, .cap-reached, .demote-target').forEach(function(t) {
-            t.classList.remove('drop-before', 'drop-after', 'swap-target', 'promote-target', 'cap-reached', 'demote-target');
+        document.querySelectorAll('.drop-before, .drop-after, .swap-target, .promote-target, .cap-reached, .demote-target, .dock-target').forEach(function(t) {
+            t.classList.remove('drop-before', 'drop-after', 'swap-target', 'promote-target', 'cap-reached', 'demote-target', 'dock-target');
         });
     }
 
@@ -274,7 +295,7 @@
     var toolsBtn = document.getElementById('tools-btn');
     if (toolsBtn) {
         toolsBtn.addEventListener('dragover', function(e) {
-            if (!dragged || !isNavBtn(dragged)) return;
+            if (!(dragged && isNavBtn(dragged)) && !draggedUtil) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             clearIndicators();
@@ -284,12 +305,119 @@
             if (e.target === toolsBtn) toolsBtn.classList.remove('swap-target');
         });
         toolsBtn.addEventListener('drop', function(e) {
+            if (draggedUtil) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (draggedUtil.parentNode === dock) undockUtil(draggedUtil); else dockUtil(draggedUtil);
+                return;
+            }
             if (!dragged || !isNavBtn(dragged)) return;
             e.preventDefault();
             e.stopPropagation();
             demote(dragged);
             clearIndicators();
             saveLayout();
+        });
+    }
+
+    // ── The bar's icons: drag them down to the Tools menu's strip and back ──
+    // The elements themselves move, so their ids and handlers come along;
+    // the inline restore script in the navbar partial moves them the same
+    // way before paint. Back on the bar they take the order the server
+    // rendered them in. The Tools button takes a drop either way. While
+    // the bar is narrow every icon sits on it and the saved list waits.
+    var UTIL_ORDER = ['backpack', 'account', 'guide', 'settings'];
+
+    function dockUtil(el) {
+        dock.appendChild(el);
+        clearIndicators();
+        saveLayout();
+    }
+    function placeUtil(el) {
+        var at = UTIL_ORDER.indexOf(el.getAttribute('data-util'));
+        var next = null;
+        Array.from(utility.querySelectorAll('[data-util]')).some(function(u) {
+            if (UTIL_ORDER.indexOf(u.getAttribute('data-util')) > at) { next = u; return true; }
+            return false;
+        });
+        utility.insertBefore(el, next || utility.querySelector('.ban-nav-hamburger'));
+    }
+    function undockUtil(el) {
+        placeUtil(el);
+        clearIndicators();
+        saveLayout();
+    }
+    function applyDock(wide) {
+        if (!wide) {
+            Array.from(dock.querySelectorAll('[data-util]')).forEach(placeUtil);
+            return;
+        }
+        savedDock().forEach(function(name) {
+            var el = document.querySelector('.nav2-utility [data-util="' + name + '"]');
+            if (el) dock.appendChild(el);
+        });
+    }
+
+    if (utility && dock && quick) {
+        if (narrow && narrow.addEventListener) narrow.addEventListener('change', function(e) { applyDock(!e.matches); });
+
+        Array.from(document.querySelectorAll('[data-util]')).forEach(function(el) {
+            el.addEventListener('dragstart', function(e) {
+                draggedUtil = el;
+                didDrag = true;
+                el.classList.add('dragging');
+                try {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', el.getAttribute('data-util') || '');
+                } catch (err) {}
+                // Show where it lands: the strip, or a slot on the bar.
+                if (el.parentNode === dock) utility.classList.add('undock-ready');
+                else if (!isNarrow() && toolsBtn && toolsBtn.getAttribute('aria-expanded') !== 'true') toolsBtn.click();
+            });
+            el.addEventListener('dragend', function() {
+                el.classList.remove('dragging');
+                utility.classList.remove('undock-ready');
+                clearIndicators();
+                draggedUtil = null;
+                setTimeout(function() { didDrag = false; }, 60);
+            });
+            el.addEventListener('click', function(e) {
+                if (didDrag) { e.preventDefault(); e.stopPropagation(); }
+            });
+        });
+
+        quick.addEventListener('dragover', function(e) {
+            if (!draggedUtil || draggedUtil.parentNode === dock) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            clearIndicators();
+            quick.classList.add('dock-target');
+        });
+        quick.addEventListener('dragleave', function(e) {
+            if (e.target === quick) quick.classList.remove('dock-target');
+        });
+        quick.addEventListener('drop', function(e) {
+            if (!draggedUtil || draggedUtil.parentNode === dock) return;
+            e.preventDefault();
+            e.stopPropagation();
+            dockUtil(draggedUtil);
+        });
+
+        utility.addEventListener('dragover', function(e) {
+            if (!draggedUtil || draggedUtil.parentNode === utility) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            clearIndicators();
+            utility.classList.add('dock-target');
+        });
+        utility.addEventListener('dragleave', function(e) {
+            if (e.target === utility) utility.classList.remove('dock-target');
+        });
+        utility.addEventListener('drop', function(e) {
+            if (!draggedUtil || draggedUtil.parentNode === utility) return;
+            e.preventDefault();
+            e.stopPropagation();
+            undockUtil(draggedUtil);
         });
     }
 
