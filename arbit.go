@@ -61,6 +61,8 @@ var FilterOptKeys = []string{
 	"rl",
 	"abu4h",
 	"nocollector",
+	"nooversize",
+	"notoken",
 	"decklists",
 	"syp",
 	"stocks",
@@ -123,6 +125,38 @@ var FilterOptConfig = map[string]FilterOpt{
 		Title: "no CE/30A/WCD",
 		Func: func(p *prices, opts *mtgban.ArbitOpts) {
 			opts.Editions = slices.Concat(opts.Editions, customBuylistSkipSets)
+		},
+		NoSealed: true,
+	},
+	"nooversize": {
+		Title: "no Oversize",
+		Func: func(p *prices, opts *mtgban.ArbitOpts) {
+			oldFunc := opts.CustomCardFilter
+			opts.CustomCardFilter = func(co *matcher.CardObject) (float64, bool) {
+				if co.IsOversized {
+					return 0, true
+				}
+				if oldFunc != nil {
+					return oldFunc(co)
+				}
+				return 1, false
+			}
+		},
+		NoSealed: true,
+	},
+	"notoken": {
+		Title: "no Tokens",
+		Func: func(p *prices, opts *mtgban.ArbitOpts) {
+			oldFunc := opts.CustomCardFilter
+			opts.CustomCardFilter = func(co *matcher.CardObject) (float64, bool) {
+				if co.Layout == "token" {
+					return 0, true
+				}
+				if oldFunc != nil {
+					return oldFunc(co)
+				}
+				return 1, false
+			}
 		},
 		NoSealed: true,
 	},
