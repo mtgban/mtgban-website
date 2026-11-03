@@ -392,9 +392,9 @@ func TestDroppingCKClearsItsSignals(t *testing.T) {
 	}
 }
 
-// The sweep asks Sessions before taking scrapersWriteMu: a session publish
+// The sweep asks Sessions before taking scrapersMu: a session publish
 // takes them the other way round, Sessions' lock and then, to install,
-// scrapersWriteMu, so holding both in the opposite order can deadlock.
+// scrapersMu, so holding both in the opposite order can deadlock.
 func TestDropStaleStoresAsksSessionsBeforeLocking(t *testing.T) {
 	withDropState(t, []mtgban.Seller{inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}, nil)
 	entered, release := make(chan struct{}), make(chan struct{})
@@ -420,9 +420,9 @@ func TestDropStaleStoresAsksSessionsBeforeLocking(t *testing.T) {
 	}()
 	// Wait for the sweep to block on Sessions, then see what it holds
 	waitForStack(t, "takeStaleStores", "sessionstore.(*Registry).Is(")
-	free := scrapersWriteMu.TryLock()
+	free := scrapersMu.TryLock()
 	if free {
-		scrapersWriteMu.Unlock()
+		scrapersMu.Unlock()
 	}
 	close(release)
 	err := <-published
@@ -431,7 +431,7 @@ func TestDropStaleStoresAsksSessionsBeforeLocking(t *testing.T) {
 	}
 	<-swept
 	if !free {
-		t.Error("the sweep held scrapersWriteMu while waiting on Sessions")
+		t.Error("the sweep held scrapersMu while waiting on Sessions")
 	}
 }
 
@@ -601,10 +601,10 @@ func TestDropStaleStoresAsksAgainAfterALoadMeanwhile(t *testing.T) {
 			}()
 			waitForStack(t, "takeStaleStores", "sessionstore.(*Registry).Is(")
 			if tc.real {
-				scrapersWriteMu.Lock()
+				scrapersMu.Lock()
 				sellers := append(GetSellers(), inventoryOf("ZZFRESH", 1, now))
 				withPrices(t, sellers, GetVendors())
-				scrapersWriteMu.Unlock()
+				scrapersMu.Unlock()
 			}
 			close(release)
 			err := <-published

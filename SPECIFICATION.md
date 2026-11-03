@@ -186,7 +186,7 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   through `updateSellers()`/`updateVendors()` which validate (timestamp must
   not regress; a new inventory/buylist under half the previous size is
   rejected once the previous one held over 100 entries) and `.Store()` a new
-  value under `scrapersWriteMu`. Zero-downtime reloads.
+  value under `scrapersMu`. Zero-downtime reloads.
 - Same pattern for newspaper page cache (`newspaperPagesPtr`), reprints
   (`reprintsPtr`), checkpoints (`checkpointsStore`, an
   `internal/bucketstore.Store[T]` — also an atomic-pointer swap, not a

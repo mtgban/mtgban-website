@@ -84,7 +84,7 @@ var (
 
 	// Serializes writers so concurrent publishes don't lose each other's
 	// changes during the read-build-publish cycle.
-	scrapersWriteMu sync.Mutex
+	scrapersMu sync.Mutex
 )
 
 // currentPrices returns the published snapshot, or the empty one before the
@@ -395,7 +395,7 @@ func currentScraperIndex() *scraperIndex {
 // publishScrapers publishes the snapshot with scrapers in place of the
 // listing it holds. Only loadScrapersNG (full replace) and
 // updateScraperIndexStore (single-store replace) call it, holding
-// scrapersWriteMu.
+// scrapersMu.
 func publishScrapers(scrapers scraperIndex) {
 	next := *currentPrices()
 	next.scrapers = scrapers
@@ -417,10 +417,10 @@ func scraperStoreOf(shorthand string) (string, bool) {
 // updateScraperIndexStore replaces store's entry in the published index
 // with kinds. It copies the current maps rather than rebuilding them, so
 // the store takes the shorthands it publishes and every other entry keeps
-// its owner. Serialized on scrapersWriteMu.
+// its owner. Serialized on scrapersMu.
 func updateScraperIndexStore(store string, kinds map[string][]string) {
-	scrapersWriteMu.Lock()
-	defer scrapersWriteMu.Unlock()
+	scrapersMu.Lock()
+	defer scrapersMu.Unlock()
 
 	current := currentScraperIndex()
 	next := newScraperIndex()
@@ -602,9 +602,9 @@ func loadScrapersNG(bucket simplecloud.Reader, stores []string) error {
 
 	// Publish before loading, so no reader sees every store as unknown
 	// during the load, and a concurrent /api/load isn't overwritten.
-	scrapersWriteMu.Lock()
+	scrapersMu.Lock()
 	publishScrapers(*idx)
-	scrapersWriteMu.Unlock()
+	scrapersMu.Unlock()
 
 	type scraperLoad struct {
 		name      string
@@ -773,8 +773,8 @@ var errDroppedDump = errors.New("dump is undated, past DropAfter or no newer tha
 func updateSellers(scraper mtgban.Scraper) error {
 	seller := applyInventoryOverrides(scraper.(mtgban.Seller))
 
-	scrapersWriteMu.Lock()
-	defer scrapersWriteMu.Unlock()
+	scrapersMu.Lock()
+	defer scrapersMu.Unlock()
 
 	p := currentPrices()
 	current := p.sellers
@@ -860,8 +860,8 @@ func buildNextSellers(current []mtgban.Seller, seller mtgban.Seller, i int) ([]m
 func updateVendors(scraper mtgban.Scraper) error {
 	vendor := applyBuylistOverrides(scraper.(mtgban.Vendor))
 
-	scrapersWriteMu.Lock()
-	defer scrapersWriteMu.Unlock()
+	scrapersMu.Lock()
+	defer scrapersMu.Unlock()
 
 	p := currentPrices()
 	current := p.vendors

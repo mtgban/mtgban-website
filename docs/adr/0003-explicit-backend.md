@@ -138,7 +138,7 @@ guard, and the root package runs in 3 s, or 31 s under `-race`.
   assumes one. Moving the rest is Phase D:
   - `Config`: some `Config.Game` readers already hold a `b` whose `Game`
     would do;
-  - the prices snapshot (`pricesPtr`, `scrapersWriteMu`, load.go)
+  - the prices snapshot (`pricesPtr`, `scrapersMu`, load.go)
     and the session stores;
   - the caches built from prices (newspaper, reprints, infos, TCG catalog,
     screener, popular searches): plain values that pin nothing, but can lag
