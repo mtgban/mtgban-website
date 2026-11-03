@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -11,9 +12,10 @@ import (
 	"testing"
 )
 
-// The Uploader transfer of a search that fills the result cap reaches the
-// Uploader: past 10,000 values Go's form parser hands back an empty form, and
-// the signing middleware, parsing first, drops the error.
+// The Uploader transfer of a search that finds more results than it takes
+// reaches the Uploader, and the page says it takes the first ones: past
+// 10,000 values Go's form parser hands back an empty form, and the signing
+// middleware, parsing first, drops the error.
 func TestSearchUploadTransferReachesUploader(t *testing.T) {
 	skipWithoutDatastore(t)
 	withSigMode(t, true, false)
@@ -30,16 +32,21 @@ func TestSearchUploadTransferReachesUploader(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape("t:creature"), nil)
 	w := httptest.NewRecorder()
 	testSite.Search(w, req)
-	if !strings.Contains(w.Body.String(), TooManyMessage) {
-		t.Skip("t:creature does not fill the result cap in this datastore")
-	}
-
 	form := url.Values{"mode": {"false"}}
 	for _, m := range regexp.MustCompile(`name="hashes" value="([^"]+)"`).FindAllStringSubmatch(w.Body.String(), -1) {
 		form.Add("hashes", m[1])
 	}
+	if len(form["hashes"]) < MaxUploadTransfer {
+		t.Skipf("t:creature finds %d results in this datastore, under the transfer's %d", len(form["hashes"]), MaxUploadTransfer)
+	}
 	if len(form["hashes"]) != MaxUploadTransfer {
 		t.Fatalf("the transfer carries %d results, want %d", len(form["hashes"]), MaxUploadTransfer)
+	}
+	for _, label := range []string{"Export", "Upload"} {
+		want := fmt.Sprintf(`sidebar-compact-cut" title="First %d results">%s<`, MaxUploadTransfer, label)
+		if !strings.Contains(w.Body.String(), want) {
+			t.Errorf("the %s label does not say it takes the first %d results", label, MaxUploadTransfer)
+		}
 	}
 
 	post := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))

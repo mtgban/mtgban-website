@@ -584,8 +584,9 @@ override; phone UA detection via `mileusna/useragent`).
   custom-buylist injection → post-filters → sort (chrono/hybrid/alpha/
   number/retail/buylist, plus `odds` — a `variable:` search only, by each
   card's `dropOdds()` expected count, ascending) → `Paginate()`
-  (utils.go) against the named constants `MaxSearchResults` (100/page)
-  and `MaxSearchTotalResults` (10k max, search.go).
+  (utils.go) at `MaxSearchResults` (100/page, search.go) over every
+  result. The exports and the Uploader transfer take the first
+  `MaxAPISearchResults`/`MaxUploadTransfer` of them.
 - **Backpack**: `js/backpack.js` collects cards with a count and a
   condition each across searches, synced as the `backpack` user-state
   section, and posts them to Upload as `hashes`, `hashesQtys` and

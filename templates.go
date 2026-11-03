@@ -228,6 +228,9 @@ var funcMap = template.FuncMap{
 	"uploadLimit":    func() int { return MaxUploadEntries },
 	"uploadProLimit": func() int { return MaxUploadProEntries },
 	"uploadMaxMB":    func() int { return MaxUploadFileSize >> 20 },
+	// How many results a search's exports and Uploader transfer take
+	"exportLimit":   func() int { return MaxAPISearchResults },
+	"transferLimit": func() int { return MaxUploadTransfer },
 	"jsonArray": func(values []string) string {
 		if values == nil {
 			values = []string{}

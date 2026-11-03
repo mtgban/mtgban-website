@@ -265,7 +265,7 @@
         return (card.fin || []).indexOf(finish) !== -1;
     }
 
-    // Mirrors MaxSearchTotalResults (search.go:36).
+    // The most candidates a name search decodes set payloads for.
     var MAX_TOTAL = 10000;
     var LRU_SIZE = 8;
 

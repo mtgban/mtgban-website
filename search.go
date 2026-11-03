@@ -38,12 +38,10 @@ const (
 	// A phone pages at 25: the 100-result page was 2.6 MB of HTML.
 	MaxSearchResultsMobile = 25
 	TooLongMessage         = "Your query planeswalked away, try a shorter one"
-	TooManyMessage         = "Too many results, try adjusting your filters"
 	NoResultsMessage       = "No products matching your search could be found"
 	NoPromosMessage        = "No products matching your search could be found - some promos may be hidden"
 	NoCardsMessage         = "No products matching your search could be found"
 
-	MaxSearchTotalResults = 10000
 	// MaxUploadTransfer is the most results the Uploader transfer posts: a
 	// form value each, plus the mode, under the 10,000 values Go's form
 	// parser takes before it hands back an empty form.
@@ -1083,8 +1081,8 @@ func sortedEditionKeys(editions *editionsSnapshot, sortOpt string) []string {
 // sellers and vendors, what the cards it was given are offered at.
 // hashes lists every card found, a decklist's repeats included, and keys each
 // card once; the two share an array unless a repeat was folded, so ordering
-// keys in place orders hashes with it. total is how many cards matched when
-// that is not len(keys), copies counts the repeats of a folded card, and
+// keys in place orders hashes with it. total is len(hashes) when a repeat
+// was folded, copies counts the repeats of a folded card, and
 // message says why the search shows none of them, or not all.
 type searchResults struct {
 	keys    []string
@@ -1130,13 +1128,6 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 		allKeys = withoutSealed(b, allKeys)
 	}
 
-	// Limit results to avoid hogging the website with large queries
-	if len(allKeys) > MaxSearchTotalResults {
-		result.total = len(allKeys)
-		result.message = TooManyMessage
-		allKeys = allKeys[:MaxSearchTotalResults]
-	}
-
 	// A post filter reads what each card is offered at, so it judges every
 	// card found; the offers themselves are built for the page shown
 	// (collectOffers), so the filters ask the stores about each card here.
@@ -1164,9 +1155,7 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 	result.keys = allKeys
 	if config.SearchMode == "hashing" && len(allKeys) > 1 {
 		if uniqueKeys := dedupeKeys(allKeys); len(uniqueKeys) < len(allKeys) {
-			if result.total == 0 {
-				result.total = len(allKeys)
-			}
+			result.total = len(allKeys)
 			// Record how many copies each card had so the deduped block can show it.
 			result.copies = make(map[string]int, len(uniqueKeys))
 			for _, k := range allKeys {
@@ -1265,7 +1254,7 @@ func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortM
 	pageSize := searchPageSize(r)
 	if len(shown.keys) > pageSize {
 		pageIndex, _ := strconv.Atoi(r.FormValue("p"))
-		shown.keys, shown.pagination = Paginate(result.keys, pageIndex, pageSize, MaxSearchTotalResults)
+		shown.keys, shown.pagination = Paginate(result.keys, pageIndex, pageSize, len(result.keys))
 		if pageSize != MaxSearchResults {
 			shown.pagination.PageSize = pageSize
 		}

@@ -1012,6 +1012,13 @@ body:has(.search-layout) {
     white-space: nowrap;
     min-width: 3.5em;
 }
+/* A row that takes the first results only; how many is in the title */
+.sidebar-compact-cut {
+    text-decoration: underline dotted;
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+    cursor: help;
+}
 
 .sidebar-section-label {
     font-size: var(--text-sm);
