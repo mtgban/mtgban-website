@@ -59,6 +59,7 @@ var FilteredEditions = []string{
 var FilterOptKeys = []string{
 	"rl",
 	"abu4h",
+	"nocollector",
 	"decklists",
 	"syp",
 	"stocks",
@@ -112,6 +113,13 @@ var FilterOptConfig = map[string]FilterOpt{
 		},
 		ArbitOnly: true,
 		NoSealed:  true,
+	},
+	"nocollector": {
+		Title: "no CE/30A/WCD",
+		Func: func(opts *mtgban.ArbitOpts) {
+			opts.Editions = slices.Concat(opts.Editions, customBuylistSkipSets)
+		},
+		NoSealed: true,
 	},
 	"decklists": {
 		Title: "only Decklists",

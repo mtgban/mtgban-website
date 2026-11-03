@@ -184,6 +184,7 @@ func TestArbitApplied(t *testing.T) {
 		want  []string
 	}{
 		{"arbit", arbitMode{}, "rl=1&abu4h=1&syp=1", []string{"abu4h", "rl"}},
+		{"sealed hides nocollector", arbitMode{Sealed: true}, "nocollector=1", nil},
 		{"global hides abu4h", arbitMode{Global: true}, "rl=1&abu4h=1&syp=1", []string{"legit", "rl", "syp"}},
 		{"global turned off legit", arbitMode{Global: true}, "legit=0", nil},
 		{"global sealed", arbitMode{Global: true, Sealed: true}, "rl=1&decklists=1", []string{"decklists", "stable"}},
@@ -201,6 +202,23 @@ func TestArbitApplied(t *testing.T) {
 				t.Errorf("applied %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestArbitNoCollector pins the option skipping the Collectors' Editions,
+// 30A and the World Championship Decks on top of global's own editions.
+func TestArbitNoCollector(t *testing.T) {
+	st := parseArbitQuery(t, "nocollector=1")
+	opts, _ := st.apply(backend(), arbitMode{})
+	if !slices.Equal(opts.Editions, customBuylistSkipSets) {
+		t.Errorf("arbit skips %v, want %v", opts.Editions, customBuylistSkipSets)
+	}
+	opts, _ = st.apply(backend(), arbitMode{Global: true})
+	if !slices.Equal(opts.Editions, slices.Concat(FilteredEditions, customBuylistSkipSets)) {
+		t.Errorf("global skips %v, want its own editions and %v", opts.Editions, customBuylistSkipSets)
+	}
+	if slices.Contains(FilteredEditions, "WC97") {
+		t.Error("the option wrote into FilteredEditions")
 	}
 }
 

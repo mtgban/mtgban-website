@@ -678,12 +678,13 @@ and `MaxUploadFileSize` 5 MB (`5 << 20` bytes).
   A filter bar (`arbit_filters.go`, `js/arbit-filters.js`) sets the
   reader's `arbitState`: condition, finish and rarity picks; min/max on the
   table's two price columns and the spread; min difference, quantity and
-  profitability; and 8 on/off options (`FilterOptKeys`/`FilterOptConfig`:
-  RL, ABU4H, decklists, SYP, stocks, legit, stable, tradable). Unset fields
-  take the page's defaults (`arbitDefaults`), and the spread and difference
-  are held to per-page floors (`arbitMode.floors`; Global's spread floor is
-  the AnySpread tier gate). Price, max-spread and quantity limits are row
-  checks on the shown columns (`arbitRowFilter`). Every generated link
+  profitability; and 9 on/off options (`FilterOptKeys`/`FilterOptConfig`:
+  RL, ABU4H, no CE/30A/WCD, decklists, SYP, stocks, legit, stable,
+  tradable). Unset fields take the page's defaults (`arbitDefaults`), and
+  the spread and difference are held to per-page floors
+  (`arbitMode.floors`; Global's spread floor is the AnySpread tier gate).
+  Price, max-spread and quantity limits are row checks on the shown
+  columns (`arbitRowFilter`). Every generated link
   carries the state plus `f=1`. Applying, sorting or restoring the
   defaults saves the state client side in a cookie, `ArbitFilters` for
   arbit and reverse together and `GlobalFilters` for global
