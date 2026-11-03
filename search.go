@@ -289,6 +289,7 @@ func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchC
 		names = []string{config.CleanQuery}
 	}
 	var queries, asTyped []string
+	reads := map[string]bool{}
 	for _, name := range names {
 		var query []string
 		if name != "" {
@@ -297,7 +298,7 @@ func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchC
 		if config.NumberTerms != "" {
 			query = append(query, config.NumberTerms)
 		}
-		filters, rekeyed := rekeyFilters(ds, p, query, config.AppliedFilters, pinned, packs, sealed)
+		filters, rekeyed := rekeyFilters(ds, p, query, config.AppliedFilters, pinned, packs, sealed, reads)
 		whole := strings.Join(append(query, filters...), " ")
 		if rekeyed {
 			queries = append(queries, whole)
