@@ -121,6 +121,28 @@ jobs:
       - name: Decompress datastore
         run: xz -dc "${{ steps.ds.outputs.filepath }}" > allprintings5.json
 
+      # The other games' datastores sit in a private bucket, so a run with no
+      # secrets, as a fork's or Dependabot's pull request is, tests Magic alone:
+      # the tests skip a game whose variable is unset.
+      - name: Download the other games' datastores
+        env:
+          B2_APPLICATION_KEY_ID: ${{ secrets.B2_APPLICATION_KEY_ID_DATASTORE }}
+          B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY_DATASTORE }}
+        run: |
+          if [ -z "$B2_APPLICATION_KEY" ]; then
+            echo "::notice::no datastore secrets on this run, testing Magic alone"
+            exit 0
+          fi
+          pipx install b2
+          mkdir -p game-datastores/
+          for game in lorcana riftbound onepiece pokemon yugioh fleshandblood gundam palworld; do
+            "$HOME/.local/bin/b2" file download --no-progress "b2://mtgban-datastore/$game/$game.json.xz" "game-datastores/$game.json.xz"
+            xz -d "game-datastores/$game.json.xz"
+            echo "$(echo "$game" | tr '[:lower:]' '[:upper:]')_PATH=$PWD/game-datastores/$game.json" >> "$GITHUB_ENV"
+          done
+          # A red run states which datastore bytes it tested against
+          sha256sum game-datastores/*.json
+
       - name: go build ./...
         run: go build ./...
 

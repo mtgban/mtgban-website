@@ -62,7 +62,8 @@ Switching the `go-mtgban` dependency during local work:
 There is no Makefile, but `.github/workflows/ci.yml` runs on every PR and on
 push to `master`: a `style` job (`gofmt -s -l .`, `go vet ./...`, `revive`,
 `staticcheck`), and alongside it `build-and-test` (`bun test tests/`, `go build ./...`,
-`go test ./...` against a real downloaded `allprintings5.json`). Match those
+`go test ./...` against a real downloaded `allprintings5.json` and every other
+game's datastore, each named by its `<GAME>_PATH`). Match those
 same gates locally before pushing — `gofmt -s -l .` and the pinned `revive`/
 `staticcheck` versions in particular are easy to miss running only `go vet`.
 
