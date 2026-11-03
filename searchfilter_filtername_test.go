@@ -1,12 +1,7 @@
 package main
 
 import (
-	"os"
-	"slices"
 	"testing"
-	"time"
-
-	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // Which words are a set filter and which are a card's name, decided against
@@ -60,38 +55,14 @@ func TestSetFilterNamesNothing(t *testing.T) {
 //
 // The queries are run rather than the predicate asked, because a check written
 // against the predicate passes while the search is broken.
-//
-// Opening a datastore is slow, so this runs by name:
-//
-//	YUGIOH_PATH=... go test -run NameThatIsFilterSyntaxIsStillFound
 func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
-	var games []matcher.Game
+	t.Parallel()
 	for game := range gameDatastores {
-		games = append(games, game)
-	}
-	slices.Sort(games)
-
-	var checked int
-	for _, game := range games {
-		path := os.Getenv(gameDatastores[game])
-		if path == "" {
-			continue
-		}
-		f, err := os.Open(path)
-		if err != nil {
-			t.Logf("%s: %v", game, err)
-			continue
-		}
-		loaded, err := matcher.Open(game, f)
-		f.Close()
-		if err != nil {
-			t.Errorf("%s: %v", game, err)
-			continue
-		}
-
 		t.Run(string(game), func(t *testing.T) {
-			ds := testSite.newDatastore(loaded, time.Now())
+			t.Parallel()
+			ds := gameDatastore(t, game)
 
+			var checked int
 			for _, uuid := range ds.backend.GetUUIDs() {
 				co, err := ds.backend.GetUUID(uuid)
 				if err != nil || co.Sealed || !re.MatchString(co.Name) {
@@ -130,11 +101,7 @@ func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
 					}
 				}
 			}
+			t.Logf("%d printings named like a filter, every route to them answering", checked)
 		})
 	}
-
-	if checked == 0 {
-		t.Skip("no datastore on hand names a card the filter syntax can read")
-	}
-	t.Logf("%d printings named like a filter, every route to them answering", checked)
 }
