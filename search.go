@@ -1596,7 +1596,7 @@ func rebuildIndexRows(pageVars *SearchVars, metadata cardMetadata, b *matcher.Ba
 			if err == nil {
 				var link string
 
-				game := cm.GameFromName(string(Config().Game))
+				game := cm.GameFromName(string(b.Game))
 				id, err := strconv.Atoi(co.Identifiers["mcmId"])
 				if err != nil || id == 0 {
 					// Cardmarket names the game in every product path, so the

@@ -6,6 +6,8 @@ import (
 	"log"
 	"strings"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // The delayed edition is built by rewriting "0 DAY" into "3 DAY" in the live
@@ -68,16 +70,12 @@ func TestNewspaperCalcDateFilterWithoutRowFilter(t *testing.T) {
 // it was, rather than panicking: the entry only names the rows to read. The
 // lookup comes before the database check, so no database is needed here.
 func TestCacheNewspaperLogsAGameMissingFromGameMap(t *testing.T) {
-	prevGame, prevSkip, prevLog := Config().Game, SkipNewspaper, log.Writer()
-	t.Cleanup(func() {
-		Config().Game, SkipNewspaper = prevGame, prevSkip
-		log.SetOutput(prevLog)
-	})
+	prevLog := log.Writer()
+	t.Cleanup(func() { log.SetOutput(prevLog) })
 	var logged bytes.Buffer
 	log.SetOutput(&logged)
-	Config().Game, SkipNewspaper = "nosuchgame", false
 
-	newSite().cacheNewspaper()
+	newSite().cacheNewspaperWith(&matcher.Backend{Game: "nosuchgame"})
 
 	log.SetOutput(prevLog)
 	if !strings.Contains(logged.String(), `"nosuchgame" is missing from gameMap`) {

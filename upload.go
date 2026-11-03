@@ -2830,7 +2830,7 @@ func loadCollectr(ctx context.Context, b *matcher.Backend, link string, maxRows 
 		return nil, "", errors.New("no Collectr proxy is configured")
 	}
 
-	items, err := collectr.Load(ctx, proxyBase, link, Config().Game, maxRows)
+	items, err := collectr.Load(ctx, proxyBase, link, b.Game, maxRows)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to fetch Collectr showcase: %w", err)
 	}

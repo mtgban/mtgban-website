@@ -361,9 +361,9 @@ func TestCheckForLinksStaysOnItsOwnGuildAndGame(t *testing.T) {
 		t.Errorf("another guild was answered: %q", reply.Title)
 	}
 
-	previous := Config().Game
-	Config().Game = "lorcana"
-	defer func() { Config().Game = previous }()
+	previous := backend().Game
+	backend().Game = "lorcana"
+	defer func() { backend().Game = previous }()
 
 	if reply := checkForLinks(backend(), discordGuildID(), message); reply != nil {
 		t.Errorf("another game was answered: %q", reply.Title)
