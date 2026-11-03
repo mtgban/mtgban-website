@@ -85,6 +85,80 @@ test('matches the start of a name, not any word in it', async () => {
     expect(await found('lair drop')).toEqual([]);
 });
 
+// Online, a typed comma narrows the list (__acCommasMatch in js/autocomplete.js).
+test('a typed comma narrows to the names that have it there', async () => {
+    const names = [
+        { key: 'saheeli sublime artificer', uuids: ['u-ssa'] },
+        { key: 'saheeli rai', uuids: ['u-sr'] },
+        { key: 'the wanderer', uuids: ['u-wan'] },
+        { key: 'the wandering emperor', uuids: ['u-wem'] },
+        { key: 'secret lair drop jace vryn s prodigy', uuids: ['u-sld'] },
+    ];
+    const cards = {
+        'u-ssa': { uuid: 'u-ssa', n: 'Saheeli, Sublime Artificer', set: 'WAR' },
+        'u-sr': { uuid: 'u-sr', n: 'Saheeli Rai', set: 'KLD' },
+        'u-wan': { uuid: 'u-wan', n: 'The Wanderer', set: 'WAR' },
+        'u-wem': { uuid: 'u-wem', n: 'The Wandering, Emperor', set: 'NEO' },
+        'u-sld': { uuid: 'u-sld', n: "Secret Lair Drop: Jace, Vryn's Prodigy", set: 'SLD' },
+    };
+    const d = deps();
+    d.allNames = async function () { return names; };
+    d.getCard = async function (u) { return cards[u]; };
+    const found = async (typed) => (await OfflineSearch.suggest(typed, d)).map(r => r.name);
+    expect(await found('saheeli')).toEqual(['Saheeli, Sublime Artificer', 'Saheeli Rai']);
+    expect(await found('Saheeli,')).toEqual(['Saheeli, Sublime Artificer']);
+    expect(await found('saheeli, sub')).toEqual(['Saheeli, Sublime Artificer']);
+    expect(await found('saheeli r,')).toEqual([]);
+    expect(await found('wandering,')).toEqual(['The Wandering, Emperor']);
+    expect(await found('wanderer,')).toEqual([]);
+    expect(await found('jace,')).toEqual(["Secret Lair Drop: Jace, Vryn's Prodigy"]);
+});
+
+// The index is walked in key order, where the commas are already gone, so
+// the names a comma keeps can sort past the first batch of hits.
+test('a comma name past the first batch of hits is still found', async () => {
+    const names = [];
+    const cards = {};
+    for (let i = 0; i < 45; i++) {
+        const u = 'u-thing-' + i;
+        names.push({ key: 'chandra s thing ' + String(i).padStart(2, '0'), uuids: [u] });
+        cards[u] = { uuid: u, n: "Chandra's Thing " + String(i).padStart(2, '0'), set: 'NEO' };
+    }
+    names.push({ key: 'chandra torch of defiance', uuids: ['u-ctd'] });
+    cards['u-ctd'] = { uuid: 'u-ctd', n: 'Chandra, Torch of Defiance', set: 'KLD' };
+    const d = deps();
+    d.allNames = async function () { return names; };
+    let lookups = 0;
+    d.getCard = async function (u) { lookups++; return cards[u]; };
+    expect((await OfflineSearch.suggest('chandra,', d)).map(r => r.name)).toEqual(['Chandra, Torch of Defiance']);
+    expect(lookups).toBe(46);
+    lookups = 0;
+    expect(await OfflineSearch.suggest('chandra', d)).toHaveLength(10);
+    expect(lookups).toBe(40);
+});
+
+// A comma few names carry must not walk every prefix match, and a keystroke
+// the box has moved past ends its walk at the next round.
+test('a comma walk is capped, and stops once the answer is stale', async () => {
+    const names = [];
+    const cards = {};
+    for (let i = 0; i < 300; i++) {
+        const u = 'u-' + i;
+        names.push({ key: 'sol thing ' + String(i).padStart(3, '0'), uuids: [u] });
+        cards[u] = { uuid: u, n: 'Sol Thing ' + String(i).padStart(3, '0'), set: 'NEO' };
+    }
+    const d = deps();
+    d.allNames = async function () { return names; };
+    let lookups = 0;
+    d.getCard = async function (u) { lookups++; return cards[u]; };
+    expect(await OfflineSearch.suggest('sol,', d)).toEqual([]);
+    expect(lookups).toBe(200);
+    lookups = 0;
+    let rounds = 0;
+    expect(await OfflineSearch.suggest('sol,', d, () => rounds++ > 0)).toEqual([]);
+    expect(lookups).toBe(40);
+});
+
 test('missing keyrune yields empty string, not undefined', async () => {
     const out = await OfflineSearch.suggest('sol ring', deps());
     expect(out[0].keyrune).toBe('');

@@ -5,6 +5,12 @@
 
     var MIN_CHARS = 3;
     var MAX_ROWS = 10;
+    // Index hits loaded per round of card lookups, and the rounds one
+    // keystroke may spend when the loaded cards keep failing the filters.
+    // A comma name that sorts past those hits is left out, so an empty
+    // list after a comma does not prove there is no such card.
+    var BATCH = MAX_ROWS * 4;
+    var MAX_ROUNDS = 5;
 
     // The leading words a typed name may leave out, in normName form, as
     // the online matcher's __acSkippablePrefixes (js/autocomplete.js).
@@ -37,39 +43,77 @@
         return false;
     }
 
+    // Letters, digits and commas alone, as __acCommaFold (js/autocomplete.js).
+    function commaFold(text) {
+        return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^\p{L}\p{N},]/gu, '').toLowerCase();
+    }
+
+    // Whether the name has the typed commas where they were typed, read from
+    // where the match begins: the front, or past a leading word the reader
+    // left out. A typed comma is the one punctuation mark that narrows the
+    // list: "Saheeli," means the name goes on past one, as "Saheeli, Sublime
+    // Artificer" does and "Saheeli Rai" does not. The index keys have lost
+    // their commas, so this reads the name itself, once the card is loaded.
+    function commasMatch(name, commas) {
+        var folded = commaFold(name);
+        if (startsAt(folded, commas, 0)) return true;
+        for (var i = 0; i < SKIPPABLE_SQUASHED.length; i++) {
+            var skip = SKIPPABLE_SQUASHED[i];
+            if (startsAt(folded, skip, 0) && startsAt(folded, commas, skip.length)) return true;
+        }
+        return false;
+    }
+
     // Build display suggestion rows from the local name index and card store.
-    function suggest(rawValue, deps) {
+    // stale, when given, says the caller no longer wants the answer, which
+    // ends the walk before its next round of lookups.
+    function suggest(rawValue, deps, stale) {
         var needle = deps.normName(rawValue);
         if (needle.length < MIN_CHARS) return Promise.resolve([]);
         var squashed = squash(needle);
+        var commas = rawValue.indexOf(',') >= 0 ? commaFold(rawValue) : '';
         return deps.allNames().then(function (names) {
-            // Collect more candidates than MAX_ROWS to account for sealed-mode filtering.
-            var hits = [];
-            var cap = MAX_ROWS * 4;
-            for (var i = 0; i < names.length && hits.length < cap; i++) {
-                if (matches(names[i].key, needle, squashed)) hits.push(names[i]);
-            }
-            return Promise.all(hits.map(function (h) {
-                return deps.getCard(h.uuids[0]);
-            }));
-        }).then(function (cards) {
             var rows = [];
-            for (var j = 0; j < cards.length && rows.length < MAX_ROWS; j++) {
-                var c = cards[j];
-                if (!c) continue;
-                // Scope suggestions to the active mode when one is set.
-                if (deps.sealed != null && !!c.s !== deps.sealed) continue;
-                var set = deps.sets[c.set] || {};
-                rows.push({
-                    uuid: c.uuid,
-                    name: c.n,
-                    setCode: c.set,
-                    setName: set.n || c.set,
-                    number: c.num || '',
-                    keyrune: set.k || ''
+            var i = 0;
+            var rounds = 0;
+            // Index hits are loaded a batch at a time, and only as far as
+            // filling the list needs: the comma and mode filters read the
+            // loaded card, so a batch can pass fewer rows than it holds, and
+            // the names that pass can sort past any one batch of hits. The
+            // rounds are capped, since a comma few names carry would
+            // otherwise walk every prefix match.
+            function next() {
+                if (rounds >= MAX_ROUNDS || (stale && stale())) return rows;
+                rounds++;
+                var batch = [];
+                for (; i < names.length && batch.length < BATCH; i++) {
+                    if (matches(names[i].key, needle, squashed)) batch.push(names[i]);
+                }
+                if (!batch.length) return rows;
+                return Promise.all(batch.map(function (h) {
+                    return deps.getCard(h.uuids[0]);
+                })).then(function (cards) {
+                    for (var j = 0; j < cards.length && rows.length < MAX_ROWS; j++) {
+                        var c = cards[j];
+                        if (!c) continue;
+                        if (commas && !commasMatch(c.n, commas)) continue;
+                        // Scope suggestions to the active mode when one is set.
+                        if (deps.sealed != null && !!c.s !== deps.sealed) continue;
+                        var set = deps.sets[c.set] || {};
+                        rows.push({
+                            uuid: c.uuid,
+                            name: c.n,
+                            setCode: c.set,
+                            setName: set.n || c.set,
+                            number: c.num || '',
+                            keyrune: set.k || ''
+                        });
+                    }
+                    return rows.length < MAX_ROWS ? next() : rows;
                 });
             }
-            return rows;
+            return next();
         });
     }
 
@@ -142,7 +186,7 @@
 
         input.addEventListener('input', function () {
             var id = ++reqId;
-            suggest(input.value, opts.deps).then(function (r) {
+            suggest(input.value, opts.deps, function () { return id !== reqId; }).then(function (r) {
                 if (id !== reqId) return;
                 rows = r;
                 render();
