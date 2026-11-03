@@ -45,7 +45,7 @@ jobs:
       # it. Pinned, since a new release finding new things would fail a build
       # that changed nothing.
       - name: Staticcheck
-        run: go run honnef.co/go/tools/cmd/staticcheck@2026.2.1 ./...
+        run: go run honnef.co/go/tools/cmd/staticcheck@2026.2.2 ./...
 
       # The standard library ships with the toolchain, which Dependabot's
       # go.mod updates do not cover. Not pinned: the verdict follows the
