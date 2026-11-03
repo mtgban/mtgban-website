@@ -6,16 +6,48 @@
     var MIN_CHARS = 3;
     var MAX_ROWS = 10;
 
+    // The leading words a typed name may leave out, in normName form, as
+    // the online matcher's __acSkippablePrefixes (js/autocomplete.js).
+    var SKIPPABLE = ['the ', 'secret lair drop '];
+
+    function squash(key) { return key.replace(/ /g, ''); }
+
+    function startsAt(key, needle, offset) {
+        return key.lastIndexOf(needle, offset) === offset;
+    }
+
+    var SKIPPABLE_SQUASHED = SKIPPABLE.map(squash);
+
+    // Whether the typed text starts the name, as the online matcher reads
+    // it (internal/suggest, __acMatchSpan in js/autocomplete.js): by the
+    // normalized key, by that key with its spaces closed on both sides so
+    // "blue eyed" reaches "Blue-Eyed ..." and "solring" reaches "Sol Ring",
+    // or either way after a leading word the reader may leave out, so
+    // "urdragon" reaches "The Ur-Dragon".
+    function matches(key, needle, squashed) {
+        if (startsAt(key, needle, 0)) return true;
+        var sq = squash(key);
+        if (startsAt(sq, squashed, 0)) return true;
+        for (var i = 0; i < SKIPPABLE.length; i++) {
+            var skip = SKIPPABLE[i];
+            var skipSq = SKIPPABLE_SQUASHED[i];
+            if (startsAt(key, skip, 0) && startsAt(key, needle, skip.length)) return true;
+            if (startsAt(sq, skipSq, 0) && startsAt(sq, squashed, skipSq.length)) return true;
+        }
+        return false;
+    }
+
     // Build display suggestion rows from the local name index and card store.
     function suggest(rawValue, deps) {
         var needle = deps.normName(rawValue);
         if (needle.length < MIN_CHARS) return Promise.resolve([]);
+        var squashed = squash(needle);
         return deps.allNames().then(function (names) {
             // Collect more candidates than MAX_ROWS to account for sealed-mode filtering.
             var hits = [];
             var cap = MAX_ROWS * 4;
             for (var i = 0; i < names.length && hits.length < cap; i++) {
-                if (names[i].key.indexOf(needle) !== -1) hits.push(names[i]);
+                if (matches(names[i].key, needle, squashed)) hits.push(names[i]);
             }
             return Promise.all(hits.map(function (h) {
                 return deps.getCard(h.uuids[0]);
@@ -138,5 +170,5 @@
         }
     }
 
-    self.OfflineSearch = { suggest: suggest, mount: mount };
+    self.OfflineSearch = { suggest: suggest, matches: matches, mount: mount };
 })();

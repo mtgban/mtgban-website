@@ -152,7 +152,7 @@
         });
     }
 
-    // Full name-index scan backing the offline search substring matcher.
+    // Full name-index scan, in key order, backing the suggestion and search name scans.
     function allNames() {
         return withTx(['names'], 'readonly', function(tx, out) {
             out.result = [];

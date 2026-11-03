@@ -37,7 +37,7 @@ test('under 3 chars returns nothing', async () => {
     expect(await OfflineSearch.suggest('', deps())).toEqual([]);
 });
 
-test('substring match resolves display rows with keyrune', async () => {
+test('prefix match resolves display rows with keyrune', async () => {
     const out = await OfflineSearch.suggest('boseiju', deps());
     expect(out.map(r => r.name)).toEqual(['Boseiju, Who Endures', 'Boseiju Reaches Skyward']);
     const bwe = out[0];
@@ -46,6 +46,43 @@ test('substring match resolves display rows with keyrune', async () => {
     expect(bwe.setName).toBe('Kamigawa: Neon Dynasty');
     expect(bwe.number).toBe('266');
     expect(bwe.keyrune).toBe('neo');
+});
+
+// The online matcher's rules (internal/suggest, js/autocomplete.js): the
+// typed text starts the name, with its spaces closed on both sides, or after
+// a leading word the reader may leave out; a word inside the name is no match.
+test('matches the start of a name, not any word in it', async () => {
+    const names = [
+        { key: 'sol ring', uuids: ['u-sol'] },
+        { key: 'blue eyed silver zombie', uuids: ['u-bes'] },
+        { key: 'the wanderer', uuids: ['u-wan'] },
+        { key: 'wandering emperor', uuids: ['u-wem'] },
+        { key: 'the ur dragon', uuids: ['u-urd'] },
+        { key: 'secret lair drop jace s ire', uuids: ['u-sld'] },
+    ];
+    const cards = {
+        'u-sol': { uuid: 'u-sol', n: 'Sol Ring', set: 'C21' },
+        'u-bes': { uuid: 'u-bes', n: 'Blue-Eyed Silver Zombie', set: 'FIN' },
+        'u-wan': { uuid: 'u-wan', n: 'The Wanderer', set: 'WAR' },
+        'u-wem': { uuid: 'u-wem', n: 'Wandering Emperor', set: 'NEO' },
+        'u-urd': { uuid: 'u-urd', n: 'The Ur-Dragon', set: 'C17' },
+        'u-sld': { uuid: 'u-sld', n: "Secret Lair Drop: Jace's Ire", set: 'SLD' },
+    };
+    const d = deps();
+    d.allNames = async function () { return names; };
+    d.getCard = async function (u) { return cards[u]; };
+    const found = async (typed) => (await OfflineSearch.suggest(typed, d)).map(r => r.name);
+    expect(await found('ring')).toEqual([]);
+    expect(await found('sol r')).toEqual(['Sol Ring']);
+    expect(await found('solring')).toEqual(['Sol Ring']);
+    expect(await found('blueeyed')).toEqual(['Blue-Eyed Silver Zombie']);
+    expect(await found('blue eyed')).toEqual(['Blue-Eyed Silver Zombie']);
+    expect(await found('wander')).toEqual(['The Wanderer', 'Wandering Emperor']);
+    expect(await found('the w')).toEqual(['The Wanderer']);
+    expect(await found('zombie')).toEqual([]);
+    expect(await found('urdragon')).toEqual(['The Ur-Dragon']);
+    expect(await found('jaces')).toEqual(["Secret Lair Drop: Jace's Ire"]);
+    expect(await found('lair drop')).toEqual([]);
 });
 
 test('missing keyrune yields empty string, not undefined', async () => {
