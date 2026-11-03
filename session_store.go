@@ -40,11 +40,11 @@ func installSessionScraper(kind string, scraper mtgban.Scraper) error {
 }
 
 // dropSessionScraper takes the scraper serving shorthand off the served
-// snapshot, on the given side. Takes scrapersWriteMu, so per sessionstore's
-// Hooks doc, nothing that holds scrapersWriteMu may call into Sessions.
+// snapshot, on the given side. Takes scrapersMu, so per sessionstore's
+// Hooks doc, nothing that holds scrapersMu may call into Sessions.
 func dropSessionScraper(kind, shorthand string) {
-	scrapersWriteMu.Lock()
-	defer scrapersWriteMu.Unlock()
+	scrapersMu.Lock()
+	defer scrapersMu.Unlock()
 
 	p := currentPrices()
 	if kind == sessionstore.Retail {

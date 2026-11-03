@@ -9,7 +9,7 @@ import (
 // withPrices publishes sellers and vendors as the served snapshot, keeping
 // the dumps listing, and puts the snapshot it replaced back when the test
 // ends. It publishes the way a load does, newPrices then one Store, but
-// without scrapersWriteMu, which a test may hold.
+// without scrapersMu, which a test may hold.
 func withPrices(tb testing.TB, sellers []mtgban.Seller, vendors []mtgban.Vendor) {
 	tb.Helper()
 	prev := currentPrices()

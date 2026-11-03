@@ -169,7 +169,7 @@ func dropStaleStores(now time.Time) {
 // records them, and returns them.
 func takeStaleStores(now time.Time) []droppedStore {
 	sessions := lockAskedSnapshots()
-	defer scrapersWriteMu.Unlock()
+	defer scrapersMu.Unlock()
 	p := currentPrices()
 
 	// A real store counts as left on its side only with a date within
@@ -239,10 +239,10 @@ func takeStaleStores(now time.Time) []droppedStore {
 	return dropped
 }
 
-// lockAskedSnapshots takes scrapersWriteMu over a snapshot whose every store
+// lockAskedSnapshots takes scrapersMu over a snapshot whose every store
 // Sessions was asked about, and returns whether each one, keyed like the
 // alarm's rows, was published from an upload. Sessions takes its lock before
-// scrapersWriteMu (see dropSessionScraper), so it is asked first, and asked
+// scrapersMu (see dropSessionScraper), so it is asked first, and asked
 // again when a publish swaps the snapshot meanwhile.
 func lockAskedSnapshots() map[string]bool {
 	for {
@@ -257,11 +257,11 @@ func lockAskedSnapshots() map[string]bool {
 			sessions[info.Shorthand+"/"+sessionstore.Buylist] = Sessions.Is(sessionstore.Buylist, info.Shorthand)
 		}
 
-		scrapersWriteMu.Lock()
+		scrapersMu.Lock()
 		if currentPrices() == p {
 			return sessions
 		}
-		scrapersWriteMu.Unlock()
+		scrapersMu.Unlock()
 	}
 }
 
