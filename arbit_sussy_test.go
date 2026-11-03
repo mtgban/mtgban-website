@@ -14,6 +14,10 @@ import (
 // renderArbit runs the arbit page the way the server does, so a test
 // exercises the real template rather than a parsed-but-unrendered one.
 func renderArbit(t *testing.T, pageVars PageVars) string {
+	// The cart buttons scraperCompare hands the page
+	for i := range pageVars.Arb {
+		pageVars.Arb[i].fillCarts(currentPrices(), &pageVars)
+	}
 	t.Helper()
 	baseName, files := renderTemplateFiles("arbit.html", false)
 	tmpl, err := tmplparse.ParseFiles(baseName, files, funcMap)
@@ -229,7 +233,7 @@ func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
 			ScraperShort: "CHIPSRC",
 			ArbitVars: ArbitVars{
 				GlobalMode: true,
-				ArbitBar:   newArbitBar(parseArbitState(nil, arbitOffer{}), mode, arbitOffer{}, backend(), "CHIPSRC"),
+				ArbitBar:   newArbitBar(parseArbitState(nil, arbitOffer{}), mode, arbitOffer{}, backend(), currentPrices(), "CHIPSRC"),
 			},
 			UserNav: &NavElem{Short: "beta"},
 		})
@@ -253,7 +257,7 @@ func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
 		ScraperShort: "CHIPSRC",
 		ArbitVars: ArbitVars{
 			GlobalMode: true,
-			ArbitBar:   newArbitBar(parseArbitState(nil, arbitOffer{}), arbitMode{Global: true}, arbitOffer{}, backend(), "CHIPSRC"),
+			ArbitBar:   newArbitBar(parseArbitState(nil, arbitOffer{}), arbitMode{Global: true}, arbitOffer{}, backend(), currentPrices(), "CHIPSRC"),
 		},
 		UserNav: &NavElem{Short: "beta"},
 	})

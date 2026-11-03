@@ -36,7 +36,7 @@ func TestGuideStoresBreakNameTiesByShorthand(t *testing.T) {
 	want := []string{"CK", "CKSealed", "SCG", "SCGSealed"}
 	for range 100 {
 		var stores []GuideStore
-		err := json.Unmarshal([]byte(guideStoresJSON()), &stores)
+		err := json.Unmarshal([]byte(guideStoresJSON(currentPrices())), &stores)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -66,7 +66,7 @@ func TestGuideStoresLeaveOutAPIOnlyStores(t *testing.T) {
 	withPrices(t, sellers, vendors)
 
 	var stores []GuideStore
-	err := json.Unmarshal([]byte(guideStoresJSON()), &stores)
+	err := json.Unmarshal([]byte(guideStoresJSON(currentPrices())), &stores)
 	if err != nil {
 		t.Fatal(err)
 	}

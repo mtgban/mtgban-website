@@ -235,8 +235,8 @@ func TestPostStoresMatchCollectedOffers(t *testing.T) {
 		{name: "custom buylist vendors", opts: "vendor:custom", req: custom, custom: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			config := parseSearchOptionsNG(b, query, nil, nil, nil)
-			opts := parseSearchOptionsNG(b, NameToBeFound+" "+tc.opts, nil, nil, tc.misc)
+			config := parseSearchOptionsNG(b, currentPrices(), query, nil, nil, nil)
+			opts := parseSearchOptionsNG(b, currentPrices(), NameToBeFound+" "+tc.opts, nil, nil, tc.misc)
 			config.StoreFilters = opts.StoreFilters
 			config.EntryFilters = opts.EntryFilters
 			config.PriceFilters = opts.PriceFilters

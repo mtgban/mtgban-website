@@ -40,7 +40,7 @@ func TestBackpackSearchFindsTheBackpacksCards(t *testing.T) {
 		{`in:(on:backpack) -on:trade`, false, []string{"FX-1", "FX-box"}},
 	}
 	for _, tc := range cases {
-		config := parseSearchPage(ds, tc.query, tc.sealed, false, nil, nil, nil)
+		config := parseSearchPage(ds, currentPrices(), tc.query, tc.sealed, false, nil, nil, nil)
 		if tc.sealed {
 			config.SearchMode = "sealed"
 		}
@@ -53,7 +53,7 @@ func TestBackpackSearchFindsTheBackpacksCards(t *testing.T) {
 	}
 
 	// An empty backpack holds no cards, as an empty in: does.
-	config := parseSearchPage(ds, "on:empty", false, false, nil, nil, nil)
+	config := parseSearchPage(ds, currentPrices(), "on:empty", false, false, nil, nil, nil)
 	applyBackpacks(b, &config, packs)
 	if _, err := searchAndFilter(ds, currentPrices(), config); !errors.Is(err, errEmptyPool) {
 		t.Errorf("on:empty = %v, want errEmptyPool", err)
@@ -129,7 +129,7 @@ func TestDidYouMeanKeepsABackpack(t *testing.T) {
 		{"on:modern", ""},
 	}
 	for _, tt := range tests {
-		config := parseSearchPage(ds, tt.query, false, false, nil, nil, nil)
+		config := parseSearchPage(ds, currentPrices(), tt.query, false, false, nil, nil, nil)
 		applyBackpacks(ds.backend, &config, packs)
 		got, _ := searchSuggestions(ds, currentPrices(), tt.query, config, nil, packs, false)
 		if got != tt.want {

@@ -233,7 +233,7 @@ func TestCollectNonMagicSnapshotFromServedScrapers(t *testing.T) {
 	// The cache holds a variant for one of the two cards, as it does for a
 	// product the tcgcsv catalog has reached and not for one it has not.
 	var resolved int
-	snapshot := collectNonMagicSnapshot(backend(), now, func(card *matcher.CardObject) int64 {
+	snapshot := collectNonMagicSnapshot(backend(), currentPrices(), now, func(card *matcher.CardObject) int64 {
 		resolved++
 		if card.UUID == known {
 			return 555

@@ -697,7 +697,8 @@ stores' listings and sells nowhere, so a section gets only "Load at", for
 the store whose copies its rows are: the page's own store, or on sealed
 the section's, as `scraperCompare` picks its seller.
 
-- `cartLoadFor` (`cartload.go`, the `cart_load` template function) builds
+- `cartLoadFor` (`cartload.go`, filled into each split's `CartLoads` by
+  `UploadVars.fillCarts`) builds
   the button, and `cartRows` turns the split into `item_id:quantity`
   pairs. Each id names one condition. An id of anything but letters,
   digits, `_` and `-` is left out (`cartItemID`), as the loader would

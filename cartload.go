@@ -273,7 +273,7 @@ type cartLoad struct {
 // cartLoadFor builds the button for a store split, or nothing for a store the
 // bookmarklet does not fill or a split with no row it can load. See
 // docs/store-carts.md.
-func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartLoad {
+func cartLoadFor(p *prices, key string, buylist bool, entries []OptimizedUploadEntry) cartLoad {
 	for _, cs := range cartStores {
 		if !strings.HasPrefix(key, cs.prefix) {
 			continue
@@ -282,7 +282,7 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 		if page == "" {
 			return cartLoad{}
 		}
-		items := cartItems(key, buylist, entries)
+		items := cartItems(p, key, buylist, entries)
 		rows := cartRows(items, entries)
 		if rows == "" {
 			return cartLoad{}
@@ -319,11 +319,11 @@ type cartSend struct {
 // the page's splits, in their order, whose buylist cart the bookmarklet
 // fills and that lists an id for the row's card. A store with several
 // splits is named once, under its first; prices holds each split's offer.
-func cartSendsFor(keys []string, prices map[string]float64, entry OptimizedUploadEntry) []cartSend {
+func cartSendsFor(p *prices, keys []string, prices map[string]float64, entry OptimizedUploadEntry) []cartSend {
 	var sends []cartSend
 	seen := map[string]bool{}
 	for _, key := range keys {
-		load := cartLoadFor(key, true, []OptimizedUploadEntry{entry})
+		load := cartLoadFor(p, key, true, []OptimizedUploadEntry{entry})
 		if load.Link == "" || seen[load.Store] {
 			continue
 		}
@@ -351,7 +351,7 @@ const cartMostQuantity = 999
 // (cartAsksMost) asks its store cart for what the buylist takes, or as many
 // as it has where the buylist names no amount, and the store trims it to
 // what it has.
-func cartLoadForArbit(key string, buylist bool, entries []mtgban.ArbitEntry) cartLoad {
+func cartLoadForArbit(p *prices, key string, buylist bool, entries []mtgban.ArbitEntry) cartLoad {
 	most := !buylist && slices.Contains(cartAsksMost, key)
 	rows := make([]OptimizedUploadEntry, 0, len(entries))
 	quantities := make([]string, 0, len(entries))
@@ -370,7 +370,7 @@ func cartLoadForArbit(key string, buylist bool, entries []mtgban.ArbitEntry) car
 		})
 		quantities = append(quantities, strconv.Itoa(qty))
 	}
-	load := cartLoadFor(key, buylist, rows)
+	load := cartLoadFor(p, key, buylist, rows)
 	if most && load.Link != "" {
 		load.Quantities = strings.Join(quantities, ",")
 	}
@@ -405,10 +405,10 @@ func cartTakes(cs cartStore, key string, buylist bool) bool {
 // cartItems is the store item id of each of a split's rows, empty for a card
 // the store lists no id for. A buylist row goes in as NM, a store row in the
 // condition it was priced at.
-func cartItems(key string, buylist bool, entries []OptimizedUploadEntry) []string {
+func cartItems(p *prices, key string, buylist bool, entries []OptimizedUploadEntry) []string {
 	var lookup func(cardID string, cond mtgban.Condition) string
 	if buylist {
-		bl, err := findVendorBuylist(key)
+		bl, err := p.vendorBuylist(key)
 		if err != nil {
 			return nil
 		}
@@ -434,7 +434,7 @@ func cartItems(key string, buylist bool, entries []OptimizedUploadEntry) []strin
 			return name(entries[i])
 		}
 	} else {
-		inv, err := findSellerInventory(key)
+		inv, err := p.sellerInventory(key)
 		if err != nil {
 			return nil
 		}

@@ -17,9 +17,10 @@ type PriceResult struct {
 
 func (s *site) BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
+	p := s.prices()
 	// During warmup every answer would be empty; a 503 makes clients retry
 	// later instead of caching blank prices and images for their tiles
-	if !dataReady(b) {
+	if !dataReady(b, p) {
 		w.Header().Set("Cache-Control", "no-store")
 		errorResponse(w, http.StatusServiceUnavailable, "not ready")
 		return
@@ -55,12 +56,12 @@ func (s *site) BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 	// the Info() copies and blocklist checks are per store, and each
 	// store's record map is probed once per id.
 	bestSell := map[string]PriceResult{}
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		info := seller.Info()
 		if info.MetadataOnly || slices.Contains(blocklistRetail, info.Shorthand) {
 			continue
 		}
-		name := scraperName(info.Shorthand)
+		name := p.scraperName(info.Shorthand)
 		inventory := seller.Inventory()
 		for _, cardID := range cardIDs {
 			entries, found := inventory[cardID]
@@ -84,12 +85,12 @@ func (s *site) BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bestBuy := map[string]PriceResult{}
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		info := vendor.Info()
 		if info.MetadataOnly || slices.Contains(blocklistBuylist, info.Shorthand) {
 			continue
 		}
-		name := scraperName(info.Shorthand)
+		name := p.scraperName(info.Shorthand)
 		buylist := vendor.Buylist()
 		for _, cardID := range cardIDs {
 			entries, found := buylist[cardID]

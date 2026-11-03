@@ -11,8 +11,8 @@ test('autoWire registers the store adjustments binding when its container is in 
 test('the desktop and mobile templates give the editor its stores', () => {
     const desktop = readFileSync(new URL('../templates/settings/search.html', import.meta.url), 'utf8');
     const mobile = readFileSync(new URL('../templates/mobile/search.html', import.meta.url), 'utf8');
-    expect(desktop).toContain('id="settings-store-factors" data-stores="{{store_factor_options .SellerKeys .VendorKeys}}"');
-    expect(mobile).toContain('id="m-set-store-factors" data-stores="{{store_factor_options .SellerKeys .VendorKeys}}"');
+    expect(desktop).toContain('id="settings-store-factors" data-stores="{{.StoreFactorOptions}}"');
+    expect(mobile).toContain('id="m-set-store-factors" data-stores="{{.StoreFactorOptions}}"');
     expect(mobile).toContain("window.StoreFactors.render(factors, window.StoreFactors.read())");
     expect(mobile).toContain("window.StoreFactors.saveEditor(factors)");
 });

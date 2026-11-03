@@ -193,7 +193,7 @@ func (e SearchEntry) RetailTip() string {
 // storeFactorOptions lists the stores the adjustments editor offers, each
 // with its name, the sides it has and whether it is a sealed store, singles
 // stores first, as JSON for a data attribute.
-func storeFactorOptions(sellers, vendors []string) string {
+func storeFactorOptions(p *prices, sellers, vendors []string) string {
 	type option struct {
 		Key    string `json:"k"`
 		Name   string `json:"n"`
@@ -206,11 +206,11 @@ func storeFactorOptions(sellers, vendors []string) string {
 	add := func(shorthand string, sells bool) {
 		o, ok := byKey[shorthand]
 		if !ok {
-			name := scraperName(shorthand)
+			name := p.scraperName(shorthand)
 			if name == "" {
 				name = shorthand
 			}
-			o = &option{Key: shorthand, Name: name, Sealed: isSealedScraper(shorthand)}
+			o = &option{Key: shorthand, Name: name, Sealed: p.isSealedScraper(shorthand)}
 			byKey[shorthand] = o
 			keys = append(keys, shorthand)
 		}
@@ -221,7 +221,7 @@ func storeFactorOptions(sellers, vendors []string) string {
 		}
 	}
 	for _, s := range sellers {
-		if metadataOnly(s) {
+		if metadataOnly(p, s) {
 			continue
 		}
 		add(s, true)
@@ -249,7 +249,7 @@ func storeFactorOptions(sellers, vendors []string) string {
 
 // metadataOnly says whether a loaded seller is a reference index, not a
 // store a user buys from.
-func metadataOnly(shorthand string) bool {
-	seller, found := currentStoreIndex().seller[shorthand]
+func metadataOnly(p *prices, shorthand string) bool {
+	seller, found := p.index.seller[shorthand]
 	return found && seller.Info().MetadataOnly
 }

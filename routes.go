@@ -181,7 +181,7 @@ func (s *site) registerRoutes() {
 	// The gateway reads the store families without a signature, so this
 	// cannot hang off the API page: a sub-page is served unsigned only when
 	// the ACL's Any tier grants the page (see enforceSigning).
-	http.Handle("/api-plans/stores.json", noSigning(http.HandlerFunc(APIStores)))
+	http.Handle("/api-plans/stores.json", noSigning(http.HandlerFunc(s.APIStores)))
 	http.Handle("/api/palette/promos.json", noSigning(http.HandlerFunc(s.palette.Promos)))
 	http.Handle("/api/palette/finishes.json", noSigning(http.HandlerFunc(s.palette.Finishes)))
 	http.Handle("/api/palette/rarities.json", noSigning(http.HandlerFunc(s.palette.Rarities)))
@@ -195,7 +195,8 @@ func (s *site) registerRoutes() {
 	// /healthz: returns 200 only if dependencies are OK.
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		uuids := len(s.backend().GetUUIDs())
-		sellers, vendors := len(GetSellers()), len(GetVendors())
+		p := s.prices()
+		sellers, vendors := len(p.sellers), len(p.vendors)
 		if uuids == 0 || sellers == 0 || vendors == 0 {
 			log.Printf("healthz: not ready (uuids=%d, sellers=%d, vendors=%d)", uuids, sellers, vendors)
 			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)

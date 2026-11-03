@@ -43,7 +43,7 @@ func TestDefaultSearchModePerGame(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			Config().Game = tc.game
-			config := parseSearchOptionsNG(backend(), tc.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), currentPrices(), tc.query, nil, nil, nil)
 			if config.SearchMode != tc.want {
 				t.Errorf("game %q, query %q: SearchMode = %q, want %q",
 					tc.game, tc.query, config.SearchMode, tc.want)
@@ -59,7 +59,7 @@ func TestDroppedScryfallLeavesNoResidue(t *testing.T) {
 	t.Cleanup(func() { Config().Game = prev })
 	Config().Game = "lorcana"
 
-	config := parseSearchOptionsNG(backend(), "mickey sm:scryfall", nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), "mickey sm:scryfall", nil, nil, nil)
 	if config.CleanQuery != "mickey" {
 		t.Errorf("CleanQuery = %q, want %q", config.CleanQuery, "mickey")
 	}
@@ -75,7 +75,7 @@ func TestSealedOverridesTheGameDefault(t *testing.T) {
 	t.Cleanup(func() { Config().Game = prev })
 	Config().Game = "lorcana"
 
-	config := parseSearchOptionsNG(backend(), "illumineer's quest", nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), "illumineer's quest", nil, nil, nil)
 	if config.SearchMode != "any" {
 		t.Fatalf("precondition: SearchMode = %q, want %q", config.SearchMode, "any")
 	}

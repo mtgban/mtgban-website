@@ -75,7 +75,7 @@ func BenchmarkSearchAndFilter(b *testing.B) {
 	skipWithoutDatastore(b)
 	for _, query := range []string{"r:mythic", "s:MH2", "cn>300"} {
 		b.Run(query, func(b *testing.B) {
-			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil)
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				out, err := searchAndFilter(currentDatastore(), currentPrices(), config)

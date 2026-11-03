@@ -247,6 +247,26 @@ func (p *prices) scraperName(shorthand string) string {
 	return info.Name
 }
 
+// storeNames is every loaded store's display name by shorthand, with the
+// configured overrides, for the pages that name stores by key.
+func (p *prices) storeNames() map[string]string {
+	names := make(map[string]string, len(p.sellers)+len(p.vendors))
+	for _, seller := range p.sellers {
+		shorthand := seller.Info().Shorthand
+		names[shorthand] = p.scraperName(shorthand)
+	}
+	for _, vendor := range p.vendors {
+		shorthand := vendor.Info().Shorthand
+		names[shorthand] = p.scraperName(shorthand)
+	}
+	for shorthand, name := range Config().ScraperConfig.NameOverride {
+		if _, loaded := names[shorthand]; !loaded {
+			names[shorthand] = name
+		}
+	}
+	return names
+}
+
 // isSealedScraper says whether the loaded store with this shorthand trades
 // sealed product rather than singles.
 func (p *prices) isSealedScraper(shorthand string) bool {
@@ -287,11 +307,6 @@ type storeIndex struct {
 	vendor     map[string]mtgban.Vendor
 	sellerFold map[string]mtgban.Seller
 	vendorFold map[string]mtgban.Vendor
-}
-
-// currentStoreIndex returns the published snapshot's index.
-func currentStoreIndex() *storeIndex {
-	return &currentPrices().index
 }
 
 // buildStoreIndex indexes the stores by shorthand. First wins on a
@@ -567,7 +582,7 @@ func (s *site) startScraperLoad(dumpsDir string, stores []string, datastoreLoade
 		}
 		// Card Kingdom's stock history and buylist signals (ckbuylist.go),
 		// where the prices just loaded include CK's buylist.
-		if ckAvailable() {
+		if ckAvailable(s.prices()) {
 			go tracked(jobCKSignals, s.refreshCKSignals)()
 		}
 
@@ -758,7 +773,7 @@ func loadScraper(bucket simplecloud.Reader, game matcher.Game, name, kind, short
 	reader.Close()
 	// CK's buylist signals are computed from its buylist and stock.
 	if installErr == nil && strings.EqualFold(shorthand, "CK") {
-		rebuildCKSignals()
+		rebuildCKSignals(currentPrices())
 	}
 	return installErr
 }

@@ -21,10 +21,10 @@
 <div class="settings-grid" id="{{.GridId}}-{{.Section}}" data-cookie="{{.CookieName}}">
     {{range $key := $keys}}
         {{if and $wantSealed (index $.Sealed $key)}}
-        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+        <label><input type="checkbox" name="{{$key}}"> {{index $.Names $key}}</label>
         {{end}}
         {{if and (not $wantSealed) (not (index $.Sealed $key))}}
-        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+        <label><input type="checkbox" name="{{$key}}"> {{index $.Names $key}}</label>
         {{end}}
     {{end}}
 </div>
@@ -46,12 +46,12 @@
 
     {{if $hasSingles}}
     <h5 class="settings-subgroup-label">Singles</h5>
-    {{template "settings-stores-grouped-section" (dict "Keys" $keys "Sealed" .Sealed "GridId" .GridId "CookieName" .CookieName "Section" "singles")}}
+    {{template "settings-stores-grouped-section" (dict "Keys" $keys "Names" $.Names "Sealed" .Sealed "GridId" .GridId "CookieName" .CookieName "Section" "singles")}}
     {{end}}
 
     {{if $hasSealed}}
     <h5 class="settings-subgroup-label">Sealed</h5>
-    {{template "settings-stores-grouped-section" (dict "Keys" $keys "Sealed" .Sealed "GridId" .GridId "CookieName" .CookieName "Section" "sealed")}}
+    {{template "settings-stores-grouped-section" (dict "Keys" $keys "Names" $.Names "Sealed" .Sealed "GridId" .GridId "CookieName" .CookieName "Section" "sealed")}}
     {{end}}
 </div>
 {{end}}

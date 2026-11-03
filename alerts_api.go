@@ -25,7 +25,7 @@ func (s *site) alertAPIDeps() alerts.APIDeps {
 		Allowance:   alertAllowance,
 		Prices:      s.alertPrices,
 		Resolve:     func(cardID string) (alerts.Card, bool, bool) { return alertCardSnapshot(s.backend(), cardID) },
-		StoreLabel:  alertStoreLabel,
+		StoreLabel:  func(shorthand string) string { return alertStoreLabel(s.prices(), shorthand) },
 		Game:        func() string { return string(Config().Game) },
 		Channels:    alertChannels,
 		Mint:        func(t alerts.Token) string { return alerts.MintToken(alertTokenSecret(), t) },
@@ -36,19 +36,19 @@ func (s *site) alertAPIDeps() alerts.APIDeps {
 
 // alertPrices is alertVisiblePrices on the live datastore.
 func (s *site) alertPrices(cardID string, side alerts.Side, v url.Values) []alerts.StorePrice {
-	return alertVisiblePrices(s.backend(), cardID, side, v)
+	return alertVisiblePrices(s.backend(), s.prices(), cardID, side, v)
 }
 
 // alertVisiblePrices is a card's store prices on one side, less the
 // stores the ACL values block.
-func alertVisiblePrices(b *matcher.Backend, cardID string, side alerts.Side, v url.Values) []alerts.StorePrice {
+func alertVisiblePrices(b *matcher.Backend, p *prices, cardID string, side alerts.Side, v url.Values) []alerts.StorePrice {
 	co, err := b.GetUUID(cardID)
 	sealed := err == nil && co.Sealed
 	retail, buylist := blocklistsFromValues(v)
 	if side == alerts.SideRetail {
-		return alertStorePrices(cardID, sealed, side, retail)
+		return alertStorePrices(p, cardID, sealed, side, retail)
 	}
-	return alertStorePrices(cardID, sealed, side, buylist)
+	return alertStorePrices(p, cardID, sealed, side, buylist)
 }
 
 const alertsUnverifiedMsg = "verify your Patreon email to use alerts"

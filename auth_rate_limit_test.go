@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/internal/pledge"
 	"github.com/mtgban/mtgban-website/ratelimit"
@@ -103,9 +102,6 @@ func apiLimited(t *testing.T, reqs ...*http.Request) []bool {
 	t.Cleanup(func() {
 		APIRateLimiter = prevLimiter
 	})
-	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(nil, mtgban.ScraperInfo{Shorthand: "STUB"})}
-	withPrices(t, sellers, vendors)
 	APIRateLimiter = ratelimit.NewLimiter(rate.Every(time.Hour), 1)
 
 	h := enforceAPISigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))

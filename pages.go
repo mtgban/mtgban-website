@@ -209,8 +209,8 @@ func init() {
 					Description: "Cards TCGplayer wants now",
 					Link:        "/newspaper?page=syp",
 					SettingsTab: "news",
-					ShouldHide: func(*site) bool {
-						_, err := findVendorBuylist("SYP")
+					ShouldHide: func(s *site) bool {
+						_, err := s.prices().vendorBuylist("SYP")
 						return err != nil
 					},
 				},
@@ -409,6 +409,8 @@ type PageVars struct {
 
 	SellerKeys []string
 	VendorKeys []string
+	// StoreNames names the stores the page lists by shorthand
+	StoreNames map[string]string
 
 	// Price-movers screener payload (nil on non-screener pages).
 	Screener *ScreenerVars

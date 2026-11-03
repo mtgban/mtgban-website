@@ -103,6 +103,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	pageVars.SellerKeys = p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		return !info.SealedMode && !slices.Contains(blocklistRetail, info.Shorthand)
 	})
+	pageVars.StoreNames = p.storeNames()
 
 	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
 	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)

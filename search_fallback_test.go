@@ -67,7 +67,7 @@ func TestSearchFallback(t *testing.T) {
 	skipWithoutDatastore(t)
 
 	t.Run("a treatment", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "confetti", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "confetti", nil, nil, nil)
 		if _, err := searchAndFilter(currentDatastore(), currentPrices(), config); err == nil {
 			t.Skip("a card is named confetti here; the fallback would not run")
 		}
@@ -87,7 +87,7 @@ func TestSearchFallback(t *testing.T) {
 	})
 
 	t.Run("a set", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "kamigawa", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "kamigawa", nil, nil, nil)
 		if _, err := searchAndFilter(currentDatastore(), currentPrices(), config); err == nil {
 			t.Skip("a card is named kamigawa here; the fallback would not run")
 		}
@@ -108,7 +108,7 @@ func TestSearchFallback(t *testing.T) {
 	})
 
 	t.Run("a name that means nothing", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "notathing", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "notathing", nil, nil, nil)
 		if keys := searchFallback(currentDatastore(), currentPrices(), config); len(keys) != 0 {
 			t.Errorf("got %d results, want the search to give up", len(keys))
 		}
@@ -117,7 +117,7 @@ func TestSearchFallback(t *testing.T) {
 	t.Run("a query that already named a set", func(t *testing.T) {
 		// "s:LEA kamigawa" asked about LEA. Answering with every Kamigawa set
 		// would throw away the part the searcher did say.
-		config := parseSearchOptionsNG(backend(), "s:LEA kamigawa", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "s:LEA kamigawa", nil, nil, nil)
 		if keys := searchFallback(currentDatastore(), currentPrices(), config); len(keys) != 0 {
 			t.Errorf("got %d results, want the named set to stand", len(keys))
 		}

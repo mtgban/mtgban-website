@@ -35,7 +35,7 @@ func runAdminEditors(r *http.Request) PageVars {
 	adminAffiliatesEditor(r, &pv)
 	adminDatasetsEditor(r, &pv)
 	adminInfrastructureEditor(r, &pv)
-	testSite.adminKeyOverrides(r, nil, &pv)
+	testSite.adminKeyOverrides(r, nil, currentPrices(), &pv)
 	adminGrantSave(r, &pv)
 	adminGrantRevoke(r, &pv)
 	return pv

@@ -310,6 +310,10 @@ type Arbitrage struct {
 	Key   string
 	Arbit []mtgban.ArbitEntry
 
+	// BuyCart loads the store bought from and SellCart the buylist sold
+	// into, as the cart bookmarklet fills them; SellCart is empty on Global
+	BuyCart, SellCart cartLoad
+
 	// Optional multipler to obtain the store credit value
 	CreditMultiplier float64
 
@@ -496,6 +500,20 @@ type scraperCompareOpts struct {
 	// The reader's custom buylist, compared against as a vendor; none at
 	// a zero rate
 	CustomBuylist customBuylistRule
+}
+
+// fillCarts gives the section its cart buttons for the page: the store
+// bought at is the section's on reverse and on Global sealed, as
+// scraperCompare picks its seller, and Global sells nowhere.
+func (entry *Arbitrage) fillCarts(p *prices, pageVars *PageVars) {
+	buyKey, sellKey := pageVars.ScraperShort, entry.Key
+	if pageVars.ReverseMode || (pageVars.GlobalMode && pageVars.SealedSource) {
+		buyKey, sellKey = entry.Key, pageVars.ScraperShort
+	}
+	entry.BuyCart = cartLoadForArbit(p, buyKey, false, entry.Arbit)
+	if !pageVars.GlobalMode {
+		entry.SellCart = cartLoadForArbit(p, sellKey, true, entry.Arbit)
+	}
 }
 
 // hasNoQty tells whether a table has no quantity column: a store keeping no
@@ -765,6 +783,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 	}
 
 	pageVars.ScraperShort = source.Info().Shorthand
+	pageVars.StoreNames = p.storeNames()
 	pageVars.SealedSource = p.isSealedScraper(source.Info().Shorthand)
 
 	pageVars.Arb = []Arbitrage{}
@@ -790,7 +809,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 	query := state.values()
 	query.Del("sort")
 	pageVars.ArbitQuery = query.Encode()
-	pageVars.ArbitBar = newArbitBar(state, mode, offer, b, source.Info().Shorthand)
+	pageVars.ArbitBar = newArbitBar(state, mode, offer, b, p, source.Info().Shorthand)
 	pageVars.ArbitBar.Open = readCookie(r, "ArbitFiltersOpen") == "1"
 	pageVars.ArbitCookie = savedCookie
 
@@ -991,6 +1010,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 		} else if source.Info().SealedMode {
 			entry.HasNoConds = scraper.Info().MetadataOnly
 		}
+		entry.fillCarts(p, &pageVars)
 
 		pageVars.Arb = append(pageVars.Arb, entry)
 		for i := range arbit {

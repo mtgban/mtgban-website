@@ -124,14 +124,15 @@ func newSite() *site {
 		},
 
 		EnabledStores: func() (sellers, vendors []string) {
+			p := s.prices()
 			retailBlock, buylistBlock := Config().siteRetailBlockList(), Config().siteBuylistBlockList()
-			for _, seller := range GetSellers() {
+			for _, seller := range p.sellers {
 				shorthand := seller.Info().Shorthand
 				if !slices.Contains(retailBlock, shorthand) && !slices.Contains(sellers, shorthand) {
 					sellers = append(sellers, shorthand)
 				}
 			}
-			for _, vendor := range GetVendors() {
+			for _, vendor := range p.vendors {
 				shorthand := vendor.Info().Shorthand
 				if !slices.Contains(buylistBlock, shorthand) && !slices.Contains(vendors, shorthand) {
 					vendors = append(vendors, shorthand)

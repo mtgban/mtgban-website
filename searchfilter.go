@@ -429,7 +429,7 @@ func fixupOnNG(code string) []string {
 }
 
 // Return a list of shorthands representing the selected stores
-func fixupStoreCodeNG(code string) []string {
+func fixupStoreCodeNG(p *prices, code string) []string {
 	code = strings.TrimSpace(code)
 	code = strings.ToLower(code)
 
@@ -438,16 +438,16 @@ func fixupStoreCodeNG(code string) []string {
 		filters[i] = strings.Trim(filters[i], "\"")
 
 		// Validate the input against the registered scrapers
-		for _, seller := range GetSellers() {
-			if filters[i] != strings.ToLower(scraperName(seller.Info().Shorthand)) &&
+		for _, seller := range p.sellers {
+			if filters[i] != strings.ToLower(p.scraperName(seller.Info().Shorthand)) &&
 				filters[i] != strings.ToLower(seller.Info().Shorthand) {
 				continue
 			}
 			filters[i] = strings.ToLower(seller.Info().Shorthand)
 			break
 		}
-		for _, vendor := range GetVendors() {
-			if filters[i] != strings.ToLower(scraperName(vendor.Info().Shorthand)) &&
+		for _, vendor := range p.vendors {
+			if filters[i] != strings.ToLower(p.scraperName(vendor.Info().Shorthand)) &&
 				filters[i] != strings.ToLower(vendor.Info().Shorthand) {
 				continue
 			}
@@ -1177,18 +1177,18 @@ func isLetter(r rune) bool {
 // parseSearchQuery reads a query a reader typed into a SearchConfig, with the
 // datastore's numbers snapshot at hand: a number searched alone is the
 // collector number a card carries.
-func parseSearchQuery(ds *datastore, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
+func parseSearchQuery(ds *datastore, p *prices, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
 	budget := maxPools
-	return parseSearchOptionsDepth(ds.backend, ds.numbers, false, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
+	return parseSearchOptionsDepth(ds.backend, p, ds.numbers, false, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
 }
 
 // parseSearchOptionsNG reads a query into a SearchConfig without the numbers
 // snapshot, so a number searched alone is an id or a name, never a collector
 // number. The outer query is depth zero; parseSearchOptionsDepth counts the
 // in: pools nested in it.
-func parseSearchOptionsNG(b *matcher.Backend, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
+func parseSearchOptionsNG(b *matcher.Backend, p *prices, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
 	budget := maxPools
-	return parseSearchOptionsDepth(b, nil, false, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
+	return parseSearchOptionsDepth(b, p, nil, false, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
 }
 
 // maxPoolDepth is how deep in: pools nest. A pool found at depth
@@ -1206,7 +1206,7 @@ var stripMarks = strings.NewReplacer(protectedMark, "", poolMark, "")
 // parseSearchOptionsDepth reads a query with the numbers snapshot given;
 // with bareIDs a number searched alone stays an id or a name's words even
 // so, while a number after a name is still a collector number.
-func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareIDs bool, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string, depth int, budget *int) (config SearchConfig) {
+func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnapshot, bareIDs bool, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string, depth int, budget *int) (config SearchConfig) {
 	alone := numbers
 	if bareIDs {
 		alone = nil
@@ -1227,7 +1227,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareI
 		filterStores = append(filterStores, FilterStoreElem{
 			Name:          "seller",
 			Negate:        true,
-			Values:        fixupStoreCodeNG(strings.Join(blocklistRetail, ",")),
+			Values:        fixupStoreCodeNG(p, strings.Join(blocklistRetail, ",")),
 			OnlyForSeller: true,
 		})
 	}
@@ -1235,7 +1235,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareI
 		filterStores = append(filterStores, FilterStoreElem{
 			Name:          "vendor",
 			Negate:        true,
-			Values:        fixupStoreCodeNG(strings.Join(blocklistBuylist, ",")),
+			Values:        fixupStoreCodeNG(p, strings.Join(blocklistBuylist, ",")),
 			OnlyForVendor: true,
 		})
 	}
@@ -1696,7 +1696,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareI
 				subOpt = "empty"
 			}
 
-			stores := fixupStoreCodeNG(code)
+			stores := fixupStoreCodeNG(p, code)
 
 			// If this option is negated, we assume that users just want to hide a store
 			// ingoring the values-if-present function
@@ -1836,7 +1836,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareI
 			if err == nil {
 				filter.Value = price
 			} else {
-				filter.Stores = fixupStoreCodeNG(code)
+				filter.Stores = fixupStoreCodeNG(p, code)
 			}
 			filterPrices = append(filterPrices, filter)
 		}
@@ -1907,7 +1907,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareI
 				sub = `contents:"` + pool.Value + `"`
 			}
 		}
-		subConfig := parseSearchOptionsDepth(b, numbers, bareIDs, sub, nil, nil, nil, depth+1, budget)
+		subConfig := parseSearchOptionsDepth(b, p, numbers, bareIDs, sub, nil, nil, nil, depth+1, budget)
 		filters = append(filters, FilterElem{
 			Name:   "pool",
 			Negate: pool.Negate,
@@ -1932,7 +1932,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareI
 		if len(elements) > 4 {
 			extraQuery += " cond:" + strings.TrimSpace(elements[4])
 		}
-		extraConfig := parseSearchOptionsNG(b, extraQuery, nil, nil, miscSearchOpts)
+		extraConfig := parseSearchOptionsNG(b, p, extraQuery, nil, nil, miscSearchOpts)
 		filters = append(filters, extraConfig.CardFilters...)
 	}
 
@@ -1984,7 +1984,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareI
 				set, err := b.GetSet(tokens[0])
 				if err == nil {
 					config.NumberTerms = "s:" + set.Code + " " + term
-					extraConfig := parseSearchOptionsNG(b, config.NumberTerms, nil, nil, nil)
+					extraConfig := parseSearchOptionsNG(b, p, config.NumberTerms, nil, nil, nil)
 					filters = append(filters, extraConfig.CardFilters...)
 					query = ""
 				}
@@ -2008,7 +2008,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, numbers *numbersSnapshot, bareI
 			last := tokens[len(tokens)-1]
 			if typesSetTotal(last) {
 				config.NumberTerms = "cn:" + last
-				extraConfig := parseSearchOptionsNG(b, "cn:"+last, nil, nil, nil)
+				extraConfig := parseSearchOptionsNG(b, p, "cn:"+last, nil, nil, nil)
 				filters = append(filters, extraConfig.CardFilters...)
 				query = strings.Join(tokens[:len(tokens)-1], " ")
 			}

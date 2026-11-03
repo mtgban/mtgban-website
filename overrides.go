@@ -188,7 +188,7 @@ func (s *site) reloadOverriddenScrapers(shorthands map[string]struct{}) {
 	if DataBucket == nil || len(shorthands) == 0 {
 		return
 	}
-	for name, scrapersConfig := range scraperStoreConfig() {
+	for name, scrapersConfig := range s.prices().scrapers.byStore {
 		for kind, list := range scrapersConfig {
 			for _, shorthand := range list {
 				if _, ok := shorthands[shorthand]; ok {

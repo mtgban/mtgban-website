@@ -670,7 +670,7 @@ func (st arbitState) field(key string, value, fallback, floor float64) arbitFiel
 
 // newArbitBar lays out the bar for one comparison, whose source is named,
 // with the price columns labelled as its tables label them.
-func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *matcher.Backend, sourceShort string) arbitBar {
+func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *matcher.Backend, p *prices, sourceShort string) arbitBar {
 	bar := arbitBar{Sort: st.Sort, Set: st.changed(m)}
 
 	bar.Condition = st.Conditions.group("cond", "Condition", m.Sealed)
@@ -688,7 +688,7 @@ func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *matcher.Backen
 
 	sell, buy := "Sell", "Buy"
 	if m.Global {
-		sell, buy = scraperName(sourceShort), "Store"
+		sell, buy = p.scraperName(sourceShort), "Store"
 		if m.Sealed {
 			sell, buy = buy, sell
 		}

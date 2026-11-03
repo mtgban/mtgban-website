@@ -62,7 +62,7 @@ func TestCollectorNumberPlainForm(t *testing.T) {
 			co.Number = tt.number
 			co.PlainNumber = tt.original
 
-			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), currentPrices(), tt.query, nil, nil, nil)
 			elem := findNumberFilter(t, config, "number")
 			skip := applyCardFilter(backend(), currentPrices(), "number", elem.Values, co)
 			if skip == tt.want {
@@ -92,7 +92,7 @@ func TestCollectorNumberStrictIsVerbatim(t *testing.T) {
 			co.Number = tt.number
 			co.PlainNumber = tt.number
 
-			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), currentPrices(), tt.query, nil, nil, nil)
 			elem := findNumberFilter(t, config, "number_strict")
 			skip := applyCardFilter(backend(), currentPrices(), "number_strict", elem.Values, co)
 			if skip == tt.want {
@@ -129,7 +129,7 @@ func TestCollectorNumberWithTotal(t *testing.T) {
 			co.PlainNumber = tt.number
 			co.SetTotal = tt.total
 
-			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), currentPrices(), tt.query, nil, nil, nil)
 			elem := findNumberFilter(t, config, "number_total")
 			skip := applyCardFilter(backend(), currentPrices(), "number_total", elem.Values, co)
 			if skip == tt.want {
@@ -165,7 +165,7 @@ func checkBareNumbersAgreeWithSeed(t *testing.T, ds *datastore) {
 			term := numberTerm(b, number)
 			_, named := b.SearchEquals(number)
 			if term != "" && named != nil {
-				parsed := parseSearchOptionsNG(b, term, nil, nil, nil).CardFilters
+				parsed := parseSearchOptionsNG(b, currentPrices(), term, nil, nil, nil).CardFilters
 				uuids, _ := numberSeedUUIDs(ds.numbers, parsed)
 				if len(uuids) != 0 {
 					want = parsed
@@ -206,8 +206,8 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 	}
 	typed := func(query, scope string) []string {
 		t.Helper()
-		config := parseSearchQuery(ds, query, nil, nil, nil)
-		applySearchScope(&config, scopeFilters(ds, scope, false, false))
+		config := parseSearchQuery(ds, currentPrices(), query, nil, nil, nil)
+		applySearchScope(&config, scopeFilters(ds, currentPrices(), scope, false, false))
 		return search(config)
 	}
 
@@ -235,7 +235,7 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 	if len(ds.numbers.loose["99999"]) != 0 {
 		t.Fatal("a card carries 99999")
 	}
-	if pinned := scopeFilters(ds, "99999", false, false); pinned != nil {
+	if pinned := scopeFilters(ds, currentPrices(), "99999", false, false); pinned != nil {
 		t.Errorf("pinned 99999 is %+v, want no filter", pinned)
 	}
 
@@ -261,15 +261,15 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 		t.Fatalf("no TCGplayer ids to check: %q %q", carried, uncarried)
 	}
 
-	if config := parseSearchQuery(ds, carried, nil, nil, nil); config.SearchMode == "hashing" {
+	if config := parseSearchQuery(ds, currentPrices(), carried, nil, nil, nil); config.SearchMode == "hashing" {
 		t.Errorf("%q is read as a TCGplayer id, not a collector number", carried)
 	}
-	idlookup := parseSearchQuery(ds, "id:"+carried, nil, nil, nil)
+	idlookup := parseSearchQuery(ds, currentPrices(), "id:"+carried, nil, nil, nil)
 	if len(idlookup.CardFilters) != 1 || idlookup.CardFilters[0].Name != "idlookup" {
 		t.Errorf("id:%s is not an id lookup: %+v", carried, idlookup.CardFilters)
 	}
 	uuid := ds.backend.ConvertID(matcher.IDSpaceTCGplayer, uncarried)
-	if config := parseSearchQuery(ds, uncarried, nil, nil, nil); !slices.Equal(config.UUIDs, []string{uuid}) {
+	if config := parseSearchQuery(ds, currentPrices(), uncarried, nil, nil, nil); !slices.Equal(config.UUIDs, []string{uuid}) {
 		t.Errorf("%q reaches %v, want the TCGplayer id's %s", uncarried, config.UUIDs, uuid)
 	}
 
@@ -291,22 +291,22 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 	if word == "" {
 		t.Fatal("no sealed product names a number a card carries")
 	}
-	sealed := parseSearchPage(ds, word, true, false, nil, nil, nil)
+	sealed := parseSearchPage(ds, currentPrices(), word, true, false, nil, nil, nil)
 	sealed.SearchMode = "sealed"
 	if keys, err := searchAndFilter(ds, currentPrices(), sealed); err != nil || len(keys) == 0 {
 		t.Errorf("sealed %q reaches no product: %v", word, err)
 	}
-	if pinned := scopeFilters(ds, word, true, false); pinned != nil {
+	if pinned := scopeFilters(ds, currentPrices(), word, true, false); pinned != nil {
 		t.Errorf("sealed pinned %q is %+v, want no filter", word, pinned)
 	}
 
 	// Without the snapshot a number is an id or a name, and the bot embeds
 	// the product its id names.
 	carriedUUID := ds.backend.ConvertID(matcher.IDSpaceTCGplayer, carried)
-	if config := parseSearchOptionsNG(ds.backend, carried, nil, nil, nil); !slices.Equal(config.UUIDs, []string{carriedUUID}) {
+	if config := parseSearchOptionsNG(ds.backend, currentPrices(), carried, nil, nil, nil); !slices.Equal(config.UUIDs, []string{carriedUUID}) {
 		t.Errorf("%q without the snapshot reaches %v, want the TCGplayer id's %s", carried, config.UUIDs, carriedUUID)
 	}
-	if config := parseSearchOptionsNG(ds.backend, "17a", nil, nil, nil); config.CleanQuery != "17a" || len(config.CardFilters) != 0 {
+	if config := parseSearchOptionsNG(ds.backend, currentPrices(), "17a", nil, nil, nil); config.CleanQuery != "17a" || len(config.CardFilters) != 0 {
 		t.Errorf("17a without the snapshot is %q %+v, want a name", config.CleanQuery, config.CardFilters)
 	}
 	if res, msg := parseMessage(ds, currentPrices(), carried, false); res == nil || res.Invalid || res.CardID != carriedUUID {
@@ -326,11 +326,11 @@ func TestNameThenNumber(t *testing.T) {
 		{"lightning bolt 141*", "lightning bolt cn:141 f:foil"},
 		{"command tower 7029 s:sld", "command tower cn:7029 s:sld"},
 	} {
-		want, err := searchAndFilter(ds, currentPrices(), parseSearchQuery(ds, tt.as, nil, nil, nil))
+		want, err := searchAndFilter(ds, currentPrices(), parseSearchQuery(ds, currentPrices(), tt.as, nil, nil, nil))
 		if err != nil || len(want) == 0 {
 			t.Fatalf("%q reaches nothing: %v", tt.as, err)
 		}
-		got, err := searchAndFilter(ds, currentPrices(), parseSearchQuery(ds, tt.query, nil, nil, nil))
+		got, err := searchAndFilter(ds, currentPrices(), parseSearchQuery(ds, currentPrices(), tt.query, nil, nil, nil))
 		if err != nil {
 			t.Fatalf("%q: %v", tt.query, err)
 		}
@@ -343,7 +343,7 @@ func TestNameThenNumber(t *testing.T) {
 
 	// A number another card carries, but no card of the name, is a miss,
 	// with no card of a longer name pulled in.
-	miss := parseSearchQuery(ds, "lightning bolt 7029", nil, nil, nil)
+	miss := parseSearchQuery(ds, currentPrices(), "lightning bolt 7029", nil, nil, nil)
 	if len(miss.CardFilters) == 0 {
 		t.Errorf("lightning bolt 7029 is not split: %q", miss.CleanQuery)
 	}
@@ -352,7 +352,7 @@ func TestNameThenNumber(t *testing.T) {
 	}
 
 	// The start of a longer name stays a name: Pyromancy 101.
-	prefix := parseSearchQuery(ds, "pyromancy 10", nil, nil, nil)
+	prefix := parseSearchQuery(ds, currentPrices(), "pyromancy 10", nil, nil, nil)
 	if len(prefix.CardFilters) != 0 {
 		t.Errorf("pyromancy 10 is read as %q %+v", prefix.CleanQuery, prefix.CardFilters)
 	}
@@ -364,8 +364,8 @@ func TestNameThenNumber(t *testing.T) {
 		t.Fatal("a card carries 99999")
 	}
 	for _, config := range []SearchConfig{
-		parseSearchQuery(ds, "command tower 99999", nil, nil, nil),
-		parseSearchOptionsNG(ds.backend, "command tower 7029", nil, nil, nil),
+		parseSearchQuery(ds, currentPrices(), "command tower 99999", nil, nil, nil),
+		parseSearchOptionsNG(ds.backend, currentPrices(), "command tower 7029", nil, nil, nil),
 	} {
 		if len(config.CardFilters) != 0 {
 			t.Errorf("%q is read as %+v, want a name", config.CleanQuery, config.CardFilters)
@@ -388,7 +388,7 @@ func checkNumberedNamesStayNames(t *testing.T, ds *datastore) {
 		if len(tokens) < 2 || !writtenAsNumber(tokens[len(tokens)-1]) {
 			continue
 		}
-		config := parseSearchQuery(ds, co.Name, nil, nil, nil)
+		config := parseSearchQuery(ds, currentPrices(), co.Name, nil, nil, nil)
 		if len(config.CardFilters) != 0 || config.SearchMode != "" {
 			t.Errorf("%q is read as %q %+v", co.Name, config.CleanQuery, config.CardFilters)
 		}

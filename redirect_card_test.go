@@ -96,7 +96,7 @@ func TestCardRedirectSetAloneFindsTheSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), loc.Query().Get("q"), nil, nil, nil))
+	keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), loc.Query().Get("q"), nil, nil, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestCardRedirectLandsOnThePrinting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), loc.Query().Get("q"), nil, nil, nil))
+	keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), loc.Query().Get("q"), nil, nil, nil))
 	if err != nil {
 		t.Fatalf("the query the redirect hands over does not run: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestCardRedirectFinishNarrowsTheResults(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), loc.Query().Get("q"), nil, nil, nil))
+		keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), loc.Query().Get("q"), nil, nil, nil))
 		if err != nil {
 			t.Fatalf("%s: %v", path, err)
 		}
@@ -231,7 +231,7 @@ func TestCardRedirectKeepsTheNumberAsPrinted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), loc.Query().Get("q"), nil, nil, nil))
+	keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), loc.Query().Get("q"), nil, nil, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestCardRedirectReadsAFinishOverAName(t *testing.T) {
 			t.Fatal(err)
 		}
 		query := loc.Query().Get("q")
-		keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+		keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -345,7 +345,7 @@ func TestCardPathComesBackWithItsName(t *testing.T) {
 		if !strings.HasPrefix(query, co.Name+" ") {
 			t.Errorf("%s asked %q, want it to open with %s", path, query, co.Name)
 		}
-		keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+		keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil))
 		if err != nil {
 			t.Fatal(err)
 		}

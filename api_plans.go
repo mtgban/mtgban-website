@@ -89,7 +89,7 @@ func (s *site) APIPlans(w http.ResponseWriter, r *http.Request) {
 	// The page may be served without enforceSigning, so only a verified signature names the reader.
 	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "API", sig)
-	pageVars.API = apiPlansVars(r, sig)
+	pageVars.API = apiPlansVars(s.prices(), r, sig)
 	render(w, "api-plans.html", pageVars)
 }
 
@@ -97,14 +97,15 @@ func (s *site) APIPlans(w http.ResponseWriter, r *http.Request) {
 // resolve. It is registered on its own unsigned route, not as a sub-page of
 // the API page, so the gateway can read it whether or not the pricing page
 // is public.
-func APIStores(w http.ResponseWriter, r *http.Request) {
+func (s *site) APIStores(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	// A cold start would serve a partial list, so the gateway keeps its last good one.
-	if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
+	p := s.prices()
+	if len(p.sellers) == 0 || len(p.vendors) == 0 {
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		if err := json.NewEncoder(w).Encode(map[string]string{"error": "Stores are still loading."}); err != nil {
@@ -117,7 +118,7 @@ func APIStores(w http.ResponseWriter, r *http.Request) {
 		Implied []StoreFamily `json:"implied"`
 		Stores  []StoreFamily `json:"stores"`
 	}{Game: Config().Game, Implied: []StoreFamily{}, Stores: []StoreFamily{}}
-	implied, stores := storeFamilies()
+	implied, stores := storeFamilies(p)
 	out.Implied = append(out.Implied, implied...)
 	out.Stores = append(out.Stores, stores...)
 	w.Header().Set("Cache-Control", "public, max-age=300")
@@ -127,7 +128,7 @@ func APIStores(w http.ResponseWriter, r *http.Request) {
 }
 
 // apiPlansVars gathers what the page and its configurator need.
-func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
+func apiPlansVars(p *prices, r *http.Request, sig string) *APIPlansVars {
 	origin := siteorigin.Of(r)
 	if origin == "" {
 		origin = publicOrigin()
@@ -156,9 +157,9 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 		TrialDays:  15,
 	}
 	v.Cards, v.TopCard = podiumOrder(apiProducts.Packages)
-	v.ImpliedStores, v.Stores = storeFamilies()
+	v.ImpliedStores, v.Stores = storeFamilies(p)
 	if change {
-		v.WantedStores = wantedStores(r.URL.Query()["stores"])
+		v.WantedStores = wantedStores(p, r.URL.Query()["stores"])
 		v.PaidStores = paidStores(v.WantedStores, v.Stores)
 	}
 	v.Default = apiProducts.Packages[0]
@@ -191,9 +192,9 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 }
 
 // familyKeys maps each lowercased configured shorthand to its family key, the config key up to its first underscore.
-func familyKeys() map[string]string {
+func familyKeys(p *prices) map[string]string {
 	keyOf := map[string]string{}
-	config := scraperStoreConfig()
+	config := p.scrapers.byStore
 	for _, key := range slices.Sorted(maps.Keys(config)) {
 		if strings.HasSuffix(key, "_sealed") {
 			continue
@@ -212,8 +213,8 @@ func familyKeys() map[string]string {
 }
 
 // storeFamilies groups the served scrapers by config key prefix, minus what the search blocklists hide.
-func storeFamilies() (implied, selectable []StoreFamily) {
-	keyOf := familyKeys()
+func storeFamilies(p *prices) (implied, selectable []StoreFamily) {
+	keyOf := familyKeys(p)
 	var families []*StoreFamily
 	add := func(info mtgban.ScraperInfo, blocklist []string) {
 		shorthand := info.Shorthand
@@ -230,10 +231,10 @@ func storeFamilies() (implied, selectable []StoreFamily) {
 			families[i].Shorthands = append(families[i].Shorthands, shorthand)
 		}
 	}
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		add(seller.Info(), Config().Stores.SearchRetailBlockList)
 	}
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		add(vendor.Info(), Config().Stores.SearchBuylistBlockList)
 	}
 	for _, f := range families {
@@ -245,7 +246,7 @@ func storeFamilies() (implied, selectable []StoreFamily) {
 		}
 		names := make([]string, 0, len(f.Shorthands))
 		for _, sh := range f.Shorthands {
-			if name := scraperName(sh); name != "" {
+			if name := p.scraperName(sh); name != "" {
 				names = append(names, name)
 			}
 		}
@@ -287,13 +288,13 @@ func familyName(names []string) string {
 }
 
 // wantedStores resolves a change request's stores query to family keys; the implied family is left out.
-func wantedStores(query []string) []string {
-	keyOf := familyKeys()
+func wantedStores(p *prices, query []string) []string {
+	keyOf := familyKeys(p)
 	served := map[string]bool{}
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		served[strings.ToLower(seller.Info().Shorthand)] = true
 	}
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		served[strings.ToLower(vendor.Info().Shorthand)] = true
 	}
 	families := map[string]bool{}

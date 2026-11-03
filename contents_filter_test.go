@@ -20,7 +20,7 @@ func TestContentsOfNothingIsNothing(t *testing.T) {
 		`contents:"No Such Product Exists"`,
 		`variable:"No Such Product Exists"`,
 	} {
-		ids, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+		ids, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil))
 		if len(ids) != 0 {
 			t.Errorf("%s found %d cards", query, len(ids))
 		}
@@ -47,8 +47,8 @@ func TestContentsOfNothingIsNothing(t *testing.T) {
 	if box == "" {
 		t.Skip("no product without a decklist")
 	}
-	all, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), `contents:"`+box+`"`, nil, nil, nil))
-	variable, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), `variable:"`+box+`"`, nil, nil, nil))
+	all, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), `contents:"`+box+`"`, nil, nil, nil))
+	variable, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), `variable:"`+box+`"`, nil, nil, nil))
 	if len(variable) != len(all) {
 		t.Errorf("variable:%q found %d cards, contents: finds %d", box, len(variable), len(all))
 	}
@@ -56,7 +56,7 @@ func TestContentsOfNothingIsNothing(t *testing.T) {
 	// The same is true once several typoed names are comma-listed: none of
 	// them resolves to anything, so there is still nothing to be the
 	// contents of.
-	ids, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), `contents:"No Such Product Exists","Nor Is This One"`, nil, nil, nil))
+	ids, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), `contents:"No Such Product Exists","Nor Is This One"`, nil, nil, nil))
 	if len(ids) != 0 {
 		t.Errorf("multi-value typo list found %d cards", len(ids))
 	}
@@ -80,7 +80,7 @@ func TestCommaQuotedListsTokenize(t *testing.T) {
 		{"another key, no space", `edition:"Kaladesh Inventions","Amonkhet Invocations"`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), currentPrices(), tt.query, nil, nil, nil)
 			if config.CleanQuery != "" {
 				t.Errorf("%q: leftover free text %q, the value list did not fully tokenize", tt.query, config.CleanQuery)
 			}
@@ -92,7 +92,7 @@ func TestCommaQuotedListsTokenize(t *testing.T) {
 
 	// A trailing free-text word after the list is left alone rather than
 	// swallowed into the value.
-	config := parseSearchOptionsNG(backend(), `contents:"A B","C D" trailing text`, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), `contents:"A B","C D" trailing text`, nil, nil, nil)
 	if config.CleanQuery != "trailing text" {
 		t.Errorf("leftover query = %q, want %q", config.CleanQuery, "trailing text")
 	}
@@ -105,7 +105,7 @@ func TestCommaQuotedListsTokenize(t *testing.T) {
 		`contents:"A B", "C D"`,
 		`contents:"A B" , "C D"`,
 	} {
-		config := parseSearchOptionsNG(backend(), spaced, nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), spaced, nil, nil, nil)
 		if config.CleanQuery == "" {
 			t.Errorf("%q: the whole list tokenized as one field; expected the spaced second value to fall out as free text", spaced)
 		}
@@ -166,7 +166,7 @@ func twoDisjointSealedProducts(t *testing.T) (a, b *matcher.CardObject) {
 		if v, ok := cleanCache[c.co.UUID]; ok {
 			return v
 		}
-		res, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), `contents:"`+c.co.Name+`"`, nil, nil, nil))
+		res, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), `contents:"`+c.co.Name+`"`, nil, nil, nil))
 		v := err == nil && len(res) == len(c.deck)
 		cleanCache[c.co.UUID] = v
 		return v
@@ -210,14 +210,14 @@ func TestContentsMultipleExactProductsUnion(t *testing.T) {
 		t.Skip("decklists unavailable")
 	}
 
-	resA, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), `contents:"`+a.Name+`"`, nil, nil, nil))
-	resB, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), `contents:"`+b.Name+`"`, nil, nil, nil))
+	resA, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), `contents:"`+a.Name+`"`, nil, nil, nil))
+	resB, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), `contents:"`+b.Name+`"`, nil, nil, nil))
 	if len(resA) != len(deckA) || len(resB) != len(deckB) {
 		t.Skip("a product's contents: result doesn't line up 1:1 with its raw decklist (a wrapper product)")
 	}
 
 	query := `contents:"` + a.Name + `","` + b.Name + `"`
-	config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil)
 	if config.CleanQuery != "" {
 		t.Errorf("leftover free text %q", config.CleanQuery)
 	}
@@ -231,7 +231,7 @@ func TestContentsMultipleExactProductsUnion(t *testing.T) {
 
 	// A single exact product is unaffected by any of the above: it still
 	// returns only its own cards.
-	single, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), `contents:"`+a.Name+`"`, nil, nil, nil))
+	single, _ := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), `contents:"`+a.Name+`"`, nil, nil, nil))
 	if len(single) != len(deckA) {
 		t.Errorf("a single exact contents: query returned %d cards, want %d", len(single), len(deckA))
 	}
@@ -280,11 +280,11 @@ func TestContentsSubstringFallsBackToProductType(t *testing.T) {
 		t.Skip("no product name yields an unambiguous partial-name fallback case")
 	}
 
-	exact, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), `contents:"`+co.Name+`"`, nil, nil, nil))
+	exact, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), `contents:"`+co.Name+`"`, nil, nil, nil))
 	if err != nil || len(exact) == 0 {
 		t.Skipf("%s finds nothing at all: %v", co.Name, err)
 	}
-	wide, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), `contents:"`+term+`"`, nil, nil, nil))
+	wide, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), `contents:"`+term+`"`, nil, nil, nil))
 	if err != nil {
 		t.Fatalf("contents:%q: %v", term, err)
 	}
@@ -318,7 +318,7 @@ func TestContainerFindsTheProductsACardComesIn(t *testing.T) {
 		t.Skip("no datastore loaded, or no card in it comes in a product")
 	}
 
-	ids, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), "container:"+card, nil, nil, nil))
+	ids, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), "container:"+card, nil, nil, nil))
 	if err != nil || !slices.Contains(ids, product) {
 		t.Errorf("container:%s did not find %s, a product it comes in: %d results, err %v", card, product, len(ids), err)
 	}

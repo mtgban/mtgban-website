@@ -11,7 +11,7 @@
                 <h4>Retail</h4>
                 <div class="settings-grid" id="settings-sleep-sellers">
                     {{range $key := .SleepSellerKeys}}
-                    <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                    <label><input type="checkbox" name="{{$key}}"> {{index $.StoreNames $key}}</label>
                     {{end}}
                 </div>
             </div>
@@ -19,7 +19,7 @@
                 <h4>Buylist</h4>
                 <div class="settings-grid" id="settings-sleep-vendors">
                     {{range $key := .SleepVendorKeys}}
-                    <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                    <label><input type="checkbox" name="{{$key}}"> {{index $.StoreNames $key}}</label>
                     {{end}}
                 </div>
             </div>

@@ -212,11 +212,11 @@ var AllConditions = []mtgban.Condition{"INDEX", mtgban.NM, mtgban.SP, mtgban.MP,
 // dropped, because pinning a name is what the main bar is for. A bar
 // that yields nothing at all is a bar the search will ignore, which is
 // the one thing the reader has to be told.
-func scopeFilters(ds *datastore, scope string, sealed, bareIDs bool) []FilterElem {
+func scopeFilters(ds *datastore, p *prices, scope string, sealed, bareIDs bool) []FilterElem {
 	if scope == "" {
 		return nil
 	}
-	return parseSearchPage(ds, scope, sealed, bareIDs, nil, nil, nil).CardFilters
+	return parseSearchPage(ds, p, scope, sealed, bareIDs, nil, nil, nil).CardFilters
 }
 
 // parseSearchPage parses what a reader typed into a search's bars. A sealed
@@ -224,12 +224,12 @@ func scopeFilters(ds *datastore, scope string, sealed, bareIDs bool) []FilterEle
 // collector numbers, so a number there stays an id or a name's words. With
 // bareIDs a number searched alone stays one too, as the price API's callers
 // ask by TCGplayer product id; a number after a name is a collector number.
-func parseSearchPage(ds *datastore, query string, sealed, bareIDs bool, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
+func parseSearchPage(ds *datastore, p *prices, query string, sealed, bareIDs bool, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
 	if sealed {
-		return parseSearchOptionsNG(ds.backend, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+		return parseSearchOptionsNG(ds.backend, p, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	}
 	budget := maxPools
-	return parseSearchOptionsDepth(ds.backend, ds.numbers, bareIDs, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
+	return parseSearchOptionsDepth(ds.backend, p, ds.numbers, bareIDs, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
 }
 
 // applySearchScope folds the pinned bar's filters into the search the
@@ -474,6 +474,10 @@ func parseChartIDs(b *matcher.Backend, chartParam string) (ids []string, truncat
 
 // SearchVars are the PageVars fields only the search page fills and reads.
 type SearchVars struct {
+	// StoreFactorOptions is the mobile settings drawer's store-factor editor
+	// data: the stores it lists, named, and which of them sell or buy
+	StoreFactorOptions string
+
 	Embed struct {
 		OEmbedURL    string
 		PageURL      string
@@ -599,7 +603,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// starts with nothing pinned.
 	pageVars.IsSealed = r.URL.Path == "/sealed"
 	scope := strings.TrimSpace(r.FormValue("scope"))
-	pinned := scopeFilters(ds, scope, pageVars.IsSealed, false)
+	pinned := scopeFilters(ds, p, scope, pageVars.IsSealed, false)
 	pageVars.SearchScope = scope
 	pageVars.CanScope = true
 	// Something is pinned, and none of it is a filter: the search will pass
@@ -627,6 +631,8 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if pageVars.IsMobile {
 		pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys(p)
 		pageVars.SealedStores = p.sealedStores()
+		pageVars.StoreNames = p.storeNames()
+		pageVars.StoreFactorOptions = storeFactorOptions(p, pageVars.SellerKeys, pageVars.VendorKeys)
 	}
 
 	page := r.FormValue("page")
@@ -687,7 +693,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CondKeys = AllConditions
 	pageVars.ShowUpsell = !miscSearchOpts.has("noUpsell")
 
-	config := parseSearchPage(ds, query, pageVars.IsSealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	config := parseSearchPage(ds, p, query, pageVars.IsSealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
@@ -747,7 +753,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// CHART ALL THE THINGS
 	if roster.id != "" {
-		fillChartPage(&pageVars.SearchVars, pageVars.Metadata, r, ds, roster)
+		fillChartPage(&pageVars.SearchVars, pageVars.Metadata, r, ds, p, roster)
 	}
 
 	notifyFromSearch(r, query, roster, start)
@@ -859,8 +865,8 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	miscSearchOpts := append(readSearchMiscOpts(page), "oembed")
 
 	sealed := page.URL.Path == "/sealed"
-	config := parseSearchPage(ds, query, sealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
-	applySearchScope(&config, scopeFilters(ds, strings.TrimSpace(page.FormValue("scope")), sealed, false))
+	config := parseSearchPage(ds, p, query, sealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	applySearchScope(&config, scopeFilters(ds, p, strings.TrimSpace(page.FormValue("scope")), sealed, false))
 	if sealed {
 		config.SearchMode = "sealed"
 	}
@@ -1707,7 +1713,7 @@ func refererSource(referer string) string {
 // roster's card details, the chart from the long-form price tables, and the
 // single card's sidebar. It adds the roster's ban ids to metadata, which
 // holds the results by their matcher ids.
-func fillChartPage(pageVars *SearchVars, metadata cardMetadata, r *http.Request, ds *datastore, roster chartRoster) {
+func fillChartPage(pageVars *SearchVars, metadata cardMetadata, r *http.Request, ds *datastore, p *prices, roster chartRoster) {
 	b := ds.backend
 	isMultiChart := len(roster.ids) > 1
 
@@ -1719,7 +1725,7 @@ func fillChartPage(pageVars *SearchVars, metadata cardMetadata, r *http.Request,
 	// matcher id (a ban:<id> doesn't parse as a query), so SearchQuery is
 	// non-empty and the template renders the results+chart layout rather than
 	// the empty-query editions browse.
-	cfg := parseSearchOptionsNG(b, roster.searchIDs[roster.id], nil, nil, nil)
+	cfg := parseSearchOptionsNG(b, p, roster.searchIDs[roster.id], nil, nil, nil)
 	pageVars.SearchQuery = cfg.FullQuery
 
 	// Retrieve data

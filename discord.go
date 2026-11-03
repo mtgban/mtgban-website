@@ -183,7 +183,7 @@ func parseMessage(ds *datastore, p *prices, content string, sealed bool) (*Embed
 	// Clean up query, no blocklist because we only need keys. Without the
 	// numbers snapshot: a bare number would leave no name for the check
 	// below, where as an id it embeds its product.
-	config := parseSearchOptionsNG(ds.backend, content, nil, nil, nil)
+	config := parseSearchOptionsNG(ds.backend, p, content, nil, nil, nil)
 	query := config.CleanQuery
 
 	// Enable sealed mode
@@ -809,7 +809,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 		// so the bot's own additions never land in the config's slices.
 		blocklistRetail := Config().siteRetailBlockList()
 		blocklistBuylist := append(Config().siteBuylistBlockList(), "ABUCredit", "ABUCreditSealed", "CKBLLast")
-		config := parseSearchOptionsNG(b, searchRes.CardID, blocklistRetail, blocklistBuylist, nil)
+		config := parseSearchOptionsNG(b, p, searchRes.CardID, blocklistRetail, blocklistBuylist, nil)
 
 		// Keep the bot to stores a reader can actually buy from. That is a
 		// reason to drop a foreign shop and not a reason to drop a foreign

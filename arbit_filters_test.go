@@ -603,7 +603,7 @@ func TestArbitPresetNorms(t *testing.T) {
 // that it is still there on a singles source after an Apply here.
 func TestArbitBarGreysWhatTheSourceDoesNotApply(t *testing.T) {
 	st := parseArbitQuery(t, "cond=NM%2CSP&rl=1&f=1")
-	bar := newArbitBar(st, arbitMode{Sealed: true}, testArbitOffer, rarityBackend(matcher.GameMagic, testArbitOffer.Rarities, nil), "SRC")
+	bar := newArbitBar(st, arbitMode{Sealed: true}, testArbitOffer, rarityBackend(matcher.GameMagic, testArbitOffer.Rarities, nil), currentPrices(), "SRC")
 	if !bar.Condition.Disabled || len(bar.Condition.Choices) != len(arbitConditions) {
 		t.Fatalf("a sealed source's condition row is %+v, want every grade, greyed", bar.Condition)
 	}
@@ -628,7 +628,7 @@ func TestArbitBarGreysWhatTheSourceDoesNotApply(t *testing.T) {
 	if decklists == nil || decklists.Disabled {
 		t.Errorf("only Decklists on a sealed source is %+v, want offered", decklists)
 	}
-	globalSealed := newArbitBar(parseArbitQuery(t, ""), arbitMode{Global: true, Sealed: true}, testArbitOffer, backend(), "SRC")
+	globalSealed := newArbitBar(parseArbitQuery(t, ""), arbitMode{Global: true, Sealed: true}, testArbitOffer, backend(), currentPrices(), "SRC")
 	for _, toggle := range globalSealed.Toggles {
 		if toggle.Key == "legit" && (!toggle.Disabled || !toggle.Checked || toggle.Carry != "") {
 			t.Errorf("only Legit on a sealed global page is %+v, want greyed and ticked, as a singles source applies it, carrying nothing", toggle)
@@ -646,7 +646,7 @@ func TestArbitBarGreysWhatTheSourceDoesNotApply(t *testing.T) {
 		t.Errorf("the sealed page's form reads back as %q", got)
 	}
 
-	singles := newArbitBar(st, arbitMode{}, testArbitOffer, backend(), "SRC")
+	singles := newArbitBar(st, arbitMode{}, testArbitOffer, backend(), currentPrices(), "SRC")
 	if singles.Condition.Disabled || singles.Condition.Carried {
 		t.Errorf("a singles source greys or carries its condition row: %+v", singles.Condition)
 	}
@@ -680,7 +680,7 @@ func TestArbitApplyKeepsReverseTradable(t *testing.T) {
 
 	// What arbit's form posts once Apply ticks only RL, saved as the cookie
 	st := parseArbitQuery(t, "f=1&tradable=0")
-	bar := newArbitBar(st, arbitMode{}, testArbitOffer, backend(), "SRC")
+	bar := newArbitBar(st, arbitMode{}, testArbitOffer, backend(), currentPrices(), "SRC")
 	form := url.Values{"f": {"1"}, "toggles_on": {bar.TogglesOn}, "rl": {"1"}}
 	for _, toggle := range bar.Toggles {
 		if toggle.Carry != "" {
@@ -807,7 +807,7 @@ func TestArbitBarShowsTheAppliedLimit(t *testing.T) {
 			arbitField{Key: "mindiff", Placeholder: "5", Floor: "0"}, 0},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
-			bar := newArbitBar(parseArbitQuery(t, tt.query), tt.mode, testArbitOffer, backend(), "SRC")
+			bar := newArbitBar(parseArbitQuery(t, tt.query), tt.mode, testArbitOffer, backend(), currentPrices(), "SRC")
 			if bar.Spread.Low != tt.spread || bar.Diff.Low != tt.diff {
 				t.Errorf("spread %+v, difference %+v, want %+v, %+v", bar.Spread.Low, bar.Diff.Low, tt.spread, tt.diff)
 			}
@@ -823,7 +823,7 @@ func TestArbitBarShowsTheAppliedLimit(t *testing.T) {
 // a value typed in the field to replacing it.
 func TestArbitCarriedLimitSurvivesApply(t *testing.T) {
 	saved := parseArbitQuery(t, "f=1&mindiff=-50")
-	bar := newArbitBar(saved, arbitMode{Global: true}, testArbitOffer, backend(), "SRC")
+	bar := newArbitBar(saved, arbitMode{Global: true}, testArbitOffer, backend(), currentPrices(), "SRC")
 	for _, tt := range []struct {
 		typed string
 		want  float64

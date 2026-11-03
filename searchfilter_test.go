@@ -75,7 +75,7 @@ func TestCollectorNumberRange(t *testing.T) {
 	}
 
 	t.Run("ascending numbers parse as a range", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "cn:7000-7010", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "cn:7000-7010", nil, nil, nil)
 		elem := findFilter(config, "number_less_than")
 		if elem == nil {
 			t.Fatal("missing number_less_than filter")
@@ -92,7 +92,7 @@ func TestCollectorNumberRange(t *testing.T) {
 	})
 
 	t.Run("year-prefixed number stays literal", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "cn:2002-1", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "cn:2002-1", nil, nil, nil)
 		elem := findFilter(config, "number")
 		if elem == nil {
 			t.Fatal("missing number filter")
@@ -106,7 +106,7 @@ func TestCollectorNumberRange(t *testing.T) {
 	})
 
 	t.Run("lettered number stays literal", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "cn:akh-127", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "cn:akh-127", nil, nil, nil)
 		elem := findFilter(config, "number")
 		if elem == nil {
 			t.Fatal("missing number filter")
@@ -125,7 +125,7 @@ func TestCollectorNumberPLST(t *testing.T) {
 	co.Number = "AKH-127"
 	co.PlainNumber = "AKH-127"
 
-	config := parseSearchOptionsNG(backend(), "cn:akh-127", nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), "cn:akh-127", nil, nil, nil)
 	var elem *FilterElem
 	for i := range config.CardFilters {
 		if config.CardFilters[i].Name == "number" {
@@ -181,7 +181,7 @@ func TestSetNumberShorthand(t *testing.T) {
 
 	checkNameSearch := func(t *testing.T, query string) {
 		t.Helper()
-		config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil)
 		if findFilter(config, "edition") != nil {
 			t.Error("unexpected edition filter")
 		}
@@ -191,7 +191,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	}
 
 	t.Run("set code and number rewrite to filters", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "neo 234", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "neo 234", nil, nil, nil)
 		checkValues(t, findFilter(config, "edition"), "edition", "NEO")
 		checkValues(t, findFilter(config, "number"), "number", "234")
 		if config.CleanQuery != "" {
@@ -208,19 +208,19 @@ func TestSetNumberShorthand(t *testing.T) {
 	// The number survives whole either way; what the set code in front of
 	// it decides is that the query is asked as written.
 	t.Run("PLST prefixed numbers stay in one piece", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "plst c16-177", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "plst c16-177", nil, nil, nil)
 		checkValues(t, findFilter(config, "edition"), "edition", "PLST")
 		checkValues(t, findFilter(config, "number_strict"), "number_strict", "c16-177")
 	})
 
 	t.Run("set reading wins over prefix reading", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "c16 177", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "c16 177", nil, nil, nil)
 		checkValues(t, findFilter(config, "edition"), "edition", "C16")
 		checkValues(t, findFilter(config, "number"), "number", "177")
 	})
 
 	t.Run("ascending numbers still parse as a range", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "neo 1-10", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "neo 1-10", nil, nil, nil)
 		checkValues(t, findFilter(config, "edition"), "edition", "NEO")
 		elem := findFilter(config, "number_less_than")
 		checkValues(t, elem, "number_less_than", "10")
@@ -230,7 +230,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	})
 
 	t.Run("shorthand composes with other filters", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "neo 234 f:foil", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "neo 234 f:foil", nil, nil, nil)
 		checkValues(t, findFilter(config, "edition"), "edition", "NEO")
 		checkValues(t, findFilter(config, "number"), "number", "234")
 		checkValues(t, findFilter(config, "finish"), "finish", "foil")
@@ -242,16 +242,16 @@ func TestSetNumberShorthand(t *testing.T) {
 	t.Run("shorthand composes with finish suffixes", func(t *testing.T) {
 		// The trailing */&/~ is peeled into a finish filter before the
 		// shorthand sees the query, leaving a clean two-token rewrite
-		config := parseSearchOptionsNG(backend(), "neo 123*", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "neo 123*", nil, nil, nil)
 		checkValues(t, findFilter(config, "edition"), "edition", "NEO")
 		checkValues(t, findFilter(config, "number"), "number", "123")
 		checkValues(t, findFilter(config, "finish"), "finish", "foil")
 	})
 
 	t.Run("hash and zero prefixes normalize away", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "neo #234", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "neo #234", nil, nil, nil)
 		checkValues(t, findFilter(config, "number"), "number", "234")
-		config = parseSearchOptionsNG(backend(), "neo 0234", nil, nil, nil)
+		config = parseSearchOptionsNG(backend(), currentPrices(), "neo 0234", nil, nil, nil)
 		checkValues(t, findFilter(config, "number"), "number", "234")
 	})
 
@@ -259,7 +259,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	// the region code; both are the two words "info 067".
 	t.Run("a printed number reads as set code and number", func(t *testing.T) {
 		for _, query := range []string{"neo-234", "NEO-EN234", "neo-e234"} {
-			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil)
 			checkValues(t, findFilter(config, "edition"), "edition", "NEO")
 			checkValues(t, findFilter(config, "number"), "number", "234")
 			if config.CleanQuery != "" {
@@ -291,7 +291,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	})
 
 	t.Run("explicit search mode disables the shorthand", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "neo 234 sm:prefix", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "neo 234 sm:prefix", nil, nil, nil)
 		if findFilter(config, "edition") != nil {
 			t.Error("unexpected edition filter")
 		}
@@ -306,7 +306,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	// writes cn: and the wrong one for whoever typed two words: SPG files
 	// eight Mana Crypts under 17, and "spg 17a" names exactly one of them.
 	t.Run("a suffix asks for the printing wearing it", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "spg 17a", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "spg 17a", nil, nil, nil)
 		checkValues(t, findFilter(config, "edition"), "edition", "SPG")
 		checkValues(t, findFilter(config, "number_strict"), "number_strict", "17a")
 		if findFilter(config, "number") != nil {
@@ -335,7 +335,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	// A mark is a suffix like any other: 4ED files Thoughtlace at 107 and
 	// Drudge Skeletons at 107†, and cn: answers both.
 	t.Run("a mark asks for the marked printing", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "4ed 107†", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "4ed 107†", nil, nil, nil)
 		checkValues(t, findFilter(config, "number_strict"), "number_strict", "107†")
 
 		keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
@@ -357,7 +357,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	})
 
 	t.Run("a plain number still answers the family", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "spg 17", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "spg 17", nil, nil, nil)
 		checkValues(t, findFilter(config, "number"), "number", "17")
 
 		keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
@@ -380,7 +380,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	// A prefixed number is asked as written like any other, and reaches the
 	// one printing it names.
 	t.Run("a prefixed number reaches its printing", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "plst c16-177", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "plst c16-177", nil, nil, nil)
 		keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 		if err != nil {
 			t.Fatal(err)
@@ -402,7 +402,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	// Writing cn: out asks for a lettered number as typed, as the
 	// shorthand does.
 	t.Run("writing cn: asks for a lettered number as typed", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "s:spg cn:17a", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "s:spg cn:17a", nil, nil, nil)
 		checkValues(t, findFilter(config, "number"), "number", "17a")
 	})
 
@@ -412,7 +412,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	// picks the reading, while the token as typed is what gets asked for -
 	// so "#17a" is asked for whole, and no card is numbered that.
 	t.Run("a hash on a suffixed number is no number at all", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "spg #17a", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "spg #17a", nil, nil, nil)
 		checkValues(t, findFilter(config, "number_strict"), "number_strict", "#17a")
 
 		keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
@@ -428,7 +428,7 @@ func TestSetNumberShorthand(t *testing.T) {
 	// back #30; answering nothing says what is true, and the plain number
 	// is still one keystroke away.
 	t.Run("a suffix the set does not carry reaches nothing", func(t *testing.T) {
-		config := parseSearchOptionsNG(backend(), "neo 30a", nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), "neo 30a", nil, nil, nil)
 		checkValues(t, findFilter(config, "number_strict"), "number_strict", "30a")
 
 		keys, err := searchAndFilter(currentDatastore(), currentPrices(), config)
@@ -451,13 +451,13 @@ func TestCollectorNumberStrict(t *testing.T) {
 	co.Number = "107★"
 	co.PlainNumber = "107"
 
-	config := parseSearchOptionsNG(backend(), "cn:107", nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), "cn:107", nil, nil, nil)
 	elem := findNumberFilter(t, config, "number")
 	if skip := applyCardFilter(backend(), currentPrices(), "number", elem.Values, co); skip {
 		t.Error("cn:107 should match the starred printing")
 	}
 
-	config = parseSearchOptionsNG(backend(), "cn:107★", nil, nil, nil)
+	config = parseSearchOptionsNG(backend(), currentPrices(), "cn:107★", nil, nil, nil)
 	elem = findNumberFilter(t, config, "number")
 	if len(elem.Values) != 1 || elem.Values[0] != "107★" {
 		t.Errorf("cn should keep a decorated query as typed, got %v", elem.Values)
@@ -469,7 +469,7 @@ func TestCollectorNumberStrict(t *testing.T) {
 		t.Error("cn:107★ should not match the plain printing")
 	}
 
-	config = parseSearchOptionsNG(backend(), "cns:107★", nil, nil, nil)
+	config = parseSearchOptionsNG(backend(), currentPrices(), "cns:107★", nil, nil, nil)
 	elem = findNumberFilter(t, config, "number_strict")
 	if len(elem.Values) != 1 || elem.Values[0] != "107★" {
 		t.Errorf("cns should keep the query verbatim, got %v", elem.Values)
@@ -478,7 +478,7 @@ func TestCollectorNumberStrict(t *testing.T) {
 		t.Error("cns:107★ should match the starred printing")
 	}
 
-	config = parseSearchOptionsNG(backend(), "cns:107", nil, nil, nil)
+	config = parseSearchOptionsNG(backend(), currentPrices(), "cns:107", nil, nil, nil)
 	elem = findNumberFilter(t, config, "number_strict")
 	if skip := applyCardFilter(backend(), currentPrices(), "number_strict", elem.Values, co); !skip {
 		t.Error("cns:107 should not match the starred printing")

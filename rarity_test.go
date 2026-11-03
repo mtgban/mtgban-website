@@ -27,7 +27,7 @@ func rarityBackend(game matcher.Game, order []string, cards map[string]string) *
 // rarityKept parses the query the way the search does and lists the cards
 // its filters keep.
 func rarityKept(b *matcher.Backend, query string) []string {
-	config := parseSearchOptionsNG(b, query, nil, nil, nil)
+	config := parseSearchOptionsNG(b, currentPrices(), query, nil, nil, nil)
 	var kept []string
 	for _, uuid := range b.AllUUIDs {
 		skip := shouldSkipCardNG(b, currentPrices(), uuid, config.CardFilters)

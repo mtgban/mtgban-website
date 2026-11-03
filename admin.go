@@ -120,6 +120,7 @@ type AdminVars struct {
 }
 
 func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
+	p := s.prices()
 	// The dashboard asks for the workflow status once it has rendered, so a
 	// round trip to GitHub never delays the page. Answered from here rather
 	// than a route of its own, to stay behind the same signing middleware.
@@ -160,11 +161,11 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		pageVars.SelectableLabel = "Invite link"
 	}
 
-	if s.adminActions(w, r, &pageVars) {
+	if s.adminActions(w, r, p, &pageVars) {
 		return
 	}
 
-	if s.adminTools(w, r, &pageVars) {
+	if s.adminTools(w, r, p, &pageVars) {
 		return
 	}
 
@@ -180,15 +181,15 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	adminInfrastructureEditor(r, &pageVars)
 
-	s.adminKeyOverrides(r, b, &pageVars)
+	s.adminKeyOverrides(r, b, p, &pageVars)
 
 	// now anchors every staleness check below, so one row is never compared
 	// against a slightly later "now" than its neighbor.
 	now := time.Now()
 
-	adminScraperTable(sessionstore.Retail, now, &pageVars)
+	adminScraperTable(p, sessionstore.Retail, now, &pageVars)
 
-	adminScraperTable(sessionstore.Buylist, now, &pageVars)
+	adminScraperTable(p, sessionstore.Buylist, now, &pageVars)
 
 	adminPageTable(&pageVars)
 
@@ -217,7 +218,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 			pageVars.DemoKeyPackages = append(pageVars.DemoKeyPackages, pkg)
 		}
 	}
-	_, pageVars.DemoKeyStores = storeFamilies()
+	_, pageVars.DemoKeyStores = storeFamilies(p)
 	pageVars.DemoKeyImplied = apiProducts.Implied.Name
 	pageVars.Uptime = uptime()
 	pageVars.DiskStatus = disk()
@@ -279,11 +280,11 @@ func crossSitePost(r *http.Request) bool {
 // logs name it does not know leaves a message for the page instead.
 // removestore, refresh and reload change live stores, so only a POST's body
 // names them.
-func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *PageVars) bool {
+func (s *site) adminActions(w http.ResponseWriter, r *http.Request, p *prices, pageVars *PageVars) bool {
 	refresh := r.PostFormValue("refresh")
 	if refresh != "" {
 		v := url.Values{}
-		_, found := currentScraperIndex().byStore[refresh]
+		_, found := p.scrapers.byStore[refresh]
 		if !found {
 			v.Set("msg", refresh+" not found")
 		} else {
@@ -351,7 +352,7 @@ func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *Pa
 		}
 
 		// If it's not a Page, look if the last listing named it as a store
-		_, found = currentScraperIndex().byStore[logs]
+		_, found = p.scrapers.byStore[logs]
 		if found {
 			link := fmt.Sprintf(gaLogURL, newBantoolWorkflow(Config().Game, logs).File)
 			http.Redirect(w, r, link, http.StatusFound)
@@ -378,7 +379,7 @@ var restartServer = func() {
 // link is minted for the admin's own page and saved nowhere, so a GET's
 // query can ask for one. A new API key is put on the page the POST
 // answers rather than in a redirect, so no URL, history or log holds it.
-func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *PageVars) bool {
+func (s *site) adminTools(w http.ResponseWriter, r *http.Request, p *prices, pageVars *PageVars) bool {
 	tool := r.PostFormValue("tool")
 	if r.FormValue("tool") == "invite" {
 		tool = "invite"
@@ -471,7 +472,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 		scope, modes := "ALL_ACCESS", "all"
 		if tool == "demokey" && r.PostFormValue("package") != "" {
 			var err error
-			scope, modes, err = demoKeyScope(r.PostFormValue("package"), r.PostFormValue("store"))
+			scope, modes, err = demoKeyScope(p, r.PostFormValue("package"), r.PostFormValue("store"))
 			if err != nil {
 				pageVars.InfoMessage = "error: " + err.Error()
 				break
@@ -722,7 +723,7 @@ func adminInfrastructureEditor(r *http.Request, pageVars *PageVars) {
 // reloads the scrapers they touch, then fills the editor, the override
 // builder's store list, and the builder itself when a search "Fix" link
 // pre-filled it.
-func (s *site) adminKeyOverrides(r *http.Request, b *matcher.Backend, pageVars *PageVars) {
+func (s *site) adminKeyOverrides(r *http.Request, b *matcher.Backend, p *prices, pageVars *PageVars) {
 	// -- Key overrides: handle POST if submitted --
 	newOverrides := r.PostFormValue("keyOverridesTextArea")
 	if newOverrides != "" {
@@ -767,10 +768,10 @@ func (s *site) adminKeyOverrides(r *http.Request, b *matcher.Backend, pageVars *
 
 	// -- Key overrides: store list for the builder dropdown --
 	storeSet := map[string]struct{}{}
-	for _, seller := range GetSellers() {
+	for _, seller := range p.sellers {
 		storeSet[seller.Info().Shorthand] = struct{}{}
 	}
-	for _, v := range GetVendors() {
+	for _, v := range p.vendors {
 		storeSet[v.Info().Shorthand] = struct{}{}
 	}
 	stores := make([]string, 0, len(storeSet))
@@ -797,7 +798,7 @@ func (s *site) adminKeyOverrides(r *http.Request, b *matcher.Backend, pageVars *
 // adminScraperTable appends the dashboard's retail or buylist table to the
 // page, as kind (sessionstore.Retail or Buylist) says: one row per seller or
 // vendor, with its staleness measured against now.
-func adminScraperTable(kind string, now time.Time, pageVars *PageVars) {
+func adminScraperTable(p *prices, kind string, now time.Time, pageVars *PageVars) {
 	// What a row shows of a seller or a vendor besides its info: when its
 	// prices were taken, and how many there are.
 	type dashScraper struct {
@@ -809,23 +810,23 @@ func adminScraperTable(kind string, now time.Time, pageVars *PageVars) {
 	var scrapers []dashScraper
 	affiliates := Affiliates().List
 	if kind == sessionstore.Retail {
-		for _, seller := range GetSellers() {
+		for _, seller := range p.sellers {
 			scrapers = append(scrapers, dashScraper{seller.Info(), seller.Info().InventoryTimestamp, len(seller.Inventory()), false})
 		}
 	} else {
 		affiliates = Affiliates().BuylistList
-		for _, vendor := range GetVendors() {
+		for _, vendor := range p.vendors {
 			scrapers = append(scrapers, dashScraper{vendor.Info(), vendor.Info().BuylistTimestamp, len(vendor.Buylist()), false})
 		}
 	}
-	for _, store := range droppedStoresOf(kind) {
+	for _, store := range droppedStoresOf(p, kind) {
 		scrapers = append(scrapers, dashScraper{store.info, &store.updated, 0, true})
 	}
 
 	var table [][]string
 	for _, scraper := range scrapers {
 		key := "UNKNOWN"
-		store, found := scraperStoreOf(scraper.info.Shorthand)
+		store, found := p.storeOf(scraper.info.Shorthand)
 		if found {
 			key = store
 		}
@@ -1416,7 +1417,7 @@ func saveConfig(ctx context.Context, config ConfigType) error {
 // demoKeyScope is the store scope and modes the price list's package sells,
 // as the gateway signs them: an explicit package's stores are the implied
 // family's shorthands plus those of the store family picked.
-func demoKeyScope(pkgKey, family string) (scope, modes string, err error) {
+func demoKeyScope(p *prices, pkgKey, family string) (scope, modes string, err error) {
 	pkg, found := apiProducts.Package(pkgKey)
 	if !found {
 		return "", "", fmt.Errorf("unknown package %q", pkgKey)
@@ -1426,7 +1427,7 @@ func demoKeyScope(pkgKey, family string) (scope, modes string, err error) {
 		return pkg.StoreScope, modes, nil
 	}
 
-	implied, stores := storeFamilies()
+	implied, stores := storeFamilies(p)
 	if len(implied) == 0 {
 		return "", "", fmt.Errorf("implied store %q not served", apiProducts.Implied.Name)
 	}

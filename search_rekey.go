@@ -68,9 +68,9 @@ func rekeyFilters(ds *datastore, p *prices, name, filters []string, pinned []Fil
 		// A filter that is no card filter reads its value its own way,
 		// region:jp or sort:chrono, and stays as typed; a store filter
 		// naming no store is the one read under another key.
-		elem, ok := cardFilterOf(ds, filter, sealed)
+		elem, ok := cardFilterOf(ds, p, filter, sealed)
 		store := key == "store" || key == "seller" || key == "vendor"
-		if !ok && (!store || namesStores(value)) {
+		if !ok && (!store || namesStores(p, value)) {
 			others = append(others, filter)
 			continue
 		}
@@ -82,7 +82,7 @@ func rekeyFilters(ds *datastore, p *prices, name, filters []string, pinned []Fil
 		if ok {
 			tried = append(tried, elem)
 			negate = elem.Negate
-			t.typed = newRekeyPart(ds, elem, t.key, sealed)
+			t.typed = newRekeyPart(ds, p, elem, t.key, sealed)
 		}
 		prefix := ""
 		if negate {
@@ -93,12 +93,12 @@ func rekeyFilters(ds *datastore, p *prices, name, filters []string, pinned []Fil
 				continue
 			}
 			token := prefix + key + op + value
-			elem, ok := cardFilterOf(ds, token, sealed)
+			elem, ok := cardFilterOf(ds, p, token, sealed)
 			if !ok || elem.Regexp != nil || elem.Negate != negate || slices.ContainsFunc(tried, elem.sameAs) {
 				continue
 			}
 			tried = append(tried, elem)
-			candidate, ok := newRekeyCandidate(ds, prefix+key+op, value, sealed)
+			candidate, ok := newRekeyCandidate(ds, p, prefix+key+op, value, sealed)
 			if ok {
 				candidate.token = token
 				t.candidates = append(t.candidates, candidate)
@@ -110,7 +110,7 @@ func rekeyFilters(ds *datastore, p *prices, name, filters []string, pinned []Fil
 		return filters, false
 	}
 
-	config := parseSearchPage(ds, strings.Join(others, " "), sealed, false, nil, nil, nil)
+	config := parseSearchPage(ds, p, strings.Join(others, " "), sealed, false, nil, nil, nil)
 	applySearchScope(&config, pinned)
 	if sealed {
 		config.SearchMode = "sealed"
@@ -225,7 +225,7 @@ func (t *rekeyTry) try(b *matcher.Backend, p *prices, co *matcher.CardObject) {
 // readsAnywhere reports whether a filter keeps a card somewhere in the
 // datastore and reads its value there, as a filter naming nothing does not.
 func readsAnywhere(ds *datastore, p *prices, elem FilterElem, key string, sealed bool) bool {
-	part := newRekeyPart(ds, elem, key, sealed)
+	part := newRekeyPart(ds, p, elem, key, sealed)
 	for _, co := range ds.backend.UUIDs {
 		part.try(ds.backend, p, co)
 		if !part.failed() {
@@ -238,13 +238,13 @@ func readsAnywhere(ds *datastore, p *prices, elem FilterElem, key string, sealed
 // namesStores reports whether every comma-separated value names a loaded
 // store, by shorthand or by name, read past an option the way the parser
 // reads store:empty:ck.
-func namesStores(value string) bool {
+func namesStores(p *prices, value string) bool {
 	subCodes := strings.Split(value, ":")
 	if len(subCodes) > 1 {
 		value = subCodes[1]
 	}
-	idx := currentStoreIndex()
-	for _, store := range fixupStoreCodeNG(value) {
+	idx := &p.index
+	for _, store := range fixupStoreCodeNG(p, value) {
 		_, seller := idx.sellerFold[store]
 		_, vendor := idx.vendorFold[store]
 		if !seller && !vendor {
@@ -272,14 +272,14 @@ type rekeyCandidate struct {
 // newRekeyCandidate parses each value under key, which carries its sign
 // and operation, and fails where one does not parse into a card filter of
 // one value.
-func newRekeyCandidate(ds *datastore, key, value string, sealed bool) (rekeyCandidate, bool) {
+func newRekeyCandidate(ds *datastore, p *prices, key, value string, sealed bool) (rekeyCandidate, bool) {
 	var c rekeyCandidate
 	for _, part := range strings.Split(value, ",") {
-		elem, ok := cardFilterOf(ds, key+part, sealed)
+		elem, ok := cardFilterOf(ds, p, key+part, sealed)
 		if !ok || len(elem.Values) != 1 {
 			return c, false
 		}
-		c.parts = append(c.parts, *newRekeyPart(ds, elem, key, sealed))
+		c.parts = append(c.parts, *newRekeyPart(ds, p, elem, key, sealed))
 	}
 	return c, true
 }
@@ -287,9 +287,9 @@ func newRekeyCandidate(ds *datastore, key, value string, sealed bool) (rekeyCand
 // newRekeyPart pairs the filter a value parsed into with the one
 // nonsenseValue parses into under the same key. A key that takes no
 // nonsense, as s: drops a set that is not one, reads its value.
-func newRekeyPart(ds *datastore, elem FilterElem, key string, sealed bool) *rekeyPart {
+func newRekeyPart(ds *datastore, p *prices, elem FilterElem, key string, sealed bool) *rekeyPart {
 	part := &rekeyPart{filter: []FilterElem{elem}}
-	nonsense, ok := cardFilterOf(ds, key+nonsenseValue, sealed)
+	nonsense, ok := cardFilterOf(ds, p, key+nonsenseValue, sealed)
 	if ok {
 		part.nonsense = []FilterElem{nonsense}
 	} else {
@@ -329,9 +329,9 @@ const nonsenseValue = "zzqxzzqx"
 
 // cardFilterOf is the one card filter a filter token parses into, if that
 // is all it parses into.
-func cardFilterOf(ds *datastore, token string, sealed bool) (FilterElem, bool) {
-	config := parseSearchPage(ds, token, sealed, false, nil, nil, nil)
-	plain := parseSearchPage(ds, "", sealed, false, nil, nil, nil)
+func cardFilterOf(ds *datastore, p *prices, token string, sealed bool) (FilterElem, bool) {
+	config := parseSearchPage(ds, p, token, sealed, false, nil, nil, nil)
+	plain := parseSearchPage(ds, p, "", sealed, false, nil, nil, nil)
 	if len(config.CardFilters) != 1 || config.CleanQuery != "" || config.SearchMode != plain.SearchMode {
 		return FilterElem{}, false
 	}

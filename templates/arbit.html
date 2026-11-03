@@ -362,7 +362,7 @@
                     {{end}}
 
 
-                    {{$buyCart := cart_load_arbit $sourceKey false $entries}}
+                    {{$buyCart := $arb.BuyCart}}
                     {{if $buyCart.Link}}
                         {{$hasCart = true}}
                         <span class="cart-load">
@@ -392,7 +392,7 @@
 
                     {{/* Global sells nowhere */}}
                     {{if not $.GlobalMode}}
-                    {{$sellCart := cart_load_arbit $scraperKey true $entries}}
+                    {{$sellCart := $arb.SellCart}}
                     {{if $sellCart.Link}}
                         {{$hasCart = true}}
                         <span class="cart-load">
@@ -438,7 +438,7 @@
                     <th class="c">
                         <a href="javascript:sortBy('sell_price', '{{.Name}}')">
                             {{if $.GlobalMode}}
-                                {{if $sealedSource}}{{.Name}}{{else}}{{scraper_name $.ScraperShort}}{{end}}
+                                {{if $sealedSource}}{{.Name}}{{else}}{{index $.StoreNames $.ScraperShort}}{{end}}
                             {{else}}
                                 Sell Price
                             {{end}}
@@ -448,7 +448,7 @@
                         <th class="c">
                             <a href="javascript:sortBy('buy_price', '{{.Name}}')">
                                 {{if $.GlobalMode}}
-                                    {{if $sealedSource}}{{scraper_name $.ScraperShort}}{{else}}{{.Name}}{{end}}
+                                    {{if $sealedSource}}{{index $.StoreNames $.ScraperShort}}{{else}}{{.Name}}{{end}}
                                 {{else}}
                                     Buy Price
                                 {{end}}

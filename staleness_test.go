@@ -342,7 +342,7 @@ func TestDropStaleStoresStopsServingOnlyOldData(t *testing.T) {
 	if !slices.Equal(gotSellers, []string{"ZZSTALE", "ZZUPLOAD", "ZZUNDATED"}) || !slices.Equal(gotVendors, []string{"ZZFRESHV"}) {
 		t.Errorf("served sellers %v, vendors %v; want ZZOLD and ZZOLDV dropped", gotSellers, gotVendors)
 	}
-	if got := droppedStoresOf(sessionstore.Retail); len(got) != 1 || got[0].info.Shorthand != "ZZOLD" {
+	if got := droppedStoresOf(currentPrices(), sessionstore.Retail); len(got) != 1 || got[0].info.Shorthand != "ZZOLD" {
 		t.Errorf("dropped retail = %v, want ZZOLD", got)
 	}
 
@@ -350,7 +350,7 @@ func TestDropStaleStoresStopsServingOnlyOldData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a fresh load was refused: %s", err)
 	}
-	if got := droppedStoresOf(sessionstore.Retail); len(got) != 0 {
+	if got := droppedStoresOf(currentPrices(), sessionstore.Retail); len(got) != 0 {
 		t.Errorf("ZZOLD is served again but still listed as dropped: %v", got)
 	}
 }
@@ -367,7 +367,7 @@ func TestCheckStalenessAnnouncesADropAndItsReturn(t *testing.T) {
 	}
 
 	var pv PageVars
-	adminScraperTable(sessionstore.Retail, time.Now(), &pv)
+	adminScraperTable(currentPrices(), sessionstore.Retail, time.Now(), &pv)
 	if len(pv.Tables) != 1 || len(pv.Tables[0]) != 2 || pv.Tables[0][1][1] != "ZZOLD" || pv.Tables[0][1][8] != "dropped 8d" {
 		t.Errorf("dashboard = %q, want ZZOLD marked dropped 8d", pv.Tables)
 	}
@@ -636,7 +636,7 @@ func TestDropStaleStoresKeepsTheLastStoreOnASide(t *testing.T) {
 	if !slices.Equal(gotSellers, []string{"ZZOLD"}) || !slices.Equal(gotVendors, []string{"ZZOLDV"}) {
 		t.Errorf("served sellers %v, vendors %v; want ZZOLD and ZZOLDV kept", gotSellers, gotVendors)
 	}
-	dropped := droppedStoresOf(sessionstore.Retail)
+	dropped := droppedStoresOf(currentPrices(), sessionstore.Retail)
 	if len(dropped) != 1 || dropped[0].info.Shorthand != "ZZOLDER" {
 		t.Errorf("dropped retail = %v, want ZZOLDER", dropped)
 	}

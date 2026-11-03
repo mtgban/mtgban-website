@@ -80,7 +80,7 @@ func TestMain(m *testing.M) {
 }
 
 func parseSearchOptionsWrapper(input string) SearchConfig {
-	return parseSearchOptionsNG(backend(), input, nil, nil, nil)
+	return parseSearchOptionsNG(backend(), currentPrices(), input, nil, nil, nil)
 }
 
 // skipWithoutDatastore skips a test or benchmark that needs real card data
@@ -243,7 +243,7 @@ func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
 		t.Skip("no exact card named Serra in this datastore")
 	}
 
-	config := parseSearchOptionsNG(backend(), "s:leb serra", nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), currentPrices(), "s:leb serra", nil, nil, nil)
 	results, err := searchAndFilter(currentDatastore(), currentPrices(), config)
 	if err != nil {
 		t.Fatal(err)
@@ -262,7 +262,7 @@ func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
 	}
 
 	// Bare exact query: only the exact matches, no widening
-	config = parseSearchOptionsNG(backend(), "serra", nil, nil, nil)
+	config = parseSearchOptionsNG(backend(), currentPrices(), "serra", nil, nil, nil)
 	results, err = searchAndFilter(currentDatastore(), currentPrices(), config)
 	if err != nil {
 		t.Fatal(err)

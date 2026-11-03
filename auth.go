@@ -556,11 +556,6 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			return
 		}
 
-		if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
-			errorResponse(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
-			return
-		}
-
 		w.Header().Add("Content-Type", "application/json")
 
 		sig := r.FormValue("sig")

@@ -533,19 +533,19 @@ func ckViewFor(q ckQuote, h ckHistory, hasHistory bool, odds *ckOdds, newHigh bo
 // card's from its history, the odds and the other cash buylists. It runs when
 // CK's data, the history or the new highs change, and hourly because the
 // rules and facts count days and the other buylists reload.
-func rebuildCKSignals() {
+func rebuildCKSignals(p *prices) {
 	ckSignalsMu.Lock()
 	defer ckSignalsMu.Unlock()
 
 	// Without CK's buylist there is nothing to show, the last signals included
-	if !ckAvailable() {
+	if !ckAvailable(p) {
 		ckSignalsPtr.Store(nil)
 		return
 	}
 
-	offers, _ := findVendorBuylist("CK")
+	offers, _ := p.vendorBuylist("CK")
 	// A missing inventory leaves stock unknown rather than zero.
-	stock, err := findSellerInventory("CK")
+	stock, err := p.sellerInventory("CK")
 	stockKnown := err == nil && len(stock) > 0
 	newHighs := GetInfos()["newhigh"]
 	history := ckHistoryPtr.Load()
@@ -566,9 +566,9 @@ func rebuildCKSignals() {
 		}
 	}
 
-	lastKnown, _ := findVendorBuylist("CKBLLast")
+	lastKnown, _ := p.vendorBuylist("CKBLLast")
 	var cash []mtgban.BuylistRecord
-	for _, vendor := range GetVendors() {
+	for _, vendor := range p.vendors {
 		if ckCashBuylist(vendor.Info()) {
 			cash = append(cash, vendor.Buylist())
 		}
@@ -613,8 +613,8 @@ func rebuildCKSignals() {
 // ckAvailable tells whether this site serves Card Kingdom's buylist, which
 // everything here starts from: the history, the odds and the signals are
 // loaded and built only where it does.
-func ckAvailable() bool {
-	_, err := findVendorBuylist("CK")
+func ckAvailable(p *prices) bool {
+	_, err := p.vendorBuylist("CK")
 	return err == nil
 }
 
@@ -658,12 +658,13 @@ func ckSignalsReport(signals map[string]ckView, history *ckHistorySnapshot, odds
 // refreshCKSignals reloads the history when the newspaper has a new day and
 // the odds when they are a day old, and rebuilds the signals either way.
 func (s *site) refreshCKSignals() {
-	if !ckAvailable() {
+	p := s.prices()
+	if !ckAvailable(p) {
 		return
 	}
 	s.loadCKHistory()
 	refreshCKOdds()
-	rebuildCKSignals()
+	rebuildCKSignals(p)
 }
 
 // ckSignalForCard is a card's CK signal as of the last rebuild.

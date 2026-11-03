@@ -595,7 +595,7 @@ func TestCollectMagicSnapshotCountsResolveErrors(t *testing.T) {
 	now := time.Now()
 	withPrices(t, []mtgban.Seller{serveSellerN("ZZMKM", map[string]float64{filed: 1, failing: 2}, now)}, nil)
 
-	snapshot := collectMagicSnapshot(backend(), now, func(id string, _ timeseries.MagicVariant) (int64, error) {
+	snapshot := collectMagicSnapshot(backend(), currentPrices(), now, func(id string, _ timeseries.MagicVariant) (int64, error) {
 		if id == failing {
 			return 0, errors.New("connection reset")
 		}
@@ -624,7 +624,7 @@ func TestCollectMagicSnapshotCountsRespellings(t *testing.T) {
 	now := time.Now()
 	withPrices(t, []mtgban.Seller{serveSellerN("ZZMKM", map[string]float64{filed: 1, respelled: 2}, now)}, nil)
 
-	snapshot := collectMagicSnapshot(backend(), now, func(id string, alias timeseries.MagicVariant) (int64, error) {
+	snapshot := collectMagicSnapshot(backend(), currentPrices(), now, func(id string, alias timeseries.MagicVariant) (int64, error) {
 		if id == respelled {
 			return 0, &timeseries.ErrVariantRespelled{MtgbanID: id, Stored: "old-id", Alias: alias}
 		}
@@ -684,7 +684,7 @@ func TestMagicIDAltCopy(t *testing.T) {
 	now := time.Now()
 	withPrices(t, []mtgban.Seller{serveSellerN("ZZMKM", map[string]float64{original.UUID: 4.34, copied.UUID: 285.01}, now)}, nil)
 
-	snapshot := collectMagicSnapshot(backend(), now, func(id string, alias timeseries.MagicVariant) (int64, error) {
+	snapshot := collectMagicSnapshot(backend(), currentPrices(), now, func(id string, alias timeseries.MagicVariant) (int64, error) {
 		switch id {
 		case original.UUID:
 			if alias.IsAlt {

@@ -481,7 +481,7 @@ func TestBanSearchLinkFindsItsPrinting(t *testing.T) {
 			t.Fatalf("parsing the link for %s: %v", co.Name, err)
 		}
 		query := parsed.Query().Get("q")
-		keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+		keys, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil))
 		if err != nil {
 			t.Errorf("%s %s #%s: %v", co.Name, co.SetCode, co.Number, err)
 			continue

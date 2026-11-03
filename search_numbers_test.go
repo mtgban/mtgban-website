@@ -31,7 +31,7 @@ func TestNumbersSnapshotMatchesScan(t *testing.T) {
 		{"cn:akh-127", "number"},
 	} {
 		t.Run(tt.query, func(t *testing.T) {
-			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), currentPrices(), tt.query, nil, nil, nil)
 			seeded, ok := numberSeedUUIDs(numbers, config.CardFilters)
 			if !ok {
 				t.Fatalf("%s did not seed", tt.query)
@@ -62,7 +62,7 @@ func TestNumberSeedDeclines(t *testing.T) {
 		"cne:^6.5$",  // a pattern, which names no key
 	} {
 		t.Run(query, func(t *testing.T) {
-			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil)
 			_, ok := numberSeedUUIDs(numbers, config.CardFilters)
 			if ok {
 				t.Errorf("%s seeded, but it does not bound the result set", query)
@@ -97,7 +97,7 @@ func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
 
 	for _, query := range []string{"cn:635", "cn:635,635", "cn:999999999", "cn:139s", "cns:107★", "cn:635 -s:SLD", "-cn:635", "cn:SLD:635", "cn:1-10", "cne:^6.5$", "s:LEA cn:999999999"} {
 		t.Run(query, func(t *testing.T) {
-			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil)
 			want, wantErr := searchAndFilter(&withoutNumbers, currentPrices(), config)
 			got, gotErr := searchAndFilter(base, currentPrices(), config)
 			slices.Sort(want)
@@ -119,7 +119,7 @@ func BenchmarkNumbersSnapshotSearch(b *testing.B) {
 	withoutNumbers.numbers = nil
 
 	for _, query := range []string{"cn:635", "cn:161", "cns:107★"} {
-		config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil)
 		scanned, err := searchAndFilter(&withoutNumbers, currentPrices(), config)
 		if err != nil {
 			b.Fatal(err)
