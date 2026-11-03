@@ -112,8 +112,9 @@ func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
 	}
 	vars.Alerts = views
 	b := s.backend()
+	p := s.prices()
 	vars.Cards = cardMetadata{}
 	for _, view := range views {
-		vars.Cards[view.CardID] = uuid2card(b, view.CardID, false, nil)
+		vars.Cards[view.CardID] = uuid2card(b, p, view.CardID, false, nil)
 	}
 }

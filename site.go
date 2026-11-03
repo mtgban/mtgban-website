@@ -51,7 +51,7 @@ type site struct {
 
 	// fetchLastSold is how the Discord $$ lookup fetches a printing's recent
 	// sales: getLastSold, held here so a test can answer in its place.
-	fetchLastSold func(ctx context.Context, b *matcher.Backend, cardID string, anyLang bool) ([]tcgplayer.LatestSalesData, error)
+	fetchLastSold func(ctx context.Context, b *matcher.Backend, p *prices, cardID string, anyLang bool) ([]tcgplayer.LatestSalesData, error)
 }
 
 // newSite builds the services a deployment serves through. It runs at

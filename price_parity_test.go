@@ -265,13 +265,13 @@ func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
 		regular: {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitCount}}},
 		foil:    {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitExpectedCount}}},
 	}
-	out := banPricesFromRows(backend(), []string{regular, foil}, found, "name", "shorthands", true, false, true)
+	out := banPricesFromRows(backend(), currentPrices(), []string{regular, foil}, found, "name", "shorthands", true, false, true)
 
 	coRegular, err := backend().GetUUID(regular)
 	if err != nil {
 		t.Fatal(err)
 	}
-	idRegular := getIDFromMode(backend(), "name", coRegular)
+	idRegular := getIDFromMode(backend(), currentPrices(), "name", coRegular)
 	if got := out[idRegular]["FAKEIDX"].Qty; got != 12 {
 		t.Errorf("a want-count row summed to %v, want 12", got)
 	}
@@ -280,7 +280,7 @@ func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	idFoil := getIDFromMode(backend(), "name", coFoil)
+	idFoil := getIDFromMode(backend(), currentPrices(), "name", coFoil)
 	if got := out[idFoil]["FAKEIDX"].QtyFoil; got != 0 {
 		t.Errorf("an average-count row summed to %v, want 0 - it is not a want", got)
 	}
@@ -351,7 +351,7 @@ func TestSearchDownloadFilters(t *testing.T) {
 	config := SearchConfig{StoreFilters: []FilterStoreElem{{
 		Name: "seller", Values: []string{"paritya"}, OnlyForSeller: true,
 	}}}
-	api := banPricesFromRows(backend(), cardIDs, searchSellers(currentPrices(), cardIDs, config), "", "", true, true, false)
+	api := banPricesFromRows(backend(), currentPrices(), cardIDs, searchSellers(currentPrices(), cardIDs, config), "", "", true, true, false)
 	if _, found := api[regular]["PARITYIDX"]; found {
 		t.Error("seller filter should exclude PARITYIDX from the output")
 	}
@@ -364,7 +364,7 @@ func TestSearchDownloadFilters(t *testing.T) {
 	config = SearchConfig{EntryFilters: []FilterEntryElem{{
 		Name: "condition", Values: []string{"NM"}, OnlyForVendor: true,
 	}}}
-	bl := banPricesFromRows(backend(), cardIDs, searchVendors(currentPrices(), cardIDs, config), "", "", true, true, true)
+	bl := banPricesFromRows(backend(), currentPrices(), cardIDs, searchVendors(currentPrices(), cardIDs, config), "", "", true, true, true)
 	if got := bl[regular]["PARITYV"].Conditions.Get("NM"); got != 5 {
 		t.Errorf("conditions[NM] = %v, want 5", got)
 	}

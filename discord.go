@@ -862,7 +862,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 			// the half that needs a context, a timeout and an error to
 			// report back to the reader.
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			lastSales, err := s.fetchLastSold(ctx, b, searchRes.CardID, false)
+			lastSales, err := s.fetchLastSold(ctx, b, p, searchRes.CardID, false)
 			cancel()
 			if err == nil {
 				fields = embed.LastSoldFields(lastSales2embed(lastSales), co.Language)
@@ -877,7 +877,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 			} else if len(fields) == 0 {
 				errMsg = fmt.Sprintf("No Last Sold Price available for \"%s\" %s", content, emoteShurg)
 			}
-			embed := prepareCard(b, searchRes, fields, m.GuildID, lastSold)
+			embed := prepareCard(b, p, searchRes, fields, m.GuildID, lastSold)
 			if errMsg != "" {
 				embed.Description += errMsg
 			}
@@ -885,7 +885,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 		}()
 	}
 
-	embed := prepareCard(b, searchRes, ogFields, m.GuildID, lastSold)
+	embed := prepareCard(b, p, searchRes, ogFields, m.GuildID, lastSold)
 	if lastSold {
 		embed.Description += "Grabbing last sold prices, hang tight " + emoteHappy
 	}
@@ -903,7 +903,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 		case edit = <-channel:
 			break
 		case <-time.After(LastSoldTimeout * time.Second):
-			edit = prepareCard(b, searchRes, nil, m.GuildID, lastSold)
+			edit = prepareCard(b, p, searchRes, nil, m.GuildID, lastSold)
 			edit.Description += "Connection time out " + emoteSleep
 			break
 		}
@@ -915,7 +915,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 	}
 }
 
-func prepareCard(b *matcher.Backend, searchRes *EmbedSearchResult, ogFields []EmbedField, guildID string, lastSold bool) *discordgo.MessageEmbed {
+func prepareCard(b *matcher.Backend, p *prices, searchRes *EmbedSearchResult, ogFields []EmbedField, guildID string, lastSold bool) *discordgo.MessageEmbed {
 	// Convert search results into proper fields
 	var fields []*discordgo.MessageEmbedField
 	for _, field := range ogFields {
@@ -940,7 +940,7 @@ func prepareCard(b *matcher.Backend, searchRes *EmbedSearchResult, ogFields []Em
 	}
 
 	// Prepare card data
-	card := uuid2card(b, searchRes.CardID, false, nil)
+	card := uuid2card(b, p, searchRes.CardID, false, nil)
 	co, _ := b.GetUUID(searchRes.CardID)
 
 	printings := embed.PrintingsLine(co.Printings)
@@ -978,7 +978,7 @@ func prepareCard(b *matcher.Backend, searchRes *EmbedSearchResult, ogFields []Em
 	if lastSold {
 		title = "TCG Last Sold prices for " + name
 
-		tcgID := findTCGproductID(b, co.UUID)
+		tcgID := findTCGproductID(b, p, co.UUID)
 		productID, _ := strconv.Atoi(tcgID)
 		printing := "Normal"
 		if co.Etched || co.Foil {

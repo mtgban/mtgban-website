@@ -752,11 +752,6 @@ const (
 	MaxRuneSymbols = 57
 )
 
-// filterSellers is the published snapshot's, for a caller not handed one.
-func filterSellers(predicate func(mtgban.ScraperInfo) bool) []string {
-	return currentPrices().filterSellers(predicate)
-}
-
 // canAccessMode reports whether the caller is allowed to read the given
 // API mode (retail/buylist/sealed). Access is granted if the mode is in
 // the signed enabledModes list, the list contains "all", or signature
@@ -827,7 +822,7 @@ func findVendorBuylistByName(name string, sealed bool) (mtgban.BuylistRecord, er
 }
 
 // Look for a TCGproductId in all available places
-func findTCGproductID(b *matcher.Backend, cardID string) string {
+func findTCGproductID(b *matcher.Backend, p *prices, cardID string) string {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return ""
@@ -841,18 +836,18 @@ func findTCGproductID(b *matcher.Backend, cardID string) string {
 		}
 	}
 	if tcgID == "" {
-		tcgID = findOriginalID("TCGLow", cardID)
+		tcgID = findOriginalID(p, "TCGLow", cardID)
 	}
 	if tcgID == "" {
-		tcgID = findOriginalID("TCGMarket", cardID)
+		tcgID = findOriginalID(p, "TCGMarket", cardID)
 	}
 
 	return tcgID
 }
 
 // Look for the instance id (sku) of a card in a given inventory
-func findInstanceID(sellerName, cardID string, cond mtgban.Condition) string {
-	tcgplayer, _ := findSellerInventory(sellerName)
+func findInstanceID(p *prices, sellerName, cardID string, cond mtgban.Condition) string {
+	tcgplayer, _ := p.sellerInventory(sellerName)
 	for _, entry := range tcgplayer[cardID] {
 		if entry.Conditions == cond {
 			return entry.InstanceID
@@ -865,19 +860,19 @@ func findInstanceID(sellerName, cardID string, cond mtgban.Condition) string {
 // a card in a given condition, picking the inventory the product lives in.
 // Sources that carry no condition are assumed to be NM, the same way the
 // TCGplayer CSV export does. Returns "" when the card has no SKU on file.
-func uuid2TCGSKU(cardID string, sealed bool, cond mtgban.Condition) string {
+func uuid2TCGSKU(p *prices, cardID string, sealed bool, cond mtgban.Condition) string {
 	if cond == "" {
 		cond = "NM"
 	}
 	if sealed {
-		return findInstanceID("TCGSealed", cardID, cond)
+		return findInstanceID(p, "TCGSealed", cardID, cond)
 	}
-	return findInstanceID("TCGPlayer", cardID, cond)
+	return findInstanceID(p, "TCGPlayer", cardID, cond)
 }
 
 // Look for the original id (product id) of a card in a given inventory
-func findOriginalID(sellerName, cardID string) string {
-	tcgplayer, _ := findSellerInventory(sellerName)
+func findOriginalID(p *prices, sellerName, cardID string) string {
+	tcgplayer, _ := p.sellerInventory(sellerName)
 	entries, found := tcgplayer[cardID]
 	if found {
 		return entries[0].OriginalID
@@ -900,7 +895,7 @@ var allLanguageFlags = map[string]string{
 
 // uuid2card reads what the pages show of one card. odds labels its source
 // products with how often each yields it; nil off the search page.
-func uuid2card(b *matcher.Backend, cardID string, preferFlavorName bool, odds *productOdds) GenericCard {
+func uuid2card(b *matcher.Backend, p *prices, cardID string, preferFlavorName bool, odds *productOdds) GenericCard {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return GenericCard{}
@@ -909,23 +904,23 @@ func uuid2card(b *matcher.Backend, cardID string, preferFlavorName bool, odds *p
 	var stocksURL string
 	var sypList bool
 
-	syp, err := findVendorBuylist("SYP")
+	syp, err := p.vendorBuylist("SYP")
 	if err == nil {
 		_, sypList = syp[cardID]
 	}
 
-	inv, _ := findSellerInventory("STKS")
+	inv, _ := p.sellerInventory("STKS")
 	entries, stocks := inv[co.UUID]
 	if stocks {
 		stocksURL = entries[0].URL
 	}
 
 	var ckBuylistID string
-	ckBuylist, err := findVendorBuylist("CK")
+	ckBuylist, err := p.vendorBuylist("CK")
 	if err == nil && len(ckBuylist[cardID]) > 0 {
 		ckBuylistID = ckBuylist[cardID][0].OriginalID
 	}
-	tcgMarket, _ := findSellerInventory("TCGMarket")
+	tcgMarket, _ := p.sellerInventory("TCGMarket")
 	tcgMarketPrice := tcgMarketPriceIn(tcgMarket, cardID)
 
 	var newspaper bool
@@ -1031,13 +1026,13 @@ func uuid2card(b *matcher.Backend, cardID string, preferFlavorName bool, odds *p
 
 	products, numProducts := productsHTML(b, sourceSealed, odds, co.UUID)
 
-	tcgID := findTCGproductID(b, co.UUID)
+	tcgID := findTCGproductID(b, p, co.UUID)
 
 	// Retrieve the CK URL from the in memory api list, which uses mtgjson ids
 	var restockURL string
-	ckInv, _ := findSellerInventory("CK")
+	ckInv, _ := p.sellerInventory("CK")
 	if co.Sealed {
-		ckInv, _ = findSellerInventory("CKSealed")
+		ckInv, _ = p.sellerInventory("CKSealed")
 	}
 	entries, found := ckInv[co.UUID]
 	if found {
@@ -1189,11 +1184,11 @@ func cardPrintings(b *matcher.Backend, cardID string) string {
 type cardMetadata map[string]GenericCard
 
 // add reads a card's details into m, once: a card already there is kept.
-func (m cardMetadata) add(b *matcher.Backend, cardID string, preferFlavor bool) {
+func (m cardMetadata) add(b *matcher.Backend, p *prices, cardID string, preferFlavor bool) {
 	if _, found := m[cardID]; found {
 		return
 	}
-	m[cardID] = uuid2card(b, cardID, preferFlavor, nil)
+	m[cardID] = uuid2card(b, p, cardID, preferFlavor, nil)
 }
 
 // quoteIfFilter quotes a card name the filter regexp would read a filter
@@ -1762,8 +1757,8 @@ func getHighestBuylistPrice(cardID string) float64 {
 }
 
 // Retrieve the IQR of the simulation using TCGplayer Low as base
-func getTCGSimulationIQR(productID string) float64 {
-	inv, err := findSellerInventory("TCGLowSim")
+func getTCGSimulationIQR(p *prices, productID string) float64 {
+	inv, err := p.sellerInventory("TCGLowSim")
 	if err != nil {
 		return 0
 	}

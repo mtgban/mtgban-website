@@ -18,7 +18,7 @@ func TestSleepersLayoutSkipsPlaytest(t *testing.T) {
 	plain := somePlainCardUUIDs(t, 2)
 	registerTestSeller(t, "TCGLow", append(plain, playtest))
 
-	sleepers, err := sleepersLayout(backend(), map[string]int{playtest: 100, plain[0]: 50, plain[1]: 2})
+	sleepers, err := sleepersLayout(backend(), currentPrices(), map[string]int{playtest: 100, plain[0]: 50, plain[1]: 2})
 	if err != nil {
 		t.Fatal(err)
 	}

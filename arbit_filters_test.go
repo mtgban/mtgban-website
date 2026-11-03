@@ -51,7 +51,7 @@ func TestArbitDefaultsMatchToday(t *testing.T) {
 		{"global sealed", arbitMode{Global: true, Sealed: true}, 10, 0, 1, ProfConst, 0, 0, true, false},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
-			opts, rows := arbitState{}.apply(backend(), tt.mode)
+			opts, rows := arbitState{}.apply(backend(), currentPrices(), tt.mode)
 			if rows.limits.MinSpread != tt.minSpread || opts.MaxSpread != tt.maxSpread || rows.limits.MinDiff != tt.minDiff {
 				t.Errorf("spread %v..%v diff %v, want %v..%v diff %v",
 					rows.limits.MinSpread, opts.MaxSpread, rows.limits.MinDiff, tt.minSpread, tt.maxSpread, tt.minDiff)
@@ -99,7 +99,7 @@ func TestArbitFloors(t *testing.T) {
 		{"a value above the floor stands", arbitMode{Global: true}, "minspread=350&mindiff=12", 350, 12, 1000},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
-			opts, rows := parseArbitQuery(t, tt.query).apply(backend(), tt.mode)
+			opts, rows := parseArbitQuery(t, tt.query).apply(backend(), currentPrices(), tt.mode)
 			if rows.limits.MinSpread != tt.spread || rows.limits.MinDiff != tt.diff || opts.MaxSpread != tt.engineMaxSpread {
 				t.Errorf("spread %v diff %v cap %v, want %v %v %v",
 					rows.limits.MinSpread, rows.limits.MinDiff, opts.MaxSpread, tt.spread, tt.diff, tt.engineMaxSpread)
@@ -209,11 +209,11 @@ func TestArbitApplied(t *testing.T) {
 // 30A and the World Championship Decks on top of global's own editions.
 func TestArbitNoCollector(t *testing.T) {
 	st := parseArbitQuery(t, "nocollector=1")
-	opts, _ := st.apply(backend(), arbitMode{})
+	opts, _ := st.apply(backend(), currentPrices(), arbitMode{})
 	if !slices.Equal(opts.Editions, customBuylistSkipSets) {
 		t.Errorf("arbit skips %v, want %v", opts.Editions, customBuylistSkipSets)
 	}
-	opts, _ = st.apply(backend(), arbitMode{Global: true})
+	opts, _ = st.apply(backend(), currentPrices(), arbitMode{Global: true})
 	if !slices.Equal(opts.Editions, slices.Concat(FilteredEditions, customBuylistSkipSets)) {
 		t.Errorf("global skips %v, want its own editions and %v", opts.Editions, customBuylistSkipSets)
 	}
@@ -224,11 +224,11 @@ func TestArbitNoCollector(t *testing.T) {
 
 func TestArbitApplyPicks(t *testing.T) {
 	st := parseArbitQuery(t, "cond=NM,SP,MP,PO&rarity=mythic,rare&finish=etched")
-	opts, _ := st.apply(rarityBackend(matcher.GameMagic, testArbitOffer.Rarities, nil), arbitMode{})
+	opts, _ := st.apply(rarityBackend(matcher.GameMagic, testArbitOffer.Rarities, nil), currentPrices(), arbitMode{})
 	if !slices.Equal(opts.Conditions, []mtgban.Condition{"HP", "PO"}) {
 		t.Errorf("conditions dropped %v, want HP and the PO that goes with it", opts.Conditions)
 	}
-	kept, _ := parseArbitQuery(t, "cond=NM,HP").apply(backend(), arbitMode{})
+	kept, _ := parseArbitQuery(t, "cond=NM,HP").apply(backend(), currentPrices(), arbitMode{})
 	if !slices.Equal(kept.Conditions, []mtgban.Condition{"SP", "MP"}) {
 		t.Errorf("keeping HP dropped %v, want SP and MP", kept.Conditions)
 	}
@@ -246,7 +246,7 @@ func TestArbitApplyPicks(t *testing.T) {
 		}
 	}
 
-	sealed, _ := st.apply(rarityBackend(matcher.GameMagic, testArbitOffer.Rarities, nil), arbitMode{Sealed: true})
+	sealed, _ := st.apply(rarityBackend(matcher.GameMagic, testArbitOffer.Rarities, nil), currentPrices(), arbitMode{Sealed: true})
 	if sealed.Conditions != nil || sealed.Rarities != nil || sealed.CustomCardFilter != nil {
 		t.Errorf("a sealed source applies the singles' picks: %+v", sealed)
 	}
@@ -285,7 +285,7 @@ func TestArbitRowFilter(t *testing.T) {
 		{"minqty=3", false, true, true},
 		{"minqty=3&minsell=11", false, true, false},
 	} {
-		_, rows := parseArbitQuery(t, tt.query).apply(backend(), arbitMode{Global: tt.global, AnySpread: true})
+		_, rows := parseArbitQuery(t, tt.query).apply(backend(), currentPrices(), arbitMode{Global: tt.global, AnySpread: true})
 		if rows.keep(row, tt.noQuantity) != tt.keep {
 			t.Errorf("%q (global=%v, no quantities=%v) keeps the row: %v, want %v",
 				tt.query, tt.global, tt.noQuantity, !tt.keep, tt.keep)
@@ -313,7 +313,7 @@ func TestArbitMinProfitAsShown(t *testing.T) {
 		{"minprof=0.19", true},
 		{"minprof=0.2", false},
 	} {
-		opts, rows := parseArbitQuery(t, tt.query).apply(b, arbitMode{})
+		opts, rows := parseArbitQuery(t, tt.query).apply(b, currentPrices(), arbitMode{})
 		arbit := slices.DeleteFunc(mtgban.Arbit(b, opts, vendor, seller), func(e mtgban.ArbitEntry) bool {
 			return !rows.keep(e, false)
 		})
@@ -359,7 +359,7 @@ func TestArbitMinDiffAndSpreadAsShown(t *testing.T) {
 		{"maxspread=29.85", true},
 		{"maxspread=29.84", false},
 	} {
-		opts, rows := parseArbitQuery(t, tt.query).apply(b, arbitMode{})
+		opts, rows := parseArbitQuery(t, tt.query).apply(b, currentPrices(), arbitMode{})
 		arbit := slices.DeleteFunc(mtgban.Arbit(b, opts, vendor, seller), func(e mtgban.ArbitEntry) bool {
 			return !rows.keep(e, false)
 		})
@@ -402,7 +402,7 @@ func TestArbitMinQuantitySparesSellersWithout(t *testing.T) {
 
 	r := httptest.NewRequest("GET", "/arbit?source=NOQTY&minqty=1", nil)
 	w := httptest.NewRecorder()
-	testSite.scraperCompare(w, r, PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"NOQTY"}, nil, scraperCompareOpts{AllResults: true})
+	testSite.scraperCompare(w, r, currentPrices(), PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"NOQTY"}, nil, scraperCompareOpts{AllResults: true})
 	if !strings.Contains(w.Body.String(), `data-arb-id="`+cardID+`"`) {
 		t.Error("a minimum quantity empties the table of a seller that publishes none")
 	}
@@ -454,7 +454,7 @@ func TestArbitStoreLinksCarryState(t *testing.T) {
 		r := httptest.NewRequest("GET", "/global?source=LINKSRC"+query, nil)
 		w := httptest.NewRecorder()
 		pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: true}, UserNav: &NavElem{Short: "beta"}}
-		testSite.scraperCompare(w, r, pageVars, []string{"LINKSRC", "LINKOTH"}, nil, scraperCompareOpts{AllResults: true})
+		testSite.scraperCompare(w, r, currentPrices(), pageVars, []string{"LINKSRC", "LINKOTH"}, nil, scraperCompareOpts{AllResults: true})
 		return w.Body.String()
 	}
 
@@ -524,7 +524,7 @@ func TestArbitSavedCookies(t *testing.T) {
 		r.Header.Set("Cookie", cookies)
 		w := httptest.NewRecorder()
 		pageVars.UserNav = &NavElem{Short: "beta"}
-		testSite.scraperCompare(w, r, pageVars, allow, nil, scraperCompareOpts{AllResults: true})
+		testSite.scraperCompare(w, r, currentPrices(), pageVars, allow, nil, scraperCompareOpts{AllResults: true})
 		return w.Body.String()
 	}
 	for _, tt := range []struct {
@@ -673,7 +673,7 @@ func TestArbitApplyKeepsReverseTradable(t *testing.T) {
 	r := httptest.NewRequest("GET", "/arbit?source=CARRYSRC", nil)
 	r.Header.Set("Cookie", "ArbitFilters="+url.QueryEscape("f=1&tradable=0&t=1"))
 	w := httptest.NewRecorder()
-	testSite.scraperCompare(w, r, PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"CARRYSRC"}, nil, scraperCompareOpts{AllResults: true})
+	testSite.scraperCompare(w, r, currentPrices(), PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"CARRYSRC"}, nil, scraperCompareOpts{AllResults: true})
 	if !strings.Contains(w.Body.String(), `<input type="hidden" name="tradable" value="0" data-carry>`) {
 		t.Fatal("arbit's form does not carry the saved only Tradable")
 	}
@@ -723,7 +723,7 @@ func TestArbitPreviewSample(t *testing.T) {
 		{"minprof=2", 0},
 	} {
 		st := parseArbitQuery(t, tt.query)
-		_, rows := st.apply(backend(), mode)
+		_, rows := st.apply(backend(), currentPrices(), mode)
 		got := previewSample(slices.Clone(entries), rows, false)
 		if len(got) != tt.want {
 			t.Errorf("%q keeps %d rows of the preview, want %d", tt.query, len(got), tt.want)
@@ -766,7 +766,7 @@ func TestGlobalPreviewCannotSteerItsSample(t *testing.T) {
 		r := httptest.NewRequest("GET", "/global?source=PREVIDX&f=1&legit=0"+query, nil)
 		w := httptest.NewRecorder()
 		pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: true}, UserNav: &NavElem{Short: "beta"}}
-		testSite.scraperCompare(w, r, pageVars, []string{"PREVIDX"}, nil, scraperCompareOpts{})
+		testSite.scraperCompare(w, r, currentPrices(), pageVars, []string{"PREVIDX"}, nil, scraperCompareOpts{})
 		return strings.Count(w.Body.String(), `data-arb-id="`)
 	}
 	all := rows("")
@@ -853,7 +853,7 @@ func TestArbitBarShowsTheCarriedLimit(t *testing.T) {
 	r := httptest.NewRequest("GET", "/arbit?source=CARRYSRC", nil)
 	r.Header.Set("Cookie", "ArbitFilters="+url.QueryEscape("f=1&mindiff=-500&t=1"))
 	w := httptest.NewRecorder()
-	testSite.scraperCompare(w, r, PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"CARRYSRC"}, nil, scraperCompareOpts{AllResults: true})
+	testSite.scraperCompare(w, r, currentPrices(), PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"CARRYSRC"}, nil, scraperCompareOpts{AllResults: true})
 	body := w.Body.String()
 	for _, want := range []string{
 		`<input type="hidden" name="mindiff" value="-500" data-limit>`,

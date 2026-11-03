@@ -507,7 +507,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		hashesCond := r.Form[hashTag+"hashesCond"]
 
 		if hashes != nil && hashTag == "SCGRetail" {
-			err := redirectToSCGMassEntry(w, r, b, hashes, hashesQtys, hashesCond)
+			err := redirectToSCGMassEntry(w, r, b, p, hashes, hashesQtys, hashesCond)
 			if err != nil {
 				UserNotify("upload", err.Error())
 				pageVars.InfoMessage = "Unable to forward your list to SCG right now"
@@ -517,7 +517,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if hashes != nil {
-			err := writeTagCSV(w, b, hashTag, hashes, hashesQtys, hashesCond)
+			err := writeTagCSV(w, b, p, hashTag, hashes, hashesQtys, hashesCond)
 			if err != nil {
 				UserNotify("upload", err.Error())
 				pageVars.InfoMessage = "Unable to download CSV right now"
@@ -741,7 +741,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if modes.tcgpCSV && canBuylist {
-		err := writeTCGplayerCSV(w, b, uploadedData, st.multiplier, st.maxQty)
+		err := writeTCGplayerCSV(w, b, p, uploadedData, st.multiplier, st.maxQty)
 		if err != nil {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
@@ -772,7 +772,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	fillUploadEntries(&pageVars.UploadVars, r, b, in, uploadName, uploadedData)
 
-	pageVars.Metadata = uploadMetadata(b, st, uploadedData)
+	pageVars.Metadata = uploadMetadata(b, p, st, uploadedData)
 
 	rows := priceUploadRows(b, blMode, st, prices, indexes, uploadedData)
 	pageVars.TotalEntries = rows.totalEntries
@@ -846,7 +846,7 @@ func fillUploadEntries(pageVars *UploadVars, r *http.Request, b *matcher.Backend
 
 // uploadMetadata reads what the page shows of every matched card, and of the
 // other printings the printing picker offers for it.
-func uploadMetadata(b *matcher.Backend, st uploadSettings, uploadedData []UploadEntry) cardMetadata {
+func uploadMetadata(b *matcher.Backend, p *prices, st uploadSettings, uploadedData []UploadEntry) cardMetadata {
 	metadata := cardMetadata{}
 
 	// Load up image links
@@ -855,11 +855,11 @@ func uploadMetadata(b *matcher.Backend, st uploadSettings, uploadedData []Upload
 			continue
 		}
 
-		metadata.add(b, data.CardID, st.preferFlavor)
+		metadata.add(b, p, data.CardID, st.preferFlavor)
 
 		// Load metadata for alternative printings (used by pick-printing picker)
 		for _, alias := range data.PossibleAliases {
-			metadata.add(b, alias, st.preferFlavor)
+			metadata.add(b, p, alias, st.preferFlavor)
 		}
 	}
 
@@ -1311,9 +1311,9 @@ func (rows *uploadRows) tallyFor(product string) *unpackedTally {
 
 // redirectToSCGMassEntry sends the cards to Star City Games' mass entry and
 // redirects to the deck builder holding them.
-func redirectToSCGMassEntry(w http.ResponseWriter, r *http.Request, b *matcher.Backend, hashes, hashesQtys, hashesCond []string) error {
+func redirectToSCGMassEntry(w http.ResponseWriter, r *http.Request, b *matcher.Backend, p *prices, hashes, hashesQtys, hashesCond []string) error {
 	log.Println("Preparing a mass-entry call to SCG")
-	dataID, err := SCGRetailRedirect(r.Context(), b, hashes, hashesQtys, hashesCond)
+	dataID, err := SCGRetailRedirect(r.Context(), b, p, hashes, hashesQtys, hashesCond)
 	if err != nil {
 		return err
 	}
@@ -1327,18 +1327,18 @@ func redirectToSCGMassEntry(w http.ResponseWriter, r *http.Request, b *matcher.B
 // writeTagCSV answers with the CSV the store hashTag names (CK, SCG or TCG)
 // imports, listing the cards hashes names. When it fails it drops the
 // download headers, so the caller can answer with a page instead.
-func writeTagCSV(w http.ResponseWriter, b *matcher.Backend, hashTag string, hashes, hashesQtys, hashesCond []string) error {
+func writeTagCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, hashTag string, hashes, hashesQtys, hashesCond []string) error {
 	setCSVDownloadHeaders(w, "ban_"+strings.ToLower(hashTag)+".csv")
 	csvWriter := csv.NewWriter(w)
 
 	var err error
 	switch hashTag {
 	case "CK":
-		err = UUID2CKCSV(csvWriter, hashes, hashesQtys)
+		err = UUID2CKCSV(p, csvWriter, hashes, hashesQtys)
 	case "SCG":
-		err = UUID2SCGCSV(csvWriter, hashes, hashesQtys)
+		err = UUID2SCGCSV(p, csvWriter, hashes, hashesQtys)
 	case "TCG":
-		err = UUID2TCGCSV(b, csvWriter, hashes, hashesQtys, hashesCond)
+		err = UUID2TCGCSV(b, p, csvWriter, hashes, hashesQtys, hashesCond)
 	}
 	if err != nil {
 		dropDownloadHeaders(w)
@@ -1409,7 +1409,7 @@ func writeDeckboxCSV(w http.ResponseWriter, b *matcher.Backend, uploadedData []U
 
 // writeTCGplayerCSV answers with the cards as a TCGplayer import. When it
 // fails it drops the download headers, so the caller can answer with a page.
-func writeTCGplayerCSV(w http.ResponseWriter, b *matcher.Backend, uploadedData []UploadEntry, multiplier, maxQty int) error {
+func writeTCGplayerCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, uploadedData []UploadEntry, multiplier, maxQty int) error {
 	setCSVDownloadHeaders(w, "ban_tcgplayer.csv")
 	csvWriter := csv.NewWriter(w)
 
@@ -1427,7 +1427,7 @@ func writeTCGplayerCSV(w http.ResponseWriter, b *matcher.Backend, uploadedData [
 		conds = append(conds, string(uploadedData[i].OriginalCondition))
 	}
 
-	err := UUID2TCGCSV(b, csvWriter, ids, qtys, conds)
+	err := UUID2TCGCSV(b, p, csvWriter, ids, qtys, conds)
 	if err != nil {
 		dropDownloadHeaders(w)
 	}
@@ -2188,7 +2188,7 @@ func writePricesCSV(w http.ResponseWriter, r *http.Request, b *matcher.Backend, 
 	}
 
 	csvWriter := csv.NewWriter(w)
-	err := SimplePrice2CSV(b, csvWriter, prices.results, uploadedData, nil, st.preferFlavor)
+	err := SimplePrice2CSV(b, p, csvWriter, prices.results, uploadedData, nil, st.preferFlavor)
 	if err != nil {
 		dropDownloadHeaders(w)
 	}

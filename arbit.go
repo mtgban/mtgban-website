@@ -71,7 +71,7 @@ var FilterOptKeys = []string{
 
 type FilterOpt struct {
 	Title string
-	Func  func(*mtgban.ArbitOpts)
+	Func  func(*prices, *mtgban.ArbitOpts)
 
 	ArbitOnly  bool
 	GlobalOnly bool
@@ -106,14 +106,14 @@ func (opt FilterOpt) Shown(globalMode, reverseMode, sealedSource bool) bool {
 var FilterOptConfig = map[string]FilterOpt{
 	"rl": {
 		Title: "only RL",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(p *prices, opts *mtgban.ArbitOpts) {
 			opts.OnlyReserveList = true
 		},
 		NoSealed: true,
 	},
 	"abu4h": {
 		Title: "only ABU4H",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(p *prices, opts *mtgban.ArbitOpts) {
 			opts.OnlyEditions = ABU4H
 		},
 		ArbitOnly: true,
@@ -121,26 +121,26 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 	"nocollector": {
 		Title: "no CE/30A/WCD",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(p *prices, opts *mtgban.ArbitOpts) {
 			opts.Editions = slices.Concat(opts.Editions, customBuylistSkipSets)
 		},
 		NoSealed: true,
 	},
 	"decklists": {
 		Title: "only Decklists",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(p *prices, opts *mtgban.ArbitOpts) {
 			opts.SealedDecklist = true
 		},
 		SealedOnly: true,
 	},
 	"syp": {
 		Title: "only SYP",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(p *prices, opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomCardFilter
 			// Looked up once: the filter runs per card per scraper, and the
 			// lookup scans every vendor. A missing SYP is a nil map, on
 			// which nothing is listed.
-			syp, _ := findVendorBuylist("SYP")
+			syp, _ := p.vendorBuylist("SYP")
 			opts.CustomCardFilter = func(co *matcher.CardObject) (float64, bool) {
 				_, onSypList := syp[co.UUID]
 				if !onSypList {
@@ -158,9 +158,9 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 	"stocks": {
 		Title: "only Stocks",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(p *prices, opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomCardFilter
-			inv, _ := findSellerInventory("STKS")
+			inv, _ := p.sellerInventory("STKS")
 			opts.CustomCardFilter = func(co *matcher.CardObject) (float64, bool) {
 				_, onStocks := inv[co.UUID]
 				if !onStocks {
@@ -178,9 +178,9 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 	"legit": {
 		Title: "only Legit",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(p *prices, opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomPriceFilter
-			tcgMarket, _ := findSellerInventory("TCGMarket")
+			tcgMarket, _ := p.sellerInventory("TCGMarket")
 			opts.CustomPriceFilter = func(cardId string, invEntry mtgban.InventoryEntry) (float64, bool) {
 				if invalidDirectIn(tcgMarket, cardId, invEntry.Price) {
 					return 0, true
@@ -197,10 +197,10 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 	"stable": {
 		Title: "only Stable",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(p *prices, opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomPriceFilter
 			opts.CustomPriceFilter = func(cardId string, invEntry mtgban.InventoryEntry) (float64, bool) {
-				if getTCGSimulationIQR(cardId) > IQRThreshold {
+				if getTCGSimulationIQR(p, cardId) > IQRThreshold {
 					return 0, true
 				}
 				if oldFunc != nil {
@@ -361,6 +361,7 @@ func (s *site) Reverse(w http.ResponseWriter, r *http.Request) {
 
 func arbit(s *site, w http.ResponseWriter, r *http.Request, reverse bool) {
 	sig := verifiedSignature(r)
+	p := s.prices()
 
 	pageName := "Arbitrage"
 	if reverse {
@@ -373,7 +374,7 @@ func arbit(s *site, w http.ResponseWriter, r *http.Request, reverse bool) {
 	allowlistSellersOpt := GetParamFromSig(sig, "ArbitEnabled")
 
 	if allowlistSellersOpt == "ALL" || (DevMode && !SigCheck) {
-		allowlistSellers = filterSellers(func(info mtgban.ScraperInfo) bool {
+		allowlistSellers = p.filterSellers(func(info mtgban.ScraperInfo) bool {
 			return !info.MetadataOnly
 		})
 	} else if allowlistSellersOpt != "" {
@@ -409,7 +410,7 @@ func arbit(s *site, w http.ResponseWriter, r *http.Request, reverse bool) {
 
 	start := time.Now()
 
-	s.scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+	s.scraperCompare(w, r, p, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults:    true,
 		CustomBuylist: customRule,
 	})
@@ -422,6 +423,7 @@ func arbit(s *site, w http.ResponseWriter, r *http.Request, reverse bool) {
 
 func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 	sig := verifiedSignature(r)
+	p := s.prices()
 
 	pageVars := genPageNav(s, r, "Global", sig)
 	pageVars.GlobalMode = true
@@ -440,7 +442,7 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 	anySpread = anySpread || (DevMode && !SigCheck)
 
 	// The "menu" section, the reference
-	allowlistSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
+	allowlistSellers := p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		if Config().apiOnly(info.Shorthand) {
 			return false
 		}
@@ -454,7 +456,7 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// The "Jump to" section, the probe
-	blocklistVendors := globalProbeBlocklist(s.prices())
+	blocklistVendors := globalProbeBlocklist(p)
 
 	if r.FormValue("page") == "options" {
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
@@ -472,7 +474,7 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	s.scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+	s.scraperCompare(w, r, p, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults: anyEnabled,
 		AnySpread:  anySpread,
 	})
@@ -560,13 +562,13 @@ func (v *customBuylistVendor) Buylist() mtgban.BuylistRecord { return v.buylist 
 
 // newCustomBuylistVendor prices the cards seller sells by the rule, against
 // the sealed reference when seller trades sealed, or nil without a reference.
-func newCustomBuylistVendor(b *matcher.Backend, rule customBuylistRule, seller mtgban.Seller) *customBuylistVendor {
+func newCustomBuylistVendor(b *matcher.Backend, p *prices, rule customBuylistRule, seller mtgban.Seller) *customBuylistVendor {
 	sealed := seller.Info().SealedMode
 	refName, shorthand := rule.seller, customStore
 	if sealed {
 		refName, shorthand = rule.sealedSeller, customSealedStore
 	}
-	ref, err := findSellerInventory(refName)
+	ref, err := p.sellerInventory(refName)
 	if err != nil {
 		return nil
 	}
@@ -628,9 +630,8 @@ func customBuylistEntries(inventory []mtgban.InventoryEntry, rule customBuylistR
 	return entries
 }
 
-func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
+func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
 	ds := s.datastore()
-	p := s.prices()
 	r.ParseForm()
 	b := ds.backend
 
@@ -781,7 +782,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, pageVars P
 	if limitedResults && mode.Global {
 		engineState = state.unbounded()
 	}
-	opts, rows := engineState.apply(b, mode)
+	opts, rows := engineState.apply(b, p, mode)
 	view := newArbitView(engineState, mode)
 	readerRows := arbitRowFilter{limits: state.limits(mode), global: mode.Global}
 	applied := state.applied(mode)
@@ -830,7 +831,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, pageVars P
 		}
 
 		if cmp.CustomBuylist.rate > 0 {
-			custom := newCustomBuylistVendor(b, cmp.CustomBuylist, source.(mtgban.Seller))
+			custom := newCustomBuylistVendor(b, p, cmp.CustomBuylist, source.(mtgban.Seller))
 			if custom != nil {
 				scrapers = append(scrapers, custom)
 			}
@@ -940,7 +941,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, pageVars P
 			sussy = map[string]float64{}
 
 			for _, res := range arbit {
-				iqr := getTCGSimulationIQR(res.CardID)
+				iqr := getTCGSimulationIQR(p, res.CardID)
 				if iqr > 150 {
 					sussy[res.CardID] = iqr
 				}
@@ -993,7 +994,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, pageVars P
 
 		pageVars.Arb = append(pageVars.Arb, entry)
 		for i := range arbit {
-			pageVars.Metadata.add(b, arbit[i].CardID, preferFlavor)
+			pageVars.Metadata.add(b, p, arbit[i].CardID, preferFlavor)
 		}
 	}
 

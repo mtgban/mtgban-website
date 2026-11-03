@@ -13,7 +13,7 @@ func TestUploadMetadataHasEveryOfferedPrinting(t *testing.T) {
 		{CardID: uuids[1], PossibleAliases: []string{uuids[1], uuids[2]}},
 	}
 
-	metadata := uploadMetadata(backend(), uploadSettings{}, rows)
+	metadata := uploadMetadata(backend(), currentPrices(), uploadSettings{}, rows)
 	for _, id := range uuids {
 		if _, ok := metadata[id]; !ok {
 			t.Errorf("no details for %s, which a row offers", id)

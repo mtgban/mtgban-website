@@ -63,7 +63,7 @@ func runPrice2CSV(t *testing.T, pm map[string]map[string]*BanPrice, uploaded []U
 
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	if err := SimplePrice2CSV(backend(), w, pm, uploaded, nil, false); err != nil {
+	if err := SimplePrice2CSV(backend(), currentPrices(), w, pm, uploaded, nil, false); err != nil {
 		t.Fatalf("SimplePrice2CSV: %v", err)
 	}
 	w.Flush()
@@ -119,7 +119,7 @@ func TestCSVCondQtyIndexing(t *testing.T) {
 	qtys := []string{"1", "2", "3"}
 
 	for _, tc := range []struct {
-		export          func(*matcher.Backend, *csv.Writer, []string, []string, []string) error
+		export          func(*matcher.Backend, *prices, *csv.Writer, []string, []string, []string) error
 		condCol, qtyCol int
 		labels          map[mtgban.Condition]string
 	}{
@@ -128,7 +128,7 @@ func TestCSVCondQtyIndexing(t *testing.T) {
 	} {
 		var buf bytes.Buffer
 		w := csv.NewWriter(&buf)
-		err := tc.export(backend(), w, ids, qtys, conds)
+		err := tc.export(backend(), currentPrices(), w, ids, qtys, conds)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestUUID2BuylistCSV(t *testing.T) {
 
 	ids := []string{"a", "b", "c", "a"}
 	for _, tc := range []struct {
-		export func(*csv.Writer, []string, []string) error
+		export func(*prices, *csv.Writer, []string, []string) error
 		qtys   []string
 		want   string
 	}{
@@ -186,7 +186,7 @@ func TestUUID2BuylistCSV(t *testing.T) {
 		{UUID2SCGCSV, nil, "quantity,productid,name,set_name,language,finish\n1,1,A,Set,en,foil\n1,2,,,,\n1,1,A,Set,en,foil\n"},
 	} {
 		var buf bytes.Buffer
-		err := tc.export(csv.NewWriter(&buf), ids, tc.qtys)
+		err := tc.export(currentPrices(), csv.NewWriter(&buf), ids, tc.qtys)
 		if err != nil {
 			t.Fatal(err)
 		}

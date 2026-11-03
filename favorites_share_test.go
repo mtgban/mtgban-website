@@ -252,7 +252,7 @@ func TestSharedRowsReadsTheSyncShape(t *testing.T) {
 		{"id":"ID_F","t":1,"pinned":1800000000000},
 		{"id":"ID_G","t":12.5,"pinned":1700000000000}
 	]`)
-	rows := sharedRows(backend(), json.RawMessage(raw))
+	rows := sharedRows(backend(), currentPrices(), json.RawMessage(raw))
 	var got []string
 	for _, r := range rows {
 		got = append(got, letter[r.ID])
@@ -261,7 +261,7 @@ func TestSharedRowsReadsTheSyncShape(t *testing.T) {
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("rows = %v, want %v", got, want)
 	}
-	if rows := sharedRows(backend(), json.RawMessage(`not json`)); rows != nil {
+	if rows := sharedRows(backend(), currentPrices(), json.RawMessage(`not json`)); rows != nil {
 		t.Errorf("bad JSON gave rows %v", rows)
 	}
 }
@@ -292,7 +292,7 @@ func TestSharedRowsTakeArtFromTheDatastore(t *testing.T) {
 		{"id":"` + warned + `","name":"Invoke Prejudice","t":2,"img":"` + beacon + `?v=2","cw":false},
 		{"id":"not-a-card","name":"Ghost","t":1,"img":"` + beacon + `?v=3","cw":true}
 	]`
-	rows := sharedRows(b, json.RawMessage(raw))
+	rows := sharedRows(b, currentPrices(), json.RawMessage(raw))
 	if len(rows) != 2 {
 		t.Fatalf("%d rows, want 2", len(rows))
 	}
