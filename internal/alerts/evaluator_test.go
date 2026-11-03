@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -796,31 +797,35 @@ func TestRunAlertEvaluationWritesLandInsideTheRunDeadline(t *testing.T) {
 	writeGrace = 10 * time.Millisecond
 	t.Cleanup(func() { writeGrace = grace })
 
-	store := newFakeEvalStore(activeAlert())
-	dd := &fakeDeliverer{delay: 50 * time.Millisecond}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	sum := runEvaluation(ctx, evalDeps(store, dd, 13), buylistOnly)
+	synctest.Test(t, func(t *testing.T) {
+		store := newFakeEvalStore(activeAlert())
+		dd := &fakeDeliverer{delay: 50 * time.Millisecond}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		sum := runEvaluation(ctx, evalDeps(store, dd, 13), buylistOnly)
 
-	st := store.states[7]
-	if sum.err != nil || st.LastFiredAt == nil || len(store.events) != 1 || !store.events[0].Delivered {
-		t.Fatalf("writes lost inside the deadline: err=%v state=%+v events=%+v", sum.err, st, store.events)
-	}
+		st := store.states[7]
+		if sum.err != nil || st.LastFiredAt == nil || len(store.events) != 1 || !store.events[0].Delivered {
+			t.Fatalf("writes lost inside the deadline: err=%v state=%+v events=%+v", sum.err, st, store.events)
+		}
+	})
 }
 
 // TestRunAlertEvaluationWritesLandPastTheRunDeadline proves a delivery
 // that outlives the run deadline still gets its writes within the grace.
 func TestRunAlertEvaluationWritesLandPastTheRunDeadline(t *testing.T) {
-	store := newFakeEvalStore(activeAlert())
-	dd := &fakeDeliverer{delay: 50 * time.Millisecond}
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	defer cancel()
-	sum := runEvaluation(ctx, evalDeps(store, dd, 13), buylistOnly)
+	synctest.Test(t, func(t *testing.T) {
+		store := newFakeEvalStore(activeAlert())
+		dd := &fakeDeliverer{delay: 50 * time.Millisecond}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+		defer cancel()
+		sum := runEvaluation(ctx, evalDeps(store, dd, 13), buylistOnly)
 
-	st := store.states[7]
-	if sum.err != nil || st.LastFiredAt == nil || len(store.events) != 1 {
-		t.Fatalf("writes lost past the deadline: err=%v state=%+v events=%+v", sum.err, st, store.events)
-	}
+		st := store.states[7]
+		if sum.err != nil || st.LastFiredAt == nil || len(store.events) != 1 {
+			t.Fatalf("writes lost past the deadline: err=%v state=%+v events=%+v", sum.err, st, store.events)
+		}
+	})
 }
 
 // TestRunAlertEvaluationDeadlineRetriesAtOnce proves a firing the run

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 	"unicode/utf8"
 
@@ -283,20 +284,22 @@ func TestDiscordDelivererSendsOneDMPerFiring(t *testing.T) {
 }
 
 func TestDiscordDelivererPacesBetweenSends(t *testing.T) {
-	const pace = 200 * time.Millisecond
-	sender := &fakeSender{}
-	del := NewDiscordDeliverer(sender, pace)
-	start := time.Now()
-	del.Deliver(context.Background(), discordDigest(7), Channel{Address: "d9"}, shorthandLabel)
-	if time.Since(start) >= pace {
-		t.Fatalf("first DM waited %s", time.Since(start))
-	}
-	// The notice after it waits, as every later DM of the run does.
-	start = time.Now()
-	err := del.(notifier).notify("d9", &discordgo.MessageEmbed{Title: "x"})
-	if err != nil || time.Since(start) < pace || len(sender.sent) != 2 {
-		t.Fatalf("second DM after %s, err %v, sent %v", time.Since(start), err, sender.sent)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		const pace = 200 * time.Millisecond
+		sender := &fakeSender{}
+		del := NewDiscordDeliverer(sender, pace)
+		start := time.Now()
+		del.Deliver(context.Background(), discordDigest(7), Channel{Address: "d9"}, shorthandLabel)
+		if time.Since(start) != 0 {
+			t.Fatalf("first DM waited %s", time.Since(start))
+		}
+		// The notice after it waits, as every later DM of the run does.
+		start = time.Now()
+		err := del.(notifier).notify("d9", &discordgo.MessageEmbed{Title: "x"})
+		if err != nil || time.Since(start) != pace || len(sender.sent) != 2 {
+			t.Fatalf("second DM after %s, err %v, sent %v", time.Since(start), err, sender.sent)
+		}
+	})
 }
 
 func TestDiscordDelivererStopsAtTheDeadline(t *testing.T) {
