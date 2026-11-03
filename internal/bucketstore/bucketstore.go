@@ -25,6 +25,9 @@ type Store[T any] struct {
 	Bucket func(ctx context.Context) (simplecloud.ReadWriter, string, error)
 
 	ptr atomic.Pointer[T]
+	// read is set once a document was read or written, after which a
+	// document that cannot be opened is a failure rather than "none yet".
+	read atomic.Bool
 }
 
 // Get returns the current snapshot, or the zero T when nothing was loaded.
@@ -44,8 +47,10 @@ func (s *Store[T]) Set(value T) {
 }
 
 // Load reads the document from the bucket and publishes it. A document that
-// cannot be opened publishes the zero T instead of failing: every document
-// here is optional until first saved.
+// cannot be opened publishes the zero T instead of failing, since every
+// document here is optional until first saved; once one was read or saved,
+// that is an error and the loaded snapshot stays, since the bucket cannot
+// tell a missing document from one it failed to serve.
 func (s *Store[T]) Load(ctx context.Context) error {
 	bucket, path, err := s.Bucket(ctx)
 	if err != nil {
@@ -53,6 +58,9 @@ func (s *Store[T]) Load(ctx context.Context) error {
 	}
 	reader, err := simplecloud.InitReader(ctx, bucket, path)
 	if err != nil {
+		if s.read.Load() {
+			return err
+		}
 		log.Printf("bucketstore: %s unavailable, starting empty: %v", path, err)
 		var zero T
 		s.ptr.Store(&zero)
@@ -65,6 +73,7 @@ func (s *Store[T]) Load(ctx context.Context) error {
 		return err
 	}
 	s.ptr.Store(&value)
+	s.read.Store(true)
 	return nil
 }
 
@@ -95,6 +104,7 @@ func (s *Store[T]) Save(ctx context.Context, value T) error {
 	}
 
 	s.ptr.Store(&value)
+	s.read.Store(true)
 	return nil
 }
 

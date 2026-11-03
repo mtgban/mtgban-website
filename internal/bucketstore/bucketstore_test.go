@@ -2,6 +2,7 @@ package bucketstore
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -58,6 +59,39 @@ func TestStoreMissingDocument(t *testing.T) {
 	}
 	if got := s.Get(); got.Events != nil {
 		t.Errorf("missing document should publish the zero value, got %v", got)
+	}
+}
+
+func TestStoreReloadKeepsDocument(t *testing.T) {
+	ctx := context.Background()
+	s := fileStore(t, "doc.json")
+	if err := s.Save(ctx, testDoc{Events: []string{"a"}}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	_, path, _ := s.Bucket(ctx)
+
+	// A reader on the same path never saw the document fail: it loads it,
+	// then a reload that cannot open it fails and keeps what was read
+	fresh := &Store[testDoc]{Bucket: s.Bucket}
+	if err := fresh.Load(ctx); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := fresh.Load(ctx); err == nil {
+		t.Error("reload of a document that cannot be opened should fail")
+	}
+	if got := fresh.Get(); len(got.Events) != 1 || got.Events[0] != "a" {
+		t.Errorf("Get after a failed reload = %v, want the loaded document", got)
+	}
+
+	// A store that never read one stays quiet on every reload
+	absent := fileStore(t, "absent.json")
+	for range 2 {
+		if err := absent.Load(ctx); err != nil {
+			t.Errorf("Load of a document never read: %v", err)
+		}
 	}
 }
 
