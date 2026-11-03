@@ -777,9 +777,10 @@ func TestUserPageRendersOnMobileBase(t *testing.T) {
 }
 
 // The navbar's utility bar draws Account from the nav's own entry, which
-// every reader has, signed in or not, between the backpack and the guide.
+// every reader has, signed in or not, between the backpack and the guide,
+// and names it for the drag down to the Links strip.
 func TestNavbarAccountIconFromTheNav(t *testing.T) {
-	const button = `class="nav2-icon-btn" href="/user" title="Account"`
+	const button = `class="nav2-icon-btn" href="/user" title="Account" data-util="account" draggable="true"`
 	for _, sig := range []string{"", tierSig("Pioneer")} {
 		pv := genPageNav(testSite, nil, "Search", sig)
 		out := renderPage(t, "search.html", false, pv)
@@ -788,7 +789,7 @@ func TestNavbarAccountIconFromTheNav(t *testing.T) {
 			t.Errorf("sig %q: the utility bar lacks the Account button", sig)
 			continue
 		}
-		if strings.Index(out, `id="nav-backpack"`) > at || strings.Index(out, `title="Guide"`) < at {
+		if strings.Index(out, `data-util="backpack"`) > at || strings.Index(out, `data-util="guide"`) < at {
 			t.Errorf("sig %q: Account is not between the backpack and the guide", sig)
 		}
 	}
