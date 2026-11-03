@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -321,18 +322,12 @@ func TestSigningRenewalNeverActsOnAnAnswerThatSettlesNothing(t *testing.T) {
 		{name: "a tier title the site does not know", title: "SOMETHING NEW"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			block := renewalBlock
-			if tc.slowIdentity {
-				block.RenewTimeoutSeconds = 1
-			}
-			rig := newRenewalRig(t, block)
+			rig := newRenewalRig(t, renewalBlock)
 			rig.stub.token, rig.stub.identity, rig.stub.member = tc.token, tc.identity, tc.member
 			if tc.title != "" {
 				rig.stub.title = tc.title
 			}
-			if tc.slowIdentity {
-				rig.stub.identityDelay = 1500 * time.Millisecond
-			}
+			rig.stub.timeOutIdentity = tc.slowIdentity
 			session := rig.session("")
 			elsewhere := rig.session("")
 			old := rig.sig("Legacy", 9*day)
@@ -708,21 +703,38 @@ func TestSigningRenewsOnAPostAndOnADataRoute(t *testing.T) {
 	rig.wantRenewed(data, old, session)
 }
 
+// holdUntil blocks a stub's answer until released, or fails the test: a
+// request that should have been served without it is waiting on it.
+func holdUntil(t *testing.T, release <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-release:
+	case <-time.After(5 * time.Second):
+		t.Error("the answer was held past the deadline")
+	}
+}
+
 // Of every request at once that finds the signature due, from one device or
 // several, one asks Patreon; the others are served on the old signature, and
 // every session ends on the new token.
 func TestSigningRenewalIsSingleFlightAcrossDevices(t *testing.T) {
 	rig := newRenewalRig(t, renewalBlock)
-	rig.stub.delay = 300 * time.Millisecond
 	devices := []string{rig.session(""), rig.session("")}
 	old := rig.sig("Legacy", 9*day)
 
 	const requests = 6
+	rest := make(chan struct{})
+	rig.stub.beforeToken = func() { holdUntil(t, rest) }
 	results := make([]*served, requests)
+	var finished atomic.Int32
 	var wg sync.WaitGroup
 	for i := range results {
 		wg.Go(func() {
 			results[i] = rig.serve(rig.request(http.MethodGet, "/limited", browser(old, devices[i%len(devices)])...), false)
+			// The refresh answers once every other request has been served
+			if finished.Add(1) == requests-1 {
+				close(rest)
+			}
 		})
 	}
 	wg.Wait()
@@ -1047,18 +1059,23 @@ func TestSigningLeavesAYoungSignatureAlone(t *testing.T) {
 	}
 }
 
-// The refresh waits longer than renew_timeout_seconds gives the lookups: an
+// The refresh has longer than renew_timeout_seconds gives the lookups: an
 // answer given up on after Patreon rotated the token would leave the
 // sessions holding a dead one.
-func TestSigningRenewalWaitsOutASlowRefresh(t *testing.T) {
+func TestSigningRenewalGivesTheRefreshLongerThanTheLookups(t *testing.T) {
 	block := renewalBlock
 	block.RenewTimeoutSeconds = 1
 	rig := newRenewalRig(t, block)
-	rig.stub.delay = 1500 * time.Millisecond
 	session := rig.session("")
 	old := rig.sig("Legacy", 9*day)
 
 	rig.wantRenewed(rig.page(browser(old, session)...), old, session)
+	if rig.stub.tokenLeft <= block.RenewTimeout() {
+		t.Errorf("the refresh went out with %v left, want longer than the lookups' %v", rig.stub.tokenLeft, block.RenewTimeout())
+	}
+	if rig.stub.identityLeft <= 0 || rig.stub.identityLeft > block.RenewTimeout() {
+		t.Errorf("the identity lookup went out with %v left, want at most %v", rig.stub.identityLeft, block.RenewTimeout())
+	}
 	rows := rig.rows()
 	if len(rows) != 1 || rows[0].token != rig.stub.liveToken() || rig.stub.liveToken() == "refresh-0" {
 		t.Errorf("rows %+v with Patreon honouring %q, want the session holding the rotated token", rows, rig.stub.liveToken())
