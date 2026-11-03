@@ -201,10 +201,9 @@ func TestUploadSaysADeadShareIsGone(t *testing.T) {
 	}
 }
 
-// A share's notes stay with the owner. On the reader's page a URL note is
-// what sourceLink turns into the price cell's href, and the note is written
-// verbatim into the reader's CSV, so an owner could hand every reader a
-// link, or a spreadsheet formula, under the site's own wording.
+// A share's notes stay with the owner. The note is written verbatim into
+// the reader's CSV, so an owner could hand every reader a link, or a
+// spreadsheet formula, under the site's own wording.
 func TestSharedRowsCarryNoNotes(t *testing.T) {
 	rows := "uuid-1\t1\tNM\t12.00\thttps://attacker.example/login?next=1\t\t\n" +
 		"uuid-2\t2\tSP\t3.00\t=HYPERLINK(\"https://attacker.example\",\"open\")\t\t"
@@ -218,18 +217,11 @@ func TestSharedRowsCarryNoNotes(t *testing.T) {
 		if entry.Notes != "" {
 			t.Errorf("row %d carries the owner's note %q", i, entry.Notes)
 		}
-		cell := loadedPrice(t, entry)
-		if strings.Contains(cell, "<a") || strings.Contains(cell, "attacker.example") {
-			t.Errorf("row %d links the reader somewhere:\n%s", i, cell)
-		}
 	}
 	// The rest of the row still arrives.
 	if entries[0].OriginalPrice != 12 || entries[0].Quantity != 1 || entries[0].OriginalCondition != "NM" ||
 		entries[1].OriginalPrice != 3 || entries[1].Quantity != 2 || entries[1].OriginalCondition != "SP" {
 		t.Fatalf("other fields lost: %+v", entries)
-	}
-	if !strings.Contains(loadedPrice(t, entries[0]), "$ 12.00") {
-		t.Fatal("the price itself is missing")
 	}
 }
 

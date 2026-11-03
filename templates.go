@@ -238,36 +238,6 @@ var funcMap = template.FuncMap{
 		}
 		return string(encoded)
 	},
-	// sourceLink answers with a URL a results row can be made clickable
-	// with, or "" for a note that is not one.
-	//
-	// The notes column is whatever the uploaded file put in it, so only an
-	// absolute http or https URL becomes a link and every other note stays
-	// the text it is. html/template would refuse a javascript: href on its
-	// own, but a note is not a link merely for being a string, and a row
-	// whose note is a sentence should not look like one.
-	"sourceLink": func(note string) string {
-		parsed, err := url.Parse(strings.TrimSpace(note))
-		if err != nil || parsed.Host == "" {
-			return ""
-		}
-		if parsed.Scheme != "http" && parsed.Scheme != "https" {
-			return ""
-		}
-		// Rebuilt rather than echoed, the same way the handoff link is:
-		// Host excludes userinfo, so https://user:pass@host/... would get
-		// this far and keep the credentials in the href, which a browser
-		// may then send as Basic auth.
-		clean := url.URL{
-			Scheme:   parsed.Scheme,
-			Host:     parsed.Host,
-			Path:     parsed.Path,
-			RawPath:  parsed.RawPath,
-			RawQuery: parsed.RawQuery,
-			Fragment: parsed.Fragment,
-		}
-		return clean.String()
-	},
 	"inc": func(i, j int) int {
 		return i + j
 	},

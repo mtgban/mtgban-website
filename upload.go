@@ -307,12 +307,6 @@ type OptimizedUploadEntry struct {
 	// Price used to display a visual indicator
 	VisualPrice float64
 
-	// Whatever the source row carried in its notes column, for the link
-	// back to the offer the price was read from. Only the loaded price is
-	// that offer's: with IgnorePrices the number shown is an index's, and
-	// linking it to a seller would name the wrong source for it.
-	Notes string
-
 	// Profitability index
 	Profitability float64
 }
@@ -1071,9 +1065,6 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 			added = price * float64(qty)
 			entry.Quantity += qty
 			entry.Profitability = profitability(entry.Price, entry.BestPrice, entry.Spread, entry.Quantity)
-			if entry.Notes != row.Notes {
-				entry.Notes = ""
-			}
 		} else {
 			// Break down by store
 			if opened {
@@ -1087,7 +1078,6 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 				Spread:        factor,
 				BestPrice:     price,
 				Quantity:      row.qty,
-				Notes:         row.Notes,
 				VisualPrice:   comparePrice * st.visualPerc / 100.0,
 				Profitability: profitability(comparePrice, price, factor, row.qty),
 			})

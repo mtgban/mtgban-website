@@ -1,10 +1,3 @@
-{{/* The loaded price, linked back to where the row was read when the file
-     said: the extension writes the offer's own page into the notes column,
-     so the price you were charged links to the offer charging it. Defined
-     once because both tables draw it - the rows that matched and the ones
-     that found nothing, which are the ones most worth going back to. */}}
-{{define "loaded-price"}}<td class="ures-price">{{$source := sourceLink .Notes}}{{if $source}}<a href="{{$source}}" target="_blank" rel="nofollow noopener" title="Open this offer where it was read from">$ {{printf "%.2f" .OriginalPrice}}</a>{{else}}$ {{printf "%.2f" .OriginalPrice}}{{end}}</td>{{end}}
-
 {{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/upload.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/backpack.css?hash={{.Hash}}">
@@ -500,7 +493,7 @@
                         {{if $canRemove}}<button type="button" class="ures-remove-btn" onclick="window.toggleRemoveRow && toggleRemoveRow(this)" title="Remove from results" aria-label="Remove from results">×</button>{{end}}
                     </div>
                 </td>
-                {{template "loaded-price" .}}
+                <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
                 <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
                 <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{.Quantity}}</td>
                 {{range $storeKeys}}
@@ -672,7 +665,7 @@
                     </div>
                 </div>
             </td>
-            {{template "loaded-price" .}}
+            <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
             <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
             <td style="text-align:center">{{.Quantity}}</td>
         </tr>
@@ -1058,7 +1051,7 @@
                                 </td>
                                 <td>{{$ckTip := buylist_title "CK" (grade "NM") "" $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}<div class="bl-info"{{if $ckTip}} title="{{plain_tip $ckTip}}" data-tip="{{$ckTip}}"{{end}}>{{buylist_detail $scraperKey $card.HotlistStore $price $card.GoodBuylist $card.HighestBuylist true $card.CKSignal}}{{buylist_ck $card.CKSignal}}</div></td>
                                 <td class="opt-offer"><span class="offer">$ <a href="/go/b/{{$scraperKey}}/{{.CardID}}" target="_blank">{{printf "%.2f" $price}}</a></span></td>
-                                <td class="opt-loaded" data-sort="{{printf "%.2f" .Price}}"><span class="loaded-wrap"><span class="loaded">{{if .Price}}$ {{if $.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a>{{else}}{{$source := sourceLink .Notes}}{{if $source}}<a href="{{$source}}" target="_blank" rel="nofollow noopener" title="Open this offer where it was read from">{{printf "%.2f" .Price}}</a>{{else}}{{printf "%.2f" .Price}}{{end}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{end}}</span><span class="loaded-qty">{{if .Quantity}}&times;{{.Quantity}}{{end}}</span><span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}</span></span></td>
+                                <td class="opt-loaded" data-sort="{{printf "%.2f" .Price}}"><span class="loaded-wrap"><span class="loaded">{{if .Price}}$ {{if $.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a>{{else}}{{printf "%.2f" .Price}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{end}}</span><span class="loaded-qty">{{if .Quantity}}&times;{{.Quantity}}{{end}}</span><span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}</span></span></td>
                                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}">
                                     {{if .Price}}
                                         {{printf "%.2f" .Spread}}%

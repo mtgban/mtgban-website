@@ -166,8 +166,8 @@ func TestOptimizerMergesOpenedCopies(t *testing.T) {
 	}
 
 	got := rows.optimizedResults["CK"]
-	if len(got) != 1 || got[0].Quantity != 3 || got[0].Notes != "" {
-		t.Fatalf("CK lists %+v, want one row of 3 with no notes", got)
+	if len(got) != 1 || got[0].Quantity != 3 {
+		t.Fatalf("CK lists %+v, want one row of 3", got)
 	}
 	if rows.optimizedTotals["CK"] != 6 || rows.optimizedQtys["CK"] != 3 || rows.highestTotal != 6 {
 		t.Errorf("total %v, quantity %v, highest %v, want 6, 3 and 6",
