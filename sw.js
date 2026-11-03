@@ -1,9 +1,11 @@
 // MTGBAN offline mode service worker. The server injects self.__BUILD as
-// the first line, so deploys change the bytes and trigger the update check.
+// the first line, so deploys change the bytes and trigger the update check,
+// and self.__GAME, the deployment's game.
 'use strict';
 
 // URLs must match the page's ?hash= exactly, even when the build id is empty.
 var BUILD = self.__BUILD || '';
+var GAME = self.__GAME || '';
 // Dev, or a build without a commit: the server sends static files
 // no-store, so the cache answers only offline.
 var DEV = !!self.__DEV;
@@ -65,6 +67,9 @@ var SHELL_URLS = [
     '/img/favicon/favicon-32x32.png',
     '/img/favicon/site.webmanifest'
 ];
+// The game's card back: what card-art-fallback.js shows for a card whose
+// image was never synced, so it has to be here when the network is not.
+if (GAME) SHELL_URLS.push('/img/backs/' + GAME + '.webp');
 // Keyrune ships from a CDN so its ~460 KB of font and stylesheet stay out of
 // the repo, and stays on @latest so new set symbols arrive without a deploy.
 var KEYRUNE_PREFIX = 'https://cdn.jsdelivr.net/npm/keyrune@';

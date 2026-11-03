@@ -18,6 +18,9 @@ func ServeServiceWorker(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Write([]byte("self.__BUILD = '" + assetHash() + "';\n"))
+	// The card back the art fallback shows for a card whose image was never
+	// synced, precached so it is there offline too.
+	w.Write([]byte("self.__GAME = '" + string(Config().Game) + "';\n"))
 	if DevMode || BuildCommit == "" {
 		w.Write([]byte("self.__DEV = true;\n"))
 	}

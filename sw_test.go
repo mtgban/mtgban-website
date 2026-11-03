@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // The offline shell renders base.html with the shared navbar, so every script
@@ -47,6 +49,18 @@ func TestServiceWorkerPrecachesExistingFiles(t *testing.T) {
 	for _, m := range matches {
 		if _, err := os.Stat(strings.TrimPrefix(m[1], "/")); err != nil {
 			t.Errorf("precached %s does not exist: %v", m[1], err)
+		}
+	}
+}
+
+// The precache adds the game's card back by name, and the install fails on
+// any missing entry: a game shipped without its back would take the whole
+// offline shell down with it, not just the fallback.
+func TestEveryGameHasACardBack(t *testing.T) {
+	for _, game := range matcher.AllGames {
+		path := "img/backs/" + string(game) + ".webp"
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("%s has no card back for the offline shell to precache: %v", game, err)
 		}
 	}
 }
@@ -102,6 +116,9 @@ func TestServeServiceWorker(t *testing.T) {
 			n = 40
 		}
 		t.Errorf("body does not start with the build injection: %q", string(body[:n]))
+	}
+	if !strings.Contains(string(body), "self.__GAME = '"+string(Config().Game)+"';\n") {
+		t.Error("body does not name the game whose card back the shell precaches")
 	}
 	if !strings.Contains(string(body), "mtgban-shell-") {
 		t.Error("body does not contain the shell cache prefix (sw.js not appended)")
