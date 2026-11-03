@@ -132,7 +132,7 @@ func TestSaveDatasetsWritesThePath(t *testing.T) {
 	}
 }
 
-// The Datasets tab offers Update, and an editable editor, only when there is
+// The Datasets file offers Update, and an editable editor, only when there is
 // a file to save to.
 func TestAdminDatasetsUpdateNeedsAPath(t *testing.T) {
 	pv := PageVars{UserNav: &NavElem{Short: "b"}, AdminVars: AdminVars{ACLText: "{}"}}
@@ -145,10 +145,10 @@ func TestAdminDatasetsUpdateNeedsAPath(t *testing.T) {
 	if strings.Contains(out, update) {
 		t.Error("Update offered with no datasets path")
 	}
-	panel := out[strings.Index(out, `id="panel-datasets"`):]
-	panel = panel[:strings.Index(panel, `class="admin-panel`)]
+	panel := out[strings.Index(out, `id="file-datasets"`):]
+	panel = panel[:strings.Index(panel, `class="admin-file`)]
 	if !strings.Contains(panel, "not configured") {
-		t.Error("tab does not say no datasets file is configured")
+		t.Error("file does not say no datasets file is configured")
 	}
 	if !readOnly.MatchString(out) {
 		t.Error("editor is editable with no datasets path")

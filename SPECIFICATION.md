@@ -937,9 +937,10 @@ tier, `?tier=&duration=`, for up to the 31 days its cookie lasts). Every
 command but `logs` and `invite` changes state, so it runs only from a POST
 (below; the dashboard's buttons and the scraper names are small forms).
 `invite` mints a link onto the admin's own page and saves nothing, so it
-and the views stay on GET. JSON
-editors for the config, checkpoints, ACL/access table, affiliates, chart
-datasets, infrastructure file and key overrides; the datasets and
+and the views stay on GET. The Files tab holds the JSON editors, one at a
+time from a column of the files (`?page=<file>` opens one): the config,
+checkpoints, ACL/access table, affiliates, chart datasets, infrastructure
+file and key overrides; the datasets and
 infrastructure editors are read-only when the config names no path for
 them, and the infrastructure one shows the file alone, without the keys
 the deployment's own config sets. Key overrides are backed
