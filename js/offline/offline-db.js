@@ -152,8 +152,26 @@
         });
     }
 
-    // Full name-index scan, in key order, backing the suggestion and search name scans.
+    // The name index as last scanned, and the catalog version it was read
+    // under. The sync rewrites the index only with a new catalog, stamped
+    // once the index is in, so a list read under the stamp still set is current.
+    var names = null;
+
+    // The name index in key order, backing the suggestion and search name
+    // scans: scanned once per catalog version, not on every keystroke.
     function allNames() {
+        return getMeta('catalogVersion').then(function(version) {
+            if (names && names.version === version) return names.list;
+            var list = scanNames();
+            names = { version: version, list: list };
+            list.catch(function() {
+                if (names && names.list === list) names = null;
+            });
+            return list;
+        });
+    }
+
+    function scanNames() {
         return withTx(['names'], 'readonly', function(tx, out) {
             out.result = [];
             var req = tx.objectStore('names').openCursor();

@@ -270,11 +270,9 @@
     var LRU_SIZE = 8;
 
     var payloadCache = new Map();
-    var nameCache = null;
 
     function resetCaches() {
         payloadCache = new Map();
-        nameCache = null;
     }
 
     // cachedPayload is an LRU over decoded set payloads.
@@ -291,14 +289,6 @@
             payloadCache.delete(payloadCache.keys().next().value);
         }
         return payload;
-    }
-
-    // nameList caches the names store in memory once per session.
-    async function nameList(env) {
-        if (nameCache === null) {
-            nameCache = await env.allNames();
-        }
-        return nameCache;
     }
 
     // candidateUUIDs unions the exact-key hit with a substring scan.
@@ -321,7 +311,7 @@
         (await env.lookupName(needle)).forEach(push);
         // Skip substring scan for short needles to avoid a full-index walk.
         if (needle.length >= 3) {
-            var list = await nameList(env);
+            var list = await env.allNames();
             for (var i = 0; i < list.length && uuids.length < MAX_TOTAL; i++) {
                 if (list[i].key !== needle && list[i].key.indexOf(needle) !== -1) {
                     list[i].uuids.forEach(push);
