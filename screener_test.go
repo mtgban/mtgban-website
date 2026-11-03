@@ -11,7 +11,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -554,10 +553,8 @@ func TestCachedMoversCollapsesConcurrentBuilds(t *testing.T) {
 	}
 
 	<-arrived
-	// The first caller is inside the read; give the rest a moment to queue up
-	// behind it. Arriving late is harmless - they find the filled cache - so a
-	// slow scheduler costs the test its point, never a false failure.
-	time.Sleep(50 * time.Millisecond)
+	// The first caller is inside the read; the rest queue up behind it
+	waitForGoroutines(t, callers-1, "singleflight.(*Group).Do", "(*WaitGroup).Wait", "cachedMovers")
 	close(release)
 	wg.Wait()
 

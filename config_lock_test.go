@@ -110,8 +110,8 @@ func (b *heldBucket) NewWriter(ctx context.Context, path string) (io.WriteCloser
 }
 
 // duringSave runs first up to its config write, and second while that write
-// is held. Unless second waits for first, it finishes in between; if it does
-// wait, the hold ends after half a second and second runs after first.
+// is held. The hold ends once second is waiting on configMu, so second runs
+// after first; if it never waits, it finishes in between and the test fails.
 func duringSave(t *testing.T, first, second func() error) {
 	t.Helper()
 	held := &heldBucket{ReadWriter: ConfigBucket, opened: make(chan struct{}), release: make(chan struct{})}
@@ -127,14 +127,9 @@ func duringSave(t *testing.T, first, second func() error) {
 
 	secondErr := make(chan error, 1)
 	go func() { secondErr <- second() }()
-	var err error
-	select {
-	case err = <-secondErr:
-		close(held.release)
-	case <-time.After(500 * time.Millisecond):
-		close(held.release)
-		err = <-secondErr
-	}
+	waitForGoroutines(t, 1, "sync.(*Mutex).Lock", "duringSave")
+	close(held.release)
+	err := <-secondErr
 	if err != nil {
 		t.Error(err)
 	}
