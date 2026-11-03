@@ -23,6 +23,7 @@ var adminSavingFields = map[string]string{
 	"keyOverridesTextArea":   "not json",
 	"grantEmail":             "not-an-email",
 	"revokeEmail":            "nobody@example.invalid",
+	"updateEmail":            "nobody@example.invalid",
 }
 
 // runAdminEditors runs every editor and form the admin page saves from on r.
@@ -35,7 +36,7 @@ func runAdminEditors(r *http.Request) PageVars {
 	adminDatasetsEditor(r, &pv)
 	adminInfrastructureEditor(r, &pv)
 	testSite.adminKeyOverrides(r, nil, &pv)
-	adminGrantAdd(r, &pv)
+	adminGrantSave(r, &pv)
 	adminGrantRevoke(r, &pv)
 	return pv
 }

@@ -162,10 +162,6 @@
 }
 
 /* Per-row grant removal: a small ✕ at the right edge of the grants table */
-.admin-grant-remove-cell {
-    width: 1%;
-    text-align: center;
-}
 .admin-grant-remove {
     border: none;
     background: none;
@@ -701,4 +697,56 @@ td.admin-stale-date { color: var(--adanger); font-weight: 600; }
 }
 @media (prefers-reduced-motion: reduce) {
     .admin-spinner { animation: none; }
+}
+
+/* Grants edit in place: a cell reads as text until it is pointed at or
+   typed in, and a row's Save stays dim until one of its fields differs
+   from what the table loaded with. */
+.admin-grants td { padding-top: 2px; padding-bottom: 2px; }
+.admin-grants input,
+.admin-grants select {
+    width: 100%;
+    min-width: 6em;
+    box-sizing: border-box;
+    padding: 5px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--normal);
+    font-size: inherit;
+    font-family: inherit;
+    outline: none;
+}
+.admin-grants input.admin-mono { font-family: var(--font-mono); }
+.admin-grants input[name="grantEmail"] { min-width: 16em; }
+.admin-grants select { cursor: pointer; }
+.admin-grants tr:hover input,
+.admin-grants tr:hover select { border-color: var(--border-moderate); }
+.admin-grants input:focus,
+.admin-grants select:focus {
+    border-color: var(--ainfo);
+    background: var(--surface-2);
+}
+.admin-grants input::placeholder { color: var(--text-dim); }
+/* Overrides is the one column that runs long, so it takes the slack. */
+.admin-grants td:nth-child(6) { width: 32%; }
+.admin-grant-actions {
+    width: 1%;
+    white-space: nowrap;
+}
+.admin-grant-actions form { display: inline-block; vertical-align: middle; }
+.admin-grant-save {
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-moderate);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+.admin-grant-row.edited .admin-grant-save {
+    border-color: var(--dodgerblue-fill);
+    background: var(--dodgerblue-fill);
+    color: #fff;
 }
