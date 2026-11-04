@@ -138,6 +138,19 @@ output, not a claim written here.
   without regexing it out of a template, and CodeQL scans it, which it
   does not do for templates. Keep inline only what has to run before
   anything loads (the theme guard in `base.html`) or a few lines of glue.
+- **No fixed waits in tests.** A test doesn't sleep or wait out a window to
+  prove something happened: on a slow machine the wait ends early and the
+  check passes without testing anything. Wait on the event itself:
+  `waitForGoroutines`/`waitForStack` for a blocked goroutine,
+  `pg_blocking_pids` for a Postgres lock (`waitForBlocked` in
+  `internal/alerts`), `testing/synctest` for timers with no socket, a stub's
+  hook for a slow answer. A deadline that only fires on a failure and a short
+  polling loop are fine, and a real socket keeps a real deadline, at about
+  20 ms.
+- **A slow test that only reads the datastore calls `t.Parallel()`**, which
+  runs it after every sequential test, with the other parallel ones. It
+  touches no globals, so no `t.Setenv` or `withSigMode`. A per-game test gets
+  its datastore from `gameDatastore`, which opens each game once a run.
 
 ## Where things live (root package)
 
