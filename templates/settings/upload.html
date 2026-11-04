@@ -121,6 +121,11 @@
                 <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
                 <span>Enable the custom buylist</span>
             </label>
+            <label class="settings-toggle" title="A condition the reference seller has no price for pays the buy rate on the fallback price, or on a better condition's price if lower">
+                <input type="checkbox" data-misc="fallback">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Fill missing conditions</span>
+            </label>
         </div>
         <div class="settings-upload-fields">
             <label class="settings-field-row">
@@ -136,6 +141,14 @@
                         <option value="{{.}}">{{$name}}</option>
                         {{end}}{{end}}
                     </optgroup>
+                </select>
+            </label>
+            <label class="settings-field-row">
+                <span>Fallback price (singles)</span>
+                <select id="opt-customfallback" data-cookie="UploadCustomFallback">
+                    {{range $.UploadAltKeys}}{{$name := index $.StoreNames .}}{{if $name}}
+                    <option value="{{.}}" {{if eq . "TCGLow"}}selected{{end}}>{{$name}}</option>
+                    {{end}}{{end}}
                 </select>
             </label>
             <label class="settings-field-row">

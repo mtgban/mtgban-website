@@ -39,7 +39,7 @@
             'SearchSellersPriority', 'SearchVendorsPriority',
             // upload
             'UploadSorting', 'UploadAltPrice', 'UploadPriceSource',
-            'UploadCustomBuyer', 'UploadCustomSealedBuyer',
+            'UploadCustomBuyer', 'UploadCustomSealedBuyer', 'UploadCustomFallback',
         ],
         misc: {
             // search

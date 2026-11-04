@@ -43,5 +43,8 @@ function syncUploadOptionsFromSettings() {
         add('customsealedseller', getCookie('UploadCustomSealedBuyer') || 'TCGSealed');
         add('customminprice',     getCookie('UploadCustomMinPrice')    || '7');
         add('customrate',         getCookie('UploadCustomRate')        || '0.8');
+        if (customOpts.indexOf('fallback') >= 0) {
+            add('customfallback', getCookie('UploadCustomFallback') || 'TCGLow');
+        }
     }
 }

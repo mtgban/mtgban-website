@@ -2205,9 +2205,12 @@ func customBuylistSkips(b *matcher.Backend, co *matcher.CardObject, releasedBy t
 
 // customBuylistRule is the reader's custom buylist as the upload settings
 // save it: the reference sellers' prices at a rate, from a minimum price.
+// With a fallback set, a price index fills in the grades the singles
+// reference does not price.
 type customBuylistRule struct {
 	rate, minPrice       float64
 	seller, sealedSeller string
+	fallback             string
 }
 
 // readCustomBuylistRule reads the reader's custom buylist rule, the zero
@@ -2223,12 +2226,71 @@ func readCustomBuylistRule(r *http.Request) customBuylistRule {
 		return customBuylistRule{}
 	}
 
-	return customBuylistRule{
+	rule := customBuylistRule{
 		rate:         rate,
 		minPrice:     customBuylistSetting(readCookie(r, "UploadCustomMinPrice")),
 		seller:       readCookie(r, "UploadCustomBuyer"),
 		sealedSeller: readCookie(r, "UploadCustomSealedBuyer"),
 	}
+	if slices.Contains(customOpts, "fallback") {
+		rule.fallback = readCookie(r, "UploadCustomFallback")
+	}
+	return rule
+}
+
+// customBuylistFallback is the inventory of the fallback a rule names, nil
+// when it names no price index.
+func customBuylistFallback(p *prices, name string) mtgban.InventoryRecord {
+	if !slices.Contains(UploadIndexComparePriceList, name) {
+		return nil
+	}
+	inventory, _ := p.sellerInventory(name)
+	return inventory
+}
+
+// customBuylistReference is what the rule prices one card off: the
+// reference's listings, best grade first, plus a price at every grade the
+// reference does not price: the lowest of the fallback's and those listed at
+// better grades. An index reference has one price whatever the grade, so the
+// fallback only stands in for a missing one.
+func customBuylistReference(entries, fallback []mtgban.InventoryEntry, isIndex bool) []mtgban.InventoryEntry {
+	priced := func(e mtgban.InventoryEntry) bool { return !unpriced(e.Price) }
+	first := slices.IndexFunc(fallback, priced)
+	if first < 0 {
+		return entries
+	}
+	if isIndex {
+		if slices.ContainsFunc(entries, priced) {
+			return entries
+		}
+		return fallback[first : first+1]
+	}
+
+	lowest := fallback[first].Price
+	merged := make([]mtgban.InventoryEntry, 0, len(entries)+len(mtgban.FullGradeTags))
+	for _, grade := range mtgban.FullGradeTags {
+		listed := false
+		for _, entry := range entries {
+			if entry.Conditions != grade {
+				continue
+			}
+			merged = append(merged, entry)
+			if priced(entry) {
+				listed = true
+				lowest = min(lowest, entry.Price)
+			}
+		}
+		if !listed {
+			merged = append(merged, mtgban.InventoryEntry{Conditions: grade, Price: lowest})
+		}
+	}
+	// Anything filed outside the grades keeps its place behind them
+	for _, entry := range entries {
+		if !slices.Contains(mtgban.FullGradeTags, entry.Conditions) {
+			merged = append(merged, entry)
+		}
+	}
+	return merged
 }
 
 // customBuylistSetting reads a custom buylist rate or minimum price, 0 for
@@ -2278,6 +2340,7 @@ func customBuylistOffers(b *matcher.Backend, p *prices, r *http.Request, cardIDs
 
 	singles, _ := p.sellerInventory(rule.seller)
 	sealed, _ := p.sellerInventory(rule.sealedSeller)
+	fallback := customBuylistFallback(p, rule.fallback)
 
 	isIndex := slices.Contains(UploadIndexComparePriceList, rule.seller)
 
@@ -2290,15 +2353,13 @@ func customBuylistOffers(b *matcher.Backend, p *prices, r *http.Request, cardIDs
 			continue
 		}
 
-		ref := singles
+		var entries []mtgban.InventoryEntry
 		if co.Sealed {
-			ref = sealed
+			entries = sealed[cardID]
+		} else {
+			entries = customBuylistReference(singles[cardID], fallback[cardID], isIndex)
 		}
-		if ref == nil {
-			continue
-		}
-		entries, found := ref[cardID]
-		if !found || len(entries) == 0 {
+		if len(entries) == 0 {
 			continue
 		}
 

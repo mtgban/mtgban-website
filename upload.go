@@ -2116,9 +2116,13 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 
 		// Build the custom buylist if requested
 		customBuylist, _ := strconv.ParseBool(r.FormValue("custombuylist"))
+		customFallback := r.FormValue("customfallback")
 		if !r.Form.Has("custombuylist") {
 			customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
 			customBuylist = slices.Contains(customOpts, "enabled")
+			if slices.Contains(customOpts, "fallback") {
+				customFallback = readCookie(r, "UploadCustomFallback")
+			}
 		}
 		// A rate that is not a positive number means no custom buylist, as
 		// on search and arbit
@@ -2131,8 +2135,11 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 			customSeller := getUploadSetting(r, "customseller", "UploadCustomBuyer")
 			if customSeller != "" {
 				ref, _ := p.sellerInventory(customSeller)
+				fallback := customBuylistFallback(p, customFallback)
+				isIndex := slices.Contains(UploadIndexComparePriceList, customSeller)
 				for _, cardID := range ids.cardIDs {
-					processEntry(b, p, results, ref[cardID], "", cardID, customStore, false, ids.shouldCheckForConditions, false, rule)
+					entries := customBuylistReference(ref[cardID], fallback[cardID], isIndex)
+					processEntry(b, p, results, entries, "", cardID, customStore, false, ids.shouldCheckForConditions, false, rule)
 				}
 				enabledStores = append(enabledStores, customStore)
 			}
