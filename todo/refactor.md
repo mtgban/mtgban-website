@@ -31,15 +31,15 @@ to 30.8k lines between May 17 and Sep 30.
 | #762, #763, #764 | `Admin` from 719 lines and 410 statements to 104 and 55: its actions, tools, five editors, dashboard tables and grant forms are each a function below it |
 | #767, #770-#774, #777, #778 | `Upload` from 1,269 lines and 701 statements to 292 and 171: its settings, store selection, exports, input, loading, price lookups, row pricing and results page are each a function below it |
 | #779, #782, #784-#787, #795, #815, #816 | `Search` from 1,046 lines and 550 statements to 157 and 82: its chart page, result shaping, chart roster, preferences, landing, search run and request prelude are each a function below it; #782 dropped the legacy chart reads first, #795 gave oEmbed its own handler, and #815 and #816 put its helpers in Upload's shape |
+| #1269 | CI tests the eight other games too, where a run has the secrets for their datastores |
 
 ## Open
 
 | Item | Type | I/R/E | Score | Effort | Evidence |
 |---|---|---|---|---|---|
 | Price API handlers thinly tested | Test | 2/4/2 | 24 | M | `PriceAPI` 25% covered, `BatchPricesAPI` 0% |
-| Database code untested in CI | Test | 3/4/3 | 21 | M | No Postgres in CI; every DB test is env-gated. news.go 5%, `timeseries` 20% (the gateway imports it), `userstate` 1% |
+| Database code partly untested in CI | Test | 3/4/3 | 21 | M | CI's Postgres runs the `userstate` and alert store tests; the rest stay env-gated. news.go 5%, `timeseries` 20% (the gateway imports it) |
 | Monitoring gaps | Infra | 2/3/2 | 20 | S-M | `/healthz` checks no database; every alert goes to one Discord webhook (none set: logged only); stale-data alarms live in memory and repeat after a restart |
-| Non-Magic games untested in CI | Test | 3/3/3 | 18 | M | 8 of 9 deployments; their tests skip without the `*_PATH` datastores |
 | Giant functions keep growing | Code | 5/3/4 | 16 | L | Since May 17: `Upload` 793 -> 1,275 lines, `Search` 630 -> 1,040, `Admin` 447 -> 719; all three since split, to 292, 157 and 104 (Done above). `parseSearchOptionsNG` 646 -> 816, left whole. Plan below |
 
 Lower down, measured but not scored: 45 request values parsed with the

@@ -1087,7 +1087,9 @@ staleness alarm's map and messages, from 15 minutes after startup.
   `go vet ./...`, `revive` (its config also rejects any import of
   `reflect`, per `docs/adr/0002-no-reflect.md`) and `staticcheck`, both
   pinned in the workflow) and a `build-and-test` job (`bun test tests/`, `go build ./...`,
-  `go test ./...` against a downloaded `allprintings5.json`).
+  `go test ./...` against a downloaded `allprintings5.json`, every other game's
+  datastore and a Postgres service). A run with no secrets, as a fork's pull
+  request is, tests Magic alone.
 - **Deployment**: pushing a `v*` or `<game>-*` tag runs that game's
   `.github/workflows/<game>-deploy.yml`. App Platform games deploy with
   `doctl apps create-deployment`; `magic`, `pokemon` and `yugioh` run
