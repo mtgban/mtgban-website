@@ -59,9 +59,11 @@
         var flags = (raw === null || raw === '') ? FLAG_DEFAULTS : splitList(raw);
         FLAG_KEYS.forEach(function (k) { if (flags.indexOf(k) >= 0) o[k] = 'true'; });
         TEXTS.forEach(function (t) { o[t[0]] = cookies(t[1]) || t[2]; });
-        if (splitList(cookies('UploadCustomOpts')).indexOf('enabled') >= 0) {
+        var customOpts = splitList(cookies('UploadCustomOpts'));
+        if (customOpts.indexOf('enabled') >= 0) {
             o.custombuylist = 'true';
             CUSTOM.forEach(function (t) { o[t[0]] = cookies(t[1]) || t[2]; });
+            if (customOpts.indexOf('fallback') >= 0) o.customfallback = cookies('UploadCustomFallback') || 'TCGLow';
         }
         if (ctx && ctx.canChangeStores) {
             STORE_LISTS.forEach(function (k) { o[k] = (state[k] || []).slice(); });
@@ -252,8 +254,9 @@
         setCookie('UploadOptimizerOpts', flags.join(',') + ',', 1000);
         TEXTS.forEach(function (t) { setCookie(t[1], opts[t[0]] == null ? t[2] : opts[t[0]], 1000); });
         if (opts.custombuylist === 'true') {
-            setCookie('UploadCustomOpts', 'enabled,', 1000);
+            setCookie('UploadCustomOpts', opts.customfallback ? 'enabled,fallback,' : 'enabled,', 1000);
             CUSTOM.forEach(function (t) { setCookie(t[1], opts[t[0]] == null ? t[2] : opts[t[0]], 1000); });
+            if (opts.customfallback) setCookie('UploadCustomFallback', opts.customfallback, 1000);
         } else {
             setCookie('UploadCustomOpts', '', 1000);
         }

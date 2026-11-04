@@ -345,6 +345,7 @@ func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 			`data-tab="offline" data-path=""`,
 			`id="settings-search-listing"`, // unlocked for a signed reader
 			`id="opt-customseller"`,        // the custom rule's controls
+			`id="opt-customfallback"`,
 			`id="offline-img-editions-picker"`,
 			`id="sleep-editions-picker"`,
 		} {

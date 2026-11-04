@@ -150,3 +150,58 @@ func TestUploadCustomBuylistIgnoresABadSetting(t *testing.T) {
 		}
 	}
 }
+
+// On upload a row's grade the reference lacks is priced off the fallback at
+// the rule's rate when the request turns it on; without it the row keeps the
+// reference's flat price. The form speaks for a re-post, the cookies otherwise.
+func TestUploadCustomBuylistFallback(t *testing.T) {
+	cards := closeVendors(t)
+	card := cards[0]
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			card: {{Conditions: "NM", Price: 10, Quantity: 1}},
+		}, sessionInfo("ZZA")),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			card: {{Conditions: "NM", Price: 4, Quantity: 1}},
+		}, sessionInfo("TCGLow")),
+	}
+	withPrices(t, sellers, currentPrices().vendors)
+
+	offer := func(form url.Values, cookies map[string]string) string {
+		t.Helper()
+		form.Set("mode", "true")
+		form.Set("stores", "ZZV")
+		form.Set("rows", card+"\t1\tSP\t0\t\n")
+		req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		for name, value := range cookies {
+			req.AddCookie(&http.Cookie{Name: name, Value: value})
+		}
+		rec := httptest.NewRecorder()
+		testSite.Upload(rec, req)
+		m := regexp.MustCompile(`/go/b/CUSTOM/` + regexp.QuoteMeta(card) + `" target="_blank">\$ ([0-9.]+)</a>`).FindStringSubmatch(rec.Body.String())
+		if m == nil {
+			t.Fatalf("no custom offer for %s", card)
+		}
+		return m[1]
+	}
+
+	base := url.Values{"custombuylist": {"true"}, "customseller": {"ZZA"}, "customrate": {"0.5"}}
+	if got := offer(base, map[string]string{"UploadCustomFallback": "TCGLow"}); got != "5.00" {
+		t.Errorf("fallback off: SP offer is $%s, want the flat $5.00", got)
+	}
+	on := url.Values{"customfallback": {"TCGLow"}}
+	for k, v := range base {
+		on[k] = v
+	}
+	if got := offer(on, nil); got != "2.00" {
+		t.Errorf("fallback on: SP offer is $%s, want $2.00", got)
+	}
+	got := offer(url.Values{}, map[string]string{
+		"UploadCustomOpts": "enabled,fallback,", "UploadCustomBuyer": "ZZA",
+		"UploadCustomRate": "0.5", "UploadCustomFallback": "TCGLow",
+	})
+	if got != "2.00" {
+		t.Errorf("fallback on by cookie: SP offer is $%s, want $2.00", got)
+	}
+}
