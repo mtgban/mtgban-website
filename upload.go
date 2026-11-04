@@ -40,6 +40,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/xlsread"
 	"github.com/mtgban/mtgban-website/manabox"
 	"github.com/mtgban/mtgban-website/moxfield"
+	"github.com/mtgban/mtgban-website/mythictools"
 	"github.com/mtgban/mtgban-website/userstate"
 )
 
@@ -2001,6 +2002,8 @@ func loadUploadEntries(r *http.Request, b *matcher.Backend, p *prices, in upload
 				uploadedData, uploadName, err = loadArchidekt(r.Context(), b, in.remoteURL, maxRows)
 			case "cubecobra.com", "www.cubecobra.com":
 				uploadedData, uploadName, err = loadCubeCobra(r.Context(), b, in.remoteURL, maxRows)
+			case "mythic.tools", "www.mythic.tools":
+				uploadedData, uploadName, err = loadMythicTools(r.Context(), b, in.remoteURL, maxRows)
 			case "app.getcollectr.com":
 				uploadedData, uploadName, err = loadCollectr(r.Context(), b, in.remoteURL, maxRows)
 			case "docs.google.com":
@@ -2819,6 +2822,32 @@ func loadCubeCobra(ctx context.Context, b *matcher.Backend, link string, maxRows
 	}
 
 	return uploadEntries, cubeName, nil
+}
+
+func loadMythicTools(ctx context.Context, b *matcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
+	items, listName, err := mythictools.Load(ctx, link, maxRows)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch Mythic Tools list: %w", err)
+	}
+
+	var uploadEntries []UploadEntry
+	for _, item := range items {
+		cardID, err := b.MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
+		entry := UploadEntry{
+			Card: matcher.InputCard{
+				Name: item.Name,
+				Foil: item.IsFoil,
+			},
+			HasQuantity:       true,
+			Quantity:          item.Quantity,
+			CardID:            cardID,
+			MismatchError:     err,
+			OriginalCondition: item.Condition,
+		}
+		uploadEntries = append(uploadEntries, entry)
+	}
+
+	return uploadEntries, listName, nil
 }
 
 // loadCollectr fetches a public Collectr showcase (through the configured
