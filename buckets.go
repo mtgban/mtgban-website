@@ -84,23 +84,26 @@ func openBucketPath(ctx context.Context, path string) (io.ReadCloser, error) {
 // reads from can - so the scheme switch survives here, for the two a
 // deployment keeps anything writable under.
 func openBucketWriter(ctx context.Context, path string) (io.WriteCloser, error) {
+	bucket, err := writableBucket(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	return simplecloud.InitWriter(ctx, bucket, path)
+}
+
+// writableBucket returns the backend for a path that is read and written.
+func writableBucket(ctx context.Context, path string) (simplecloud.ReadWriter, error) {
 	u, err := url.Parse(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var bucket simplecloud.ReadWriter
 	switch u.Scheme {
 	case "":
-		bucket = &simplecloud.FileBucket{}
+		return &simplecloud.FileBucket{}, nil
 	case "b2":
-		bucket, err = newB2ClientFor(ctx, u.Host)
-		if err != nil {
-			return nil, err
-		}
+		return newB2ClientFor(ctx, u.Host)
 	default:
 		return nil, fmt.Errorf("cannot write to %q: unsupported scheme %q", path, u.Scheme)
 	}
-
-	return simplecloud.InitWriter(ctx, bucket, path)
 }

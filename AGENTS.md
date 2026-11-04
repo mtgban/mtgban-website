@@ -93,7 +93,8 @@ output, not a claim written here.
   databases; `internal/infrastructure`, and a key the config sets
   itself wins), `acl_path` (tier → page → flags), `patreon_grants_path`,
   `affiliates_path` and `datasets_path` (the chart datasets). The admin
-  page edits each of them. The store list comes from listing
+  page edits each of them. `checkpoints_path` names a game's curated chart
+  markers; with none, nothing is read. The store list comes from listing
   bantool's dumps at startup (`load.go`'s `loadScrapersNG`/`listDumps`),
   which live in bucket `mtgban-dumps` (or a local copy, with `-dumps`) as
   `<game>/<store>/<kind>/<shorthand>.json.xz` and are read with the

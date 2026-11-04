@@ -62,30 +62,35 @@ type ChartCheckpoint struct {
 	KeyruneCode string `json:"keyruneCode,omitempty"`
 }
 
-// checkpointsName is the name of the checkpoints document, stored as a
-// sibling of the main config file in the same bucket.
-const checkpointsName = "checkpoints.json"
-
-// checkpointsStore holds the checkpoints document. A game with none has no
-// curated markers, so a document that cannot be read loads as empty.
+// checkpointsStore holds the checkpoints document that checkpoints_path names.
 var checkpointsStore = &bucketstore.Store[checkpointsFile]{
 	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-		return ConfigBucket, configSibling(checkpointsName), nil
+		path := Config().CheckpointsPath
+		bucket, err := writableBucket(ctx, path)
+		return bucket, path, err
 	},
 }
 
 // reloadCheckpoints refreshes whatever this game draws its ban markers from.
 // Magic reads the published ban list, which is not ours to edit; every other
-// game reads the curated document on the bucket.
+// game reads the curated document checkpoints_path names, and with no path has
+// nothing to read.
 func reloadCheckpoints() error {
 	if Config().Game == DefaultGame {
 		return reloadBanlist(context.Background())
 	}
 
-	if err := checkpointsStore.Load(context.Background()); err != nil {
+	path := Config().CheckpointsPath
+	if path == "" {
+		checkpointsStore.Set(checkpointsFile{})
+		log.Println("checkpoints: no checkpoints_path, no curated markers")
+		return nil
+	}
+	err := checkpointsStore.Load(context.Background())
+	if err != nil {
 		return err
 	}
-	log.Printf("checkpoints: loaded %d events from %s", len(checkpointsStore.Get().Events), configSibling(checkpointsName))
+	log.Printf("checkpoints: loaded %d events from %s", len(checkpointsStore.Get().Events), path)
 	return nil
 }
 
@@ -96,15 +101,19 @@ func saveCheckpoints(ctx context.Context, events []CheckpointEvent) error {
 	if Config().Game == DefaultGame {
 		return errors.New("checkpoints for Magic come from the published ban list and cannot be edited")
 	}
+	if Config().CheckpointsPath == "" {
+		return errors.New("checkpoints_path not configured")
+	}
 	return checkpointsStore.Save(ctx, checkpointsFile{Events: events})
 }
 
 // currentCheckpointsJSON returns the in-memory document serialized as JSON,
 // for display in the admin editor. An empty store still produces a valid
-// `{"events": []}` document. Magic has no document to show: an empty string
-// is what tells the page to offer no editor at all.
+// `{"events": []}` document. Magic and a game with no checkpoints_path have no
+// document to show: an empty string is what tells the page to offer no editor
+// at all.
 func currentCheckpointsJSON() (string, error) {
-	if Config().Game == DefaultGame {
+	if Config().Game == DefaultGame || Config().CheckpointsPath == "" {
 		return "", nil
 	}
 	return checkpointsStore.JSON()

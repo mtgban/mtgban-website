@@ -124,12 +124,15 @@ type ConfigType struct {
 	// affiliate data, which every game shares: a store a game doesn't
 	// carry never matches its list entries. DatasetsPath names the chart
 	// datasets' file; with none, nothing charts.
+	// CheckpointsPath names a game's curated chart markers; with none, it has
+	// none and nothing is read. Magic draws its markers from the ban list.
 	// InfrastructurePath names the infrastructure file. These locate the
 	// files; see common.go for the readers and writers.
 	ACLPath            string `json:"acl_path"`
 	PatreonGrantsPath  string `json:"patreon_grants_path"`
 	AffiliatesPath     string `json:"affiliates_path"`
 	DatasetsPath       string `json:"datasets_path"`
+	CheckpointsPath    string `json:"checkpoints_path"`
 	InfrastructurePath string `json:"infrastructure_path"`
 
 	// The infrastructure every deployment uses, filed in the
