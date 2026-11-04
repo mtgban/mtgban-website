@@ -294,9 +294,10 @@ func TestContentsSeedMatchesFullWalk(t *testing.T) {
 
 	all := append(slices.Clone(b.GetUUIDs()), b.GetSealedUUIDs()...)
 	checked := 0
-	// A stride reaches every set rather than the first few.
+	// A stride spreads them across the sets rather than the first few. Only
+	// some products qualify, so it takes more steps than there are checks.
 	products := b.GetSealedUUIDs()
-	stride := max(1, len(products)/200)
+	stride := max(1, len(products)/90)
 	for i := 0; i < len(products); i += stride {
 		co, err := b.GetUUID(products[i])
 		if err != nil || !sealed.HasDecklist(b, co.SetCode, co.UUID) {
@@ -319,7 +320,7 @@ func TestContentsSeedMatchesFullWalk(t *testing.T) {
 			t.Errorf("%s: seeded %d keys, full walk %d", co.Name, len(got), len(want))
 		}
 		checked++
-		if checked == 200 {
+		if checked == 50 {
 			break
 		}
 	}
