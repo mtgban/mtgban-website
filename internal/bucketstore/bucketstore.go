@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"sync/atomic"
@@ -68,9 +69,12 @@ func (s *Store[T]) Load(ctx context.Context) error {
 	}
 	defer reader.Close()
 
+	// B2 opens lazily, so a missing object first fails here, in an error that
+	// does not name it.
 	var value T
-	if err := json.NewDecoder(reader).Decode(&value); err != nil {
-		return err
+	err = json.NewDecoder(reader).Decode(&value)
+	if err != nil {
+		return fmt.Errorf("bucketstore: %s: %w", path, err)
 	}
 	s.ptr.Store(&value)
 	s.read.Store(true)
