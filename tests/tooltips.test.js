@@ -60,6 +60,9 @@ function loadPage() {
             this.children = [];
             this.style = {};
             this.hidden = false;
+            this.computed = { textOverflow: 'clip', overflowX: 'visible' };
+            this.scrollWidth = 0;
+            this.clientWidth = 0;
             this.rect = { left: 100, top: 100, width: 40, height: 20, right: 140, bottom: 120 };
             if (parent) {
                 parent.appendChild(this);
@@ -100,6 +103,10 @@ function loadPage() {
             this.ownText = value;
             this.children = [];
         }
+        // What is rendered: a display:none child is left out.
+        get innerText() {
+            return this.ownText + this.children.filter(child => !child.notRendered).map(child => child.innerText).join('');
+        }
         getBoundingClientRect() { return this.rect; }
         // Ten pixels a letter up to the CSS max-width, in no more room than
         // its left leaves: a fixed box shrinks to fit.
@@ -118,6 +125,7 @@ function loadPage() {
     };
     const window = {
         MutationObserver: FakeMutationObserver,
+        getComputedStyle: el => el.computed,
         addEventListener: (type, fn) => on('window:' + type, fn),
     };
     const { banTooltipPlace } = new Function('document', 'window',
@@ -209,6 +217,98 @@ test('a titled element\'s tooltip sets aside the titles around it', () => {
     for (const el of [pill, row, list]) {
         expect(el.hasAttribute('data-ban-title')).toBe(false);
     }
+});
+
+// An element the way CSS leaves one with an ellipsis: fits says whether its
+// text has the room.
+function ellipsized(page, parent, text, fits = false) {
+    const el = page.el({}, parent, text);
+    el.computed = { textOverflow: 'ellipsis', overflowX: 'hidden' };
+    el.clientWidth = 100;
+    el.scrollWidth = fits ? 100 : 180;
+    return el;
+}
+
+test('text an ellipsis cuts short shows in full, and leaves no title behind', () => {
+    const page = loadPage();
+    const name = ellipsized(page, page.body, 'Asmoranomardicadaistinaculdacar');
+    const link = page.el({}, name);
+
+    page.move(page.body, link);
+    expect(page.shown()).toBe('Asmoranomardicadaistinaculdacar');
+    expect(name.hasAttribute('title')).toBe(false);
+    expect(name.hasAttribute('data-ban-title')).toBe(false);
+    // The page holds the words already, so the tooltip does not repeat them.
+    expect(name.hasAttribute('aria-describedby')).toBe(false);
+
+    page.move(link, name);
+    expect(page.shown()).toBe('Asmoranomardicadaistinaculdacar');
+
+    page.move(name, page.body);
+    expect(page.shown()).toBeNull();
+    expect(name.hasAttribute('title')).toBe(false);
+    expect(name.hasAttribute('data-ban-title')).toBe(false);
+});
+
+test('text that fits, and overflow no ellipsis draws, show nothing', () => {
+    const page = loadPage();
+    const fits = ellipsized(page, page.body, 'Opt', true);
+    const clipped = ellipsized(page, page.body, 'Clipped');
+    clipped.computed = { textOverflow: 'clip', overflowX: 'hidden' };
+    const spilling = ellipsized(page, page.body, 'Spilling');
+    spilling.computed = { textOverflow: 'ellipsis', overflowX: 'visible' };
+
+    for (const el of [fits, clipped, spilling]) {
+        page.move(page.body, el);
+        expect(page.shown()).toBeNull();
+    }
+});
+
+test('a cut-off name folds the template\'s whitespace and shows what is rendered', () => {
+    const page = loadPage();
+    const store = ellipsized(page, page.body, '\n    Star City Games\n    ');
+    page.el({}, store, '  US\n');
+    page.el({}, store, 'hidden').notRendered = true;
+
+    page.move(page.body, store);
+    expect(page.shown()).toBe('Star City Games US');
+});
+
+test('a title wins over cut-off text, and the nearest of the two speaks', () => {
+    const page = loadPage();
+    const row = page.el({ title: 'Row' }, page.body, 'x');
+    const titled = ellipsized(page, row, 'Long name');
+    titled.setAttribute('title', 'Its title');
+    const name = ellipsized(page, row, 'Long name');
+    const badge = page.el({ title: 'Reserved List' }, name, 'RL');
+
+    page.move(page.body, titled);
+    expect(page.shown()).toBe('Its title');
+
+    page.move(titled, name);
+    expect(page.shown()).toBe('Long nameRL');
+    // The row's title goes aside with it, and comes back.
+    expect(row.hasAttribute('title')).toBe(false);
+
+    page.move(name, badge);
+    expect(page.shown()).toBe('Reserved List');
+
+    page.move(badge, page.body);
+    expect(row.getAttribute('title')).toBe('Row');
+    expect(name.hasAttribute('data-ban-title')).toBe(false);
+});
+
+test('a title a script sets over cut-off text stays when the pointer leaves', () => {
+    const page = loadPage();
+    const name = ellipsized(page, page.body, 'Long name');
+
+    page.move(page.body, name);
+    name.setAttribute('title', 'Copied!');
+    page.flush();
+    expect(page.shown()).toBe('Copied!');
+
+    page.move(name, page.body);
+    expect(name.getAttribute('title')).toBe('Copied!');
 });
 
 test('touch and blank titles show nothing', () => {
