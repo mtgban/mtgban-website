@@ -14,6 +14,10 @@
 // table is its footnote. Its title stays plain, the tables as sentences, for
 // screen readers and for the browser's own tooltip (templates.go writes
 // both).
+//
+// Text an ellipsis cuts short shows in full the same way, with no title to
+// write: the check runs when the pointer arrives, so it holds for any width
+// and for rows a script adds.
 
 // Pixels kept between the tooltip and the viewport edge, and between the
 // tooltip and its element.
@@ -63,6 +67,13 @@ function banTipCells(row) {
     });
 }
 
+// banCutOff reports whether CSS is drawing an ellipsis over el's text.
+function banCutOff(el, window) {
+    var style = window.getComputedStyle(el);
+    return style.textOverflow === 'ellipsis' && style.overflowX !== 'visible'
+        && el.scrollWidth > el.clientWidth;
+}
+
 function installTitleTooltips(document, window) {
     var tip = null;
     var current = null;
@@ -76,6 +87,9 @@ function installTitleTooltips(document, window) {
     // Set when the title describes an element named some other way, and
     // nothing else describes it, so the tooltip does while the title is aside.
     var described = false;
+    // Set when the text shown is current's own, cut off by an ellipsis: there
+    // is no title to set aside, and the page already holds the words.
+    var cutOff = false;
 
     function place() {
         // Measured from the corner: where the last tooltip sat would narrow
@@ -172,7 +186,9 @@ function installTitleTooltips(document, window) {
     // Moves the title aside and shows it, or its data-tip when it has one; a
     // blank title shows nothing.
     function take(text, rich) {
-        setAside(current, text);
+        if (!cutOff) {
+            setAside(current, text);
+        }
         if (labelled) {
             current.setAttribute('aria-label', text);
         }
@@ -186,6 +202,7 @@ function installTitleTooltips(document, window) {
     function retitle() {
         var text = current.getAttribute('title');
         if (text !== null) {
+            cutOff = false;
             take(text, null);
         }
     }
@@ -198,8 +215,20 @@ function installTitleTooltips(document, window) {
         }
     }
 
+    // The element that speaks for what is under the pointer: the nearest with
+    // a title or with its text cut off.
+    function speaker(target) {
+        for (var el = target; el; el = el.parentElement) {
+            if (el.hasAttribute('title') || banCutOff(el, window)) {
+                return el;
+            }
+        }
+        return null;
+    }
+
     function show(el) {
-        var text = el.getAttribute('title');
+        cutOff = !el.hasAttribute('title');
+        var text = cutOff ? el.innerText.replace(/\s+/g, ' ').trim() : el.getAttribute('title');
         if (!text || !text.trim()) {
             return;
         }
@@ -211,7 +240,7 @@ function installTitleTooltips(document, window) {
         }
         current = el;
         labelled = !el.hasAttribute('aria-label') && !el.textContent.trim();
-        described = !labelled && !el.hasAttribute('aria-describedby');
+        described = !cutOff && !labelled && !el.hasAttribute('aria-describedby');
         if (described) {
             el.setAttribute('aria-describedby', tip.id);
         }
@@ -248,7 +277,7 @@ function installTitleTooltips(document, window) {
         if (e.pointerType === 'touch' || !e.target.closest) {
             return;
         }
-        var el = e.target.closest('[title]');
+        var el = speaker(e.target);
         if (current && current.contains(e.target) && !(el && el !== current && current.contains(el))) {
             return;
         }
