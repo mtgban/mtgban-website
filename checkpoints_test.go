@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -55,42 +56,50 @@ func TestSameDayCheckpointsKeepOneOrder(t *testing.T) {
 	}
 }
 
-// The checkpoints document is read from and saved to the config's own
-// bucket, beside the config file.
-func TestCheckpointsBesideTheConfig(t *testing.T) {
+// A game with no checkpoints_path reads nothing, so the cron has nothing to
+// report, and saving is refused rather than sent nowhere.
+func TestCheckpointsNoPathReadsNothing(t *testing.T) {
 	withConfigCopy(t)
-	Config().sourcePath = "b2://mtgban-config/lorcana/config.json"
-
-	_, path, err := checkpointsStore.Bucket(context.Background())
-	if err != nil {
-		t.Fatal(err)
+	Config().Game = "lorcana"
+	Config().CheckpointsPath = ""
+	saved, savedDoc := checkpointsStore.Bucket, checkpointsStore.Get()
+	t.Cleanup(func() {
+		checkpointsStore.Bucket = saved
+		checkpointsStore.Set(savedDoc)
+	})
+	checkpointsStore.Set(checkpointsFile{Events: []CheckpointEvent{{ID: "dropped"}}})
+	checkpointsStore.Bucket = func(context.Context) (simplecloud.ReadWriter, string, error) {
+		t.Error("the store asked for a bucket with no path set")
+		return nil, "", errors.New("no path")
 	}
-	if path != "b2://mtgban-config/lorcana/checkpoints.json" {
-		t.Errorf("checkpoints read from %q, want beside the config", path)
+
+	err := reloadCheckpoints()
+	if err != nil {
+		t.Errorf("reload with no path: %v", err)
+	}
+	if events := checkpointsStore.Get().Events; len(events) != 0 {
+		t.Errorf("reload with no path kept %+v", events)
+	}
+	err = saveCheckpoints(context.Background(), []CheckpointEvent{{ID: "launch"}})
+	if err == nil {
+		t.Error("save with no path succeeded")
+	}
+	text, err := currentCheckpointsJSON()
+	if err != nil || text != "" {
+		t.Errorf("editor text with no path = %q, %v; want none", text, err)
 	}
 }
 
-// A game with no checkpoints.json reloads to no markers without an error, so
-// the cron has nothing to report, and a save is what the next reload reads.
-func TestCheckpointsMissingThenSaved(t *testing.T) {
+// A save is what the next reload reads, from where checkpoints_path says.
+func TestCheckpointsSavedThenReloaded(t *testing.T) {
 	withConfigCopy(t)
-	dir := t.TempDir()
 	Config().Game = "lorcana"
-	Config().sourcePath = filepath.Join(dir, "config.json")
-	savedBucket, savedDoc := ConfigBucket, checkpointsStore.Get()
-	ConfigBucket = &simplecloud.FileBucket{}
-	t.Cleanup(func() {
-		ConfigBucket = savedBucket
-		checkpointsStore.Set(savedDoc)
-	})
-
-	err := reloadCheckpoints()
-	if err != nil || len(checkpointsStore.Get().Events) != 0 {
-		t.Fatalf("no document reloads to %d events, err %v; want none and no error", len(checkpointsStore.Get().Events), err)
-	}
+	Config().CheckpointsPath = filepath.Join(t.TempDir(), "checkpoints.json")
+	savedDoc := checkpointsStore.Get()
+	t.Cleanup(func() { checkpointsStore.Set(savedDoc) })
 
 	event := CheckpointEvent{ID: "launch", Type: "format", Date: "2026-10-01", Title: "Launch"}
-	err = saveCheckpoints(context.Background(), []CheckpointEvent{event})
+	err := saveCheckpoints(context.Background(), []CheckpointEvent{event})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,6 +110,6 @@ func TestCheckpointsMissingThenSaved(t *testing.T) {
 	}
 	events := checkpointsStore.Get().Events
 	if len(events) != 1 || events[0].ID != "launch" {
-		t.Errorf("reloaded %+v from %s, want the saved event", events, filepath.Join(dir, checkpointsName))
+		t.Errorf("reloaded %+v from %s, want the saved event", events, Config().CheckpointsPath)
 	}
 }

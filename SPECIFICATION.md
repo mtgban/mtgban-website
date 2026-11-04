@@ -330,7 +330,8 @@ read, or its workflow state's names.
   bucket paths out-of-band.
 - **Checkpoints** (`checkpoints.go`): curated chart annotations (bans,
   releases, reprints) that a game other than Magic loads from
-  `checkpoints.json` beside its config file (B2 or file; none, no markers)
+  the document `checkpoints_path` names (B2 or file; with no path, nothing
+  is read, no markers and no editor)
   into `checkpointsStore`, editable as JSON in the admin panel, rendered as
   markers on price charts. Magic draws its markers from the published ban
   list instead (`banlist.go`).
