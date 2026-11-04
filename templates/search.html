@@ -427,6 +427,7 @@
                                  data-finish-class="{{$card.FinishClass}}"
                                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{index $card.PromoLabels $t}}{{end}}"
                                  data-has-warning="{{$card.HasContentWarning}}"
+                                 data-is-sealed="{{$card.Sealed}}"
                                  data-crop-url="{{$card.CropURL}}"
                                  data-hover="{{hover_args $card.FullImageURL $card.Foil $card.Etched $card.SetCode $card.HasContentWarning $card.NumProducts $card.Date $card.Name}}">
                                 <template class="result-hover">

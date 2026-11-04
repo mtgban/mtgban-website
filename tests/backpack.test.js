@@ -110,7 +110,7 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     };
     window.CardRow = { read: (btn) => {
         const row = btn.closest('.result-header'); if (!row) return null;
-        return { id: row.getAttribute('data-card-id'), name: row.getAttribute('data-card-name'), set: 'S', edition: 'Set', number: '7', finishTag: '', finishClass: '', img: '', cw: false, t: Date.now() };
+        return { id: row.getAttribute('data-card-id'), name: row.getAttribute('data-card-name'), set: 'S', edition: 'Set', number: '7', finishTag: '', finishClass: '', img: '', cw: false, sealed: row.getAttribute('data-is-sealed') === 'true', t: Date.now() };
     } };
     // A test passing timers runs the page's timeouts itself, not the clock.
     const later = timers ? (fn, ms) => { timers.push({ fn, ms }); } : setTimeout;
@@ -128,6 +128,22 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
 }
 
 describe('adding', () => {
+    test('a sealed row marks its entry, and an entry stored without the mark', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'Box', qty: 1, t: 1, m: 1 }] });
+        p.rows.forEach((b) => b.parentNode.setAttribute('data-is-sealed', 'true'));
+        p.rows.forEach((b) => p.window.addToBackpack(b));
+        const got = p.stored();
+        expect(got.length).toBe(p.rows.length);
+        expect(got.every((e) => e.sealed === true)).toBe(true);
+        expect(got.find((e) => e.id === 'uuid-1').qty).toBe(2);
+    });
+
+    test('a single row leaves the mark off', () => {
+        const p = page();
+        p.window.addToBackpack(p.rows[0]);
+        expect('sealed' in p.stored()[0]).toBe(false);
+    });
+
     test('the first click creates an entry with qty 1 and marks the row and navbar', () => {
         const p = page();
         p.window.addToBackpack(p.rows[0]);
@@ -790,6 +806,29 @@ describe('moving cards between backpacks', () => {
         expect(tabsOf().map((b) => b.children[1].textContent)).toEqual(['1', '5', '0']);
         expect(p.m.mtgban_backpack_active).toBeUndefined();
         expect(p.document.activeElement).toBe(tabsOf()[0]);
+    });
+
+    test('a sealed line offers only the moves', () => {
+        const sealed = [{ id: 'uuid-1', name: 'Box', sealed: true, qty: 2, t: 2, m: 2 }];
+        const p = page({ store: sealed, tabs: 3, tabList });
+        open(p);
+        const sel = rowsOf()[0].querySelector('.backpack-cond');
+        expect(sel.getAttribute('aria-label')).toBe('Move to');
+        expect(sel.value).toBe('');
+        expect(sel.children.map((o) => o.tag)).toEqual(['option', 'optgroup']);
+        expect(sel.children[0].disabled).toBe(true);
+        expect(moves(sel)).toEqual(['@2:Trades', '@3:Backpack 3']);
+        pick(sel, '@2');
+        expect(p.stored().filter((e) => !e.del).map((e) => [e.pack, e.id, e.sealed, e.qty])).toEqual([[2, 'uuid-1', true, 2]]);
+        expect(ids['backpack-toast'].textContent).toBe('Moved to Trades');
+    });
+
+    test('a sealed line has no dropdown without another backpack', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'Box', sealed: true, qty: 2, t: 2, m: 2 }] });
+        open(p);
+        const row = rowsOf()[0];
+        expect(row.querySelector('.backpack-cond')).toBeNull();
+        expect(row.querySelector('.backpack-plus')).not.toBeNull();
     });
 
     test('a row dragged by its art onto another tab moves there', () => {
@@ -1604,6 +1643,21 @@ describe('adding an Upload store section', () => {
         expect(ids['backpack-toast'].textContent).toBe('Added 5 copies to the backpack');
         expect(p.optSections[0].take.hidden).toBe(false);
         expect(p.navCount.textContent).toBe('5');
+    });
+
+    test('marks an Upload row\'s sealed product', () => {
+        const p = page({ sections: [[['a', 1], ['b', 1]]] });
+        p.optSections[0].rows[0].setAttribute('data-opt-sealed', 'true');
+        p.optSections[0].rows[1].setAttribute('data-opt-sealed', 'false');
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(p.stored().map((e) => [e.id, e.sealed])).toEqual([['a', true], ['b', undefined]]);
+    });
+
+    test('marks an entry stored without the mark when its sealed row joins it', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 2, t: 1, m: 1 }], sections: [[['a', 1]]] });
+        p.optSections[0].rows[0].setAttribute('data-opt-sealed', 'true');
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(p.stored().map((e) => [e.id, e.qty, e.sealed])).toEqual([['a', 3, true]]);
     });
 
     test('joins the copies a card already has in that grade', () => {

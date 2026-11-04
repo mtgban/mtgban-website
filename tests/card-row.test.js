@@ -49,10 +49,20 @@ test('reads a desktop result header', () => {
     expect(got.etched).toBe(false);
     expect(got.treatments).toEqual(['a', 'b']);
     expect(got.cw).toBe(true);
+    expect(got.sealed).toBe(false);
     expect(got.query).toBe('Black Lotus s:LEA cns:232 f:foil');
     expect(got.img).toBe('https://img/lotus.jpg');
     expect(typeof got.t).toBe('number');
     expect(container.children.length).toBe(1);
+});
+
+test('reads a sealed product', () => {
+    const btn = el({ 'data-card-id': 'uuid-1' }, ['pack-btn']);
+    const row = header('result-header');
+    row.attrs['data-is-sealed'] = 'true';
+    row.children.push(btn); btn.parentNode = row;
+    el({}, ['result'], [row]);
+    expect(load().read(btn).sealed).toBe(true);
 });
 
 test('reads a button inside the mobile actions menu through the card', () => {

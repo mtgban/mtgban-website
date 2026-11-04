@@ -79,6 +79,11 @@ test('the pushed entries carry only the synced fields', async () => {
     expect(pushed[0].sellPrice).toBeUndefined();
 });
 
+test('a sealed entry keeps its mark through a sync', async () => {
+    const { pushed } = await reconcileBackpack([entry('a', 1, 10, { sealed: true })], []);
+    expect(pushed[0].sealed).toBe(true);
+});
+
 test('the merge caps the backpack at 100 live entries, newest first', async () => {
     const local = [];
     for (let i = 0; i < 150; i++) local.push(entry('l' + i, 1, 1000 + i));

@@ -288,6 +288,8 @@
             remember(list, [k]);
             list[idx].qty = next;
             list[idx].m = t;
+            // An entry stored without the flag learns it from its row.
+            if (data.sealed) list[idx].sealed = true;
         } else {
             if (full(p)) return false;
             remember(list, [k]);
@@ -295,7 +297,7 @@
             list.unshift({
                 id: data.id, name: data.name || "", edition: data.edition || "", set: data.set || "",
                 number: data.number || "", finishTag: data.finishTag || "", finishClass: data.finishClass || "",
-                img: data.img || "", cw: !!data.cw, cond: "NM", pack: p, qty: 1, t: t, m: t
+                img: data.img || "", cw: !!data.cw, sealed: data.sealed || undefined, cond: "NM", pack: p, qty: 1, t: t, m: t
             });
         }
         save(list);
@@ -691,6 +693,7 @@
             if (i >= 0 && !list[i].del) {
                 list[i].qty += x.n;
                 list[i].m = t;
+                if (rows[x.k].getAttribute("data-opt-sealed") === "true") list[i].sealed = true;
                 return;
             }
             if (i >= 0) list.splice(i, 1);
@@ -700,7 +703,7 @@
                 id: attr("data-opt-id"), name: attr("data-load-name"), edition: attr("data-opt-edition"), set: attr("data-load-set"),
                 number: attr("data-load-number"), finishTag: attr("data-opt-finish-tag"), finishClass: attr("data-opt-finish-class"),
                 img: attr("data-opt-img"), cw: attr("data-opt-cw") === "true", cond: ListStorage.backpackCond({ cond: attr("data-opt-cond") }),
-                pack: p, qty: x.n, t: t, m: t
+                sealed: attr("data-opt-sealed") === "true" || undefined, pack: p, qty: x.n, t: t, m: t
             });
         });
         save(list);
@@ -1091,14 +1094,24 @@
 
     // condSelect moves the entry to a grade, or adds the card in one more,
     // never offering the grades its other entries hold, or moves it to one
-    // of the other backpacks.
+    // of the other backpacks. A sealed product has no grades, so it offers
+    // only the moves, and without another backpack there is no dropdown.
     function condSelect(e, held, others) {
+        if (e.sealed && !others.length) return null;
         var sel = text("select", "backpack-cond");
-        sel.setAttribute("aria-label", "Condition");
-        CONDS.forEach(function (c) {
-            if (c === e.cond || held.indexOf(c) === -1) sel.appendChild(option(c, c, COND_NAMES[c]));
-        });
-        var free = CONDS.filter(function (c) { return c !== e.cond && held.indexOf(c) === -1; });
+        sel.setAttribute("aria-label", e.sealed ? "Move to" : "Condition");
+        var shown = e.sealed ? "" : e.cond;
+        if (e.sealed) {
+            var label = option("", "Move", "Move every copy to another backpack");
+            label.disabled = true;
+            label.hidden = true;
+            sel.appendChild(label);
+        } else {
+            CONDS.forEach(function (c) {
+                if (c === e.cond || held.indexOf(c) === -1) sel.appendChild(option(c, c, COND_NAMES[c]));
+            });
+        }
+        var free = e.sealed ? [] : CONDS.filter(function (c) { return c !== e.cond && held.indexOf(c) === -1; });
         if (free.length) {
             var group = text("optgroup");
             group.setAttribute("label", "Add another condition");
@@ -1111,10 +1124,10 @@
             others.forEach(function (t) { to.appendChild(option("@" + t.pack, t.name, "Move every copy to " + t.name)); });
             sel.appendChild(to);
         }
-        sel.value = e.cond;
+        sel.value = shown;
         sel.addEventListener("change", function () {
             var v = sel.value;
-            sel.value = e.cond;
+            sel.value = shown;
             if (v.charAt(0) === "@") {
                 moveCard(key(e), parseInt(v.slice(1), 10));
                 focusTab(active());
@@ -1191,7 +1204,9 @@
         plus.setAttribute("type", "button");
         plus.setAttribute("aria-label", "One more");
         plus.addEventListener("click", function () { setQty(key(e), (e.qty || 1) + 1); render(); });
-        ctl.append(condSelect(e, held, others), minus, qty, plus);
+        var sel = condSelect(e, held, others);
+        if (sel) ctl.appendChild(sel);
+        ctl.append(minus, qty, plus);
 
         r.append(art, body, ctl);
         return r;

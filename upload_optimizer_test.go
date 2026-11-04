@@ -332,6 +332,23 @@ func TestOptimizerShowsTheLoadedQuantity(t *testing.T) {
 	}
 }
 
+// TestOptimizerSealedRowsCarryNoCondition keeps a sealed product out of the
+// grades, which the backpack offers no way to change on it.
+func TestOptimizerSealedRowsCarryNoCondition(t *testing.T) {
+	out := renderUpload(t, PageVars{
+		UploadVars: UploadVars{
+			Optimized:     map[string][]OptimizedUploadEntry{"CK": {{CardID: "a", Condition: "SP"}, {CardID: "b", Condition: "SP"}}},
+			OptimizedKeys: []string{"CK"},
+		},
+		Metadata: map[string]GenericCard{"a": {Sealed: true}},
+	})
+	for _, want := range []string{`data-opt-id="a" data-opt-cond=""`, `data-opt-sealed="true"`, `data-opt-id="b" data-opt-cond="SP"`, `data-opt-sealed="false"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("no %s", want)
+		}
+	}
+}
+
 // TestOptimizerRowsCarryTheCondition marks each row with its condition,
 // which the backpack takes copies by.
 func TestOptimizerRowsCarryTheCondition(t *testing.T) {

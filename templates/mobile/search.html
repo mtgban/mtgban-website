@@ -240,6 +240,7 @@
                  data-finish-class="{{$card.FinishClass}}"
                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{index $card.PromoLabels $t}}{{end}}"
                  data-has-warning="{{$card.HasContentWarning}}"
+                 data-is-sealed="{{$card.Sealed}}"
                  data-crop-url="{{$card.CropURL}}"
                  data-setcode="{{$card.SetCode}}"
                  onclick="window.showCardDrawer && showCardDrawer({{$card.FullImageURL}}, '{{$card.Name}}', {{$card.HasContentWarning}})">

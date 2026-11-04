@@ -739,7 +739,7 @@
         return {
             id: e.id, cond: e.cond, pack: e.pack, qty: e.qty, t: e.t, m: e.m, del: e.del,
             name: e.name, edition: e.edition, set: e.set, number: e.number,
-            finishTag: e.finishTag, finishClass: e.finishClass, img: e.img, cw: e.cw
+            finishTag: e.finishTag, finishClass: e.finishClass, img: e.img, cw: e.cw, sealed: e.sealed
         };
     }
 

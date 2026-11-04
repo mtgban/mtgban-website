@@ -93,7 +93,8 @@ window.CardRow = (function () {
             query: query,
             t: Date.now(),
             img: imageUrl,
-            cw: hasContentWarning
+            cw: hasContentWarning,
+            sealed: row.getAttribute('data-is-sealed') === 'true'
         };
     }
 
