@@ -125,5 +125,17 @@
     text-align: center;
 }
 
+/* A long answer's biggest cost is laying out results nobody can see yet, so
+   those wait until they scroll near. The heights are the real medians; "auto"
+   only remembers one until the next answer replaces the list. */
+.offline-shell .result-body {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 2000px;
+}
+.m-offline-results-wrap .m-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 530px;
+}
+
 /* Condition label for sealed offline results (mirrors search.html condHeader) */
 .m-page .m-cond-label { padding: 0.3em 0.75em; font-size: 0.8em; color: var(--activetext); }
