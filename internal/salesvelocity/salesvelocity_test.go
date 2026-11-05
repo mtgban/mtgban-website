@@ -196,12 +196,39 @@ func TestView(t *testing.T) {
 	v := Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
 	s := storeOf(map[string]*Sales{"card": &v})
 	wantRate, wantDetail := text(v, Window)
-	rate, detail := s.View("card")
+	rate, detail, _ := s.View("card")
 	if rate != wantRate || detail != wantDetail {
 		t.Errorf("card: got %q, %q; want %q, %q", rate, detail, wantRate, wantDetail)
 	}
-	rate, detail = s.View("missing")
+	rate, detail, _ = s.View("missing")
 	if rate != "" || detail != "" {
 		t.Errorf("missing: got %q, %q; want nothing", rate, detail)
+	}
+}
+
+// TestViewNotable leaves out every rate that prints as 0.1/day or less.
+func TestViewNotable(t *testing.T) {
+	s := storeOf(map[string]*Sales{
+		"zero":  {},
+		"tenth": {Copies: 3},
+		"round": {Copies: 4},
+		"low":   {Copies: 5},
+		"fast":  {Copies: 69},
+	})
+	for _, tc := range []struct {
+		card, rate string
+		notable    bool
+	}{
+		{"zero", "0/day", false},
+		{"tenth", "0.1/day", false},
+		{"round", "0.1/day", false},
+		{"low", "0.2/day", true},
+		{"fast", "2.3/day", true},
+		{"missing", "", false},
+	} {
+		rate, _, notable := s.View(tc.card)
+		if rate != tc.rate || notable != tc.notable {
+			t.Errorf("%s: got %q, %v; want %q, %v", tc.card, rate, notable, tc.rate, tc.notable)
+		}
 	}
 }

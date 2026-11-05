@@ -435,7 +435,7 @@ func TestUUID2CardCarriesSalesVelocity(t *testing.T) {
 	}
 	v := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
 	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{co.UUID: &v})
-	wantRate, wantDetail := salesVelocityStore.View(co.UUID)
+	wantRate, wantDetail, _ := salesVelocityStore.View(co.UUID)
 	if wantRate == "" {
 		t.Fatal("the store has no rate for the card")
 	}
@@ -454,7 +454,7 @@ func TestUUID2CardCarriesSalesVelocity(t *testing.T) {
 // velocityPageVars is one card on a results page, its velocity read from the snapshot.
 func velocityPageVars(canVelocity, showUpsell bool) PageVars {
 	const cardID = "velocity-card"
-	rate, detail := salesVelocityStore.View(cardID)
+	rate, detail, _ := salesVelocityStore.View(cardID)
 	return PageVars{
 		ShowUpsell: showUpsell,
 		SearchVars: SearchVars{

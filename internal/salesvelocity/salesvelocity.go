@@ -353,13 +353,19 @@ func text(v Sales, window int) (rate, detail string) {
 	return rate, strings.Join(lines, "\n")
 }
 
-// View is a card's rate and details, both empty without data.
-func (s *Store) View(cardID string) (rate, detail string) {
+// notableFloor is the rate worth showing on a table of cards: anything lower
+// prints as 0.1/day or less, which is noise there.
+const notableFloor = 0.15
+
+// View is a card's rate and details, both empty without data, and whether it
+// sells fast enough to show the rate on a table of cards.
+func (s *Store) View(cardID string) (rate, detail string, notable bool) {
 	v, found := s.For(cardID)
 	if !found {
-		return "", ""
+		return "", "", false
 	}
-	return text(v, Window)
+	rate, detail = text(v, Window)
+	return rate, detail, v.PerDay(Window) >= notableFloor
 }
 
 // Rates is the copies sold a day of each card with data.
