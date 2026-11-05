@@ -84,9 +84,8 @@ log and the cap at 50 a day (`velocityTierCap`) set those bands; without the cap
 card far ahead of the rest would have S to itself. Like every Sleepers tier, each shows its 34
 priciest cards, so a tier is the most valuable of what sells that fast.
 
-The order is as revealing as the sort, so a reader without the tier gets the index,
-where the page's card is greyed out with a tooltip. With no sales loaded, the card is
-not there at all.
+Every tier with Sleepers also has the Newspaper, so the page checks no tier. With no
+sales loaded, its card is not on the index.
 
 ## Searching by it
 

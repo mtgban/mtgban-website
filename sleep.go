@@ -107,7 +107,6 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
 	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)
 
-	pageVars.CanVelocity = newspaperTier(sig)
 	pageVars.HasVelocity = salesVelocityStore.Snapshot() != nil
 
 	var tiers map[string]int
@@ -115,10 +114,6 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	page := r.FormValue("page")
-	// Which cards sell fastest is the Newspaper tiers' to read: anyone else gets the index.
-	if page == "velocity" && !pageVars.CanVelocity {
-		page = ""
-	}
 	switch page {
 	default:
 		pageVars.Subtitle = "Index"

@@ -348,6 +348,9 @@ type PageVars struct {
 	BackpackMax  int
 	BackpackTabs int
 
+	// HasVelocity says sales are loaded, so there is something to sort or rank by.
+	HasVelocity bool
+
 	// What the page's scripts gate on, rendered on <html> because a script
 	// cannot read the signature cookie: that the request carried one, and
 	// that it names SearchOfflineMode. Neither is verified; they only show

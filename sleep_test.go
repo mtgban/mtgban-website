@@ -6,11 +6,9 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/salesvelocity"
@@ -214,10 +212,9 @@ func TestVelocityTiers(t *testing.T) {
 	}
 }
 
-// TestSleepersVelocityGatedByTier opens the page to the Newspaper tiers, sends
-// anyone else to the index with the card greyed out, and hides the card with no
-// sales loaded.
-func TestSleepersVelocityGatedByTier(t *testing.T) {
+// TestSleepersVelocityNeedsSales links the page from the index once sales are
+// loaded, and not before.
+func TestSleepersVelocityNeedsSales(t *testing.T) {
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -225,40 +222,20 @@ func TestSleepersVelocityGatedByTier(t *testing.T) {
 		LogPages["Sleepers"] = log.New(io.Discard, "", 0)
 		t.Cleanup(func() { delete(LogPages, "Sleepers") })
 	}
-	signingEnabled(t, true)
-	reader := func(news string) *http.Cookie {
-		fields := url.Values{"UserEmail": {"reader@example.com"}, "UserTier": {"Test"}}
-		if news != "" {
-			fields.Set("NewsEnabled", news)
-		}
-		return &http.Cookie{Name: "BAN_SIG", Value: signedAs(t, fields, time.Now().Add(time.Hour))}
-	}
-	page := func(path string, cookie *http.Cookie) string {
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		req.AddCookie(cookie)
+	withSigMode(t, true, false)
+	index := func() string {
 		rec := httptest.NewRecorder()
-		testSite.Sleepers(rec, req)
+		testSite.Sleepers(rec, httptest.NewRequest(http.MethodGet, "/sleepers", nil))
 		return rec.Body.String()
 	}
-	const link, locked, results = `href="?page=velocity"`, "sleepers-tool-locked", `<h1>Sales Velocity</h1>`
+	const link = `href="?page=velocity"`
 
 	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{"a-card": {Copies: 3}})
-	index := page("/sleepers", reader("1day"))
-	if !strings.Contains(index, link) || strings.Contains(index, locked) {
-		t.Error("a newspaper tier does not get the link on the index")
+	if !strings.Contains(index(), link) {
+		t.Error("no link on the index with sales loaded")
 	}
-	index = page("/sleepers", reader(""))
-	if strings.Contains(index, link) || !strings.Contains(index, locked) || !strings.Contains(index, "Increase your tier to rank cards by sales velocity") {
-		t.Error("a reader without the tier does not get the greyed-out card")
-	}
-	refused := page("/sleepers?page=velocity", reader(""))
-	if strings.Contains(refused, results) || !strings.Contains(refused, locked) {
-		t.Error("a reader without the tier got past the index")
-	}
-
 	setSalesVelocityStore(t, &salesvelocity.Store{})
-	index = page("/sleepers", reader("1day"))
-	if strings.Contains(index, "<h3>Sales Velocity</h3>") {
-		t.Error("the card shows with no sales loaded")
+	if strings.Contains(index(), link) {
+		t.Error("the link shows with no sales loaded")
 	}
 }

@@ -591,8 +591,6 @@ type SearchVars struct {
 	// VelocityNotice says a velocity filter needs a higher tier, for the phone's
 	// empty page, which quotes the query instead of listing the notices.
 	VelocityNotice string
-	// HasVelocity says sales are loaded, so there is something to sort by.
-	HasVelocity bool
 	// AlertChannelList is the delivery channels the alert modal offers,
 	// read off #alert-modal's data-alert-channels by js/alerts.js.
 	AlertChannelList string
