@@ -176,7 +176,7 @@ output, not a claim written here.
 | `ckbuylist.go`, `ckodds.go` | Card Kingdom buylist signals on search and the odds their tooltips quote (`docs/adr/0004-ck-buylist-signals.md`) |
 | `store_factors.go` | A user's per-store retail discount and credit value from the `SearchStoreFactors` cookie (a mirror of the synced preference), applied to the search offers after the price filters judged the quoted price and before they are ranked |
 | `tcglistings.go` | TCGplayer seller and copy counts per grade, from the newspaper's nightly listings scrape |
-| `salesvelocity.go` | TCGplayer copies sold a day in a row atop search's Buyers, for the Newspaper tiers, from the newspaper's sales table (`docs/search-sales-velocity.md`) |
+| `salesvelocity.go`, `newspaper_sales.go` | TCGplayer copies sold a day in a row atop search's Buyers, for the Newspaper tiers, from the newspaper's sales table, and the alarm on that table's pull signing out or stopping (`docs/search-sales-velocity.md`) |
 | `alerts_*.go` | Price alerts: the Alerts page, the ACL values and login contact it reads, the site's wiring of `internal/alerts`, and alert mail delivery and the webhook (`docs/adr/0005-price-alerts.md`, `docs/adr/0007-alert-email-address.md`) |
 | `settings_modal.go` | The settings modal's body: the tabs a reader's nav earns, each tab's lists from the handlers' shared functions, served by `/api/settings/modal` and rendered from `templates/settings/` |
 | `screener.go`, `popular.go`, `guide.go`, `changelog.go` | The price-movers screener; the landing page's popular searches, ranked from signed-in users' typed searches in the observability database and padded with the config's curated list; the guide; release notes read from Discord |

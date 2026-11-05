@@ -144,6 +144,26 @@ it shows the semi-join kept to the game.
 A card counts as capped if any day in its window was, so the capped
 share of cards runs well above the share of capped days.
 
+## Watching the pull
+
+The rates are only as good as the newspaper's TCGplayer logins. `newspaper_sales.go`
+checks hourly, on the Magic site alone since every site reads the same table,
+and reports on the `Newspaper sales` job's row, so the admin dashboard shows it
+and `checkJobHealth` announces it and its recovery on Discord. It looks across
+every game, at the newest sale day once it holds 10,000 rows, which takes about
+an hour of the pull, and otherwise at the day before.
+
+- **Signed out:** under 1% of the day's rows have over five orders. Signed in it
+  has stayed between 5% and 19% on finished days through the signed-in stretches
+  of the last year, 3.5% at 10,000 rows into a day, and signed out it is exactly
+  none. So it fires within a couple of hours of a signed-out pull starting.
+- **Stopped:** the newest sale day is over 72 hours old. Waiting on the next pull
+  it reaches about 56, so `StaleAfter`'s 48 would fire every day. The newspaper
+  stops its pull when no login works, so this is the likely shape of a full expiry.
+
+A pull that stops partway through a day leaves it short but not signed out, which
+neither check catches.
+
 ## Why not the most-searched cards first
 
 The ticket suggested filling in the most-searched cards first. One pass

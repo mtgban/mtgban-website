@@ -169,6 +169,9 @@ Boot sequence (`main()`):
      a plain function rather than a site method)
    - `10 5 * * *` - `pruneUploadShares()` (api_upload_share.go): deletes
      expired upload share rows, which reads already treat as misses
+   - `10 * * * *` - `checkNewspaperSales()` (newspaper_sales.go), on the Magic
+     site only: alarms through the job's row when the newspaper's sales pull
+     looks signed out or stopped (`docs/search-sales-velocity.md`)
    - `0 * * * *` - `checkStaleness()` (staleness.go): the Discord alarm below
    - `0 * * * *` - `checkJobHealth()` (jobs.go): the same alarm for the
      background jobs, below; under `recovered()`, not a job itself
