@@ -280,3 +280,11 @@ test('index-only card: INDEX m-cond-group gets active class', () => {
     expect(sellersHtml).toContain('m-cond-group active');
     expect(sellersHtml).toContain('data-cond="INDEX"');
 });
+
+// A row priceRows left unpriced carries no price objects, and renders as no offers.
+test('a row with no price objects renders as no offers', () => {
+    const empty = R.buildHTML([result({retail: {}, buylist: {}})], CTX);
+    expect(R.buildHTML([result({retail: null, buylist: null})], CTX)).toBe(empty);
+    expect(R.buildHTML([result({retail: null})], CTX))
+        .toBe(R.buildHTML([result({retail: {}})], CTX));
+});

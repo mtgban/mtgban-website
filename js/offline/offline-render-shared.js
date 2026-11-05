@@ -117,8 +117,9 @@
     // refRetail finds the best CK-or-TCG retail for the ratio.
     function refRetail(res, cond) {
         var best = 0;
+        var retail = res.retail || {};
         for (var i = 0; i < REF_STORES.length; i++) {
-            var entry = res.retail[REF_STORES[i]];
+            var entry = retail[REF_STORES[i]];
             if (!entry) continue;
             var per = condPrices(entry, res.card);
             var p = per[cond] ? per[cond].price : finishPrice(entry, res.card);
