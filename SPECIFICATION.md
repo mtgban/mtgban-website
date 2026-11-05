@@ -568,7 +568,7 @@ override; phone UA detection via `mileusna/useragent`).
 
 - **Query language**: `parseSearchOptionsNG()` (searchfilter.go) tokenizes
   `option:value` / `option>value` / `option<value` pairs, with `-`
-  negation, against the `FilterOperations` table of **49 operators, not
+  negation, against the `FilterOperations` table of **51 operators, not
   ~35**: search-engine
   modifiers (`sm:` mode override incl. `sm:scryfall`, `skip:`
   retail/buylist/empty/index, `sort:` chrono/hybrid/alpha/number/retail/
@@ -580,8 +580,10 @@ override; phone UA detection via `mileusna/useragent`).
   `year:`), sealed relations (`unpack:`, `contents:`, `container:`,
   `decklist:`, `variable:`, new), UUID lookup (`id:`), store/region
   (`store:`, `seller:`, `vendor:`, `region:`), entry filters (`cond:`/
-  `condr:`/`condb:`, `qty>`/`quantity>`, `ratio>`), and price comparisons
-  (`price>`, `buy_price>`, `arb_price>`, `rev_price>`). Suffix sigils
+  `condr:`/`condb:`, `qty>`/`quantity>`, `ratio>`), price comparisons
+  (`price>`, `buy_price>`, `arb_price>`, `rev_price>`), and TCGplayer's
+  copies sold a day (`v>`/`velocity>`, locked to the Newspaper tiers).
+  Suffix sigils
   select finish (`*` foil, `~` etched, `&` nonfoil, `` ` `` alt-art foil).
   Bare hashes trigger UUID lookup mode; pipe syntax
   (`name|set|number|finish|cond`) supports the Scryfall-bot format.

@@ -32,6 +32,11 @@ type salesVelocity struct {
 	LastSale time.Time
 }
 
+// perDay is the copies sold a day over window days.
+func (v salesVelocity) perDay(window int) float64 {
+	return float64(v.Copies) / float64(window)
+}
+
 // salesVelocitySnapshot is one load of the sales, keyed by card uuid.
 type salesVelocitySnapshot struct {
 	// The newest sale_date, which the window ends on.
@@ -325,7 +330,7 @@ func velocityText(v salesVelocity, window int) (rate, detail string) {
 		return "0/day", head + "\n" + zero
 	}
 
-	perDay := float64(v.Copies) / float64(window)
+	perDay := v.perDay(window)
 	rate = strconv.FormatFloat(perDay, 'f', 1, 64) + "/day"
 	switch {
 	case perDay < 0.1:
@@ -360,4 +365,54 @@ func salesVelocityView(cardID string) (rate, detail string) {
 		return "", ""
 	}
 	return velocityText(v, salesVelocityWindow)
+}
+
+// cardFilterVelocityGreaterThan skips a card selling at most the rate asked,
+// and one with no data, which is not the same as selling none.
+func cardFilterVelocityGreaterThan(filters []string, co *matcher.CardObject) bool {
+	v, found := salesVelocityFor(co.UUID)
+	if !found {
+		return true
+	}
+	limit, _ := strconv.ParseFloat(filters[0], 64)
+	return v.perDay(salesVelocityWindow) <= limit
+}
+
+// cardFilterVelocityLessThan skips a card selling at least the rate asked, and
+// one with no data.
+func cardFilterVelocityLessThan(filters []string, co *matcher.CardObject) bool {
+	v, found := salesVelocityFor(co.UUID)
+	if !found {
+		return true
+	}
+	limit, _ := strconv.ParseFloat(filters[0], 64)
+	return v.perDay(salesVelocityWindow) >= limit
+}
+
+// A velocity filter parses locked and a locked one matches nothing, so no way
+// into the parser reveals which cards sell without having read the reader's tier.
+const lockedFilterPrefix = "locked_"
+
+// unlockVelocity opens a query's velocity filters, those in its pools too, for
+// a handler that checked the reader's signature.
+func unlockVelocity(filters []FilterElem) {
+	for i := range filters {
+		if filters[i].Pool != nil {
+			unlockVelocity(filters[i].Pool.CardFilters)
+		}
+		filters[i].Name = strings.TrimPrefix(filters[i].Name, lockedFilterPrefix)
+	}
+}
+
+// lockedVelocity reports whether a query holds a velocity filter still locked.
+func lockedVelocity(filters []FilterElem) bool {
+	for i := range filters {
+		if strings.HasPrefix(filters[i].Name, lockedFilterPrefix) {
+			return true
+		}
+		if filters[i].Pool != nil && lockedVelocity(filters[i].Pool.CardFilters) {
+			return true
+		}
+	}
+	return false
 }

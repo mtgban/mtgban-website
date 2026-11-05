@@ -703,21 +703,23 @@ window.__BAN_GUIDE = {
             title: 'Price Filters',
             icon: 'dollar-sign',
             summary: 'Filter by price (price>10), buylist (buy_price>5), ratio (ratio>50), or cross-store (price>TCGLow).',
-            snippets: ['price>10', 'price<5', 'buy_price>5', 'ratio>50', 'price>TCGLow', 'arb_price', 'rev_price'],
-            keywords: ['price', 'buy_price', 'arb_price', 'rev_price', 'ratio', 'cost', 'value', 'retail', 'buylist', 'TCGLow', 'filter', 'comparison', 'desirability'],
+            snippets: ['price>10', 'price<5', 'buy_price>5', 'ratio>50', 'price>TCGLow', 'arb_price', 'rev_price', 'v>1'],
+            keywords: ['price', 'buy_price', 'arb_price', 'rev_price', 'ratio', 'velocity', 'cost', 'value', 'retail', 'buylist', 'TCGLow', 'filter', 'comparison', 'desirability'],
             content: {
                 table: [
                     { value: 'price', short: 'Retail price filter' },
                     { value: 'buy_price', short: 'Buylist price filter' },
                     { value: 'arb_price', short: 'Retail results filtered by buylist price' },
                     { value: 'rev_price', short: 'Buylist results filtered by retail price' },
-                    { value: 'ratio', short: 'Buylist desirability ratio (0–64)' }
+                    { value: 'ratio', short: 'Buylist desirability ratio (0–64)' },
+                    { value: 'v, velocity', short: 'TCGplayer copies sold a day, Newspaper tiers only' }
                 ],
                 examples: [
                     { query: 'price<10', desc: 'Cards selling under $10 retail' },
                     { query: 'price>TCGLow', desc: 'Stores above TCG Low price' },
                     { query: 'buy_price>5', desc: 'Buylists paying over $5' },
-                    { query: 'ratio>50', desc: 'High buylist demand cards' }
+                    { query: 'ratio>50', desc: 'High buylist demand cards' },
+                    { query: 'v>1', desc: 'Cards selling more than once a day' }
                 ]
             }
         },

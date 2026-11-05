@@ -42,6 +42,7 @@ const (
 	NoResultsMessage       = "No products matching your search could be found"
 	NoPromosMessage        = "No products matching your search could be found - some promos may be hidden"
 	NoCardsMessage         = "No products matching your search could be found"
+	VelocityLockedMessage  = "Increase your tier to filter by sales velocity"
 
 	MaxSearchTotalResults = 10000
 	// MaxUploadTransfer is the most results the Uploader transfer posts: a
@@ -584,6 +585,9 @@ type SearchVars struct {
 	CanUpload bool
 	// CanVelocity shows the sales velocity row to the newspaper tiers.
 	CanVelocity bool
+	// VelocityNotice says a velocity filter needs a higher tier, for the phone's
+	// empty page, which quotes the query instead of listing the notices.
+	VelocityNotice string
 	// AlertChannelList is the delivery channels the alert modal offers,
 	// read off #alert-modal's data-alert-channels by js/alerts.js.
 	AlertChannelList string
@@ -710,6 +714,12 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	config := parseSearchPage(ds, p, query, pageVars.IsSealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)
+	if pageVars.CanVelocity {
+		unlockVelocity(config.CardFilters)
+	} else if lockedVelocity(config.CardFilters) {
+		pageVars.VelocityNotice = VelocityLockedMessage
+		pageVars.Notices = append(pageVars.Notices, VelocityLockedMessage)
+	}
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
 	}

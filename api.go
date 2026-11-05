@@ -704,6 +704,9 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	// included; a key's caller has none.
 	if !isAPI {
 		resolveBackpacks(r.Context(), sig, b, &config)
+		if newspaperTier(sig) {
+			unlockVelocity(config.CardFilters)
+		}
 	}
 
 	// A key sold without sealed reads no sealed product, whatever the path:
