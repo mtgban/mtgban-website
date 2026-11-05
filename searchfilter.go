@@ -109,6 +109,10 @@ type FilterElem struct {
 	// between one compile and one per card.
 	Regexp *regexp.Regexp
 
+	// Value is Values[0] parsed, for the filters that compare a number, so
+	// the parse runs once rather than once per card.
+	Value float64
+
 	// Pool is the sub-search a pool filter is the members of, as parsed.
 	// The search resolves it, with the datastore in hand, into Members.
 	Pool    *SearchConfig
@@ -1816,6 +1820,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 				Name:   opt,
 				Negate: negate,
 				Values: []string{code},
+				Value:  limit,
 			})
 		case "price", "buy_price", "arb_price", "rev_price":
 			var isSeller, isVendor bool
@@ -3141,9 +3146,9 @@ func shouldSkipCard(b *matcher.Backend, p *prices, co *matcher.CardObject, filte
 			// Members holds the cards of the backpacks it names.
 			res = cardFilterOn(p, filters[i].Values, co) && !filters[i].Members[co.UUID]
 		case "velocity_greater_than":
-			res = cardFilterVelocityGreaterThan(filters[i].Sales, filters[i].Values, co)
+			res = cardFilterVelocityGreaterThan(filters[i].Sales, filters[i].Value, co)
 		case "velocity_less_than":
-			res = cardFilterVelocityLessThan(filters[i].Sales, filters[i].Values, co)
+			res = cardFilterVelocityLessThan(filters[i].Sales, filters[i].Value, co)
 		default:
 			res = applyCardFilter(b, p, filters[i].Name, filters[i].Values, co)
 		}
