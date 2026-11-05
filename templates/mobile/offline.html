@@ -98,6 +98,7 @@
         dicts = await OfflineUtil.loadCatalogDicts();
         env = {
             normName: OfflineUtil.normName,
+            lastSync: function () { return OfflineDB.getMeta('lastSync'); },
             lookupName: OfflineDB.lookupName,
             allNames: OfflineDB.allNames,
             getCard: OfflineDB.getCard,
