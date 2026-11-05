@@ -75,21 +75,31 @@ test('an ordinary page remembers the flag it was rendered with, the shell does n
 test('syncStatusText reports last sync date when present', () => {
     const iso = '2026-07-11T12:00:00Z';
     expect(OfflineMode.syncStatusText({ lastSync: iso, syncing: false }))
-        .toBe('last sync ' + new Date(iso).toLocaleString());
+        .toBe('Last sync ' + new Date(iso).toLocaleString());
 });
 
-test('syncStatusText reports enabling offline mode during the first sync', () => {
-    expect(OfflineMode.syncStatusText({ lastSync: null, syncing: true })).toBe('enabling offline mode');
+test('syncStatusText reports the first sync in progress', () => {
+    expect(OfflineMode.syncStatusText({ lastSync: null, syncing: true })).toBe('First sync in progress');
 });
 
 test('syncStatusText reports not synced yet when idle with no prior sync', () => {
-    expect(OfflineMode.syncStatusText({ lastSync: null, syncing: false })).toBe('not synced yet');
+    expect(OfflineMode.syncStatusText({ lastSync: null, syncing: false })).toBe('Not synced yet');
 });
 
 test('syncStatusText prefers last sync date even while a later sync is running', () => {
     const iso = '2026-07-11T12:00:00Z';
     expect(OfflineMode.syncStatusText({ lastSync: iso, syncing: true }))
-        .toBe('last sync ' + new Date(iso).toLocaleString());
+        .toBe('Last sync ' + new Date(iso).toLocaleString());
+});
+
+test('usageText names the size as stored and the quota as the browser limit', () => {
+    expect(OfflineMode.usageText({ bytes: 4300, quota: 241300000000, lastSync: null, syncing: true }))
+        .toBe('Stored on this device: 4.2 KB (browser limit 224.7 GB).\nFirst sync in progress.');
+});
+
+test('usageText leaves the limit out when the browser reports no quota', () => {
+    expect(OfflineMode.usageText({ bytes: 0, quota: 0, lastSync: null, syncing: false }))
+        .toBe('Stored on this device: 0 B.\nNot synced yet.');
 });
 
 // --- Finished-sync status line ---
