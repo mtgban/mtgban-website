@@ -223,6 +223,7 @@ paths:
         - $ref: "#/components/parameters/page"
       responses:
         "200": { $ref: "#/components/responses/History" }
+        "304": { description: "Not modified: If-None-Match holds the ETag" }
         default: { $ref: "#/components/responses/Error" }
 
   /history/{idsOrSet}.csv:
@@ -238,6 +239,7 @@ paths:
         - $ref: "#/components/parameters/page"
       responses:
         "200": { $ref: "#/components/responses/HistoryCSV" }
+        "304": { description: "Not modified: If-None-Match holds the ETag" }
         default: { $ref: "#/components/responses/Error" }
 
   /history/sealed/{set}.json:
@@ -250,6 +252,7 @@ paths:
         - $ref: "#/components/parameters/page"
       responses:
         "200": { $ref: "#/components/responses/History" }
+        "304": { description: "Not modified: If-None-Match holds the ETag" }
         default: { $ref: "#/components/responses/Error" }
 
   /history/sealed/{set}.csv:
@@ -262,6 +265,7 @@ paths:
         - $ref: "#/components/parameters/page"
       responses:
         "200": { $ref: "#/components/responses/HistoryCSV" }
+        "304": { description: "Not modified: If-None-Match holds the ETag" }
         default: { $ref: "#/components/responses/Error" }
 
 components:
@@ -400,7 +404,8 @@ components:
       in: query
       description: >-
         1-based page of a set, each holding as many cards as the budget
-        allows for the range; meta.pages says how many there are
+        allows for the range; meta.pages says how many there are. The set
+        form only: a card id or a batch of them ignores it
       schema: { type: integer, minimum: 1, default: 1 }
 
   responses:
