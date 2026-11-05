@@ -1042,13 +1042,14 @@ window.__BAN_GUIDE = {
             icon: 'moon',
             summary: 'Find cards the market hasn\'t caught up on - bulk gems, no-reprint plays, mismatches, and seller gaps.',
             snippets: [],
-            keywords: ['sleepers', 'bulk', 'reprint', 'mismatch', 'gap', 'hotlist', 'analysis', 'tier', 'rank', 'S', 'F', 'undervalued', 'opportunity', 'arbitrage', 'ocean gap', 'custom comparison', 'seller', 'reference', 'target', 'TCGLow', 'MKMLow', 'MKMTrend', 'Manapool'],
+            keywords: ['sleepers', 'bulk', 'reprint', 'mismatch', 'gap', 'hotlist', 'velocity', 'analysis', 'tier', 'rank', 'S', 'F', 'undervalued', 'opportunity', 'arbitrage', 'ocean gap', 'custom comparison', 'seller', 'reference', 'target', 'TCGLow', 'MKMLow', 'MKMTrend', 'Manapool'],
             content: {
                 table: [
                     { value: 'Bulk Me Up',              short: 'Cards deviating from their set\'s 5-year average' },
                     { value: 'Long Time No Reprint',    short: 'No reprint in 2+ years (excludes bulk / RL / non-tournament)' },
                     { value: 'Market Mismatch',         short: 'Buylist > market, or priced below TCG Low' },
                     { value: 'Hotlist',                 short: 'Most buylist growth over past 3 months' },
+                    { value: 'Sales Velocity',          short: 'Copies sold a day on TCGplayer, Newspaper tiers only' },
                     { value: 'Ocean Gap (BETA)',        short: 'Head-to-head seller comparison' },
                     { value: 'Ocean Gap presets',       short: 'TCGLow vs MKMLow / MKMTrend; MKMTrend vs CK / SCG / Manapool' },
                     { value: 'Custom comparison',       short: 'Pick any reference seller and target seller (tier-gated)' }

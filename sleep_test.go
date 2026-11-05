@@ -6,10 +6,14 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
 
 func TestSleepersLayoutSkipsPlaytest(t *testing.T) {
@@ -153,5 +157,108 @@ func TestSleeperCacheAsksAgainAfterAPanic(t *testing.T) {
 	entry, found := c.pairs[pairs[0]]
 	if !found || entry.cardIDs == nil {
 		t.Errorf("the pair was not computed again after a panic: held %v", found)
+	}
+}
+
+// TestVelocityTiers puts the fastest sellers in S on the scale the doc gives,
+// with a card far ahead of the rest not emptying S, and leaves out one copy and
+// a skipped edition.
+func TestVelocityTiers(t *testing.T) {
+	skipWithoutDatastore(t)
+	b := backend()
+	cards := somePlainCardUUIDs(t, 9)
+	registerTestSeller(t, testSite, "TCGLow", cards)
+	rates := []struct {
+		copies int32
+		want   string
+	}{
+		{4000, "S"},
+		{900, "S"},
+		{450, "A"},
+		{200, "B"},
+		{90, "C"},
+		{40, "D"},
+		{5, "E"},
+		{2, "F"},
+		{1, ""},
+	}
+	sales := map[string]*salesvelocity.Sales{}
+	for i, rate := range rates {
+		sales[cards[i]] = &salesvelocity.Sales{Copies: rate.copies}
+	}
+	setTestSalesVelocity(t, sales)
+
+	got, err := sleepersLayout(b, currentPrices(), getVelocity(b, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, rate := range rates {
+		letter := ""
+		for candidate, ids := range got {
+			if slices.Contains(ids, cards[i]) {
+				letter = candidate
+			}
+		}
+		if letter != rate.want {
+			t.Errorf("%d copies: tier %q, want %q", rate.copies, letter, rate.want)
+		}
+	}
+
+	co, err := b.GetUUID(cards[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ranked := getVelocity(b, []string{co.SetCode})[cards[0]]
+	if ranked {
+		t.Errorf("%s: a skipped edition was ranked", co.SetCode)
+	}
+}
+
+// TestSleepersVelocityGatedByTier opens the page to the Newspaper tiers, sends
+// anyone else to the index with the card greyed out, and hides the card with no
+// sales loaded.
+func TestSleepersVelocityGatedByTier(t *testing.T) {
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Sleepers"] == nil {
+		LogPages["Sleepers"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Sleepers") })
+	}
+	signingEnabled(t, true)
+	reader := func(news string) *http.Cookie {
+		fields := url.Values{"UserEmail": {"reader@example.com"}, "UserTier": {"Test"}}
+		if news != "" {
+			fields.Set("NewsEnabled", news)
+		}
+		return &http.Cookie{Name: "BAN_SIG", Value: signedAs(t, fields, time.Now().Add(time.Hour))}
+	}
+	page := func(path string, cookie *http.Cookie) string {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		testSite.Sleepers(rec, req)
+		return rec.Body.String()
+	}
+	const link, locked, results = `href="?page=velocity"`, "sleepers-tool-locked", `<h1>Sales Velocity</h1>`
+
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{"a-card": {Copies: 3}})
+	index := page("/sleepers", reader("1day"))
+	if !strings.Contains(index, link) || strings.Contains(index, locked) {
+		t.Error("a newspaper tier does not get the link on the index")
+	}
+	index = page("/sleepers", reader(""))
+	if strings.Contains(index, link) || !strings.Contains(index, locked) || !strings.Contains(index, "Increase your tier to rank cards by sales velocity") {
+		t.Error("a reader without the tier does not get the greyed-out card")
+	}
+	refused := page("/sleepers?page=velocity", reader(""))
+	if strings.Contains(refused, results) || !strings.Contains(refused, locked) {
+		t.Error("a reader without the tier got past the index")
+	}
+
+	setSalesVelocityStore(t, &salesvelocity.Store{})
+	index = page("/sleepers", reader("1day"))
+	if strings.Contains(index, "Sales Velocity") {
+		t.Error("the card shows with no sales loaded")
 	}
 }

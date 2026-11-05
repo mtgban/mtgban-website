@@ -727,7 +727,8 @@ and `MaxUploadFileSize` 5 MB (`5 << 20` bytes).
   are not in sleep.go: they live in product.go's `getReprintsGlobal()`
   (`YearsBeforeReprint`/`MinimumReprintPrice`), which builds the snapshot
   `getReprints()` reads via `GetReprints()`, see §5.5), CK hotlist growth
-  (`getHotlist()`), market-gap (`getGap()`). Scores are normalized onto S–F
+  (`getHotlist()`), market-gap (`getGap()`), copies sold a day for the Newspaper
+  tiers (`getVelocity()`, on a log scale). Scores are normalized onto S–F
   tiers (`SleeperLetters`), 34 cards per tier (`MaxSleepers`).
 
 ### 5.4 Newspaper (`news.go`)

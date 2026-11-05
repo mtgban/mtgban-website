@@ -49,7 +49,7 @@
 /* ── Tool strip: horizontal row of cards ── */
 .sleepers-tools-strip {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     gap: 12px;
     margin-bottom: 28px;
 }
@@ -100,6 +100,15 @@
     opacity: 1;
     color: var(--ainfo);
     transform: translateX(2px);
+}
+
+.sleepers-tool-locked,
+.sleepers-tool-locked:hover {
+    opacity: 0.45;
+    cursor: help;
+    transform: none;
+    border-color: var(--border-subtle);
+    background: var(--surface-1);
 }
 
 .sleepers-tool h3 {
