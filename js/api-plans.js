@@ -23,6 +23,8 @@
         var modeAddons = choice.modeAddons || [];
         var applies = data.addon_applies || {};
         for (var m = 0; m < modeAddons.length; m++) {
+            // Each card carries its own box, so one add-on can arrive twice.
+            if (modeAddons.indexOf(modeAddons[m]) !== m) continue;
             if ((data.mode_addons || []).indexOf(modeAddons[m]) === -1) continue;
             // A missing or non-array list applies to no package, same as the backend's Addon.Applies.
             var list = applies[modeAddons[m]];
@@ -57,6 +59,16 @@
         return out;
     }
 
+    // The add-ons to bill: checked boxes on the chosen card, each value once.
+    function chosenAddons() {
+        var out = [];
+        var inputs = form.querySelectorAll('input[name="addons"]');
+        for (var i = 0; i < inputs.length; i++) {
+            if (inputs[i].checked && !inputs[i].disabled && out.indexOf(inputs[i].value) === -1) out.push(inputs[i].value);
+        }
+        return out;
+    }
+
     function selectedPackage() {
         var key = checkedValues('package')[0];
         for (var i = 0; i < data.packages.length; i++) {
@@ -65,31 +77,76 @@
         return null;
     }
 
-    function update() {
-        var pkg = selectedPackage();
-        var explicit = !!(pkg && pkg.explicit);
+    // The user's store picks on an explicit package, kept across preset packages.
+    var pickedStores = new Set();
+    var wasExplicit = false;
+
+    function choiceRow(box) {
+        return box.closest ? box.closest('.api-choice') : null;
+    }
+
+    // An explicit package takes the user's picks; a preset one lights what its scope includes.
+    // While explicit it refreshes pickedStores from the boxes before applying them.
+    function lightStores(pkg, explicit) {
         var stores = document.getElementById('api-stores');
-        if (stores) {
-            stores.hidden = !explicit;
-            // hidden alone does not stop submission, so disable too
-            var storeBoxes = stores.querySelectorAll('input[name="stores"]');
-            for (var k = 0; k < storeBoxes.length; k++) {
-                storeBoxes[k].disabled = !explicit;
+        if (!stores) return;
+        var storeBoxes = stores.querySelectorAll('input[name="stores"]');
+        // Entering an explicit package with no picks starts on the first store, as the server does.
+        if (explicit && !wasExplicit && pickedStores.size === 0 && storeBoxes.length) pickedStores.add(storeBoxes[0].value);
+        for (var k = 0; k < storeBoxes.length; k++) {
+            var box = storeBoxes[k];
+            var row = choiceRow(box);
+            if (explicit && wasExplicit) {
+                if (box.checked) pickedStores.add(box.value); else pickedStores.delete(box.value);
             }
+            var lit = explicit ? pickedStores.has(box.value) :
+                pkg.scope === 'ALL_ACCESS' || (pkg.scope === 'BASE_ACCESS' && !!row && row.dataset.base === 'true');
+            box.disabled = !explicit;
+            box.checked = lit;
+            if (row) row.classList.toggle('api-choice-off', !explicit && !lit);
         }
-        // A mode add-on only applies to some packages; hide and uncheck the rest.
+        var sealedRow = document.getElementById('api-stores-sealed');
+        var sealedBoxes = sealedRow ? sealedRow.querySelectorAll('input') : [];
+        for (var sb = 0; sb < sealedBoxes.length; sb++) {
+            sealedBoxes[sb].checked = !!pkg.sealed;
+            var sealedLabel = choiceRow(sealedBoxes[sb]);
+            if (sealedLabel) sealedLabel.classList.toggle('api-choice-off', !pkg.sealed);
+        }
+        var notes = stores.querySelectorAll('[data-when]');
+        for (var n = 0; n < notes.length; n++) {
+            notes[n].hidden = notes[n].dataset.when !== (explicit ? 'explicit' : 'preset');
+        }
+    }
+
+    // Only the chosen card's add-on box submits, and only if the add-on applies to it.
+    function enableAddons(pkg) {
         var applies = data.addon_applies || {};
         var addonBoxes = form.querySelectorAll('input[name="addons"]');
         for (var ab = 0; ab < addonBoxes.length; ab++) {
             var box = addonBoxes[ab];
             // A missing or non-array list applies to no package, same as the backend's Addon.Applies.
             var list = applies[box.value];
-            var allowed = Array.isArray(list) && !!pkg && list.indexOf(pkg.key) !== -1;
-            if (!allowed) box.checked = false;
-            box.disabled = !allowed;
-            var row = box.closest ? box.closest('.api-choice') : null;
-            if (row) row.hidden = !allowed;
+            var allowed = Array.isArray(list) && list.indexOf(pkg.key) !== -1;
+            box.disabled = !allowed || box.dataset.package !== pkg.key;
         }
+    }
+
+    // A change on one card's add-on box carries to its namesakes on the other cards.
+    function mirrorAddon(changed) {
+        var addonBoxes = form.querySelectorAll('input[name="addons"]');
+        for (var ab = 0; ab < addonBoxes.length; ab++) {
+            if (addonBoxes[ab].value === changed.value) addonBoxes[ab].checked = changed.checked;
+        }
+    }
+
+    function update() {
+        var pkg = selectedPackage();
+        var explicit = !!(pkg && pkg.explicit);
+        if (pkg) {
+            lightStores(pkg, explicit);
+            enableAddons(pkg);
+        }
+        wasExplicit = explicit;
         var checkedStores = explicit ? checkedValues('stores').length : 0;
         var checkedGames = form.querySelectorAll('input[name="games"]:checked').length;
         // Checkout needs the included stores picked on an explicit package, and at least the included games.
@@ -102,7 +159,7 @@
             interval: checkedValues('interval')[0] || 'monthly',
             stores: checkedStores,
             games: checkedGames,
-            modeAddons: checkedValues('addons')
+            modeAddons: chosenAddons()
         });
         if (!total) return;
         var name = document.getElementById('api-total-package');
@@ -164,6 +221,12 @@
     }
 
     prefill();
-    form.addEventListener('change', update);
+    // The boxes checked at load are the first picks only on an explicit default.
+    var initial = selectedPackage();
+    wasExplicit = !!(initial && initial.explicit);
+    form.addEventListener('change', function (ev) {
+        if (ev && ev.target && ev.target.name === 'addons') mirrorAddon(ev.target);
+        update();
+    });
     update();
 })();
