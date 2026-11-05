@@ -591,6 +591,8 @@ type SearchVars struct {
 	// VelocityNotice says a velocity filter needs a higher tier, for the phone's
 	// empty page, which quotes the query instead of listing the notices.
 	VelocityNotice string
+	// HasVelocity says sales are loaded, so there is something to sort by.
+	HasVelocity bool
 	// AlertChannelList is the delivery channels the alert modal offers,
 	// read off #alert-modal's data-alert-channels by js/alerts.js.
 	AlertChannelList string
@@ -717,8 +719,10 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	config := parseSearchPage(ds, p, query, pageVars.IsSealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)
+	pageVars.HasVelocity = salesVelocityPtr.Load() != nil
 	if pageVars.CanVelocity {
 		unlockVelocity(config.CardFilters)
+		config.VelocitySort = true
 	} else if lockedVelocity(config.CardFilters) {
 		pageVars.VelocityNotice = VelocityLockedMessage
 		pageVars.Notices = append(pageVars.Notices, VelocityLockedMessage)
@@ -735,7 +739,8 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CleanSearchQuery = config.CleanQuery
 	pageVars.ShowAllQuery = quoteIfFilter(config.CleanQuery)
 	pageVars.SearchSort = readSearchSort(r, config)
-	pageVars.NoSort = config.SortMode != ""
+	// A sort the reader may not use leaves the pills up, its own greyed out.
+	pageVars.NoSort = config.SortMode != "" && config.SortMode == pageVars.SearchSort
 
 	result := runSearch(r, ds, p, config)
 	if result.message != "" {
@@ -974,17 +979,20 @@ func fillSearchPrefs(pageVars *SearchVars, r *http.Request) {
 }
 
 // readSearchSort is the order a search asks for: the one its own syntax
-// names, else the sort parameter, else the reader's saved default.
+// names, else the sort parameter, else the reader's saved default. Velocity
+// counts only for a reader a handler has unlocked it for; otherwise it is as if
+// not asked, so the next one still applies.
 func readSearchSort(r *http.Request, config SearchConfig) string {
-	if config.SortMode != "" {
-		return config.SortMode
+	for _, asked := range [...]string{config.SortMode, r.FormValue("sort"), readCookie(r, "SearchDefaultSort")} {
+		// The order alone would say which cards sell fastest.
+		if asked == "velocity" && !config.VelocitySort {
+			continue
+		}
+		if asked != "" {
+			return asked
+		}
 	}
-
-	asked := r.FormValue("sort")
-	if asked == "" {
-		return readCookie(r, "SearchDefaultSort")
-	}
-	return asked
+	return ""
 }
 
 // fillChartRoster reads the chart= roster: it puts the roster on the page for
@@ -1347,6 +1355,22 @@ func sortSearchKeys(r *http.Request, ds *datastore, p *prices, allKeys []string,
 				return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 			}
 			return oddsI < oddsJ
+		}
+	case "velocity":
+		// Fastest first. A card with no data is not one selling none, so as
+		// with odds it sorts last in either direction.
+		rates := salesVelocityRates(allKeys)
+		less = func(i, j int) bool {
+			rateI, hasI := rates[allKeys[i]]
+			rateJ, hasJ := rates[allKeys[j]]
+			// A reversed sort hands i and j over swapped
+			if hasI != hasJ {
+				return hasI != reversed
+			}
+			if rateI == rateJ {
+				return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
+			}
+			return rateI > rateJ
 		}
 	case "alpha":
 		less = func(i, j int) bool {

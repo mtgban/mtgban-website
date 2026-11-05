@@ -706,6 +706,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 		resolveBackpacks(r.Context(), sig, b, &config)
 		if newspaperTier(sig) {
 			unlockVelocity(config.CardFilters)
+			config.VelocitySort = true
 		}
 	}
 

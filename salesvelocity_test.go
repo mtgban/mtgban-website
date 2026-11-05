@@ -628,6 +628,8 @@ func velocityPageVars(canVelocity, showUpsell bool) PageVars {
 
 const velocityUpsell = "Increase your tier to unlock sales velocity"
 
+const velocitySortTip = "Increase your tier to sort by sales velocity"
+
 // velocityPages renders vars on both layouts.
 func velocityPages(t *testing.T, vars PageVars) map[string]string {
 	t.Helper()
@@ -1022,5 +1024,250 @@ func TestSearchExportGatesVelocityFilter(t *testing.T) {
 	}
 	if body := api(name + " v>1"); strings.Contains(body, "Card Kingdom") {
 		t.Errorf("the API reads the filter: %s", body)
+	}
+}
+
+// velocitySortKeys sorts keys by velocity, reversed if asked, and returns them.
+func velocitySortKeys(keys []string, reversed bool) []string {
+	target := "/search"
+	if reversed {
+		target += "?reverse=true"
+	}
+	sorted := slices.Clone(keys)
+	sortSearchKeys(httptest.NewRequest(http.MethodGet, target, nil), currentDatastore(), currentPrices(), sorted, nil, "velocity")
+	return sorted
+}
+
+// TestSortSearchKeysByVelocity ranks the fastest first, reverses to slowest
+// first, and leaves a card with no data last in both directions.
+func TestSortSearchKeysByVelocity(t *testing.T) {
+	skipWithoutDatastore(t)
+	ids, err := backend().SearchEquals("Counterspell")
+	if err != nil || len(ids) < 4 {
+		t.Skip("matcher data not loaded")
+	}
+	fast, slow, none, zero := ids[0], ids[1], ids[2], ids[3]
+	setTestSalesVelocity(t, map[string]*salesVelocity{
+		fast: {Copies: 90},
+		slow: {Copies: 3},
+		zero: {LastSale: time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)},
+	})
+	keys := []string{none, zero, slow, fast}
+	if got, want := velocitySortKeys(keys, false), []string{fast, slow, zero, none}; !slices.Equal(got, want) {
+		t.Errorf("fastest first: got %v, want %v", got, want)
+	}
+	if got, want := velocitySortKeys(keys, true), []string{zero, slow, fast, none}; !slices.Equal(got, want) {
+		t.Errorf("slowest first: got %v, want %v", got, want)
+	}
+}
+
+// TestReadSearchSortGatesVelocity drops velocity however it was asked for,
+// unless a handler unlocked it, and leaves the other sorts alone.
+func TestReadSearchSortGatesVelocity(t *testing.T) {
+	cookie := &http.Cookie{Name: "SearchDefaultSort", Value: "velocity"}
+	for _, tc := range []struct {
+		desc   string
+		target string
+		cookie *http.Cookie
+		config SearchConfig
+		want   string
+	}{
+		{"syntax, locked", "/search", nil, SearchConfig{SortMode: "velocity"}, ""},
+		{"parameter, locked", "/search?sort=velocity", nil, SearchConfig{}, ""},
+		{"saved default, locked", "/search", cookie, SearchConfig{}, ""},
+		{"syntax, unlocked", "/search", nil, SearchConfig{SortMode: "velocity", VelocitySort: true}, "velocity"},
+		{"parameter, unlocked", "/search?sort=velocity", nil, SearchConfig{VelocitySort: true}, "velocity"},
+		{"saved default, unlocked", "/search", cookie, SearchConfig{VelocitySort: true}, "velocity"},
+		{"another sort, locked", "/search?sort=retail", nil, SearchConfig{}, "retail"},
+		{"syntax beats the parameter", "/search?sort=velocity", nil, SearchConfig{SortMode: "alpha"}, "alpha"},
+		{"refused syntax, parameter next", "/search?sort=number", nil, SearchConfig{SortMode: "velocity"}, "number"},
+		{"refused parameter, saved default next", "/search?sort=velocity", &http.Cookie{Name: "SearchDefaultSort", Value: "alpha"}, SearchConfig{}, "alpha"},
+	} {
+		req := httptest.NewRequest(http.MethodGet, tc.target, nil)
+		if tc.cookie != nil {
+			req.AddCookie(tc.cookie)
+		}
+		got := readSearchSort(req, tc.config)
+		if got != tc.want {
+			t.Errorf("%s: got %q, want %q", tc.desc, got, tc.want)
+		}
+	}
+}
+
+// TestSearchGatesVelocitySortByTier orders the page for a newspaper tier, and
+// for anyone else keeps the default order, however asked, with the pill greyed
+// out and its tooltip.
+func TestSearchGatesVelocitySortByTier(t *testing.T) {
+	skipWithoutDatastore(t)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Search")
+	}
+	ids, err := backend().SearchEquals("Counterspell")
+	if err != nil || len(ids) < 4 {
+		t.Skip("matcher data not loaded")
+	}
+	// The default order's last card, the one a real sort has to move first.
+	chrono := velocitySortChrono(ids)
+	fastest := chrono[len(chrono)-1]
+	co, err := backend().GetUUID(fastest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setTestSalesVelocity(t, map[string]*salesVelocity{fastest: {Copies: 90}})
+	signingEnabled(t, true)
+	fields := func(news string) url.Values {
+		reader := url.Values{"UserEmail": {"reader@example.com"}, "UserTier": {"Test"}}
+		if news != "" {
+			reader.Set("NewsEnabled", news)
+		}
+		return reader
+	}
+	tier := signedAs(t, fields("1day"), time.Now().Add(time.Hour))
+	lower := signedAs(t, fields(""), time.Now().Add(time.Hour))
+	page := func(target, cookie string) string {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+		w := httptest.NewRecorder()
+		testSite.Search(w, req)
+		return w.Body.String()
+	}
+	// The rate row is the tier's only, so the first card's set line says who is first.
+	firstCard := func(body string) string {
+		_, rest, found := strings.Cut(body, `class="result-card-name"`)
+		if !found {
+			t.Fatal("the page shows no results")
+		}
+		first, _, _ := strings.Cut(rest, "</a>")
+		return first
+	}
+	number := "cns%3A" + url.QueryEscape(co.Card.Number)
+	for _, target := range []string{"/search?q=Counterspell+sort%3Avelocity", "/search?q=Counterspell&sort=velocity"} {
+		got := page(target, tier)
+		if !strings.Contains(firstCard(got), number) {
+			t.Errorf("%s: a newspaper tier does not get the fastest card first: %s", target, firstCard(got))
+		}
+		if strings.Contains(got, velocitySortTip) {
+			t.Errorf("%s: a newspaper tier sees the locked pill", target)
+		}
+		locked := page(target, lower)
+		// Once, on the pill: there is no notice.
+		if strings.Count(locked, velocitySortTip) != 1 {
+			t.Errorf("%s: want the tooltip once for a reader without the tier", target)
+		}
+		if strings.Contains(firstCard(locked), number) {
+			t.Errorf("%s: the order reveals the fastest card", target)
+		}
+	}
+	const pill = `sort=velocity`
+	if !strings.Contains(page("/search?q=Counterspell", tier), pill) {
+		t.Error("a newspaper tier has no velocity pill")
+	}
+	plain := page("/search?q=Counterspell", lower)
+	if strings.Contains(plain, pill) || !strings.Contains(plain, "sort-pill-locked") {
+		t.Error("a reader without the tier should see the pill locked, with no link")
+	}
+	if strings.Count(plain, velocitySortTip) != 1 {
+		t.Error("want the tooltip once, on the pill")
+	}
+	if strings.Contains(page("/search?q=Counterspell+sort%3Aalpha&sort=velocity", lower), `class="search-sort-pill`) {
+		t.Error("the query's own sort should leave no pills up")
+	}
+	// The pills link back with the typed sort still in the query, and must work.
+	_, active, found := strings.Cut(page("/search?q=Counterspell+sort%3Avelocity&sort=number", lower), `search-sort-pill active`)
+	if !found {
+		t.Fatal("no sort pill is active after picking one past a refused sort:velocity")
+	}
+	activeTag, _, _ := strings.Cut(active, ">")
+	if !strings.Contains(activeTag, "sort=number") {
+		t.Errorf("the pill picked past a refused sort:velocity is not the active one: %s", activeTag)
+	}
+	setTestSalesVelocity(t, nil)
+	salesVelocityPtr.Store(nil)
+	if strings.Contains(page("/search?q=Counterspell&sort=velocity", lower), velocitySortTip) {
+		t.Error("the pill shows with no sales loaded")
+	}
+}
+
+// velocitySortChrono is keys in the default order.
+func velocitySortChrono(keys []string) []string {
+	sorted := slices.Clone(keys)
+	sortSearchKeys(httptest.NewRequest(http.MethodGet, "/search", nil), currentDatastore(), currentPrices(), sorted, nil, "")
+	return sorted
+}
+
+// TestSearchExportGatesVelocitySort holds the export's order to the page's rule.
+func TestSearchExportGatesVelocitySort(t *testing.T) {
+	skipWithoutDatastore(t)
+	ids, err := backend().SearchEquals("Counterspell")
+	if err != nil || len(ids) < 2 {
+		t.Skip("matcher data not loaded")
+	}
+	signingEnabled(t, false)
+	inventory := mtgban.InventoryRecord{}
+	for _, id := range ids {
+		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1})
+	}
+	withPrices(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}, nil)
+	chrono := velocitySortChrono(ids)
+	fastest := chrono[len(chrono)-1]
+	co, err := backend().GetUUID(fastest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setTestSalesVelocity(t, map[string]*salesVelocity{fastest: {Copies: 90}})
+	firstRow := func(news string) string {
+		fields := url.Values{"SearchDownloadCSV": {"true"}}
+		if news != "" {
+			fields.Set("NewsEnabled", news)
+		}
+		req := httptest.NewRequest(http.MethodGet, "/search/export/retail/Counterspell.csv?id=mtgjson&sort=velocity", nil)
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: signedAs(t, fields, time.Now().Add(time.Hour))})
+		w := httptest.NewRecorder()
+		testSite.SearchExport(w, req)
+		lines := strings.Split(w.Body.String(), "\n")
+		if len(lines) < 2 {
+			t.Fatalf("no rows: %s", w.Body.String())
+		}
+		return lines[1]
+	}
+	want := co.SetCode + "," + co.Edition + "," + co.Card.Number
+	if !strings.Contains(firstRow("1day"), want) {
+		t.Errorf("a newspaper tier's export does not start with the fastest card: %s, want %s", firstRow("1day"), want)
+	}
+	if strings.Contains(firstRow(""), want) {
+		t.Error("the export's order reveals the fastest card")
+	}
+}
+
+// TestVelocitySortPillShowsLocked greys the pill out, on both layouts, for a
+// reader without the tier, the upsell setting aside, and only with sales loaded.
+func TestVelocitySortPillShowsLocked(t *testing.T) {
+	setTestSalesVelocity(t, map[string]*salesVelocity{"velocity-card": {Copies: 69}})
+	const locked, linked = "sort-pill-locked", "sort=velocity"
+	vars := func(canVelocity, loaded bool) PageVars {
+		page := velocityPageVars(canVelocity, false)
+		page.SearchRan = true
+		page.TotalUnique = 1
+		page.HasVelocity = loaded
+		return page
+	}
+	for name, page := range velocityPages(t, vars(false, true)) {
+		if !strings.Contains(page, locked) || strings.Contains(page, linked) {
+			t.Errorf("%s: want the pill greyed out with no link", name)
+		}
+	}
+	for name, page := range velocityPages(t, vars(true, true)) {
+		if strings.Contains(page, locked) || !strings.Contains(page, linked) {
+			t.Errorf("%s: want a working pill for a newspaper tier", name)
+		}
+	}
+	for name, page := range velocityPages(t, vars(false, false)) {
+		if strings.Contains(page, locked) {
+			t.Errorf("%s: the pill shows with no sales loaded", name)
+		}
 	}
 }
