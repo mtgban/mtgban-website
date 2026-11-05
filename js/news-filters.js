@@ -3,11 +3,13 @@
 // it with the reader's last choices for it.
 (function () {
     // Kept where user-state.js syncs it to the reader's other devices, one
-    // state per report
+    // state per game and report: every game's site shares the preferences
+    // and names its reports the same.
     var STORE_KEY = 'mtgban_news_filters';
 
     var form = document.getElementById('newsFilters');
     var report = form && form.elements.page ? form.elements.page.value : '';
+    var key = (document.body.getAttribute('data-game') || '') + ':' + report;
     // The mobile page has no sort control, so it applies no saved sort: a
     // sort saved on another device would leave no way back to the default.
     var sortless = form && form.dataset.sortless === 'true';
@@ -47,14 +49,14 @@
             // the sort saved for the report, from another device or none.
             if (sortless) {
                 var params = new URLSearchParams(query);
-                var mine = new URLSearchParams(saved[report] && typeof saved[report].q === 'string' ? saved[report].q : '');
+                var mine = new URLSearchParams(saved[key] && typeof saved[key].q === 'string' ? saved[key].q : '');
                 ['sort', 'dir'].forEach(function (k) {
                     params.delete(k);
                     if (mine.get(k)) params.set(k, mine.get(k));
                 });
                 query = params.toString();
             }
-            saved[report] = { q: query, t: now() };
+            saved[key] = { q: query, t: now() };
             localStorage.setItem(STORE_KEY, JSON.stringify(saved));
         } catch (e) {}
     }
@@ -66,7 +68,7 @@
         var here = new URLSearchParams(window.location.search);
         var bare = true;
         here.forEach(function (v, k) { if (k !== 'page') bare = false; });
-        var mine = readSaved()[report];
+        var mine = readSaved()[key];
         if (!bare || !mine || typeof mine.q !== 'string') return;
         var params = new URLSearchParams(mine.q);
         if (sortless) {

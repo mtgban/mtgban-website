@@ -32,7 +32,7 @@ function fakeLink(search) {
     return { search, addEventListener: (ev, fn) => { listeners[ev] = fn; }, listeners };
 }
 
-function load({ form = null, links = [], search = '', local = fakeStorage(), userStateClock } = {}) {
+function load({ form = null, links = [], search = '', local = fakeStorage(), userStateClock, game = 'magic' } = {}) {
     const replaced = [];
     const window = {
         location: { search, pathname: '/newspaper', replace: (u) => replaced.push(u) },
@@ -41,6 +41,7 @@ function load({ form = null, links = [], search = '', local = fakeStorage(), use
     const document = {
         getElementById: (id) => (id === 'newsFilters' ? form : null),
         querySelectorAll: (sel) => (sel === '#newsTable .sort-links a' ? links : []),
+        body: { getAttribute: (a) => (a === 'data-game' ? game : null) },
     };
     class FormData {
         constructor(f) { this.pairs = (f && f.pairs) || []; }
@@ -58,34 +59,46 @@ test('submitting saves the choices for the report, less the report and empty fie
     const form = fakeForm([['page', 'top'], ['sort', 'ranking'], ['dir', 'asc'], ['rarity', 'M'], ['min_price', ''], ['max_price', '20']]);
     const { local } = load({ form, search: '?page=top&sort=ranking', userStateClock: { now: () => 4242 } });
     form.listeners.submit();
-    expect(saved(local)).toEqual({ top: { q: 'sort=ranking&dir=asc&rarity=M&max_price=20', t: 4242 } });
+    expect(saved(local)).toEqual({ 'magic:top': { q: 'sort=ranking&dir=asc&rarity=M&max_price=20', t: 4242 } });
 });
 
 test('saving one report keeps every other report\'s choices', () => {
-    const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ vendors: { q: 'rarity=R', t: 1 } }) });
+    const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ 'magic:vendors': { q: 'rarity=R', t: 1 } }) });
     const form = fakeForm([['page', 'top'], ['bucket', '$5+']]);
     load({ form, search: '?page=top&bucket=', local });
     form.listeners.submit();
     const s = saved(local);
-    expect(s.vendors).toEqual({ q: 'rarity=R', t: 1 });
-    expect(s.top.q).toBe('bucket=%245%2B');
+    expect(s['magic:vendors']).toEqual({ q: 'rarity=R', t: 1 });
+    expect(s['magic:top'].q).toBe('bucket=%245%2B');
 });
 
 test('a sort link saves its choices, less the report and the page of results', () => {
     const link = fakeLink('?page=top&sort=spike&dir=desc&filter=&rarity=U&index=3');
     const { local } = load({ form: fakeForm([['page', 'top']]), links: [link], search: '?page=top&rarity=U' });
     link.listeners.click();
-    expect(saved(local).top.q).toBe('sort=spike&dir=desc&rarity=U');
+    expect(saved(local)['magic:top'].q).toBe('sort=spike&dir=desc&rarity=U');
 });
 
 test('a link naming only the report opens it with its saved choices', () => {
-    const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ top: { q: 'sort=spike&rarity=M', t: 1 }, vendors: { q: 'rarity=C', t: 1 } }) });
+    const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ 'magic:top': { q: 'sort=spike&rarity=M', t: 1 }, 'magic:vendors': { q: 'rarity=C', t: 1 } }) });
     const { replaced } = load({ form: fakeForm([['page', 'top']]), search: '?page=top', local });
     expect(replaced).toEqual(['/newspaper?page=top&sort=spike&rarity=M']);
 });
 
+test('each game keeps its own choices for a report every game names', () => {
+    const magic = { q: 'filter=Modern+Horizons+3', t: 1 };
+    const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ 'magic:spike_score': magic }) });
+    const lorcana = () => load({ form: fakeForm([['page', 'spike_score']]), search: '?page=spike_score', local, game: 'lorcana' }).replaced;
+    expect(lorcana()).toEqual([]);
+    const form = fakeForm([['page', 'spike_score'], ['rarity', 'R']]);
+    load({ form, search: '?page=spike_score', local, game: 'lorcana', userStateClock: { now: () => 7 } });
+    form.listeners.submit();
+    expect(saved(local)).toEqual({ 'magic:spike_score': magic, 'lorcana:spike_score': { q: 'rarity=R', t: 7 } });
+    expect(lorcana()).toEqual(['/newspaper?page=spike_score&rarity=R']);
+});
+
 test('the mobile page, with no sort control, opens a report without its saved sort', () => {
-    const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ top: { q: 'sort=spike&dir=asc&rarity=M', t: 1 }, vendors: { q: 'sort=spike', t: 1 } }) });
+    const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ 'magic:top': { q: 'sort=spike&dir=asc&rarity=M', t: 1 }, 'magic:vendors': { q: 'sort=spike', t: 1 } }) });
     const mobile = (page) => load({ form: fakeForm([['page', page]], { sortless: 'true' }), search: '?page=' + page, local }).replaced;
     expect(mobile('top')).toEqual(['/newspaper?page=top&rarity=M']);
     expect(mobile('vendors')).toEqual([]);
@@ -101,21 +114,21 @@ test('a filter changed on mobile keeps the sort saved on desktop, and saves none
     const mobile = fakeForm([['page', 'top'], ['sort', 'ranking'], ['dir', ''], ['rarity', 'R']], { sortless: 'true' });
     load({ form: mobile, search: '?page=top&rarity=M', local });
     mobile.listeners.submit();
-    expect(saved(local).top.q).toBe('rarity=R&sort=spike&dir=asc');
+    expect(saved(local)['magic:top'].q).toBe('rarity=R&sort=spike&dir=asc');
     const fresh = fakeForm([['page', 'vendors'], ['sort', 'ranking'], ['rarity', 'U']], { sortless: 'true' });
     load({ form: fresh, search: '?page=vendors&rarity=C', local });
     fresh.listeners.submit();
-    expect(saved(local).vendors.q).toBe('rarity=U');
+    expect(saved(local)['magic:vendors'].q).toBe('rarity=U');
 });
 
 test('a saved state cannot move the reader to another report or page of results', () => {
-    const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ top: { q: 'page=vendors&index=4&rarity=M', t: 1 } }) });
+    const local = fakeStorage({ mtgban_news_filters: JSON.stringify({ 'magic:top': { q: 'page=vendors&index=4&rarity=M', t: 1 } }) });
     const { replaced } = load({ form: fakeForm([['page', 'top']]), search: '?page=top', local });
     expect(replaced).toEqual(['/newspaper?page=top&rarity=M']);
 });
 
 test('a link with choices of its own keeps them and saves nothing', () => {
-    const before = JSON.stringify({ top: { q: 'rarity=M', t: 1 } });
+    const before = JSON.stringify({ 'magic:top': { q: 'rarity=M', t: 1 } });
     const local = fakeStorage({ mtgban_news_filters: before });
     const { replaced } = load({ form: fakeForm([['page', 'top']]), search: '?page=top&rarity=', local });
     expect(replaced).toEqual([]);
@@ -123,7 +136,7 @@ test('a link with choices of its own keeps them and saves nothing', () => {
 });
 
 test('a report with nothing saved, or the defaults saved, stays as linked', () => {
-    for (const stored of [{}, { top: { q: '', t: 5 } }, { top: 'junk' }]) {
+    for (const stored of [{}, { 'magic:top': { q: '', t: 5 } }, { 'magic:top': 'junk' }]) {
         const local = fakeStorage({ mtgban_news_filters: JSON.stringify(stored) });
         expect(load({ form: fakeForm([['page', 'top']]), search: '?page=top', local }).replaced).toEqual([]);
     }
