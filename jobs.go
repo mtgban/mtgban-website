@@ -92,8 +92,15 @@ func (s *site) scheduleCrons() *cron.Cron {
 	// Update set values with new prices
 	addJob("30 */12 * * *", jobSetAnalysis, s.runSealedAnalysis)
 
-	// Reload DB Newspaper every 3 hours
-	addJob("33 */3 * * *", jobNewspaper, s.cacheNewspaper)
+	// Reload DB Newspaper every 3 hours, TCGplayer's copies sold a day after it.
+	// refreshNewspaper tracks each as its own job.
+	newspaperSchedule, err := cron.Parse("33 */3 * * *")
+	if err != nil {
+		log.Fatalln("cron", jobNewspaper, err)
+	}
+	backgroundJobs.Schedule(jobNewspaper, newspaperSchedule.Next)
+	backgroundJobs.Schedule(jobSalesVelocity, newspaperSchedule.Next)
+	c.Schedule(newspaperSchedule, cron.FuncJob(s.refreshNewspaper))
 
 	// Rebuild CK's buylist signals, reloading its stock history once the
 	// newspaper has a new day; until then that is one indexed MAX(date).
@@ -115,9 +122,6 @@ func (s *site) scheduleCrons() *cron.Cron {
 	// Reload TCGplayer's sellers and copies per grade once the newspaper
 	// finishes a scrape; until then that is one MAX(calc_date).
 	addJob("50 * * * *", jobTCGListings, s.loadTCGListings)
-
-	// Reload TCGplayer's copies sold a day once the newspaper adds a sale day.
-	addJob("55 * * * *", jobSalesVelocity, s.loadSalesVelocity)
 
 	// Alarm on the newspaper's sales pull signing out or stopping. Every site reads
 	// the same table, so one of them watches it.

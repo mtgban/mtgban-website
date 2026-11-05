@@ -440,6 +440,30 @@ func TestLoadSalesVelocityNoSalesYet(t *testing.T) {
 	}
 }
 
+// TestRefreshNewspaperLoadsSalesVelocity checks for a new sale day when the
+// pages refresh, and the sales job shares their schedule on the dashboard.
+func TestRefreshNewspaperLoadsSalesVelocity(t *testing.T) {
+	f := &fakeNewspaper{answer: func(string) (*fakeRows, error) {
+		return &fakeRows{cols: []string{"sale_date"}}, nil
+	}}
+	s := withFakeNewspaper(t, f)
+	s.refreshNewspaper()
+	queries := f.seen()
+	if len(queries) == 0 || queries[len(queries)-1].sql != salesVelocityDayQuery {
+		t.Errorf("the refresh ended without the day query: %d queries", len(queries))
+	}
+
+	setTestJobs(t)
+	testSite.scheduleCrons()
+	next := map[string]bool{}
+	for _, row := range backgroundJobs.Rows() {
+		next[row.Name] = true
+	}
+	if !next[jobSalesVelocity] || !next[jobNewspaper] {
+		t.Errorf("want both jobs on the dashboard: %v", next)
+	}
+}
+
 // TestLoadSalesVelocityRunsOnce lets one load at a time reach the newspaper:
 // a second call while the first is querying returns at once.
 func TestLoadSalesVelocityRunsOnce(t *testing.T) {

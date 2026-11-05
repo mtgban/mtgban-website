@@ -112,7 +112,7 @@ Boot sequence (`main()`):
    snapshots and the palette's sets/promos/finishes lists from it
    (`s.newDatastore()`, site.go), publishes backend and snapshots
    together in one `s.ds.Store()`, then itself spawns
-   `s.cacheNewspaper()`, `s.loadTCGListings()`, `s.loadSalesVelocity()`
+   `s.refreshNewspaper()`, `s.loadTCGListings()`
    and, where the observability database is configured,
    `s.refreshPopularSearches()` as further goroutines, which the
    tracker's recover does not reach: each runs under `tracked()`
@@ -137,7 +137,12 @@ Boot sequence (`main()`):
    the admin dashboard's Background Jobs ("Background jobs" in §5.9):
    - `0 */12 * * *` — `s.stashInTimeseries()` (snapshot prices to Postgres)
    - `30 */12 * * *` — `s.runSealedAnalysis()`
-   - `33 */3 * * *` — `s.cacheNewspaper()`
+   - `33 */3 * * *` - `s.refreshNewspaper()` (salesvelocity.go):
+     `s.cacheNewspaper()`, then `s.loadSalesVelocity()`, which reloads
+     TCGplayer's copies sold per card over the 30 days to the newspaper's
+     last complete sale day, and each card's last sale in the year before, for
+     search's sales velocity row, once the newspaper adds a sale day;
+     retries a day whose load failed every 6 hours
    - `45 * * * *` — `s.refreshCKSignals()` (ckbuylist.go): reloads CK's
      stock history once the newspaper has a new day, rereads the odds its
      tooltips quote (`ck-odds-v2.json.xz` beside the datastore, ckodds.go)
@@ -157,12 +162,6 @@ Boot sequence (`main()`):
      once the newspaper finishes a scrape, and retries a scrape day whose
      load failed every 6 hours; every datastore load also runs it, which
      queries only if no day is loaded yet
-   - `55 * * * *` - `s.loadSalesVelocity()` (salesvelocity.go): reloads
-     TCGplayer's copies sold per card over the 30 days to the newspaper's
-     last complete sale day, and each card's last sale in the year before, for
-     search's sales velocity row, once the newspaper adds a sale day;
-     retries a day whose load failed every 6 hours; every datastore load
-     also runs it
    - `20 */12 * * *` — `s.offline.RequestRefresh()` (backstop; normal
      refreshes are event-driven)
    - `15 */6 * * *` — `refreshCheckpoints()` (reads no datastore, so it stays
