@@ -390,7 +390,7 @@ test('headers and covers take their z-index from the stylesheet alone', () => {
 // result navigation measures positions that off-screen results only estimate.
 test('only the offline page skips off-screen results', () => {
     const offlineCss = fs.readFileSync(path.join(__dirname, '../../css/offline.css'), 'utf8');
-    expect(offlineCss).toMatch(/\.offline-shell \.result-body \{\s*content-visibility: auto;\s*contain-intrinsic-size: auto 2000px;/);
+    expect(offlineCss).toMatch(/\.offline-shell \.result-body \{\s*content-visibility: auto;\s*contain-intrinsic-size: auto 2000px;\s*overflow: clip;/);
     expect(offlineCss).toMatch(/\.m-offline-results-wrap \.m-card \{\s*content-visibility: auto;\s*contain-intrinsic-size: auto 530px;/);
     expect(css).not.toMatch(/content-visibility/);
     expect(offlineCss).not.toMatch(/m-layout-expanded/);
