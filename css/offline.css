@@ -127,10 +127,13 @@
 
 /* A long answer's biggest cost is laying out results nobody can see yet, so
    those wait until they scroll near. The heights are the real medians; "auto"
-   only remembers one until the next answer replaces the list. */
+   only remembers one until the next answer replaces the list. Clipping rather
+   than search.css's overflow: hidden, which makes Firefox lay these out more
+   slowly with the skip than without it. */
 .offline-shell .result-body {
     content-visibility: auto;
     contain-intrinsic-size: auto 2000px;
+    overflow: clip;
 }
 .m-offline-results-wrap .m-card {
     content-visibility: auto;
