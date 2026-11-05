@@ -169,6 +169,16 @@ body:has(#m-offline-results) .m-nav-filter-btn {
         display: none;
     }
 }
+/* Landscape hides the bar other pages only keep a search box in, and here it
+   holds the Singles and Sealed pills. */
+@media (orientation: landscape) {
+    .m-search-bar-sticky:has(.m-offline-mode-pills) {
+        display: block !important;
+    }
+    .m-page:has(.m-offline-mode-pills) {
+        padding-top: 52px;
+    }
+}
 
 /* Condition label for sealed offline results (mirrors search.html condHeader) */
 .m-page .m-cond-label { padding: 0.3em 0.75em; font-size: 0.8em; color: var(--activetext); }

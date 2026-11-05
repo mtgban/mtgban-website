@@ -27,3 +27,15 @@ test('the suggestions open over the Singles and Sealed pills', () => {
     const nav = zIndex('css/offline.css', 'body:has\\(#m-offline-results\\) \\.m-nav');
     expect(nav).toBeGreaterThan(zIndex('css/search-mobile.css', '\\.m-search-bar-sticky'));
 });
+
+// Landscape hides this bar on every page (search-mobile.css), which on this one
+// would take the only way to switch between singles and sealed.
+test('the Singles and Sealed pills stay on a landscape phone', () => {
+    const landscape = read('css/offline.css').match(/^@media \(orientation: landscape\) \{([\s\S]*?)^\}/m);
+    const bar = landscape[1].match(/\.m-search-bar-sticky:has\(\.m-offline-mode-pills\) \{([^}]*)\}/);
+    expect(bar[1]).toContain('display: block !important');
+
+    // Or the first result slides under the bar.
+    const page = landscape[1].match(/\.m-page:has\(\.m-offline-mode-pills\) \{([^}]*)\}/);
+    expect(page[1]).toContain('padding-top: 52px');
+});
