@@ -5,7 +5,9 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
@@ -171,6 +173,59 @@ func TestArbitCacheAsksAgainAfterAPanic(t *testing.T) {
 	seller.panics = false
 	if rows := p.arbitRows(b, arbitView{}, opts, seller, vendor); len(rows) != 1 {
 		t.Errorf("rows after a panic = %v, want FIXA-1 once", rows)
+	}
+}
+
+// stallingSeller is a seller whose first inventory read closes entered,
+// waits for release to close and panics. Every later read answers.
+type stallingSeller struct {
+	mtgban.Seller
+	entered, release chan struct{}
+	reads            atomic.Int32
+}
+
+func newStallingSeller(seller mtgban.Seller) *stallingSeller {
+	return &stallingSeller{Seller: seller, entered: make(chan struct{}), release: make(chan struct{})}
+}
+
+func (s *stallingSeller) Inventory() mtgban.InventoryRecord {
+	if s.reads.Add(1) == 1 {
+		close(s.entered)
+		<-s.release
+		panic("inventory")
+	}
+	return s.Seller.Inventory()
+}
+
+// TestArbitCacheWaiterComparesAfterAPanic gives a request that waited on a
+// comparison that panicked under another the rows, not none.
+func TestArbitCacheWaiterComparesAfterAPanic(t *testing.T) {
+	b := fixtureBackend("FIXA", "Fixture Arbit", "2024-01-01", [][2]string{{"Fixture Arbit", "1"}})
+	seller := newStallingSeller(mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		"FIXA-1": {{Conditions: "NM", Price: 5, Quantity: 1}},
+	}, mtgban.ScraperInfo{Shorthand: "SEL"}))
+	vendor := fixtureBuys("VEN", map[string]float64{"FIXA-1": 8})
+	withPrices(t, []mtgban.Seller{seller}, []mtgban.Vendor{vendor})
+	p := currentPrices()
+	opts := &mtgban.ArbitOpts{MinSpread: MinSpread}
+
+	go func() {
+		defer func() { _ = recover() }()
+		p.arbitRows(b, arbitView{}, opts, seller, vendor)
+	}()
+	<-seller.entered
+	waiter := make(chan []mtgban.ArbitEntry, 1)
+	go func() { waiter <- p.arbitRows(b, arbitView{}, opts, seller, vendor) }()
+	waitForStack(t, "arbitRows", "Once).doSlow", "lockSlow")
+	close(seller.release)
+
+	select {
+	case rows := <-waiter:
+		if len(rows) != 1 {
+			t.Errorf("the waiter's rows = %v, want FIXA-1 once", rows)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the waiter never answered")
 	}
 }
 

@@ -564,6 +564,14 @@ func (c *sleeperCache) hits(b *matcher.Backend, pairs []sleeperPair) [][]string 
 			entry.cardIDs, entry.done = cardIDs, true
 			c.mu.Unlock()
 		})
+		// A request that waited on a pair that panicked asks for it itself
+		c.mu.Lock()
+		done := entry.done
+		c.mu.Unlock()
+		if !done {
+			out[i] = pairs[i].cardIDs(b)
+			continue
+		}
 		out[i] = entry.cardIDs
 	}
 	return out

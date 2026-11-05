@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/salesvelocity"
@@ -260,5 +261,39 @@ func TestSleeperTiersCarryFinishedPairs(t *testing.T) {
 	_, carried := c.pairs[runningPair]
 	if carried {
 		t.Error("the pair still being computed was carried")
+	}
+}
+
+// TestSleeperCacheWaiterAsksAfterAPanic gives a request that waited on a
+// pair that panicked under another the pair's hits, not none.
+func TestSleeperCacheWaiterAsksAfterAPanic(t *testing.T) {
+	b := fixtureBackend("FIXA", "Fixture Arbit", "2024-01-01", [][2]string{{"Fixture Arbit", "1"}})
+	for _, co := range b.UUIDs {
+		co.Language = "English"
+	}
+	seller := newStallingSeller(mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		"FIXA-1": {{Conditions: "NM", Price: 5, Quantity: 1}},
+	}, mtgban.ScraperInfo{Shorthand: "SEL"}))
+	vendor := fixtureBuys("VEN", map[string]float64{"FIXA-1": 8})
+	c := &sleeperCache{pairs: map[sleeperPair]*sleeperHits{}}
+	pairs := []sleeperPair{{seller: seller, vendor: vendor}}
+
+	go func() {
+		defer func() { _ = recover() }()
+		c.hits(b, pairs)
+	}()
+	<-seller.entered
+	waiter := make(chan [][]string, 1)
+	go func() { waiter <- c.hits(b, pairs) }()
+	waitForStack(t, "sleeperCache).hits", "Once).doSlow", "lockSlow")
+	close(seller.release)
+
+	select {
+	case hits := <-waiter:
+		if !slices.Equal(hits[0], []string{"FIXA-1"}) {
+			t.Errorf("the waiter's hits = %v, want FIXA-1", hits[0])
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the waiter never answered")
 	}
 }
