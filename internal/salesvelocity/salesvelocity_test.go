@@ -158,6 +158,29 @@ func TestQueries(t *testing.T) {
 	}
 }
 
+// TestDayQueries keeps both day queries to an index walk over the window,
+// and only the game's own to its products: the complete day is every game's.
+func TestDayQueries(t *testing.T) {
+	semiJoin := "SELECT product_id FROM tcgplayerproductinfomodel"
+	for _, tc := range []struct {
+		name, query, bound string
+		ownGame            bool
+	}{
+		{"game", DayQuery, "sale_date > current_date - $2::int", true},
+		{"global", GlobalDayQuery, "sale_date > current_date - $1::int", false},
+	} {
+		if !strings.Contains(tc.query, tc.bound) || !strings.Contains(tc.query, "ORDER BY sale_date DESC") {
+			t.Errorf("%s: not a walk down the date index over the window", tc.name)
+		}
+		if strings.Contains(tc.query, "max(") {
+			t.Errorf("%s: reads every row with a max()", tc.name)
+		}
+		if strings.Contains(tc.query, semiJoin) != tc.ownGame {
+			t.Errorf("%s: keeps to one game %v, want %v", tc.name, !tc.ownGame, tc.ownGame)
+		}
+	}
+}
+
 // TestText words each state: a rate to one decimal, under a tenth, and
 // zero with the last sale.
 func TestText(t *testing.T) {

@@ -79,6 +79,16 @@ const DayQuery = `
 	 ORDER BY sale_date DESC
 	 LIMIT 1`
 
+// GlobalDayQuery is the newest day any game has a sale, none over the window.
+// It walks the same date index as DayQuery, with no game to keep to, so it
+// stops at the first row rather than reading the whole table as a max() does.
+const GlobalDayQuery = `
+	SELECT sale_date
+	  FROM tcgplayersalesdata
+	 WHERE sale_date > current_date - $1::int
+	 ORDER BY sale_date DESC
+	 LIMIT 1`
+
 // WindowQuery is the copies, orders and sale days per product and printing of one game.
 const WindowQuery = `
 	SELECT product_id, variant,
@@ -125,12 +135,18 @@ func (s *Store) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, game s
 	}
 	defer s.loading.Store(false)
 
+	// This game's newest sale only says it sold in the window: the newspaper
+	// writes a sale day for every game at once, so the partial one is the
+	// newest across them all.
 	var newest time.Time
 	err := db.QueryRowContext(ctx, DayQuery, game, Window).Scan(&newest)
 	if errors.Is(err, sql.ErrNoRows) {
 		result = fmt.Sprintf("no sales in the last %d days", Window)
 		log.Println("sales velocity:", result)
 		return result, ""
+	}
+	if err == nil {
+		err = db.QueryRowContext(ctx, GlobalDayQuery, Window).Scan(&newest)
 	}
 	if err != nil {
 		log.Println("sales velocity:", err)
@@ -159,8 +175,9 @@ func (s *Store) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, game s
 	return result, ""
 }
 
-// lastCompleteSaleDay is the day before the newest: the newspaper writes a day
-// as it pulls each product, so for hours the newest holds only part of its sales.
+// lastCompleteSaleDay is the day before the newest of any game: the newspaper
+// writes a day as it pulls each product, so for hours the newest holds only part
+// of its sales.
 func lastCompleteSaleDay(newest time.Time) time.Time {
 	return newest.AddDate(0, 0, -1)
 }

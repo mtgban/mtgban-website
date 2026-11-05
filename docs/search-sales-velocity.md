@@ -25,7 +25,7 @@ low on the busiest cards.
 Per card uuid, a printing in one finish:
 
 - copies and orders summed over the 30 days ending on the last complete
-  sale day, the one before the newest `sale_date` in the table;
+  sale day, the one before the newest `sale_date` of any game in the table;
 - the days in that window with a sale;
 - the last sale over the 365 days ending on the same day.
 
@@ -114,23 +114,26 @@ sales velocity`, even after typing `sort:velocity`, which otherwise hides the pi
 `salesvelocity.go` wires it to the site and holds the filters and their locks.
 It runs right after the Newspaper pages refresh, every three hours and
 after each datastore load, because the newspaper writes one sale day a day.
-It reads the newest sale day and stops if that day is already loaded, or
-if its last load failed less than six hours ago. Two queries then run in one
+It reads whether this game has a sale in the window, then the newest sale day
+of any game, and stops if the day before it is already loaded, or if its last
+load failed less than six hours ago. Two queries then run in one
 read-only transaction, their date bounds computed in Go from that day:
 the window grouped by product and printing, and the last sale per pair
 over the year.
 
-With no game column, all three queries keep to this deployment's game
-through the listings loader's semi-join on `tcgplayerproductinfomodel`'s
-`game_name`: the day query, and the window and lookback that follow it.
-That keeps each deployment to its own game and makes the unmatched
-count mean something. A product with sales but no info row is left out.
+With no game column, the game's day query and the window and lookback keep
+to this deployment's game through the listings loader's semi-join on
+`tcgplayerproductinfomodel`'s `game_name`. That keeps each deployment to
+its own game and makes the unmatched count mean something. A product with
+sales but no info row is left out. The other day query reads every game's
+sales, since the day being written is the same for all of them.
 
-The day query walks the date index down from the newest sale and stops at
-this game's first. A `max()` has to read every row the game has, which for
-Magic is a scan of the whole table. It looks back over the window only, so a
-game that stops selling costs a few seconds rather than a walk of the whole
-index; such a game loads nothing and keeps its last load.
+Both day queries walk the date index down from the newest sale, the game's
+stopping at this game's first and the other at the first row of any game. A
+`max()` has to read every row it covers, which is a scan of the whole table.
+They look back over the window only, so a game that stops selling costs a few
+seconds rather than a walk of the whole index; such a game loads nothing and
+keeps its last load.
 
 Each pair resolves to a card through `b.Match` with the product id and
 the printing, as TCGplayer's own prices are filed. Two pairs on one card
@@ -141,12 +144,15 @@ printing lacks, or a product the datastore does not carry, such as a
 sealed item. A load that matches no card fails and keeps the
 previous one.
 
-The newspaper writes a sale day as it pulls each product, over hours, so the
-newest `sale_date` holds only part of its sales while that runs. So the window
-ends on the day before it, and the rates run a day behind the newest sales. A
-pull keeps only sales dated the day before it runs, so that day takes no more
-rows once the newest has its first. The loader reruns once a new sale day
-appears, which is also when the one before it is complete.
+The newspaper writes a sale day as it pulls each product of every game, over
+hours, so the newest `sale_date` of any game holds only part of its sales
+while that runs. So the window ends on the day before it, and the rates run a
+day behind the newest sales. A game with no sale on that day or the ones
+before has empty days at the end of its window, which are complete all the
+same. A pull keeps only sales dated the day before it runs, so that day takes
+no more rows once the newest has its first. The loader reruns once a new sale
+day appears in any game, which is also when the one before it is complete, so
+every game loads once a day.
 
 ## What it costs
 
