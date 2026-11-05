@@ -488,10 +488,14 @@
             '</div>';
         document.body.appendChild(overlay);
 
-        var toast = document.createElement('div');
-        toast.className = 'cp-toast';
-        toast.id = 'cp-toast';
-        document.body.appendChild(toast);
+        // The guide makes its own for a copy made before the palette loaded
+        var toast = document.getElementById('cp-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.className = 'cp-toast';
+            toast.id = 'cp-toast';
+            document.body.appendChild(toast);
+        }
 
         return {
             overlay:   overlay,

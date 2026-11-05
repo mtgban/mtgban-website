@@ -10,7 +10,8 @@ class KeyboardEvent {
 
 // Runs the loader on a page whose head records what is appended to it, with
 // the caret on activeTag. press() fires a keydown at the document's listeners.
-function page({ guide = false, activeTag = 'BODY', width = 1024 } = {}) {
+// linked holds the hrefs of the stylesheets the page's own template links.
+function page({ guide = false, activeTag = 'BODY', width = 1024, linked = [] } = {}) {
     const head = [];
     const listeners = {};
     const dispatched = [];
@@ -18,6 +19,12 @@ function page({ guide = false, activeTag = 'BODY', width = 1024 } = {}) {
         currentScript: { src: 'http://localhost/js/palette-loader.js?hash=abc123' },
         activeElement: { tagName: activeTag, isContentEditable: false },
         head: { appendChild(el) { head.push(el); } },
+        querySelector(sel) {
+            const prefix = (/^link\[href\^="([^"]*)"\]$/.exec(sel) || [])[1];
+            if (prefix === undefined) throw new Error('unexpected selector ' + sel);
+            const hrefs = linked.concat(head.filter(el => el.tagName === 'link').map(el => el.href));
+            return hrefs.some(h => h.startsWith(prefix)) ? {} : null;
+        },
         createElement(tag) { return { tagName: tag, remove() { head.splice(head.indexOf(this), 1); } }; },
         addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
         removeEventListener(type, fn) { listeners[type] = (listeners[type] || []).filter(f => f !== fn); },
@@ -117,9 +124,12 @@ test('the palette script failing hands the shortcut back', async () => {
     await p.settle();
     expect(p.dispatched).toHaveLength(0);
     expect(p.listeners.keydown).toHaveLength(1);
-    // The next press starts over
+    // The next press starts over, on the sheet already in
+    const before = p.of('script').length;
     p.press({ key: 'k', ctrlKey: true });
-    expect(p.of('link', 'stylesheet')).toHaveLength(2);
+    expect(p.of('link', 'stylesheet')).toHaveLength(1);
+    await p.settle();
+    expect(p.of('script')).toHaveLength(before + 3);
 });
 
 test('a helper script failing leaves the palette to run without it, once', async () => {
@@ -146,6 +156,16 @@ test('a stylesheet that fails to load is dropped and linked again on the next pr
     expect(p.listeners.keydown).toHaveLength(1);
     p.press({ key: 'k', ctrlKey: true });
     expect(p.of('link', 'stylesheet').map(l => l.href)).toEqual(['/css/command-palette.css?hash=abc123']);
+});
+
+test('a page that links the stylesheet itself gets no second link', async () => {
+    const p = page({ guide: true, linked: ['/css/command-palette.css?hash=abc123'] });
+    p.press({ key: 'k', ctrlKey: true });
+    expect(p.of('link', 'stylesheet')).toHaveLength(0);
+    await p.settle();
+    expect(p.of('script').map(s => s.src)).toEqual([
+        '/js/palette-chips.js?hash=abc123', '/js/command-palette.js?hash=abc123',
+    ]);
 });
 
 test('a window narrower than the palette allows leaves the keys alone', () => {
