@@ -117,8 +117,8 @@ type salesPair struct {
 }
 
 // Load reads game's last complete sale day into the store once it is new. What it
-// did goes in result or problem for the job's dashboard row, both empty when
-// there was nothing to do.
+// found goes in result or problem for the job's dashboard row, both empty while
+// another load runs or a failed day waits out its retry, so that failure stands.
 func (s *Store) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, game string) (result, problem string) {
 	if !s.loading.CompareAndSwap(false, true) {
 		return "", ""
@@ -128,15 +128,21 @@ func (s *Store) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, game s
 	var newest time.Time
 	err := db.QueryRowContext(ctx, DayQuery, game, Window).Scan(&newest)
 	if errors.Is(err, sql.ErrNoRows) {
-		log.Printf("sales velocity: no sales in the last %d days", Window)
-		return "", ""
+		result = fmt.Sprintf("no sales in the last %d days", Window)
+		log.Println("sales velocity:", result)
+		return result, ""
 	}
 	if err != nil {
 		log.Println("sales velocity:", err)
 		return "", "cannot read the newspaper: " + err.Error()
 	}
 	day := lastCompleteSaleDay(newest)
-	if !due(s.current.Load(), s.failed.Load(), day, time.Now()) {
+	current := s.current.Load()
+	if current != nil && current.Day.Equal(day) {
+		return fmt.Sprintf("%d cards over the %d days to %s, already loaded",
+			len(current.Cards), current.Window, day.Format(time.DateOnly)), ""
+	}
+	if !due(current, s.failed.Load(), day, time.Now()) {
 		return "", ""
 	}
 
