@@ -18,6 +18,7 @@ const (
 	jobCKSignals       = "CK signals"
 	jobTCGListings     = "TCG listings"
 	jobSalesVelocity   = "Sales velocity"
+	jobNewspaperSales  = "Newspaper sales"
 	jobOffline         = "Offline refresh"
 	jobTCGCSVPrices    = "TCGCSV prices"
 	jobTCGCSVProducts  = "TCGCSV products"
@@ -117,6 +118,12 @@ func (s *site) scheduleCrons() *cron.Cron {
 
 	// Reload TCGplayer's copies sold a day once the newspaper adds a sale day.
 	addJob("55 * * * *", jobSalesVelocity, s.loadSalesVelocity)
+
+	// Alarm on the newspaper's sales pull signing out or stopping. Every site reads
+	// the same table, so one of them watches it.
+	if Config().Game == DefaultGame && NewNewspaperDB != nil && !SkipNewspaper {
+		addJob("10 * * * *", jobNewspaperSales, checkNewspaperSales)
+	}
 
 	// Rank the month's typed searches for the landing strip; only where the
 	// observability database holds the votes.
