@@ -87,9 +87,10 @@ sales velocity`, even after typing `sort:velocity`, which otherwise hides the pi
 ## The loader
 
 `salesvelocity.go`, modeled on the listings loader (`tcglistings.go`).
-An hourly job at `:55`, and a run after each datastore load, read the
-newest sale day and stop if that day is already loaded, or if its last
-load failed less than six hours ago. Two queries then run in one
+It runs right after the Newspaper pages refresh, every three hours and
+after each datastore load, because the newspaper writes one sale day a day.
+It reads the newest sale day and stops if that day is already loaded, or
+if its last load failed less than six hours ago. Two queries then run in one
 read-only transaction, their date bounds computed in Go from that day:
 the window grouped by product and printing, and the last sale per pair
 over the year.

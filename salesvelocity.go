@@ -104,6 +104,15 @@ type salesPair struct {
 	variant   string
 }
 
+// refreshNewspaper reloads what the site reads from the newspaper: its pages,
+// then the sales, which load only when the newspaper has a new sale day. Each
+// is a job of its own, so the dashboard times them apart and neither panic
+// stops the other.
+func (s *site) refreshNewspaper() {
+	tracked(jobNewspaper, s.cacheNewspaper)()
+	tracked(jobSalesVelocity, s.loadSalesVelocity)()
+}
+
 // loadSalesVelocity loads the newspaper's last complete sale day once it is new.
 func (s *site) loadSalesVelocity() {
 	game, found := gameMap[Config().Game]
