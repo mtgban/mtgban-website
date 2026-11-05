@@ -61,12 +61,12 @@ function makeHarness(meta = {}) {
         close() {},
         transaction: () => ({ objectStore: () => ({ get(key) {
             const get = {};
-            setTimeout(() => { get.result = key in meta ? { v: meta[key] } : undefined; get.onsuccess(); }, 0);
+            queueMicrotask(() => { get.result = key in meta ? { v: meta[key] } : undefined; get.onsuccess(); });
             return get;
         } }) }),
     };
     const opens = { count: 0 };
-    const fakeIDB = { open() { opens.count++; const req = { result: fakeDB }; setTimeout(() => req.onsuccess(), 0); return req; } };
+    const fakeIDB = { open() { opens.count++; const req = { result: fakeDB }; queueMicrotask(() => req.onsuccess()); return req; } };
     const age = globalThis.OfflineAge;
     const win = { addEventListener() {}, OfflineAge: age };
     const src = readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', 'offline-banner.js'), 'utf8');
@@ -74,7 +74,9 @@ function makeHarness(meta = {}) {
         'setInterval', 'clearInterval', 'OfflineAge', src)(
         win, doc, { onLine: true }, { search: '' }, fakeIDB, fakeFetch,
         fakeSetInterval, fakeClearInterval, age);
-    const flush = () => new Promise((r) => setTimeout(r, 5));
+    // Every fake above answers in a microtask, so the banner's chains have
+    // all run by the time the event loop reaches the next macrotask.
+    const flush = () => new Promise((r) => setImmediate(r));
     return {
         els,
         meta,
