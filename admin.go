@@ -1416,7 +1416,8 @@ func saveConfig(ctx context.Context, config ConfigType) error {
 
 // demoKeyScope is the store scope and modes the price list's package sells,
 // as the gateway signs them: an explicit package's stores are the implied
-// family's shorthands plus those of the store family picked.
+// family's shorthands plus those of the store family picked. A demo key
+// carries no lookback, so a history one reads the 30-day default.
 func demoKeyScope(p *prices, pkgKey, family string) (scope, modes string, err error) {
 	pkg, found := apiProducts.Package(pkgKey)
 	if !found {
