@@ -6,16 +6,30 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
-	"github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 const (
 	// EstimateURL is the endpoint estimates are submitted to.
 	EstimateURL = "https://cardconduit.com/api/v1.0/estimate"
 )
+
+// client gives up on a stalled CardConduit rather than holding the upload,
+// and retries nothing, so an estimate is never submitted twice.
+var client = mtgban.NewHTTPClient(
+	mtgban.WithHTTPTimeout(30*time.Second),
+	mtgban.WithHTTPRetries(0),
+	// Hand back a 5xx as it came, for its body's message to report
+	mtgban.WithHTTPErrorHandler(retryablehttp.PassthroughErrorHandler),
+)
+
+// maxBody is well past an answer that only names the estimate's link.
+const maxBody = 1 << 20
 
 // Item is one card of an estimate request.
 type Item struct {
@@ -64,14 +78,14 @@ func SendEstimate(ctx context.Context, bearer string, items []Item) (string, err
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := cleanhttp.DefaultClient().Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	var response Response
-	err = json.NewDecoder(resp.Body).Decode(&response)
+	err = json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&response)
 	if err != nil {
 		return "", err
 	}
