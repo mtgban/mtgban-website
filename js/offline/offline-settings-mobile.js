@@ -43,7 +43,7 @@
         op.then(function () {
             el.classList.remove('m-toggle-busy');
             repaint();
-            if (OfflineMode.enabled()) paintStatus('Sync started');
+            paintStatus(OfflineMode.enabled() ? 'Sync started' : '');
         }).catch(function (err) {
             console.warn('offline:', err && err.message);
             el.classList.remove('m-toggle-busy');
@@ -57,6 +57,8 @@
         if (!section) return;
         section.style.display = '';
         repaint();
+        // The first paint has no measurements yet, and reads as an empty store.
+        if (OfflineMode.enabled()) OfflineMode.refreshUsage().then(repaint);
 
         // Sync progress: offline-mode.js dispatches this event on each worker message.
         document.addEventListener('offline:sync-message', function (e) {
@@ -65,12 +67,14 @@
                 paintStatus('Syncing: ' + m.stage + ' ' + m.done + '/' + m.total);
             } else if (m.type === 'done') {
                 paintStatus(OfflineMode.doneStatusText(m, OfflineMode.status()));
-                paintUsage();
             } else if (m.type === 'error') {
                 paintStatus('Sync error: ' + m.message);
                 paintAuthNotice();
             }
         });
+
+        // Fired once offline-mode.js has re-measured after a finished sync.
+        document.addEventListener('offline:synced', paintUsage);
 
         // Keep toggle in sync when another tab changes the localStorage pref.
         window.addEventListener('storage', function (e) {
@@ -80,9 +84,6 @@
 
     self.OfflineSettingsMobile = { init: init, handleToggle: handleToggle };
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
+    // Deferred ahead of offline-mode.js, which only exists by DOM ready.
+    document.addEventListener('DOMContentLoaded', init);
 })();
