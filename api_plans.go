@@ -62,6 +62,8 @@ type APIPlansVars struct {
 	PaidStores []string
 	// ModeAddons are the add-ons that grant a mode, listed once on sale.
 	ModeAddons []apiproductlist.Addon
+	// NewspaperOnSale names the newspaper among a package's bullets when its modes grant it.
+	NewspaperOnSale bool
 
 	// TrialDays must match the gateway's trial_days config.
 	TrialDays int
@@ -165,6 +167,8 @@ func apiPlansVars(p *prices, r *http.Request, sig string) *APIPlansVars {
 		Change:     change,
 		Email:      GetParamFromSig(sig, "UserEmail"),
 		TrialDays:  15,
+		// The gateway grants the newspaper only once it is on sale.
+		NewspaperOnSale: Config().APIGateway.NewspaperOnSale,
 	}
 	var history []apiproductlist.Package
 	v.Cards, v.TopCard, history = podiumOrder(apiProducts.Packages)

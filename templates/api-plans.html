@@ -4,16 +4,20 @@
     <link rel="stylesheet" type="text/css" href="/css/api-plans.css?hash={{.Hash}}">
 {{end}}
 
-{{/* api-card-body is the podium and history cards' shared inner markup; "." is the package. */}}
+{{/* api-card-body is the podium and history cards' shared inner markup: .Package, and .Newspaper when on sale. */}}
 {{define "api-card-body" -}}
+{{with .Package -}}
 <div class="api-tier-icon">{{plan_icon .Icon}}</div>
                     <h3><label for="api-package-{{.Key}}">{{.Name}}</label></h3>
                     <p class="api-sub">{{.Subtitle}}</p>
                     <p class="api-amount">{{usd .Monthly}}<span>per month</span></p>
                     <ul class="api-bullets">
-                        {{range .Bullets}}<li>{{.}}</li>{{end}}{{range .Caveats}}<li>{{.}}</li>{{end}}
+                        {{range .Bullets}}<li>{{.}}</li>{{end}}
+                        {{if and $.Newspaper (slice_has .Modes "newspaper")}}<li>Includes the Newspaper reports</li>{{end}}
                     </ul>
+                    {{if .Caveats}}<ul class="api-caveats">{{range .Caveats}}<li>{{.}}</li>{{end}}</ul>{{end}}
                     <button type="button" class="api-btn api-cta" data-package="{{.Key}}" data-label="Choose {{.Name}}" data-selected="Selected">Choose {{.Name}}</button>
+{{- end}}
 {{- end}}
 
 {{define "content"}}
@@ -41,19 +45,19 @@
                 {{range .Cards}}
                 <div class="card api-card{{if eq .Key $.API.TopCard}} api-card-top{{end}}">
                     <input type="radio" name="package" id="api-package-{{.Key}}" value="{{.Key}}"{{if eq .Key $.API.DefaultPackage}} checked{{end}}>
-                    {{template "api-card-body" .}}
-                    {{if eq .Key $.API.TopCard}}
-                    {{if $.API.CanTrial}}
-                    <p class="api-cta-note"><a href="/api-trial?return_to={{$.API.ReturnTo}}">Try the API before you commit</a>: as a Patreon supporter you can request a one time key with FULL ACCESS for {{$.API.TrialDays}} days</p>
-                    {{else}}
-                    <p class="api-cta-note">Patreon supporters can try the API before they commit: a one time key with FULL ACCESS for {{$.API.TrialDays}} days</p>
-                    {{end}}
-                    {{else}}
+                    {{template "api-card-body" (dict "Package" . "Newspaper" $.API.NewspaperOnSale)}}
                     <p class="api-cta-note">Billed monthly, cancel any time</p>
-                    {{end}}
+                    {{$key := .Key}}{{range $.API.ModeAddons}}{{if slice_has .AppliesTo $key}}
+                    <label class="api-choice api-card-addon"><input type="checkbox" name="addons" value="{{.Key}}" data-package="{{$key}}"> Add {{.Name}}, {{usd .Monthly}}/month</label>
+                    {{end}}{{end}}
                 </div>
                 {{end}}
             </div>
+            {{if .CanTrial}}
+            <p class="api-cta-note api-trial-note"><a href="/api-trial?return_to={{.ReturnTo}}">Try the API before you commit</a>: as a Patreon supporter you can request a one time key with FULL ACCESS for {{.TrialDays}} days</p>
+            {{else}}
+            <p class="api-cta-note api-trial-note">Patreon supporters can try the API before they commit: a one time key with FULL ACCESS for {{.TrialDays}} days</p>
+            {{end}}
         </section>
 
         {{if .HistoryCards}}
@@ -64,7 +68,7 @@
                 {{range .HistoryCards}}
                 <div class="card api-card">
                     <input type="radio" name="package" id="api-package-{{.Key}}" value="{{.Key}}"{{if eq .Key $.API.DefaultPackage}} checked{{end}}>
-                    {{template "api-card-body" .}}
+                    {{template "api-card-body" (dict "Package" . "Newspaper" $.API.NewspaperOnSale)}}
                     <p class="api-cta-note">Billed monthly, cancel any time</p>
                 </div>
                 {{end}}
@@ -98,17 +102,6 @@
                     {{end}}
                 </div>
             </fieldset>
-
-            {{if .ModeAddons}}
-            <fieldset class="api-fieldset" id="api-mode-addons">
-                <legend>Add-ons</legend>
-                <div class="api-choices">
-                    {{range .ModeAddons}}
-                    <label class="api-choice"><input type="checkbox" name="addons" value="{{.Key}}"> {{.Name}}, {{usd .Monthly}}/month</label>
-                    {{end}}
-                </div>
-            </fieldset>
-            {{end}}
 
             <fieldset class="api-fieldset"{{if not .Invite}} hidden{{end}}>
                 <legend>Billing</legend>
