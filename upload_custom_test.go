@@ -239,12 +239,12 @@ func TestUploadSpellsTheCustomBuylistRule(t *testing.T) {
 	page := rec.Body.String()
 
 	const title = ` title="50% of ZZA if ≥ $2.00">Custom Buylist<`
-	for _, tag := range []string{`<th class="r"`, `<span class="label"`, `<span class="toc-store"`, `<h3`} {
+	for _, tag := range []string{`<th class="r" data-sort-method="number" data-sort-descending`, `<span class="label"`, `<span class="toc-store"`, `<h3`} {
 		if !strings.Contains(page, tag+title) {
 			t.Errorf("no rule on %s in the %d byte page", tag, len(page))
 		}
 	}
-	if !strings.Contains(page, `<th class="r">Session ZZV<`) {
+	if !strings.Contains(page, `<th class="r" data-sort-method="number" data-sort-descending>Session ZZV<`) {
 		t.Error("another store's column has lost its plain header")
 	}
 }

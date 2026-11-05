@@ -36,7 +36,7 @@ func greenCells(t *testing.T, buylist bool, loaded float64, prices map[string]fl
 		t.Fatalf("rendering the results table: %v", err)
 	}
 	var green []string
-	for _, m := range regexp.MustCompile(`class="ures-price best">\s*<a href="[^"]*/(\w+)/card-1"`).FindAllStringSubmatch(b.String(), -1) {
+	for _, m := range regexp.MustCompile(`class="ures-price best" data-sort="[^"]*">\s*<a href="[^"]*/(\w+)/card-1"`).FindAllStringSubmatch(b.String(), -1) {
 		green = append(green, m[1])
 	}
 	return green
