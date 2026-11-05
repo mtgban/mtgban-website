@@ -595,7 +595,7 @@ func TestAPIPlansNewspaperAddonBehindTheFlag(t *testing.T) {
 	withConfigCopy(t)
 	Config().APIGateway.NewspaperOnSale = false
 	off := apiPlansPage(t, "")
-	for _, absent := range []string{`name="addons"`, "Newspaper reports", `"mode_addons"`, `"newspaper":`, `"addon_applies"`} {
+	for _, absent := range []string{`name="addons"`, "api-card-addon", "Newspaper reports", `"mode_addons"`, `"newspaper":`, `"addon_applies"`} {
 		if strings.Contains(off, absent) {
 			t.Errorf("off sale, the page carries %s", absent)
 		}
@@ -604,18 +604,102 @@ func TestAPIPlansNewspaperAddonBehindTheFlag(t *testing.T) {
 	Config().APIGateway.NewspaperOnSale = true
 	on := apiPlansPage(t, "")
 	for _, present := range []string{
-		`<label class="api-choice"><input type="checkbox" name="addons" value="newspaper"> Newspaper reports, $200/month</label>`,
 		`"mode_addons":["newspaper"]`,
 		`"newspaper":`,
 		`"addon_applies":{"newspaper":["starter","all_stores"]}`,
+		`Add Newspaper reports, $200/month`,
 	} {
 		if !strings.Contains(on, present) {
 			t.Errorf("on sale, the page lacks %s", present)
 		}
 	}
-	// Below the games picker, above billing.
-	if games, box, billing := strings.Index(on, `name="games"`), strings.Index(on, `name="addons"`), strings.Index(on, "<legend>Billing</legend>"); !(games < box && box < billing) {
-		t.Errorf("checkbox out of place: games %d addons %d billing %d", games, box, billing)
+	if strings.Contains(on, `id="api-mode-addons"`) {
+		t.Error("the add-ons fieldset is still drawn")
+	}
+	if strings.Contains(on, `data-package="all_data">`) {
+		t.Error("the add-on is offered on a card it does not apply to")
+	}
+	for _, key := range []string{"starter", "all_stores"} {
+		box := strings.Index(on, `<input type="checkbox" name="addons" value="newspaper" data-package="`+key+`">`)
+		card := strings.Index(on, `id="api-package-`+key+`"`)
+		if box < 0 || card < 0 {
+			t.Fatalf("%s: checkbox %d card %d", key, box, card)
+		}
+		next := strings.Index(on[card:], `class="card api-card`)
+		end := len(on)
+		if next >= 0 {
+			end = card + next
+		}
+		if box < card || box > end {
+			t.Errorf("%s: checkbox %d outside its card %d..%d", key, box, card, end)
+		}
+	}
+	for key, want := range map[string]bool{"starter": false, "all_stores": false, "all_data": true} {
+		card := on[strings.Index(on, `id="api-package-`+key+`"`):]
+		card = card[:strings.Index(card, `</section>`)]
+		if next := strings.Index(card, `class="card api-card`); next >= 0 {
+			card = card[:next]
+		}
+		if got := strings.Contains(card, `<li>Includes the Newspaper reports</li>`); got != want {
+			t.Errorf("%s: newspaper bullet %v, want %v", key, got, want)
+		}
+	}
+}
+
+// Caveats are drawn as a crosses list after the bullets, on the packages that have them.
+func TestAPIPlansDrawsCaveatsAsCrosses(t *testing.T) {
+	body := apiPlansPage(t, "")
+	if n := strings.Count(body, `<ul class="api-caveats">`); n != 2 {
+		t.Errorf("caveat lists = %d, want 2", n)
+	}
+	if n := strings.Count(body, `<li>No Sealed or EV data</li>`); n != 2 {
+		t.Errorf("sealed caveats = %d, want 2", n)
+	}
+	top := strings.Index(body, `<div class="card api-card api-card-top">`)
+	if top < 0 {
+		t.Fatal("no top card")
+	}
+	rest := body[top+1:]
+	end := len(rest)
+	if i := strings.Index(rest, `class="card api-card`); i >= 0 {
+		end = i
+	}
+	if i := strings.Index(rest, `</section>`); i >= 0 && i < end {
+		end = i
+	}
+	if strings.Contains(rest[:end], "api-caveats") {
+		t.Error("the top card has caveats")
+	}
+}
+
+// One trial note sits below the cards, and every card carries the billed note.
+func TestAPIPlansTrialNoteBelowTheCards(t *testing.T) {
+	body := apiPlansPage(t, "")
+	if n := strings.Count(body, "api-trial-note"); n != 1 {
+		t.Fatalf("trial notes = %d, want 1", n)
+	}
+	third := 0
+	for i := 0; i < 3; i++ {
+		j := strings.Index(body[third:], `class="card api-card`)
+		if j < 0 {
+			t.Fatal("fewer than three cards")
+		}
+		third += j + 1
+	}
+	note, conf := strings.Index(body, "api-trial-note"), strings.Index(body, "api-configurator")
+	if !(third < note && note < conf) {
+		t.Errorf("note out of place: third card %d note %d configurator %d", third, note, conf)
+	}
+	if n := strings.Count(body, "Billed monthly, cancel any time"); n != 3 {
+		t.Errorf("billed notes = %d, want 3", n)
+	}
+
+	user := &pledge.User{Email: "ann@example.com", FullName: "Ann Example", EmailVerified: true}
+	setGatewaySecret(t, "s")
+	page := apiPlansPage(t, sign("Legacy", user, nil, DefaultSignatureDuration))
+	n := strings.Index(page, "api-trial-note")
+	if n < 0 || !strings.Contains(page[n:n+400], `href="/api-trial`) {
+		t.Error("trial link missing from the note")
 	}
 }
 
