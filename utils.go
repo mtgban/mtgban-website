@@ -1060,7 +1060,7 @@ func uuid2card(b *matcher.Backend, p *prices, cardID string, preferFlavorName bo
 	if newHigh {
 		hotlistNewTip = ckNewHighTipFor(co)
 	}
-	velocity, velocityDetail := salesVelocityView(co.UUID)
+	velocity, velocityDetail := salesVelocityStore.View(co.UUID)
 
 	return GenericCard{
 		UUID:           co.UUID,
