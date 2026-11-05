@@ -2057,7 +2057,7 @@ func passthroughIndex(entries []SearchEntry, consumed []string) []SearchEntry {
 // sellerEntryFound reports whether a seller's entry for a card passes a
 // search's condition and price filters. An index's entries carry no
 // condition, so only its price is filtered.
-func sellerEntryFound(p *prices, info mtgban.ScraperInfo, cardID string, entry mtgban.InventoryEntry, config SearchConfig) bool {
+func sellerEntryFound(p *prices, info mtgban.ScraperInfo, cardID string, entry mtgban.InventoryEntry, config *SearchConfig) bool {
 	if !info.MetadataOnly && shouldSkipEntryNG(entry, config.EntryFilters) {
 		return false
 	}
@@ -2066,7 +2066,7 @@ func sellerEntryFound(p *prices, info mtgban.ScraperInfo, cardID string, entry m
 
 // vendorEntryFound reports whether a vendor's entry for a card passes a
 // search's condition and price filters.
-func vendorEntryFound(p *prices, info mtgban.ScraperInfo, cardID string, entry mtgban.BuylistEntry, config SearchConfig) bool {
+func vendorEntryFound(p *prices, info mtgban.ScraperInfo, cardID string, entry mtgban.BuylistEntry, config *SearchConfig) bool {
 	if shouldSkipEntryNG(entry, config.EntryFilters) {
 		return false
 	}
@@ -2124,7 +2124,7 @@ func searchSellers(p *prices, cardIDs []string, config SearchConfig) (foundSelle
 
 			// Loop thorugh available conditions
 			for _, entry := range entries {
-				if !sellerEntryFound(p, info, cardID, entry, config) {
+				if !sellerEntryFound(p, info, cardID, entry, &config) {
 					continue
 				}
 
@@ -2193,7 +2193,7 @@ func searchVendors(p *prices, cardIDs []string, config SearchConfig) (foundVendo
 			}
 
 			for _, entry := range entries {
-				if !vendorEntryFound(p, info, cardID, entry, config) {
+				if !vendorEntryFound(p, info, cardID, entry, &config) {
 					continue
 				}
 
