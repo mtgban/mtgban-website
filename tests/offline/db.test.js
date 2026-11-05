@@ -172,3 +172,94 @@ test('a scan that fails is not kept: the next read under the same stamp scans ag
     expect(await DB.allNames()).toEqual([{ key: 'bolt', uuids: ['a'] }]);
     expect(state.scans).toBe(2);
 });
+
+// A small stand-in for IndexedDB: enough of a transaction for ensureKey.
+const KEY_PATHS = { meta: 'k', sets: 'code' };
+let stores = {};
+
+function fakeTransaction() {
+    const tx = { oncomplete: null };
+    let pending = 0;
+    const settle = () => queueMicrotask(() => { if (pending === 0 && tx.oncomplete) tx.oncomplete(); });
+    tx.objectStore = (name) => ({
+        get(key) {
+            const req = {};
+            pending++;
+            queueMicrotask(() => {
+                req.result = stores[name].get(key);
+                pending--;
+                if (req.onsuccess) req.onsuccess();
+                settle();
+            });
+            return req;
+        },
+        put(row) { stores[name].set(row[KEY_PATHS[name]], row); },
+        delete(key) { stores[name].delete(key); },
+        clear() { stores[name].clear(); },
+    });
+    settle();
+    return tx;
+}
+
+globalThis.indexedDB = {
+    open() {
+        const req = {
+            result: { objectStoreNames: { contains: () => true }, transaction: fakeTransaction },
+        };
+        queueMicrotask(() => req.onsuccess());
+        return req;
+    },
+};
+
+function seed(meta) {
+    stores = {
+        meta: new Map(Object.entries(meta).map(([k, v]) => [k, { k, v }])),
+        sets: new Map([['NEO', { code: 'NEO', version: 'v1' }], ['MH2', { code: 'MH2', version: 'v1' }]]),
+    };
+}
+
+const realGenerate = crypto.subtle.generateKey;
+
+test('ensureKey leaves everything alone when there is a key', async () => {
+    seed({ aesKey: 'old', lastSync: 'then', missingSets: 2 });
+    let generated = 0;
+    crypto.subtle.generateKey = async () => { generated++; return 'new'; };
+    expect(await globalThis.OfflineDB.ensureKey()).toBe('old');
+    expect(generated).toBe(0);
+    expect(stores.sets.size).toBe(2);
+    expect(stores.meta.get('lastSync').v).toBe('then');
+    crypto.subtle.generateKey = realGenerate;
+});
+
+// What the lost key encrypted can't be read, and the banner must not call it fresh.
+test('a new key takes the rows it cannot read and the record of their sync', async () => {
+    seed({ lastSync: 'then', missingSets: 2, catalogVersion: 'c1' });
+    crypto.subtle.generateKey = async () => 'new';
+    expect(await globalThis.OfflineDB.ensureKey()).toBe('new');
+    expect(stores.meta.get('aesKey').v).toBe('new');
+    expect(stores.sets.size).toBe(0);
+    expect(stores.meta.has('lastSync')).toBe(false);
+    expect(stores.meta.has('missingSets')).toBe(false);
+    expect(stores.meta.get('catalogVersion').v).toBe('c1');
+    crypto.subtle.generateKey = realGenerate;
+});
+
+test('a key another tab stored first stands, with its rows', async () => {
+    seed({});
+    crypto.subtle.generateKey = async () => {
+        stores.meta.set('aesKey', { k: 'aesKey', v: 'theirs' });
+        return 'mine';
+    };
+    expect(await globalThis.OfflineDB.ensureKey()).toBe('theirs');
+    expect(stores.meta.get('aesKey').v).toBe('theirs');
+    expect(stores.sets.size).toBe(2);
+    crypto.subtle.generateKey = realGenerate;
+});
+
+test('only the database creates the key', () => {
+    const { readFileSync } = require('fs');
+    const { join } = require('path');
+    for (const file of ['offline-mode.js', 'offline-sync.js']) {
+        expect(readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', file), 'utf8')).not.toContain('generateKey');
+    }
+});

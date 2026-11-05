@@ -7,6 +7,7 @@ const DIR = join(import.meta.dir, '..', '..', 'js', 'offline');
 // Loads the sync worker against an in-memory database holding two synced
 // sets and one edition of downloaded images; prices fail when asked to.
 function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAtFirstPrice = false } = {}) {
+    const control = { cancelAtFirstPrice, onDone: null };
     const meta = { aesKey, storesKey: '', catalogVersion: 'c1' };
     const imgstate = { NEO: { code: 'NEO', keys: ['a'], done: true } };
     const sets = { NEO: { code: 'NEO', version: 'v1', blob: 'neo' }, DMU: { code: 'DMU', version: 'v1', blob: 'dmu' } };
@@ -14,6 +15,13 @@ function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAt
     const db = {
         getMeta: async (k) => meta[k],
         setMeta: async (k, v) => { meta[k] = v; },
+        ensureKey: async () => {
+            if (meta.aesKey) return meta.aesKey;
+            Object.keys(sets).forEach((code) => { delete sets[code]; });
+            delete meta.lastSync;
+            meta.aesKey = 'new-key';
+            return meta.aesKey;
+        },
         listSetVersions: async () => Object.values(sets).map((r) => ({ code: r.code, version: r.version })),
         getSet: async (code) => sets[code] && { ...sets[code] },
         putSet: async (row) => { sets[row.code] = row; },
@@ -22,7 +30,10 @@ function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAt
         deleteRow: async (store, code) => { delete (store === 'imgstate' ? imgstate : sets)[code]; },
     };
     const self = {
-        postMessage: (m) => posts.push(m),
+        postMessage: (m) => {
+            posts.push(m);
+            if (m.type === 'done' && control.onDone) control.onDone();
+        },
         caches: { open: async () => ({ delete: async () => true }) },
         OfflineDB: db,
         OfflineUtil: { gzipCompress: async (b) => b },
@@ -30,19 +41,24 @@ function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAt
     const manifest = { catalog: 'c1', sets: { NEO: 'v1', DMU: 'v1', ...extraSets }, images: {} };
     const fetch = async (url) => {
         if (url.includes('manifest')) return { ok: true, status: 200, json: async () => manifest };
-        if (cancelAtFirstPrice) self.onmessage({ data: { type: 'cancel' } });
+        if (control.cancelAtFirstPrice) self.onmessage({ data: { type: 'cancel' } });
         if (pricesFail) throw new TypeError('Failed to fetch');
         return { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(4) };
     };
     const crypto = {
         getRandomValues: (a) => a,
-        subtle: { encrypt: async () => new ArrayBuffer(8), generateKey: async () => 'new-key' },
+        subtle: { encrypt: async () => new ArrayBuffer(8) },
     };
     new Function('self', 'fetch', readFileSync(join(DIR, 'offline-images.js'), 'utf8'))(self, fetch);
     const src = readFileSync(join(DIR, 'offline-sync.js'), 'utf8') + '\n;return runSync;';
     const runSync = new Function('self', 'importScripts', 'fetch', 'crypto', 'OfflineImages', 'OfflineDB', src)(
         self, () => {}, fetch, crypto, self.OfflineImages, db);
-    return { runSync, imgstate, sets, posts, meta };
+    // Through the worker's own message handler, which clears an earlier cancel
+    const sync = (msg) => new Promise((resolve) => {
+        control.onDone = resolve;
+        self.onmessage({ data: msg });
+    });
+    return { runSync, sync, control, imgstate, sets, posts, meta };
 }
 
 test('a price-only sync keeps the downloaded images', async () => {
@@ -106,6 +122,17 @@ test('sets a cancelled new-key sync never reached count as missing', async () =>
     await w.runSync(SYNC);
     // The one set in flight landed, and the two stored ones it left are unreadable
     expect(w.meta.missingSets).toBe(2);
+});
+
+// A set the cancelled run left behind has to come back on its own.
+test('the sync after a cancelled new-key sync fetches the rest', async () => {
+    const w = loadWorker({ aesKey: null, cancelAtFirstPrice: true, extraSets: { MH2: 'v1' } });
+    await w.sync(SYNC);
+    expect(Object.keys(w.sets)).toEqual(['DMU']);
+    w.control.cancelAtFirstPrice = false;
+    await w.sync(SYNC);
+    expect(Object.keys(w.sets).sort()).toEqual(['DMU', 'MH2', 'NEO']);
+    expect(w.meta.missingSets).toBe(0);
 });
 
 test('only the selected editions can be missing', async () => {

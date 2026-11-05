@@ -46,18 +46,6 @@
             !!window.indexedDB && !!(window.crypto && window.crypto.subtle);
     }
 
-    // Generate the non-extractable AES-GCM key once, at opt-in.
-    function ensureKey() {
-        return OfflineDB.getMeta('aesKey').then(function (key) {
-            if (key) return key;
-            return crypto.subtle.generateKey(
-                { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
-            ).then(function (k) {
-                return OfflineDB.setMeta('aesKey', k).then(function () { return k; });
-            });
-        });
-    }
-
     // Mirror the roaming csv prefs into IDB meta arrays for the worker.
     function reconcileSelections() {
         var ops = Object.keys(SEL_PREFS).map(function (prefKey) {
@@ -135,7 +123,7 @@
             return navigator.serviceWorker.register('/sw.js');
         }).then(function () {
             registered = true;
-            return ensureKey();
+            return OfflineDB.ensureKey();
         }).then(function () {
             writePref(PREF, 'true');
             return reconcileSelections();
@@ -534,7 +522,7 @@
     if (available() && enabled() && supported()) {
         // Re-register heals a browser-evicted SW; no-op when installed.
         navigator.serviceWorker.register('/sw.js')
-            .then(function () { return ensureKey(); })
+            .then(function () { return OfflineDB.ensureKey(); })
             .then(function () { return reconcileSelections(); })
             .then(refreshStatus)
             .then(function () {
