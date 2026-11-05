@@ -32,7 +32,7 @@ function makeEl(attrs = {}) {
 
 // Runs the page's real scripts against stand-ins for the document, the database
 // and the query. Each query answers with the rows queries[q] names.
-function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queries = {}, broken = false } = {}) {
+function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queries = {}, broken = false, gates = {} } = {}) {
     const els = Object.fromEntries(ids.map((id) => [id, makeEl()]));
     const docListeners = {};
     const winListeners = {};
@@ -66,6 +66,7 @@ function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queri
         parse: (q) => { log.parsed.push(q); return { q }; },
         execute: async (parsed) => {
             log.executed.push(parsed);
+            await gates[parsed.q];
             return { results: (queries[parsed.q] || []).slice(), unsupported: [], truncated: false };
         },
         sortResults: (results, mode, reverse) => log.sorted.push({ mode, reverse, n: results.length }),
@@ -163,6 +164,61 @@ for (const [file, ids, box, results] of [
         expect(page.log.pushed).toEqual([]);
     });
 
+    // gate holds a search open until the test lets it finish.
+    const gate = () => {
+        let open, fail;
+        const promise = new Promise((resolve, reject) => { open = resolve; fail = reject; });
+        return { promise, open, fail };
+    };
+
+    test(file + ' draws the newest search, whichever finishes first', async () => {
+        const slow = gate();
+        const queries = { slow: [row('a'), row('b')], fast: [row('c')] };
+        const page = await started(file, { ids, queries, gates: { slow: slow.promise } });
+        page.log.mounted.onSubmit('slow');
+        await page.settle();
+        page.log.mounted.onSubmit('fast');
+        await page.settle();
+        expect(page.els[results].innerHTML).toBe('drawn 1');
+        slow.open();
+        await page.settle();
+        expect(page.els[results].innerHTML).toBe('drawn 1');
+        expect(page.log.rendered).toHaveLength(1);
+    });
+
+    test(file + ' keeps a cleared page clear when an older search finishes', async () => {
+        const slow = gate();
+        const page = await started(file, { ids, queries: { slow: [row('a')] }, gates: { slow: slow.promise } });
+        page.log.mounted.onSubmit('slow');
+        await page.settle();
+        page.log.mounted.onSubmit('');
+        slow.open();
+        await page.settle();
+        expect(page.els[results].innerHTML).toBe('');
+        expect(page.log.rendered).toHaveLength(0);
+    });
+
+    test(file + ' ignores an older search that fails, but not the newest', async () => {
+        const old = gate();
+        const newest = gate();
+        const queries = { fine: [row('a')] };
+        const page = await started(file, { ids, queries, gates: { old: old.promise, newest: newest.promise } });
+        page.log.mounted.onSubmit('old');
+        await page.settle();
+        page.log.mounted.onSubmit('fine');
+        await page.settle();
+        old.fail(new Error('unreadable'));
+        await page.settle();
+        expect(page.els[results].innerHTML).toBe('drawn 1');
+        expect(page.log.errors).toHaveLength(0);
+
+        page.log.mounted.onSubmit('newest');
+        await page.settle();
+        newest.fail(new Error('unreadable'));
+        await page.settle();
+        expect(page.els[results].innerHTML).toContain('Offline data is not ready');
+    });
+
     test(file + ' says so when the data cannot be read', async () => {
         const page = await started(file, { ids, broken: true });
         expect(page.els[results].innerHTML).toContain('Offline data is not ready');
@@ -183,6 +239,23 @@ test('desktop counts results, naming how many are shown', async () => {
     expect(await count('one')).toBe('1 result found');
     expect(await count('many')).toBe('150 results found (100 shown)');
     expect(await count('')).toBe('');
+});
+
+test('desktop sort pills keep the answer on screen while a newer search runs', async () => {
+    const slow = new Promise(() => {});
+    const pill = makeEl({ 'data-sort': 'alpha' });
+    const page = loadPage('offline-page-desktop.js', {
+        ids: DESKTOP, pills: [pill], queries: { x: [{ uuid: 'a' }] }, gates: { slow },
+    });
+    page.load();
+    await page.settle();
+    page.log.mounted.onSubmit('x');
+    await page.settle();
+    page.log.mounted.onSubmit('slow');
+    await page.settle();
+    pill.fire('click');
+    expect(page.els['offline-results'].innerHTML).toBe('drawn 1');
+    expect(page.log.sorted.at(-1)).toMatchObject({ mode: 'alpha', n: 1 });
 });
 
 test('desktop sort pills sort the last answer, reversing on a second click', async () => {
