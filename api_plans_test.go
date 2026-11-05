@@ -256,6 +256,8 @@ type scraperStub struct {
 	vendors      []string
 	sealed       []string
 	names        map[string]string
+	country      map[string]string
+	metadata     []string
 	overrides    map[string]string
 	retailBlock  []string
 	buylistBlock []string
@@ -276,7 +278,13 @@ func stubScrapers(t *testing.T, s scraperStub) {
 		if !ok {
 			name = sh
 		}
-		return mtgban.ScraperInfo{Shorthand: sh, Name: name, SealedMode: slices.Contains(s.sealed, sh)}
+		return mtgban.ScraperInfo{
+			Shorthand:    sh,
+			Name:         name,
+			SealedMode:   slices.Contains(s.sealed, sh),
+			CountryFlag:  s.country[sh],
+			MetadataOnly: slices.Contains(s.metadata, sh),
+		}
 	}
 	sellers := []mtgban.Seller{}
 	for _, sh := range s.sellers {
@@ -300,7 +308,7 @@ var magicStub = scraperStub{
 		"tcg_syplist":        {"buylist": {"SYP"}},
 		"cardkingdom":        {"retail": {"CK"}, "buylist": {"CKBLLast"}},
 		"cardkingdom_graded": {"retail": {"CKGraded"}},
-		"cardkingdom_sealed": {"retail": {"CKSealed"}},
+		"cardkingdom_sealed": {"retail": {"CKSealed", "CKBox"}},
 		"abugames":           {"retail": {"ABU"}, "buylist": {"ABUCredit"}},
 		"starcitygames":      {"retail": {"SCG"}, "buylist": {"SCGBL"}},
 		"strikezone":         {"retail": {"SZ"}},
@@ -308,10 +316,12 @@ var magicStub = scraperStub{
 		"magiccorner":        {"retail": {"MC"}},
 		"sealed_ev":          {"retail": {"CKEV"}},
 		"coolstuffinc":       {"retail": {"CSI"}},
+		"cardmarket":         {"retail": {"MKM", "MKMPS", "MKMLow", "MKMTrend"}},
+		"tcg_sealed":         {"retail": {"TCGSealed"}},
 	},
-	sellers: []string{"TCGLow", "TCGDirectLow", "TCGMarket", "CK", "CKGraded", "ABU", "SCG", "SZ", "MP", "MC", "CKSealed", "CKEV", "GN"},
+	sellers: []string{"TCGLow", "TCGDirectLow", "TCGMarket", "CK", "CKGraded", "ABU", "SCG", "SZ", "MP", "MC", "CKSealed", "CKEV", "GN", "MKM", "MKMPS", "MKMLow", "MKMTrend", "TCGSealed", "CKBox"},
 	vendors: []string{"SYP", "CKBLLast", "ABUCredit", "SCGBL"},
-	sealed:  []string{"CKEV"},
+	sealed:  []string{"CKEV", "CKSealed", "TCGSealed", "CKBox"},
 	names: map[string]string{
 		"TCGLow": "TCG Low", "TCGDirectLow": "TCG Direct Low", "TCGMarket": "TCG Market", "SYP": "TCG SYP List",
 		"CK": "Card Kingdom", "CKBLLast": "Card Kingdom", "CKGraded": "card kingdom Graded",
@@ -320,7 +330,11 @@ var magicStub = scraperStub{
 		"SCG": "StarCityGames", "SCGBL": "StarCityGames",
 		"SZ": "Strike Zone", "MP": "mana pool",
 		"MC": "Magic Corner", "GN": "Game Nerdz",
+		"MKM": "Cardmarket", "MKMPS": "Cardmarket Powersellers", "MKMLow": "MKM Low", "MKMTrend": "MKM Trend",
+		"TCGSealed": "TCG Sealed", "CKBox": "Card Kingdom Box",
 	},
+	country:  map[string]string{"MKM": "EU", "MKMPS": "EU", "MKMLow": "EU", "MKMTrend": "EU", "MC": "IT"},
+	metadata: []string{"MKMLow", "MKMTrend"},
 	// The second entry renames a family, not a scraper.
 	overrides:    map[string]string{"StarCityGames": "Star City Games", "ABU": "ABU Games"},
 	retailBlock:  []string{"TCGDirectLow", "MC"},
@@ -329,23 +343,46 @@ var magicStub = scraperStub{
 
 func TestStoreFamiliesFromTheServedScrapers(t *testing.T) {
 	stubScrapers(t, magicStub)
-	implied, selectable := storeFamilies(currentPrices())
+	implied, selectable, sealed := storeFamilies(currentPrices())
 	// The tcg_* keys merge into one family, named by the price list.
-	if len(implied) != 1 || implied[0].Key != "tcg" || implied[0].Name != "TCGplayer" || !slices.Equal(implied[0].Shorthands, []string{"SYP", "TCGLow", "TCGMarket"}) {
+	if len(implied) != 1 || implied[0].Key != "tcg" || implied[0].Name != "TCGplayer" || !slices.Equal(implied[0].Shorthands, []string{"SYP", "TCGLow", "TCGMarket"}) || !implied[0].Base {
 		t.Errorf("implied %+v", implied)
 	}
 	want := []StoreFamily{
-		{Key: "abugames", Name: "ABU Games", Shorthands: []string{"ABU", "ABUCredit"}},
-		{Key: "cardkingdom", Name: "Card Kingdom", Shorthands: []string{"CK", "CKBLLast", "CKGraded"}},
-		{Key: "manapool", Name: "mana pool", Shorthands: []string{"MP"}},
-		{Key: "starcitygames", Name: "Star City Games", Shorthands: []string{"SCG"}},
-		{Key: "strikezone", Name: "Strike Zone", Shorthands: []string{"SZ"}},
+		{Key: "abugames", Name: "ABU Games", Shorthands: []string{"ABU", "ABUCredit"}, Base: true},
+		{Key: "cardkingdom", Name: "Card Kingdom", Shorthands: []string{"CK", "CKBLLast", "CKGraded"}, Base: true},
+		// Its two indexes are metadata-only, so Base Access covers part of it.
+		{Key: "cardmarket", Name: "Cardmarket", Shorthands: []string{"MKM", "MKMLow", "MKMPS", "MKMTrend"}, Base: true},
+		{Key: "manapool", Name: "mana pool", Shorthands: []string{"MP"}, Base: true},
+		{Key: "starcitygames", Name: "Star City Games", Shorthands: []string{"SCG"}, Base: true},
+		{Key: "strikezone", Name: "Strike Zone", Shorthands: []string{"SZ"}, Base: true},
 	}
-	if !slices.EqualFunc(selectable, want, func(a, b StoreFamily) bool {
-		return a.Key == b.Key && a.Name == b.Name && slices.Equal(a.Shorthands, b.Shorthands)
-	}) {
+	if !slices.EqualFunc(selectable, want, sameFamily) {
 		t.Errorf("selectable %+v, want %+v", selectable, want)
 	}
+	// The sealed_ev key is the EV estimate, not a store, so no family is keyed sealed.
+	wantSealed := []StoreFamily{
+		{Key: "tcg", Name: "TCGplayer", Shorthands: []string{"TCGSealed"}},
+		{Key: "cardkingdom", Name: "Card Kingdom", Shorthands: []string{"CKBox", "CKSealed"}},
+	}
+	if !slices.EqualFunc(sealed, wantSealed, sameFamily) {
+		t.Errorf("sealed %+v, want %+v", sealed, wantSealed)
+	}
+
+	// A served foreign store is selectable but outside Base Access.
+	stub := magicStub
+	stub.retailBlock = []string{"TCGDirectLow"}
+	stubScrapers(t, stub)
+	_, selectable, _ = storeFamilies(currentPrices())
+	i := slices.IndexFunc(selectable, func(f StoreFamily) bool { return f.Key == "magiccorner" })
+	if i < 0 || selectable[i].Base {
+		t.Errorf("magiccorner %+v", selectable)
+	}
+}
+
+// sameFamily compares every field of two families.
+func sameFamily(a, b StoreFamily) bool {
+	return a.Key == b.Key && a.Name == b.Name && slices.Equal(a.Shorthands, b.Shorthands) && a.Base == b.Base
 }
 
 func TestFamilyName(t *testing.T) {
@@ -360,6 +397,10 @@ func TestFamilyName(t *testing.T) {
 		{[]string{"Card Kingdom", "Cardmarket"}, "Cardmarket"},
 		{[]string{"Solo"}, "Solo"},
 		{[]string{"Foo Bar", "Baz Qux Long"}, "Foo Bar"},
+		{[]string{"Cardmarket", "Cardmarket Powersellers", "MKM Low", "MKM Trend"}, "Cardmarket"},
+		{[]string{"MKM Low", "MKM Trend", "Cardmarket Powersellers", "Cardmarket"}, "Cardmarket"},
+		{[]string{"A", "A One", "B", "B Two"}, "A"},
+		{[]string{"B", "B One", "B Two", "A", "A One"}, "B"},
 		{nil, ""},
 	}
 	for _, c := range cases {
@@ -371,9 +412,9 @@ func TestFamilyName(t *testing.T) {
 
 func TestStoreFamiliesEmptyWithNothingServed(t *testing.T) {
 	stubScrapers(t, scraperStub{config: magicStub.config})
-	implied, selectable := storeFamilies(currentPrices())
-	if len(implied) != 0 || len(selectable) != 0 {
-		t.Errorf("implied %+v selectable %+v", implied, selectable)
+	implied, selectable, sealed := storeFamilies(currentPrices())
+	if len(implied) != 0 || len(selectable) != 0 || len(sealed) != 0 {
+		t.Errorf("implied %+v selectable %+v sealed %+v", implied, selectable, sealed)
 	}
 }
 
@@ -482,6 +523,7 @@ func TestAPIStoresServesTheFamilies(t *testing.T) {
 		Game    string        `json:"game"`
 		Implied []StoreFamily `json:"implied"`
 		Stores  []StoreFamily `json:"stores"`
+		Sealed  []StoreFamily `json:"sealed"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &doc); err != nil {
 		t.Fatal(err)
@@ -492,15 +534,22 @@ func TestAPIStoresServesTheFamilies(t *testing.T) {
 	if len(doc.Implied) != 1 || doc.Implied[0].Key != "tcg" || doc.Implied[0].Name != "TCGplayer" || !slices.Equal(doc.Implied[0].Shorthands, []string{"SYP", "TCGLow", "TCGMarket"}) {
 		t.Errorf("implied %+v", doc.Implied)
 	}
-	if len(doc.Stores) != 5 || doc.Stores[0].Name != "ABU Games" || doc.Stores[1].Name != "Card Kingdom" || doc.Stores[2].Name != "mana pool" || doc.Stores[3].Name != "Star City Games" {
+	if len(doc.Stores) != 6 || doc.Stores[0].Name != "ABU Games" || doc.Stores[1].Name != "Card Kingdom" || doc.Stores[2].Name != "Cardmarket" || doc.Stores[3].Name != "mana pool" || doc.Stores[4].Name != "Star City Games" {
 		t.Errorf("stores %+v", doc.Stores)
 	}
-	for _, f := range append(doc.Implied, doc.Stores...) {
+	wantSealed := []StoreFamily{
+		{Key: "tcg", Name: "TCGplayer", Shorthands: []string{"TCGSealed"}},
+		{Key: "cardkingdom", Name: "Card Kingdom", Shorthands: []string{"CKBox", "CKSealed"}},
+	}
+	if !slices.EqualFunc(doc.Sealed, wantSealed, sameFamily) {
+		t.Errorf("sealed %+v, want %+v", doc.Sealed, wantSealed)
+	}
+	for _, f := range append(append(doc.Implied, doc.Stores...), doc.Sealed...) {
 		if f.Key != strings.ToLower(f.Key) {
 			t.Errorf("key %q is not lowercase", f.Key)
 		}
 	}
-	if !strings.Contains(rec.Body.String(), `{"key":"cardkingdom","name":"Card Kingdom","shorthands":["CK","CKBLLast","CKGraded"]}`) {
+	if !strings.Contains(rec.Body.String(), `{"key":"cardkingdom","name":"Card Kingdom","shorthands":["CK","CKBLLast","CKGraded"],"base":true}`) {
 		t.Errorf("body %s", rec.Body.String())
 	}
 }
@@ -510,7 +559,7 @@ func TestAPIStoresEmptyListsAreArrays(t *testing.T) {
 	stubScrapers(t, scraperStub{sellers: []string{"GN"}, vendors: []string{"GN"}})
 	rec := httptest.NewRecorder()
 	testSite.APIStores(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
-	if body := rec.Body.String(); !strings.Contains(body, `"implied":[]`) || !strings.Contains(body, `"stores":[]`) {
+	if body := rec.Body.String(); !strings.Contains(body, `"implied":[]`) || !strings.Contains(body, `"stores":[]`) || !strings.Contains(body, `"sealed":[]`) {
 		t.Errorf("body %s", body)
 	}
 }

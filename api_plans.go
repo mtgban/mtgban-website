@@ -54,6 +54,8 @@ type APIPlansVars struct {
 	Stores []StoreFamily
 	// ImpliedStores are the families every explicit package includes.
 	ImpliedStores []StoreFamily
+	// SealedStores are the families selling sealed product, the implied one first.
+	SealedStores []StoreFamily
 	// WantedStores are the family keys a change request names, checked on arrival.
 	WantedStores []string
 	// PaidStores are keys a change request names that this site no longer offers.
@@ -70,6 +72,8 @@ type StoreFamily struct {
 	Key        string   `json:"key"`
 	Name       string   `json:"name"`
 	Shorthands []string `json:"shorthands"`
+	// Base is true when Base Access covers at least one of the family's scrapers.
+	Base bool `json:"base"`
 }
 
 // APIPlanGame is one game checkbox in the configurator.
@@ -121,10 +125,12 @@ func (s *site) APIStores(w http.ResponseWriter, r *http.Request) {
 		Game    matcher.Game  `json:"game"`
 		Implied []StoreFamily `json:"implied"`
 		Stores  []StoreFamily `json:"stores"`
-	}{Game: Config().Game, Implied: []StoreFamily{}, Stores: []StoreFamily{}}
-	implied, stores := storeFamilies(p)
+		Sealed  []StoreFamily `json:"sealed"`
+	}{Game: Config().Game, Implied: []StoreFamily{}, Stores: []StoreFamily{}, Sealed: []StoreFamily{}}
+	implied, stores, sealed := storeFamilies(p)
 	out.Implied = append(out.Implied, implied...)
 	out.Stores = append(out.Stores, stores...)
+	out.Sealed = append(out.Sealed, sealed...)
 	w.Header().Set("Cache-Control", "public, max-age=300")
 	if err := json.NewEncoder(w).Encode(out); err != nil {
 		log.Println("api-plans stores.json:", err)
@@ -165,7 +171,7 @@ func apiPlansVars(p *prices, r *http.Request, sig string) *APIPlansVars {
 	if Config().APIGateway.HistoryOnSale {
 		v.HistoryCards = history
 	}
-	v.ImpliedStores, v.Stores = storeFamilies(p)
+	v.ImpliedStores, v.Stores, v.SealedStores = storeFamilies(p)
 	if change {
 		v.WantedStores = wantedStores(p, r.URL.Query()["stores"])
 		v.PaidStores = paidStores(v.WantedStores, v.Stores)
@@ -214,10 +220,7 @@ func familyKeys(p *prices) map[string]string {
 	keyOf := map[string]string{}
 	config := p.scrapers.byStore
 	for _, key := range slices.Sorted(maps.Keys(config)) {
-		if strings.HasSuffix(key, "_sealed") {
-			continue
-		}
-		// tcg_index and tcg_market are both the tcg family.
+		// tcg_index and tcg_market are both the tcg family, and tcg_sealed its sealed one.
 		family, _, _ := strings.Cut(strings.ToLower(key), "_")
 		for _, list := range config[key] {
 			for _, sh := range list {
@@ -230,23 +233,33 @@ func familyKeys(p *prices) map[string]string {
 	return keyOf
 }
 
-// storeFamilies groups the served scrapers by config key prefix, minus what the search blocklists hide.
-func storeFamilies(p *prices) (implied, selectable []StoreFamily) {
+// storeFamilies groups the served scrapers by config key prefix, minus what
+// the search blocklists hide, into singles and sealed families.
+func storeFamilies(p *prices) (implied, selectable, sealed []StoreFamily) {
 	keyOf := familyKeys(p)
-	var families []*StoreFamily
+	var singles, sealedFamilies []*StoreFamily
 	add := func(info mtgban.ScraperInfo, blocklist []string) {
 		shorthand := info.Shorthand
 		key, ok := keyOf[strings.ToLower(shorthand)]
-		if !ok || info.SealedMode || !storeEligible(shorthand, nil, blocklist) {
+		// The sealed_ev key is the EV estimate, not a store.
+		if !ok || key == "sealed" || !storeEligible(shorthand, nil, blocklist) {
 			return
 		}
-		i := slices.IndexFunc(families, func(f *StoreFamily) bool { return f.Key == key })
-		if i < 0 {
-			families = append(families, &StoreFamily{Key: key})
-			i = len(families) - 1
+		families := &singles
+		if info.SealedMode {
+			families = &sealedFamilies
 		}
-		if !slices.Contains(families[i].Shorthands, shorthand) {
-			families[i].Shorthands = append(families[i].Shorthands, shorthand)
+		i := slices.IndexFunc(*families, func(f *StoreFamily) bool { return f.Key == key })
+		if i < 0 {
+			*families = append(*families, &StoreFamily{Key: key})
+			i = len(*families) - 1
+		}
+		f := (*families)[i]
+		if !slices.Contains(f.Shorthands, shorthand) {
+			f.Shorthands = append(f.Shorthands, shorthand)
+		}
+		if !info.SealedMode && baseAccessStoreEligible(info) {
+			f.Base = true
 		}
 	}
 	for _, seller := range p.sellers {
@@ -255,33 +268,64 @@ func storeFamilies(p *prices) (implied, selectable []StoreFamily) {
 	for _, vendor := range p.vendors {
 		add(vendor.Info(), Config().Stores.SearchBuylistBlockList)
 	}
-	for _, f := range families {
+	for _, f := range slices.Concat(singles, sealedFamilies) {
 		slices.Sort(f.Shorthands)
-		if f.Key == apiProducts.Implied.Key {
-			f.Name = apiProducts.Implied.Name
-			implied = append(implied, *f)
-			continue
-		}
-		names := make([]string, 0, len(f.Shorthands))
-		for _, sh := range f.Shorthands {
-			if name := p.scraperName(sh); name != "" {
-				names = append(names, name)
-			}
-		}
-		name := familyName(names)
-		if override, ok := Config().ScraperConfig.NameOverride[name]; ok {
-			name = override
-		}
-		f.Name = cmp.Or(name, f.Key)
-		selectable = append(selectable, *f)
 	}
-	slices.SortFunc(selectable, func(a, b StoreFamily) int {
-		return cmp.Or(strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), strings.Compare(a.Key, b.Key))
-	})
-	return implied, selectable
+	for _, f := range singles {
+		f.Name = p.familyDisplayName(f)
+		if f.Key == apiProducts.Implied.Key {
+			implied = append(implied, *f)
+		} else {
+			selectable = append(selectable, *f)
+		}
+	}
+	for _, f := range sealedFamilies {
+		// A sealed family takes its singles family's name.
+		if i := slices.IndexFunc(singles, func(s *StoreFamily) bool { return s.Key == f.Key }); i >= 0 {
+			f.Name = singles[i].Name
+		} else {
+			f.Name = p.familyDisplayName(f)
+		}
+		sealed = append(sealed, *f)
+	}
+	slices.SortFunc(selectable, compareFamilies)
+	slices.SortFunc(sealed, compareFamilies)
+	return implied, selectable, sealed
 }
 
-// familyName is the leading words every name shares, ignoring case, else the shortest name.
+// familyDisplayName is the price list's name for the implied family, else
+// one from its scrapers' names.
+func (p *prices) familyDisplayName(f *StoreFamily) string {
+	if f.Key == apiProducts.Implied.Key {
+		return apiProducts.Implied.Name
+	}
+	names := make([]string, 0, len(f.Shorthands))
+	for _, sh := range f.Shorthands {
+		if name := p.scraperName(sh); name != "" {
+			names = append(names, name)
+		}
+	}
+	name := familyName(names)
+	if override, ok := Config().ScraperConfig.NameOverride[name]; ok {
+		name = override
+	}
+	return cmp.Or(name, f.Key)
+}
+
+// compareFamilies orders families by name, the implied family first.
+func compareFamilies(a, b StoreFamily) int {
+	implied := apiProducts.Implied.Key
+	if (a.Key == implied) != (b.Key == implied) {
+		if a.Key == implied {
+			return -1
+		}
+		return 1
+	}
+	return cmp.Or(strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), strings.Compare(a.Key, b.Key))
+}
+
+// familyName is the leading words every name shares, ignoring case, else the
+// name most others extend, else the shortest name.
 func familyName(names []string) string {
 	if len(names) == 0 {
 		return ""
@@ -299,10 +343,36 @@ func familyName(names []string) string {
 		}
 		shared = i
 	}
-	if shared == 0 {
-		return shortest
+	if shared > 0 {
+		return strings.Join(words[:shared], " ")
 	}
-	return strings.Join(words[:shared], " ")
+	best, bestCount := "", 0
+	for _, n := range names {
+		count := 0
+		for _, other := range names {
+			if extendsName(other, n) {
+				count++
+			}
+		}
+		if count > 0 && (bestCount == 0 || cmp.Or(bestCount-count, len(n)-len(best), strings.Compare(n, best)) < 0) {
+			best, bestCount = n, count
+		}
+	}
+	return cmp.Or(best, shortest)
+}
+
+// extendsName reports whether name starts with every word of prefix, ignoring case, and has more.
+func extendsName(name, prefix string) bool {
+	words, lead := strings.Fields(name), strings.Fields(prefix)
+	if len(words) <= len(lead) {
+		return false
+	}
+	for i, w := range lead {
+		if !strings.EqualFold(words[i], w) {
+			return false
+		}
+	}
+	return true
 }
 
 // wantedStores resolves a change request's stores query to family keys; the implied family is left out.

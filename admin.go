@@ -218,7 +218,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 			pageVars.DemoKeyPackages = append(pageVars.DemoKeyPackages, pkg)
 		}
 	}
-	_, pageVars.DemoKeyStores = storeFamilies(p)
+	_, pageVars.DemoKeyStores, _ = storeFamilies(p)
 	pageVars.DemoKeyImplied = apiProducts.Implied.Name
 	pageVars.Uptime = uptime()
 	pageVars.DiskStatus = disk()
@@ -1427,7 +1427,7 @@ func demoKeyScope(p *prices, pkgKey, family string) (scope, modes string, err er
 		return pkg.StoreScope, modes, nil
 	}
 
-	implied, stores := storeFamilies(p)
+	implied, stores, _ := storeFamilies(p)
 	if len(implied) == 0 {
 		return "", "", fmt.Errorf("implied store %q not served", apiProducts.Implied.Name)
 	}
