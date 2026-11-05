@@ -524,10 +524,10 @@
                                 {{end}}
                             </td>
                             <td class="m">
-                                $ {{printf "%.2f" .Difference}}
+                                $ {{printf "%.2f" (shown .Difference)}}
                             </td>
                             <td class="m {{if gt .Spread 0.0}}arb-spread-up{{else}}arb-spread-down{{end}}">
-                                {{printf "%.2f" .Spread}} %
+                                {{printf "%.2f" (shown .Spread)}} %
                             </td>
                             {{if not $.GlobalMode}}
                                 <td class="m">

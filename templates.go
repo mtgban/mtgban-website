@@ -589,6 +589,7 @@ var funcMap = template.FuncMap{
 	"palette_sleepers_targets":  sync.OnceValue(palette.SleepersTargetsJSON),
 	"palette_arbit_targets":     sync.OnceValue(palette.ArbitTargetsJSON),
 	"usd":                       formatUSD,
+	"shown":                     asShown,
 	"plural":                    plural,
 	"api_plans_json":            apiPlansJSON,
 	"plan_icon":                 planIcon,
