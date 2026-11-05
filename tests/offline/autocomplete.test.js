@@ -93,6 +93,14 @@ test("folding sets case, diacritics and punctuation aside", () => {
     expect(fold("Ursula - Whisper of the Sea")).toBe("URSULA WHISPER OF THE SEA");
 });
 
+// NFD splits a kana's dakuten (U+3099) off outside the Latin accent range;
+// the fold drops it with every other mark, as the offline index key does.
+test("a kana's voicing mark folds away with its letter", () => {
+    expect(fold("精霊龍、ウギン")).toBe("精霊龍ウキン");
+    expect(fold("Lim-Dûl's Vault")).toBe("LIMDULS VAULT");
+    expect(fold("Dríadas de Shanodín")).toBe("DRIADAS DE SHANODIN");
+});
+
 // 357 of the names carry no ASCII letter at all. Folding to A-Z alone would
 // leave each of them folding to nothing, findable by nobody.
 test("a name in another script is found by typing it", () => {

@@ -76,7 +76,7 @@ var __acSkippablePrefixes = ["The ", "Secret Lair Drop "];
 function __acFold(name) {
     return name
         .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
+        .replace(/\p{M}/gu, "")
         .replace(/[^\p{L}\p{N} ]/gu, "")
         .replace(/ {2,}/g, " ")
         .toUpperCase();
@@ -101,7 +101,7 @@ var __acSkippableSquashed = __acSkippableFolded.map(__acSquash);
 function __acCommaFold(text) {
     return text
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\p{M}/gu, "")
         .replace(/[^\p{L}\p{N},]/gu, "")
         .toUpperCase();
 }

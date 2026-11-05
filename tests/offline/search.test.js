@@ -382,3 +382,28 @@ test('switching the setting takes effect on the next keystroke, both ways', asyn
     expect(m.log.typed).toEqual(['bose']);
     expect(m.parent.children.length).toBe(1);
 });
+
+// The index the sync worker builds, keyed by the real normName, finds a name
+// in any script by the prefix typed.
+test('finds a Japanese or Cyrillic name by prefix', async () => {
+    require('../../js/offline/offline-util.js');
+    const realNorm = globalThis.OfflineUtil.normName;
+    const cards = {
+        'u-jp': { uuid: 'u-jp', n: '精霊龍、ウギン', set: 'FRF' },
+        'u-ru': { uuid: 'u-ru', n: 'Шивский дракон', set: 'M10' },
+        'u-en': { uuid: 'u-en', n: 'Shivan Dragon', set: 'M10' },
+    };
+    const names = Object.values(cards)
+        .map((c) => ({ key: realNorm(c.n), uuids: [c.uuid] }))
+        .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+    const d = deps();
+    d.normName = realNorm;
+    d.allNames = async function () { return names; };
+    d.getCard = async function (u) { return cards[u]; };
+    const found = async (typed) => (await OfflineSearch.suggest(typed, d)).map(r => r.name);
+    expect(await found('精霊龍')).toEqual(['精霊龍、ウギン']);
+    expect(await found('精霊龍ウギン')).toEqual(['精霊龍、ウギン']);
+    expect(await found('Шивск')).toEqual(['Шивский дракон']);
+    expect(await found('шивский др')).toEqual(['Шивский дракон']);
+    expect(await found('shivan')).toEqual(['Shivan Dragon']);
+});

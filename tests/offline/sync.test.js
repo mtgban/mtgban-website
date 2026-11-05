@@ -4,11 +4,18 @@ import { join } from 'path';
 
 const DIR = join(import.meta.dir, '..', '..', 'js', 'offline');
 
+// The real normName and its fold version, which the stored index is stamped with.
+globalThis.self = globalThis.self || globalThis;
+require('../../js/offline/offline-util.js');
+const { normName, NAME_FOLD } = globalThis.OfflineUtil;
+
 // Loads the sync worker against an in-memory database holding two synced
 // sets and one edition of downloaded images; prices fail when asked to.
-function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAtFirstPrice = false } = {}) {
+function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAtFirstPrice = false,
+    catalogVersion = 'c1:' + NAME_FOLD, catalog = null } = {}) {
     const control = { cancelAtFirstPrice, onDone: null };
-    const meta = { aesKey, storesKey: '', catalogVersion: 'c1' };
+    const meta = { aesKey, storesKey: '', catalogVersion };
+    const index = {};
     const imgstate = { NEO: { code: 'NEO', keys: ['a'], done: true } };
     const sets = { NEO: { code: 'NEO', version: 'v1', blob: 'neo' }, DMU: { code: 'DMU', version: 'v1', blob: 'dmu' } };
     const posts = [];
@@ -28,6 +35,8 @@ function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAt
         getAllRows: async (store) => (store === 'imgstate' ? Object.values(imgstate) : []),
         putRow: async () => {},
         deleteRow: async (store, code) => { delete (store === 'imgstate' ? imgstate : sets)[code]; },
+        clearCatalog: async () => { Object.keys(index).forEach((k) => { delete index[k]; }); },
+        putCards: async (batch) => { batch.names.forEach((row) => { index[row.key] = row.uuids; }); },
     };
     const self = {
         postMessage: (m) => {
@@ -36,11 +45,12 @@ function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAt
         },
         caches: { open: async () => ({ delete: async () => true }) },
         OfflineDB: db,
-        OfflineUtil: { gzipCompress: async (b) => b },
+        OfflineUtil: { gzipCompress: async (b) => b, normName, NAME_FOLD },
     };
     const manifest = { catalog: 'c1', sets: { NEO: 'v1', DMU: 'v1', ...extraSets }, images: {} };
     const fetch = async (url) => {
         if (url.includes('manifest')) return { ok: true, status: 200, json: async () => manifest };
+        if (url.includes('catalog')) return { ok: true, status: 200, json: async () => catalog };
         if (control.cancelAtFirstPrice) self.onmessage({ data: { type: 'cancel' } });
         if (pricesFail) throw new TypeError('Failed to fetch');
         return { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(4) };
@@ -58,7 +68,7 @@ function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAt
         control.onDone = resolve;
         self.onmessage({ data: msg });
     });
-    return { runSync, sync, control, imgstate, sets, posts, meta };
+    return { runSync, sync, control, imgstate, sets, posts, meta, index };
 }
 
 test('a price-only sync keeps the downloaded images', async () => {
@@ -139,4 +149,23 @@ test('only the selected editions can be missing', async () => {
     const w = loadWorker({ pricesFail: true, extraSets: { MH2: 'v1', ONE: 'v1' } });
     await w.runSync({ ...SYNC, editions: ['NEO', 'MH2'] });
     expect(w.meta.missingSets).toBe(1);
+});
+
+// An index stamped by an earlier normName is rebuilt though the catalog is
+// the same, so a name in another script becomes findable without a new one.
+test('an index from an earlier name fold is rebuilt', async () => {
+    const catalog = { version: 'c1', cards: {
+        'u-jp': { n: '精霊龍、ウギン', set: 'FRF' },
+        'u-ru': { n: 'Шивский дракон', set: 'M10' },
+    } };
+    const w = loadWorker({ catalogVersion: 'c1', catalog });
+    await w.runSync(SYNC);
+    expect(w.index).toEqual({ '精霊龍 ウキン': ['u-jp'], 'шивскии дракон': ['u-ru'] });
+    expect(w.meta.catalogVersion).toBe('c1:' + NAME_FOLD);
+});
+
+test('an index from this name fold is kept', async () => {
+    const w = loadWorker();
+    await w.runSync(SYNC);
+    expect(w.posts.some((m) => m.stage === 'catalog')).toBe(false);
 });

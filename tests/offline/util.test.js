@@ -24,3 +24,17 @@ test("empty and symbol-only inputs give empty string", () => {
   expect(normName("")).toBe("");
   expect(normName("///")).toBe("");
 });
+
+// Letters of any script stay, as the online fold (internal/suggest) keeps
+// them; a mark NFD splits off goes with its letter, not to a space.
+test("keeps letters of any script", () => {
+  expect(normName("精霊龍、ウギン")).toBe("精霊龍 ウキン");
+  expect(normName("Шивский дракон")).toBe("шивскии дракон");
+  expect(normName("Ἀθηνᾶ")).toBe("αθηνα");
+});
+
+test("Latin names fold as before", () => {
+  expect(normName("The Ur-Dragon")).toBe("the ur dragon");
+  expect(normName("Jace's Ire")).toBe("jace s ire");
+  expect(normName("Ratonhnhaké:ton")).toBe("ratonhnhake ton");
+});

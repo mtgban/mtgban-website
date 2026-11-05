@@ -4,11 +4,17 @@
     'use strict';
 
     // Exact normalization shared by the sync worker index build and offline-query.js.
+    // Letters and digits of any script, as the online fold (internal/suggest);
+    // marks go with their letter, so "ド" keys as "ト" rather than splitting.
     function normName(s) {
-        return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
-            .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
+        return s.normalize('NFD').replace(/\p{M}/gu, '')
+            .toLowerCase().replace(/[^\p{L}\p{N} ]+/gu, ' ')
             .replace(/\s+/g, ' ').trim();
     }
+
+    // The version of what normName makes of a name, stamped on the stored
+    // index: bump it with any change to normName's output.
+    var NAME_FOLD = 2;
 
     function gzipCompress(buf) {
         var stream = new Response(buf).body.pipeThrough(new CompressionStream('gzip'));
@@ -48,6 +54,7 @@
 
     self.OfflineUtil = {
         normName: normName,
+        NAME_FOLD: NAME_FOLD,
         gzipCompress: gzipCompress,
         gzipDecompress: gzipDecompress,
         loadSetPayload: loadSetPayload,

@@ -94,12 +94,12 @@ async function runSync(msg) {
 
         stage = 'catalog';
         var catalogVersion = await self.OfflineDB.getMeta('catalogVersion');
-        if (manifest.catalog && manifest.catalog !== catalogVersion) {
+        if (manifest.catalog && indexStamp(manifest.catalog) !== catalogVersion) {
             post({ type: 'progress', stage: 'catalog', done: 0, total: 1 });
             var catalog = await fetchChecked('/api/offline/catalog.json', 'catalog', { cache: 'no-cache' })
                 .then(function(r) { return r.json(); });
             await rebuildCatalog(catalog);
-            await self.OfflineDB.setMeta('catalogVersion', catalog.version);
+            await self.OfflineDB.setMeta('catalogVersion', indexStamp(catalog.version));
             post({ type: 'progress', stage: 'catalog', done: 1, total: 1 });
         }
 
@@ -213,6 +213,10 @@ async function syncSet(code, version, stores, key) {
     await self.OfflineDB.putSet({ code: code, version: version, iv: iv.buffer, blob: blob });
     return blob.byteLength;
 }
+
+// The catalogVersion stamp of an index built from catalog version v by this
+// normName, so a new fold rebuilds the index and readers rescan it.
+function indexStamp(v) { return v + ':' + self.OfflineUtil.NAME_FOLD; }
 
 // Swap the cards and names stores to a new catalog version.
 async function rebuildCatalog(catalog) {

@@ -103,7 +103,7 @@
         var q = query.toUpperCase();
         var L = query.length;
         if (name.substr(0, L).toUpperCase() === q) return true;
-        if (name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').substr(0, L).toUpperCase() === q) return true;
+        if (name.normalize('NFD').replace(/\p{M}/gu, '').substr(0, L).toUpperCase() === q) return true;
         if (name.replace(/^The /g, '').substr(0, L).toUpperCase() === q) return true;
         if (name.replace(/[^A-Za-z0-9 ]/g, '').substr(0, L).toUpperCase() === q) return true;
         return false;
