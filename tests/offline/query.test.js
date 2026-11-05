@@ -53,10 +53,10 @@ test('cns is read as the printed number', () => {
     expect(p('cns:1116jpn').unsupported).toEqual([]);
 });
 
-test('collector numbers with letters need cn:', () => {
+test('collector numbers with letters', () => {
     const r = p('cn:234a');
     expect(r.number).toMatchObject([{values: ['234a']}]);
-    expect(p('234a').names).toEqual(['234a']);
+    expect(p('234a')).toMatchObject({names: [], bareNumber: '234a', number: [{values: ['234a'], strict: true}]});
 });
 
 test('finish aliases normalize', () => {
@@ -778,4 +778,168 @@ test('a load from before the sync does not fill the cache after it', async () =>
     await first;
     expect(price(await search())).toBe(25);
     expect(loads).toBe(1);
+});
+
+// The shortcuts online's parseSearchOptionsDepth reads out of the free words.
+const SETS = {
+    SPM: {n: "Marvel's Spider-Man"}, NEO: {n: 'Kamigawa: Neon Dynasty'}, PLST: {n: 'The List'},
+    '10E': {n: 'Tenth Edition'}, '30A': {n: '30th Anniversary Edition'}, C16: {n: 'Commander 2016'},
+    SOI: {n: 'Shadows over Innistrad'}, SIR: {n: 'Shadows over Innistrad Remastered'},
+    INFO: {n: 'The Infinite Forbidden'},
+};
+function ps(q) { return Q.parse(q, [], magic, SETS); }
+
+test('a set code and a number are that printing', () => {
+    expect(ps('spm 66')).toMatchObject({names: [], set: ['SPM'], number: [{values: ['66'], strict: false}]});
+    expect(ps('SPM #066')).toMatchObject({names: [], set: ['SPM'], number: [{values: ['66'], strict: false}]});
+    expect(ps('plst c16-177')).toMatchObject({names: [], set: ['PLST'], number: [{values: ['c16-177'], strict: true}]});
+    expect(ps('neo 17a')).toMatchObject({names: [], set: ['NEO'], number: [{values: ['17a'], strict: true}]});
+    expect(ps('spm 66 f:foil')).toMatchObject({set: ['SPM'], finish: [['foil']]});
+});
+
+// A set filter's own list must not take the place of the catalog's sets.
+test('a negated set filter leaves the shortcuts working', () => {
+    for (const q of ['spm 66 -s:neo', '-s:neo spm 66']) {
+        expect(ps(q)).toMatchObject({names: [], set: ['SPM'], not: {set: ['NEO']}, number: [{values: ['66']}]});
+    }
+    expect(ps('info-en067 -s:neo')).toMatchObject({names: [], set: ['INFO'], not: {set: ['NEO']}});
+    expect(ps('shadows -s:neo').setsNamed).toEqual(['SIR', 'SOI']);
+});
+
+test('words that are not a set and a number stay a name', () => {
+    expect(ps('neo 10e')).toMatchObject({names: ['neo', '10e'], set: [], number: []});
+    expect(ps('neo may').names).toEqual(['neo', 'may']);
+    expect(ps('neo 1st').names).toEqual(['neo', '1st']);
+    expect(ps('sol ring').set).toEqual([]);
+    expect(ps('sol 66')).toMatchObject({names: ['sol'], set: [], number: [{values: ['66']}]});
+    // A quoted name is a name, and a set already asked for is not replaced
+    expect(ps('"spm" 66')).toMatchObject({names: ['spm'], set: []});
+    expect(ps('spm 66 s:neo')).toMatchObject({names: ['spm'], set: ['NEO']});
+    // 30A is both a set code and a number's shape: as the second word, a number
+    expect(ps('neo 30a')).toMatchObject({names: [], set: ['NEO'], number: [{values: ['30a']}]});
+});
+
+test('a number as Yu-Gi-Oh prints it is its set and ordinal', () => {
+    expect(ps('info-en067')).toMatchObject({names: [], set: ['INFO'], printed: 'info-en067', number: [{values: ['67', 'info-en067']}]});
+    expect(ps('info-067')).toMatchObject({set: ['INFO'], number: [{values: ['67', 'info-067']}]});
+    expect(ps('c16-177')).toMatchObject({set: ['C16'], number: [{values: ['177', 'c16-177']}]});
+    expect(ps('fire-ice')).toMatchObject({names: ['fire-ice'], set: []});
+});
+
+test('a number with its set total reads the number', () => {
+    expect(ps('222/236')).toMatchObject({names: [], number: [{values: ['222']}]});
+    expect(ps('pikachu 007/100')).toMatchObject({names: ['pikachu'], number: [{values: ['7']}]});
+    expect(ps('spm 66/100')).toMatchObject({names: [], set: ['SPM'], number: [{values: ['66']}]});
+    expect(ps('fire/ice')).toMatchObject({names: ['fire/ice'], number: []});
+});
+
+test('the last character asks for a finish', () => {
+    expect(ps('sol ring*')).toMatchObject({names: ['sol', 'ring'], finish: [['foil']], unsupported: []});
+    expect(ps('sol ring&').finish).toEqual([['nonfoil']]);
+    expect(ps('sol ring~').finish).toEqual([['etched']]);
+    expect(ps('sol ring`')).toMatchObject({finish: [['foil']], unsupported: ['`']});
+    expect(ps('spm 66*')).toMatchObject({set: ['SPM'], number: [{values: ['66']}], finish: [['foil']]});
+});
+
+test('the bot notation spells its filters', () => {
+    expect(ps('Lightning Bolt|LEA')).toMatchObject({names: ['Lightning', 'Bolt'], set: ['LEA']});
+    expect(ps('bolt|lea|161|foil')).toMatchObject({names: ['bolt'], set: ['LEA'], number: [{values: ['161']}], finish: [['foil']]});
+    expect(ps('bolt|lea|161|foil|NM').unsupported).toEqual(['cond:NM']);
+    // A field left empty asks for nothing
+    expect(ps('bolt|lea|')).toMatchObject({names: ['bolt'], set: ['LEA'], number: []});
+    expect(ps('bolt||161')).toMatchObject({names: ['bolt'], set: [], number: [{values: ['161']}]});
+});
+
+function numberEnv() {
+    const env = fakeEnv();
+    const all = [
+        {uuid: 's66', n: 'The Soul Stone', num: '66', set: 'SPM', r: 'rare'},
+        {uuid: 's67', n: 'Other', num: '67', set: 'SPM', r: 'rare'},
+        {uuid: 'n66', n: 'Another', num: '66', set: 'NEO', r: 'rare'},
+        {uuid: 'o66', n: 'Unsynced', num: '66', set: 'OLD', r: 'rare'},
+        {uuid: 'y1', n: 'Yugi', num: 'INFO-EN067', pn: '67', set: 'INFO', r: 'rare'},
+        {uuid: 'y2', n: 'Kaiba', num: 'INFO-E067', pn: '67', set: 'INFO', r: 'rare'},
+    ];
+    const byId = Object.fromEntries(all.map(c => [c.uuid, c]));
+    function bySet(code) {
+        const retail = {};
+        all.filter(c => c.set === code).forEach(c => { retail[c.uuid] = {CK: {regular: 1}}; });
+        return {retail, buylist: {}};
+    }
+    const payloads = {SPM: bySet('SPM'), NEO: bySet('NEO'), INFO: bySet('INFO')};
+    Object.assign(env, {
+        getCard: async (uuid) => byId[uuid] || null,
+        allCards: async () => all,
+        hasSet: async (code) => !!payloads[code],
+        loadSetPayload: async (code) => payloads[code],
+        lookupName: async () => [],
+        allNames: async () => [],
+    });
+    return env;
+}
+
+async function found(q, env) {
+    Q.resetCaches();
+    const out = await Q.execute(ps(q), env || numberEnv());
+    return {uuids: out.results.map(r => r.uuid).sort(), missing: out.missingSets};
+}
+
+test('a set and a number find the printing', async () => {
+    expect(await found('spm 66')).toEqual({uuids: ['s66'], missing: []});
+});
+
+test('a number alone reaches every synced set, with no notice for the others', async () => {
+    expect(await found('66')).toEqual({uuids: ['n66', 's66'], missing: []});
+    expect(await found('cn:66')).toEqual({uuids: ['n66', 's66'], missing: []});
+});
+
+test('cards in other sets do not use up the result limit', async () => {
+    const env = numberEnv();
+    const unsynced = Array.from({length: 10001}, (_, i) => ({uuid: 'old' + i, n: 'Old', num: '66', set: 'OLD', r: 'rare'}));
+    env.allCards = async () => unsynced.concat([{uuid: 's66', n: 'The Soul Stone', num: '66', set: 'SPM', r: 'rare'}]);
+    Q.resetCaches();
+    const out = await Q.execute(ps('66'), env);
+    expect(out.results.map(r => r.uuid)).toEqual(['s66']);
+    expect(out.truncated).toBe(false);
+});
+
+test('a card named the number stays a name', async () => {
+    const env = numberEnv();
+    env.lookupName = async (key) => key === '66' ? ['s67'] : [];
+    expect(await found('66', env)).toEqual({uuids: ['s67'], missing: []});
+});
+
+test('a number no card carries is read as a name', async () => {
+    const env = numberEnv();
+    env.allNames = async () => [{key: 'game of 2048', uuids: ['s67']}];
+    expect(await found('2048', env)).toEqual({uuids: ['s67'], missing: []});
+});
+
+test('a printed number a card carries is that number exactly', async () => {
+    expect(await found('info-en067')).toEqual({uuids: ['y1'], missing: []});
+    // One no card carries is the set and ordinal
+    expect(await found('info-067')).toEqual({uuids: ['y1', 'y2'], missing: []});
+});
+
+test('a number after a name is taken only when the whole name finds nothing', async () => {
+    const env = numberEnv();
+    env.allNames = async () => [{key: 'the soul stone', uuids: ['s66']}];
+    env.lookupName = async (key) => key === 'stone 66a' ? ['s67'] : [];
+    expect(ps('soul stone #66').trailingNumber).toMatchObject({values: ['66']});
+    expect(await found('soul stone #66', env)).toEqual({uuids: ['s66'], missing: []});
+    expect(await found('soul stone #67', env)).toEqual({uuids: [], missing: []});
+    expect(await found('stone 66a', env)).toEqual({uuids: ['s67'], missing: []});
+});
+
+test('a query no name answers falls back to the sets it names', async () => {
+    const env = numberEnv();
+    expect((await found('spm', env)).uuids).toEqual(['s66', 's67']);
+    expect((await found("marvel's spider-man", env)).uuids).toEqual(['s66', 's67']);
+    expect((await found('shadows', env)).missing).toEqual(['SIR', 'SOI']);
+    // A name found only in a set this device lacks does not hide the set
+    env.allNames = async () => [{key: 'wasp mantis spmx', uuids: ['o66']}];
+    expect(await found('spm', env)).toEqual({uuids: ['s66', 's67'], missing: []});
+    env.allNames = async () => [];
+    // A set the query narrowed to is not reinterpreted
+    expect(await found('shadows s:spm', env)).toEqual({uuids: [], missing: []});
 });

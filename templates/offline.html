@@ -101,6 +101,7 @@
             allNames: OfflineDB.allNames,
             getCard: OfflineDB.getCard,
             hasSet: OfflineDB.hasSet,
+            allCards: function () { return OfflineDB.getAllRows('cards'); },
             loadSetPayload: OfflineUtil.loadSetPayload
         };
         ctx = {
@@ -148,7 +149,7 @@
             paintCount();
             return;
         }
-        var parsed = OfflineQuery.parse(q, dicts.finishes, dicts.rarities);
+        var parsed = OfflineQuery.parse(q, dicts.finishes, dicts.rarities, dicts.sets);
         parsed.sealed = sealedMode;
         exec = await OfflineQuery.execute(parsed, env);
         paint();
