@@ -37,7 +37,8 @@ function toggleAllOptRows(masterCheckbox) {
 }
 
 // updateOptTotals recounts a store's cards, copies and total from the rows
-// still ticked, in its header and in its entry in the list above the stores.
+// still ticked, in its header and in its entry in the list above the stores,
+// and takes its share button away when none is left to share.
 function updateOptTotals(section) {
     var cards = 0;
     var qty = 0;
@@ -63,6 +64,8 @@ function updateOptTotals(section) {
         if (p[0]) p[0].textContent = stats;
         if (p[1]) p[1].textContent = sum;
     });
+    var share = section.querySelector('.opt-share-btn');
+    if (share) share.hidden = !cards;
 }
 
 // After the row's own handler has marked it, as wireLoadLists does
