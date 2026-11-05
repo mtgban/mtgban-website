@@ -176,8 +176,9 @@
     }
 
     // The name index as last scanned, and the catalog version it was read
-    // under. The sync rewrites the index only with a new catalog, stamped
-    // once the index is in, so a list read under the stamp still set is current.
+    // under. The sync rewrites the index only with a new catalog or name fold,
+    // stamped once the index is in, so a list read under the stamp still set
+    // is current.
     var names = null;
 
     // The name index in key order, backing the suggestion and search name

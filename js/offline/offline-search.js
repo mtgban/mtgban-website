@@ -45,7 +45,7 @@
 
     // Letters, digits and commas alone, as __acCommaFold (js/autocomplete.js).
     function commaFold(text) {
-        return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        return text.normalize('NFD').replace(/\p{M}/gu, '')
             .replace(/[^\p{L}\p{N},]/gu, '').toLowerCase();
     }
 
