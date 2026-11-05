@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"maps"
+	"math"
 	"net/http"
 	"slices"
 	"sort"
@@ -220,6 +221,10 @@ func historyPivot(cards []historyCard, rows map[int64]map[string]timeseries.Prov
 			for provider, price := range pp {
 				k, ok := keys[provider]
 				if !ok {
+					continue
+				}
+				// numeric holds NaN, which json.Marshal refuses and no reader can chart
+				if math.IsNaN(price) || math.IsInf(price, 0) {
 					continue
 				}
 				l := leaf{k.Section, card.ID, card.Finish, k.Key}
