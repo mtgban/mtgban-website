@@ -71,6 +71,12 @@
     border-radius: 50%;
     background: var(--orange, orange);
 }
+/* A warning takes a line of its own, and wraps beside the dot, not under it */
+#offline-banner-age {
+    flex: 1 1 0;
+    min-width: 12em;
+    white-space: pre-line;
+}
 .offline-banner.offline-banner-stale {
     background: #7c2d12;
     color: var(--realwhite, #fcfcfc);

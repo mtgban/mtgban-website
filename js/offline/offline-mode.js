@@ -261,6 +261,7 @@
                 setSyncStatus(done);
                 paintUsage();
             }).catch(function() {}).then(function() {
+                document.dispatchEvent(new CustomEvent('offline:synced'));
                 if (pendingImages) {
                     pendingImages = false;
                     sync({ images: true });

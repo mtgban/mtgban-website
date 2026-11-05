@@ -6,7 +6,7 @@ const DIR = join(import.meta.dir, '..', '..', 'js', 'offline');
 
 // Loads the sync worker against an in-memory database holding two synced
 // sets and one edition of downloaded images; prices fail when asked to.
-function loadWorker({ pricesFail = false, aesKey = 'k' } = {}) {
+function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAtFirstPrice = false } = {}) {
     const meta = { aesKey, storesKey: '', catalogVersion: 'c1' };
     const imgstate = { NEO: { code: 'NEO', keys: ['a'], done: true } };
     const sets = { NEO: { code: 'NEO', version: 'v1', blob: 'neo' }, DMU: { code: 'DMU', version: 'v1', blob: 'dmu' } };
@@ -27,9 +27,10 @@ function loadWorker({ pricesFail = false, aesKey = 'k' } = {}) {
         OfflineDB: db,
         OfflineUtil: { gzipCompress: async (b) => b },
     };
-    const manifest = { catalog: 'c1', sets: { NEO: 'v1', DMU: 'v1' }, images: {} };
+    const manifest = { catalog: 'c1', sets: { NEO: 'v1', DMU: 'v1', ...extraSets }, images: {} };
     const fetch = async (url) => {
         if (url.includes('manifest')) return { ok: true, status: 200, json: async () => manifest };
+        if (cancelAtFirstPrice) self.onmessage({ data: { type: 'cancel' } });
         if (pricesFail) throw new TypeError('Failed to fetch');
         return { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(4) };
     };
@@ -41,7 +42,7 @@ function loadWorker({ pricesFail = false, aesKey = 'k' } = {}) {
     const src = readFileSync(join(DIR, 'offline-sync.js'), 'utf8') + '\n;return runSync;';
     const runSync = new Function('self', 'importScripts', 'fetch', 'crypto', 'OfflineImages', 'OfflineDB', src)(
         self, () => {}, fetch, crypto, self.OfflineImages, db);
-    return { runSync, imgstate, sets, posts };
+    return { runSync, imgstate, sets, posts, meta };
 }
 
 test('a price-only sync keeps the downloaded images', async () => {
@@ -70,4 +71,45 @@ test('a failed set goes when a new key cannot decrypt it', async () => {
     const w = loadWorker({ pricesFail: true, aesKey: null });
     await w.runSync({ type: 'sync', stores: [], editions: [], imgEditions: [] });
     expect(w.sets).toEqual({});
+});
+
+const SYNC = { type: 'sync', stores: [], editions: [], imgEditions: [] };
+
+test('a sync with every set stored records none missing', async () => {
+    const w = loadWorker({ extraSets: { MH2: 'v1' } });
+    await w.runSync(SYNC);
+    expect(w.meta.missingSets).toBe(0);
+});
+
+test('a set that failed and was never stored counts as missing', async () => {
+    const w = loadWorker({ pricesFail: true, extraSets: { MH2: 'v1', ONE: 'v1' } });
+    await w.runSync(SYNC);
+    expect(w.meta.missingSets).toBe(2);
+    expect(w.posts.at(-1)).toMatchObject({ type: 'done', failedSets: 2 });
+});
+
+test('a stored set whose refresh failed keeps its cards, so is not missing', async () => {
+    const w = loadWorker({ pricesFail: true });
+    await w.runSync({ ...SYNC, full: true });
+    expect(w.posts.at(-1)).toMatchObject({ type: 'done', failedSets: 2 });
+    expect(w.meta.missingSets).toBe(0);
+});
+
+test('a failed set a new key cannot read counts as missing', async () => {
+    const w = loadWorker({ pricesFail: true, aesKey: null });
+    await w.runSync(SYNC);
+    expect(w.meta.missingSets).toBe(2);
+});
+
+test('sets a cancelled new-key sync never reached count as missing', async () => {
+    const w = loadWorker({ aesKey: null, cancelAtFirstPrice: true, extraSets: { MH2: 'v1' } });
+    await w.runSync(SYNC);
+    // The one set in flight landed, and the two stored ones it left are unreadable
+    expect(w.meta.missingSets).toBe(2);
+});
+
+test('only the selected editions can be missing', async () => {
+    const w = loadWorker({ pricesFail: true, extraSets: { MH2: 'v1', ONE: 'v1' } });
+    await w.runSync({ ...SYNC, editions: ['NEO', 'MH2'] });
+    expect(w.meta.missingSets).toBe(1);
 });
