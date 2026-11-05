@@ -14,6 +14,7 @@ type wantPackage struct {
 	includedStores int
 	modes          []string
 	lookback       int
+	caveats        []string
 }
 
 // checkPackage reports each field of p that differs from want, by name.
@@ -37,6 +38,9 @@ func checkPackage(t *testing.T, p Package, want wantPackage) {
 	if p.LookbackDays != want.lookback {
 		t.Errorf("%s: lookback %d want %d", want.key, p.LookbackDays, want.lookback)
 	}
+	if !slices.Equal(p.Caveats, want.caveats) {
+		t.Errorf("%s: caveats %v want %v", want.key, p.Caveats, want.caveats)
+	}
 }
 
 func TestEmbeddedListMatchesIssue230(t *testing.T) {
@@ -50,10 +54,10 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	// The 500 tier is BASE_ACCESS per issue 230; the 800 tier adds sealed and
 	// every region; history is its own package, with a lookback and no stores.
 	want := []wantPackage{
-		{"starter", 20000, StoreScopeExplicit, 1, []string{"retail", "buylist"}, 0},
-		{"all_stores", 50000, StoreScopeBase, 0, []string{"retail", "buylist"}, 0},
-		{"all_data", 80000, StoreScopeAll, 0, []string{"retail", "buylist", "sealed"}, 0},
-		{"history", 30000, "", 0, []string{"history"}, 365},
+		{"starter", 20000, StoreScopeExplicit, 1, []string{"retail", "buylist"}, 0, []string{"No Sealed or EV data"}},
+		{"all_stores", 50000, StoreScopeBase, 0, []string{"retail", "buylist"}, 0, []string{"No Sealed or EV data"}},
+		{"all_data", 80000, StoreScopeAll, 0, []string{"retail", "buylist", "sealed", "newspaper"}, 0, nil},
+		{"history", 30000, "", 0, []string{"history"}, 365, nil},
 	}
 	if len(c.Packages) != len(want) {
 		t.Fatalf("%d packages, want %d: %+v", len(c.Packages), len(want), c.Packages)
@@ -64,14 +68,19 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	if !c.Packages[3].IsHistory() || c.Packages[2].IsHistory() {
 		t.Error("IsHistory is not the history package alone")
 	}
-	if !slices.Equal(c.Packages[1].Modes, []string{"retail", "buylist"}) || !slices.Equal(c.Packages[2].Modes, []string{"retail", "buylist", "sealed"}) {
-		t.Errorf("modes %+v", c.Packages)
+	// The negatives moved to caveats, which the cards draw as crosses.
+	for _, p := range c.Packages {
+		for _, b := range p.Bullets {
+			if strings.HasPrefix(b, "No ") {
+				t.Errorf("%s: bullet %q is a negative, which belongs in caveats", p.Key, b)
+			}
+		}
 	}
-	// The newspaper is bought once for its mode; its price is a placeholder.
+	// The newspaper is bought once for its mode, and All Access includes it.
 	wantAddons := []Addon{
 		{Key: "extra_store", Monthly: 15000, AppliesTo: []string{"starter"}},
 		{Key: "extra_game", Monthly: 15000, AppliesTo: []string{"starter", "all_stores", "all_data", "history"}},
-		{Key: "newspaper", Monthly: 100, AppliesTo: []string{"starter", "all_stores", "all_data"}, GrantsMode: ModeNewspaper},
+		{Key: "newspaper", Monthly: 20000, AppliesTo: []string{"starter", "all_stores"}, GrantsMode: ModeNewspaper},
 	}
 	if len(c.Addons) != len(wantAddons) {
 		t.Fatalf("%d addons, want %d: %+v", len(c.Addons), len(wantAddons), c.Addons)
@@ -149,9 +158,54 @@ const modeAddon = `{
 
 func TestParseMinimal(t *testing.T) {
 	for _, doc := range []string{minimal, explicit, history, modeAddon} {
-		if _, err := Parse([]byte(doc)); err != nil {
+		c, err := Parse([]byte(doc))
+		if err != nil {
 			t.Fatal(err)
 		}
+		if c.Packages[0].Caveats != nil {
+			t.Errorf("caveats %v, want nil", c.Packages[0].Caveats)
+		}
+	}
+	c, err := Parse([]byte(rep(minimal, `"bullets": ["B"]`, `"bullets": ["B"], "caveats": ["C"]`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(c.Packages[0].Caveats, []string{"C"}) {
+		t.Errorf("caveats %v, want [C]", c.Packages[0].Caveats)
+	}
+}
+
+func TestAddonAmount(t *testing.T) {
+	monthly := Interval{Key: "monthly", Interval: "month", Count: 1}
+	quarterly := Interval{Key: "quarterly", Interval: "month", Count: 3}
+	stepped := Addon{Key: "x", Monthly: 5000, FirstMonthly: 15000}
+	flat := Addon{Key: "x", Monthly: 5000}
+	cases := []struct {
+		name string
+		a    Addon
+		iv   Interval
+		want [4]int64
+	}{
+		{"stepped monthly", stepped, monthly, [4]int64{0, 15000, 20000, 25000}},
+		{"stepped quarterly", stepped, quarterly, [4]int64{0, 45000, 60000, 75000}},
+		{"flat monthly", flat, monthly, [4]int64{0, 5000, 10000, 15000}},
+	}
+	for _, c := range cases {
+		for qty, want := range c.want {
+			got, err := c.a.Amount(c.iv, int64(qty))
+			if err != nil || got != want {
+				t.Errorf("%s qty %d: got %d %v want %d", c.name, qty, got, err, want)
+			}
+		}
+	}
+	if got, err := stepped.Amount(monthly, -2); err != nil || got != 0 {
+		t.Errorf("negative qty: got %d %v", got, err)
+	}
+	if _, err := stepped.Amount(Interval{Key: "y", Interval: "year", Count: 1}, 1); err == nil {
+		t.Error("unsupported unit: want an error")
+	}
+	if !stepped.Stepped() || flat.Stepped() {
+		t.Error("Stepped is not true only with a first amount")
 	}
 }
 
@@ -211,6 +265,10 @@ func TestValidateRejects(t *testing.T) {
 		{"history beside prices", rep(minimal, `"store_scope": "ALL_ACCESS", "modes": ["retail"]`, `"store_scope": "ALL_ACCESS", "modes": ["retail", "history"], "lookback_days": 30`), "package p: history is a package of its own"},
 		{"lookback on a price package", rep(minimal, `"modes": ["retail"]`, `"modes": ["retail"], "lookback_days": 30`), "package p: lookback_days applies to a history package only"},
 		{"price package without a scope", rep(minimal, `"store_scope": "ALL_ACCESS"`, `"store_scope": ""`), "package p: store_scope must be one of"},
+		{"blank caveat", rep(minimal, `"bullets": ["B"]`, `"bullets": ["B"], "caveats": [" "]`), "package p: caveat 1 is empty"},
+		{"mode addon on a package granting its mode", rep(modeAddon, `"modes": ["retail"]`, `"modes": ["retail", "newspaper"]`), "addon news: applies to p, which already grants newspaper"},
+		{"negative first_monthly", rep(explicit, `"addons": []`, `"addons": [{"key": "extra_store", "name": "X", "monthly": 15000, "first_monthly": -1, "applies_to": ["p"]}]`), "addon extra_store: first_monthly must not be negative"},
+		{"first_monthly on a mode addon", rep(modeAddon, `"grants_mode": "newspaper"`, `"grants_mode": "newspaper", "first_monthly": 100`), "addon news: first_monthly applies to a counted add-on only"},
 		{"addon grants an unknown mode", rep(modeAddon, `"grants_mode": "newspaper"`, `"grants_mode": "news"`), `addon news: grants_mode "news" must be one of`},
 	}
 	for _, c := range cases {

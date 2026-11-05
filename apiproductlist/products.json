@@ -14,7 +14,8 @@
         "Enjoy TCGplayer data in an easy to ingest format",
         "Add data from any store, the first one is on us",
         "Pick any additional store available for a small fee"
-      ]
+      ],
+      "caveats": ["No Sealed or EV data"]
     },
     {
       "key": "all_stores",
@@ -27,9 +28,9 @@
       "subtitle": "Single region market overview",
       "bullets": [
         "Singles prices from every US store available",
-        "EU index prices from Cardmarket",
-        "No Sealed or EV data"
-      ]
+        "EU index prices from Cardmarket"
+      ],
+      "caveats": ["No Sealed or EV data"]
     },
     {
       "key": "all_data",
@@ -37,7 +38,7 @@
       "monthly": 80000,
       "store_scope": "ALL_ACCESS",
       "included_stores": 0,
-      "modes": ["retail", "buylist", "sealed"],
+      "modes": ["retail", "buylist", "sealed", "newspaper"],
       "icon": "crown",
       "subtitle": "One stop solution for all our data",
       "bullets": [
@@ -80,8 +81,8 @@
     {
       "key": "newspaper",
       "name": "Newspaper reports",
-      "monthly": 100,
-      "applies_to": ["starter", "all_stores", "all_data"],
+      "monthly": 20000,
+      "applies_to": ["starter", "all_stores"],
       "grants_mode": "newspaper"
     }
   ],

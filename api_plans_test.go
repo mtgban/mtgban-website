@@ -555,10 +555,10 @@ func TestAPIPlansNewspaperAddonBehindTheFlag(t *testing.T) {
 	Config().APIGateway.NewspaperOnSale = true
 	on := apiPlansPage(t, "")
 	for _, present := range []string{
-		`<label class="api-choice"><input type="checkbox" name="addons" value="newspaper"> Newspaper reports, $1/month</label>`,
+		`<label class="api-choice"><input type="checkbox" name="addons" value="newspaper"> Newspaper reports, $200/month</label>`,
 		`"mode_addons":["newspaper"]`,
 		`"newspaper":`,
-		`"addon_applies":{"newspaper":["starter","all_stores","all_data"]}`,
+		`"addon_applies":{"newspaper":["starter","all_stores"]}`,
 	} {
 		if !strings.Contains(on, present) {
 			t.Errorf("on sale, the page lacks %s", present)

@@ -11,7 +11,7 @@
                     <p class="api-sub">{{.Subtitle}}</p>
                     <p class="api-amount">{{usd .Monthly}}<span>per month</span></p>
                     <ul class="api-bullets">
-                        {{range .Bullets}}<li>{{.}}</li>{{end}}
+                        {{range .Bullets}}<li>{{.}}</li>{{end}}{{range .Caveats}}<li>{{.}}</li>{{end}}
                     </ul>
                     <button type="button" class="api-btn api-cta" data-package="{{.Key}}" data-label="Choose {{.Name}}" data-selected="Selected">Choose {{.Name}}</button>
 {{- end}}
