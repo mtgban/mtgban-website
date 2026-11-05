@@ -556,7 +556,7 @@
                                 {{else}}
                                 {{$ckNote := and (eq $entry.Shorthand "CK") (eq $conditions "NM") $card.CKFacts}}
                                 {{$pauseNote := and (eq $entry.Shorthand "CKBLLast") (eq $conditions "NM") $card.CKPauseTip}}
-                                {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM")) $ckNote $pauseNote}}
+                                {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM")) $ckNote $pauseNote $entry.RuleTip}}
                                 {{$mState := buylist_state $entry.Shorthand $conditions $entry.IsOffer $entry.Price $card.GoodBuylist $card.CKSignal $card.CKPauseWait}}
                                 {{/* A price that looks off is never one to take. */}}
                                 {{if and (eq $entry.Shorthand "TCGDirectNet") (invalid_direct $entry.Price $card.TCGMarketPrice)}}{{$mState = ""}}{{end}}
@@ -604,6 +604,9 @@
                                         {{end}}
                                         {{if $pauseNote}}
                                         <div class="m-detail-note">{{tip_html $card.CKPauseTip}}</div>
+                                        {{end}}
+                                        {{if $entry.RuleTip}}
+                                        <div class="m-detail-note">{{tip_html $entry.RuleTip}}</div>
                                         {{end}}
                                     </div>
                                 </details>

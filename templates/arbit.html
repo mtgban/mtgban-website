@@ -272,7 +272,7 @@
                         <span>&#9660;</span>
                     {{end}}
                 </div>
-                <a class="arb-section-name" href="#top">{{.Name}}</a>
+                <a class="arb-section-name" href="#top"{{with .RuleTip}} title="{{.}}"{{end}}>{{.Name}}</a>
 
                 <div class="arb-load-btns">
                     {{$scraperKey := $arb.Key}}

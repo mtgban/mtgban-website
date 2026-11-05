@@ -1,9 +1,14 @@
 package main
 
 import (
+	"io"
+	"log"
 	"maps"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -167,5 +172,43 @@ func TestNewCustomBuylistVendor(t *testing.T) {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// The custom buylist's section on Arbit says its rule, and no other's does.
+func TestArbitSpellsTheCustomBuylistRule(t *testing.T) {
+	cards := closeVendors(t)
+	if LogPages["Arbitrage"] == nil {
+		LogPages["Arbitrage"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Arbitrage") })
+	}
+	stock := mtgban.InventoryRecord{}
+	ref := mtgban.InventoryRecord{}
+	for _, card := range cards {
+		stock[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 1, Quantity: 2, URL: "u"}}
+		ref[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 100}}
+	}
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(stock, sessionInfo("ZZS")),
+		mtgban.NewSellerFromInventory(ref, sessionInfo("ZZA")),
+	}, currentPrices().vendors)
+
+	req := httptest.NewRequest(http.MethodGet, "/arbit?source=ZZS", nil)
+	for name, value := range map[string]string{
+		"UploadCustomOpts": "enabled", "UploadCustomRate": "0.5",
+		"UploadCustomBuyer": "ZZA", "UploadCustomMinPrice": "2",
+	} {
+		req.AddCookie(&http.Cookie{Name: name, Value: value})
+	}
+	rec := httptest.NewRecorder()
+	testSite.Arbit(rec, req)
+	page := rec.Body.String()
+
+	const want = `<a class="arb-section-name" href="#top" title="50% of ZZA if ≥ $2.00">Custom Buylist</a>`
+	if !strings.Contains(page, want) {
+		t.Errorf("no rule on the custom buylist's section in the %d byte page", len(page))
+	}
+	if !strings.Contains(page, `<a class="arb-section-name" href="#top">Session ZZV</a>`) {
+		t.Error("another store's section has lost its plain name")
 	}
 }

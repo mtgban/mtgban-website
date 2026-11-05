@@ -205,3 +205,46 @@ func TestUploadCustomBuylistFallback(t *testing.T) {
 		t.Errorf("fallback on by cookie: SP offer is $%s, want $2.00", got)
 	}
 }
+
+// The custom buylist's column, totals and optimizer section all say its rule,
+// and no other store's does.
+func TestUploadSpellsTheCustomBuylistRule(t *testing.T) {
+	cards := closeVendors(t)
+	ref := mtgban.InventoryRecord{}
+	for _, card := range cards {
+		ref[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 10}}
+	}
+	withPrices(t, []mtgban.Seller{mtgban.NewSellerFromInventory(ref, sessionInfo("ZZA"))}, currentPrices().vendors)
+	withConfigCopy(t)
+	Config().ScraperConfig.NameOverride = map[string]string{customStore: "Custom Buylist"}
+
+	var rows strings.Builder
+	for _, card := range cards {
+		fmt.Fprintf(&rows, "%s\t1\t\t0\t\n", card)
+	}
+	form := url.Values{
+		"mode":           {"true"},
+		"stores":         {"ZZV"},
+		"rows":           {rows.String()},
+		"custombuylist":  {"true"},
+		"customseller":   {"ZZA"},
+		"customrate":     {"0.5"},
+		"customminprice": {"2"},
+		"optimizer":      {"true"},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	testSite.Upload(rec, req)
+	page := rec.Body.String()
+
+	const title = ` title="50% of ZZA if ≥ $2.00">Custom Buylist<`
+	for _, tag := range []string{`<th class="r"`, `<span class="label"`, `<span class="toc-store"`, `<h3`} {
+		if !strings.Contains(page, tag+title) {
+			t.Errorf("no rule on %s in the %d byte page", tag, len(page))
+		}
+	}
+	if !strings.Contains(page, `<th class="r">Session ZZV<`) {
+		t.Error("another store's column has lost its plain header")
+	}
+}

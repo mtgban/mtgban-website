@@ -344,6 +344,9 @@ type Arbitrage struct {
 	Key   string
 	Arbit []mtgban.ArbitEntry
 
+	// RuleTip spells the rule behind the custom buylist's section
+	RuleTip string
+
 	// BuyCart loads the store bought from and SellCart the buylist sold
 	// into, as the cart bookmarklet fills them; SellCart is empty on Global
 	BuyCart, SellCart cartLoad
@@ -1040,6 +1043,10 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 			HasNoQty:         hasNoQty(scraper, pageVars.ReverseMode),
 			CreditMultiplier: creditInfo.CreditMultiplier,
 			SussyList:        sussy,
+		}
+		_, isCustom := scraper.(*customBuylistVendor)
+		if isCustom {
+			entry.RuleTip = cmp.CustomBuylist.tip(p, scraper.Info().SealedMode)
 		}
 		if pageVars.GlobalMode {
 			entry.HasNoCredit = true

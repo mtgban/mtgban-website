@@ -454,7 +454,7 @@
             <th class="c">Cond</th>
             <th class="c">Qty</th>
             {{range $storeKeys}}
-                <th class="r">{{index $.Root.StoreNames .}}</th>
+                <th class="r"{{with index $.Root.CustomTips .}} title="{{.}}"{{end}}>{{index $.Root.StoreNames .}}</th>
             {{end}}
             {{if $indexKeys}}<th title="Reference prices for the printing as a whole. Unlike the store columns, these are not adjusted for the condition in the Cond column.">Index<span class="ures-index-note">per printing</span></th>{{end}}
         </tr>
@@ -562,7 +562,7 @@
     </div>
     {{range .StoreKeys}}
         <div class="res-summary-stat">
-            <span class="label">{{index $.Root.StoreNames .}}</span>
+            <span class="label"{{with index $.Root.CustomTips .}} title="{{.}}"{{end}}>{{index $.Root.StoreNames .}}</span>
             <span class="val">$ {{printf "%.2f" (index $root.TotalEntries .)}}</span>
             {{$missing := (index $root.MissingCounts .)}}
             {{if ne $missing 0}}
@@ -600,7 +600,7 @@
     </div>
     {{range .StoreKeys}}
         <div class="res-summary-stat">
-            <span class="label">{{index $.Root.StoreNames .}}</span>
+            <span class="label"{{with index $.Root.CustomTips .}} title="{{.}}"{{end}}>{{index $.Root.StoreNames .}}</span>
             <span class="val">$ {{printf "%.2f" (index $s.Totals .)}}</span>
             {{$gone := (index $s.Missing .)}}
             {{if ne $gone 0}}
@@ -852,7 +852,7 @@
                 {{if $entries}}
                     {{$total := index $.OptimizedTotals .}}
                     <a class="opt-toc-item" href="#opt-{{.}}">
-                        <span class="toc-store">{{index $.StoreNames .}}</span>
+                        <span class="toc-store"{{with index $.CustomTips .}} title="{{.}}"{{end}}>{{index $.StoreNames .}}</span>
                         {{$qty := index $.OptimizedQuantities .}}
                         <span class="toc-stats">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
                         <span class="toc-total">$ {{printf "%.2f" $total}}</span>
@@ -888,7 +888,7 @@
                                 <span>&#9660;</span>
                             {{end}}
                         </div>
-                        <h3>{{index $.StoreNames .}}</h3>
+                        <h3{{with index $.CustomTips .}} title="{{.}}"{{end}}>{{index $.StoreNames .}}</h3>
                         <div class="opt-header-actions">
                         {{if and (not $.IsBuylist) (eq $sourceKey "CK")}}
                             <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
