@@ -243,3 +243,26 @@ func TestSleepersVelocityNeedsSales(t *testing.T) {
 		t.Error("the velocity page with no sales loaded does not serve the index")
 	}
 }
+
+// TestSleeperTiersCarryFinishedPairs carries a pair that finished into the
+// next snapshot's cache, and not one still being computed.
+func TestSleeperTiersCarryFinishedPairs(t *testing.T) {
+	seller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "SEL"})
+	finished := fixtureBuys("FIN", nil)
+	running := fixtureBuys("RUN", nil)
+	withPrices(t, []mtgban.Seller{seller}, []mtgban.Vendor{finished, running})
+	prev := currentPrices()
+	finishedPair := sleeperPair{seller: seller, vendor: finished}
+	runningPair := sleeperPair{seller: seller, vendor: running}
+	held := &sleeperHits{cardIDs: []string{}, done: true}
+	prev.sleepers.pairs = map[sleeperPair]*sleeperHits{finishedPair: held, runningPair: {}}
+
+	c := sleeperTiersFor(prev, prev)
+	if c.pairs[finishedPair] != held {
+		t.Error("the finished pair was not carried")
+	}
+	_, carried := c.pairs[runningPair]
+	if carried {
+		t.Error("the pair still being computed was carried")
+	}
+}
