@@ -58,3 +58,18 @@ test('dev goes to the network before the cache', async () => {
         expect(got === 'cache' ? 'cache' : 'network').toBe(want);
     }
 });
+
+// A script the shell loads but the worker never cached fails only offline,
+// which is when nobody is looking.
+test('the worker caches every script the offline pages load', async () => {
+    const w = loadWorker('b1', false, answer);
+    await install(w);
+    const cached = new Set(Object.keys(w.stored).map((url) => url.split('?')[0]));
+    const root = join(import.meta.dir, '..', '..', 'templates');
+    for (const file of ['offline.html', 'mobile/offline.html']) {
+        const html = readFileSync(join(root, file), 'utf8');
+        const scripts = [...html.matchAll(/src="(\/js\/[^"?]+)/g)].map((m) => m[1]);
+        expect(scripts.length).toBeGreaterThan(5);
+        expect(scripts.filter((path) => !cached.has(path))).toEqual([]);
+    }
+});

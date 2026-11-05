@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const root = join(import.meta.dir, '..', '..');
-const shell = readFileSync(join(root, 'templates', 'offline.html'), 'utf8');
+const shell = readFileSync(join(root, 'js', 'offline', 'offline-page-desktop.js'), 'utf8');
 const sw = readFileSync(join(root, 'sw.js'), 'utf8');
 
 // The sidebar image starts as src="", which trips the card-art fallback once
@@ -12,7 +12,9 @@ const sw = readFileSync(join(root, 'sw.js'), 'utf8');
 test('the shell sets the sidebar image through setCardArtSource', () => {
     const start = shell.indexOf('function showImage(');
     expect(start).toBeGreaterThan(-1);
-    const body = shell.slice(start, shell.indexOf('\n    function ', start + 1));
+    const end = shell.indexOf('\n    var page', start);
+    expect(end).toBeGreaterThan(start);
+    const body = shell.slice(start, end);
     expect(body).toContain("setCardArtSource(document.getElementById('cardImage')");
     expect(body).not.toMatch(/\.src\s*=/);
 });
@@ -26,5 +28,5 @@ test('the service worker precaches the game card back', () => {
 
 // An empty count collapses its line, and the sidebar image rides on it.
 test('the shell counts an empty result as well', () => {
-    expect(shell).toContain("el.textContent = n + ' result' + (n === 1 ? '' : 's') + ' found'");
+    expect(shell).toContain("n + ' result' + (n === 1 ? '' : 's') + ' found'");
 });
