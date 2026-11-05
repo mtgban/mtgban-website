@@ -22,6 +22,9 @@
         var sealedMode = new URLSearchParams(location.search).get('sealed') === '1';
         // Suggestions read the current mode off this shared deps object.
         var searchDeps = null;
+        // The latest search. One still running when a newer one starts, or the
+        // box empties, is left to finish unseen.
+        var latestSearch = 0;
 
         function call(name) {
             if (hooks[name]) hooks[name]();
@@ -70,6 +73,7 @@
         }
 
         async function runQuery(q) {
+            var search = ++latestSearch;
             if (!q) {
                 exec = null;
                 resultsEl().innerHTML = '';
@@ -78,7 +82,15 @@
             }
             var parsed = OfflineQuery.parse(q, dicts.finishes, dicts.rarities, dicts.sets);
             parsed.sealed = sealedMode;
-            exec = await OfflineQuery.execute(parsed, env);
+            var answer;
+            try {
+                answer = await OfflineQuery.execute(parsed, env);
+            } catch (err) {
+                if (search === latestSearch) throw err;
+                return;
+            }
+            if (search !== latestSearch) return;
+            exec = answer;
             paint();
         }
 
