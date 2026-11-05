@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -863,23 +864,10 @@ func TestHistoryAPIRoutes(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.Handle("/api/v2/history/", enforceAPISigning(http.HandlerFunc(s.HistoryAPI)))
 	mux.Handle("/api/v2/", enforceAPISigning(http.HandlerFunc(s.PriceAPIv2)))
-	sig := url.QueryEscape(apisig.Mint([]byte(os.Getenv("BAN_SECRET")), signatureLink(), apisig.Claims{
-		API:     "ALL_ACCESS",
-		Fields:  url.Values{"APImode": {"all"}, "UserEmail": {"h@example.com"}, "APIlookback": {"365"}},
-		Expires: time.Now().Add(time.Hour).Unix(),
-	}))
+	sig := mintAPIKey(url.Values{"APImode": {"all"}, "UserEmail": {"h@example.com"}, "APIlookback": {"365"}})
 	serve := func(i int, target string) *httptest.ResponseRecorder {
 		t.Helper()
-		sep := "?"
-		if strings.Contains(target, "?") {
-			sep = "&"
-		}
-		req := httptest.NewRequest(http.MethodGet, target+sep+"sig="+sig, nil)
-		// a fresh address each, so the API rate limit stays out of it
-		req.RemoteAddr = fmt.Sprintf("198.51.100.%d:1234", i+1)
-		rec := httptest.NewRecorder()
-		mux.ServeHTTP(rec, req)
-		return rec
+		return serveAPIKey(mux, fmt.Sprintf("198.51.100.%d", i+1), target, sig)
 	}
 	for i, target := range []string{
 		"/api/v2/history/h-1,h-2.json",
@@ -915,6 +903,71 @@ func TestHistoryAPIRoutes(t *testing.T) {
 	_, hasRange := v2.Meta["range"]
 	if v2.Meta["version"] != APIVersionV2 || latest || hasRange {
 		t.Errorf("retail.json did not reach PriceAPIv2: %d %q meta %v", rec.Code, v2.Error, v2.Meta)
+	}
+}
+
+// mintAPIKey signs fields the way the gateway mints a key, for an hour.
+func mintAPIKey(fields url.Values) string {
+	return apisig.Mint([]byte(os.Getenv("BAN_SECRET")), signatureLink(), apisig.Claims{
+		API:     "ALL_ACCESS",
+		Fields:  fields,
+		Expires: time.Now().Add(time.Hour).Unix(),
+	})
+}
+
+// forgeAPIMode sets a signature's APImode to mode, keeping its Signature.
+func forgeAPIMode(t *testing.T, sig, mode string) string {
+	t.Helper()
+	v, err := apisig.Decode(sig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v.Set("APImode", mode)
+	return base64.StdEncoding.EncodeToString([]byte(v.Encode()))
+}
+
+// serveAPIKey sends a GET for target with sig through h from ip, an
+// address of its own so the API rate limit stays out of it.
+func serveAPIKey(h http.Handler, ip, target, sig string) *httptest.ResponseRecorder {
+	sep := "?"
+	if strings.Contains(target, "?") {
+		sep = "&"
+	}
+	req := httptest.NewRequest(http.MethodGet, target+sep+"sig="+url.QueryEscape(sig), nil)
+	req.RemoteAddr = ip + ":1234"
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+// Behind the route's middleware a key whose mode was edited after signing
+// is a 401, a key signed without history a 403, and a history key a 200.
+func TestHistoryAPIForgedMode(t *testing.T) {
+	s := historySite(t)
+	historyFixture(t, historyRows, nil)
+	mux := http.NewServeMux()
+	mux.Handle("/api/v2/history/", enforceAPISigning(http.HandlerFunc(s.HistoryAPI)))
+	retail := mintAPIKey(historyFields("retail,buylist", "365"))
+	for i, tc := range []struct {
+		name, sig string
+		status    int
+		want      string
+	}{
+		{"history key", mintAPIKey(historyFields("history", "365")), 200, `"range":365`},
+		{"retail key", retail, 403, "plan does not include history"},
+		{"forged all", forgeAPIMode(t, retail, "all"), 401, "invalid or expired signature"},
+		{"forged history", forgeAPIMode(t, retail, "retail,buylist,history"), 401, "invalid or expired signature"},
+	} {
+		for j, target := range []string{"/api/v2/history/h-1.json", "/api/v2/history/h-1.csv"} {
+			rec := serveAPIKey(mux, fmt.Sprintf("198.51.100.%d", 20+2*i+j), target, tc.sig)
+			want := tc.want
+			if tc.status == 200 && strings.HasSuffix(target, ".csv") {
+				want = "id,finish,store,section,date,price\n"
+			}
+			if rec.Code != tc.status || !strings.Contains(rec.Body.String(), want) {
+				t.Errorf("%s %s: %d %s, want %d with %q", tc.name, target, rec.Code, rec.Body.String(), tc.status, want)
+			}
+		}
 	}
 }
 
