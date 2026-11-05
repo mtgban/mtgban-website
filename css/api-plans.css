@@ -198,6 +198,14 @@
 .api-choice:has(input:checked) { border-color: var(--accent-border); background: var(--accent-muted); color: var(--normal); }
 .api-choice:has(input:disabled) { cursor: default; opacity: 0.7; }
 .api-choice input { margin: 0; accent-color: var(--ainfo); }
+/* Store rows: Singles and Sealed, each chip lit by what the package includes. */
+.api-store-row { display: flex; gap: 0.75em; align-items: baseline; }
+.api-store-row + .api-store-row { margin-top: 0.5em; }
+.api-row-label { min-width: 4em; font-weight: 600; color: var(--normal); }
+.api-choice-locked { border-style: dashed; }
+/* :has matches the disabled rule's weight so this opacity wins. */
+.api-choice-off:has(input:disabled) { opacity: 0.5; text-decoration: line-through; }
+.api-choice-off input { accent-color: var(--adanger); }
 
 .api-total-row {
     display: flex;
@@ -221,4 +229,5 @@
 @media (max-width: 900px) {
     .api-cards { grid-template-columns: 1fr; }
     .api-plans .page-header { flex-direction: column; }
+    .api-store-row { flex-direction: column; gap: 0.4em; }
 }

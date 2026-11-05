@@ -424,7 +424,7 @@ func TestAPIPlansStoreRowComesFromTheServedScrapers(t *testing.T) {
 	if !strings.Contains(body, "TCGplayer always included, your first store is on us, each additional is $150/month") {
 		t.Error("legend lacks the implied family")
 	}
-	for _, want := range []string{`name="stores" value="abugames" checked disabled> ABU Games`, `name="stores" value="cardkingdom" disabled> Card Kingdom`, `name="stores" value="starcitygames" disabled> Star City Games`} {
+	for _, want := range []string{`name="stores" value="abugames" checked disabled> ABU Games`, `name="stores" value="cardkingdom" checked disabled> Card Kingdom`, `name="stores" value="starcitygames" checked disabled> Star City Games`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %q", want)
 		}
@@ -437,13 +437,167 @@ func TestAPIPlansStoreRowComesFromTheServedScrapers(t *testing.T) {
 	if strings.Contains(body, "No stores are loaded") {
 		t.Error("empty-row sentence shown with stores loaded")
 	}
-	// An explicit package leaves the boxes live and the fieldset shown.
+	// Every package shows the fieldset; an explicit one leaves the boxes live.
+	if strings.Contains(body, `id="api-stores" hidden`) {
+		t.Error("a preset package hides the stores fieldset")
+	}
 	explicit := apiPlansPageAt(t, "", "/api-plans?package=starter")
 	if !strings.Contains(explicit, `name="stores" value="abugames" checked>`) {
 		t.Error("an explicit package should leave the store boxes enabled")
 	}
-	if strings.Contains(explicit, `<fieldset class="api-fieldset" id="api-stores" hidden>`) {
+	if strings.Contains(explicit, `id="api-stores" hidden`) {
 		t.Error("an explicit package should show the stores fieldset")
+	}
+}
+
+// chipIn is the label in the row with that id holding attr, from <label to </label>.
+func chipIn(t *testing.T, body, row, attr string) string {
+	t.Helper()
+	start := strings.Index(body, `id="`+row+`"`)
+	if start < 0 {
+		t.Fatalf("no %s row", row)
+	}
+	rest := body[start:]
+	if end := strings.Index(rest, `class="api-store-row"`); end >= 0 {
+		rest = rest[:end]
+	}
+	i := strings.Index(rest, attr)
+	if i < 0 {
+		t.Fatalf("%s row lacks %s", row, attr)
+	}
+	open := strings.LastIndex(rest[:i], "<label")
+	return rest[open : i+strings.Index(rest[i:], "</label>")]
+}
+
+func TestAPIPlansStoreRowsLitByThePackage(t *testing.T) {
+	stubScrapers(t, magicStub)
+	body := apiPlansPage(t, "")
+	if !strings.Contains(body, `<fieldset class="api-fieldset" id="api-stores">`) {
+		t.Error("the stores fieldset is hidden or missing on All Access")
+	}
+	tcg := chipIn(t, body, "api-stores-singles", `data-family="tcg"`)
+	if !strings.Contains(tcg, `class="api-choice api-choice-locked"`) || !strings.Contains(tcg, `<input type="checkbox" checked disabled> TCGplayer`) || strings.Contains(tcg, "name=") {
+		t.Errorf("tcg chip %s", tcg)
+	}
+	for _, want := range []string{`name="stores" value="cardkingdom" checked disabled`, `data-family="cardmarket" data-base="true"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("All Access lacks %s", want)
+		}
+	}
+	for _, family := range []string{"tcg", "cardkingdom"} {
+		if l := chipIn(t, body, "api-stores-sealed", `data-family="`+family+`"`); !strings.Contains(l, "checked") {
+			t.Errorf("All Access sealed %s unchecked: %s", family, l)
+		}
+	}
+	if strings.Contains(body, "api-choice-off") {
+		t.Error("All Access has an unlit chip")
+	}
+	if !strings.Contains(body, `<span class="api-legend-note" data-when="explicit" hidden>`) || !strings.Contains(body, `<span class="api-legend-note" data-when="preset">Lit stores are included in the package</span>`) {
+		t.Error("All Access legend notes in the wrong state")
+	}
+
+	// Magic Corner served and unblocked: a family outside Base Access.
+	stub := magicStub
+	stub.retailBlock = []string{"TCGDirectLow"}
+	stubScrapers(t, stub)
+	base := apiPlansPageAt(t, "", "/api-plans?package=all_stores")
+	if ck := chipIn(t, base, "api-stores-singles", `data-family="cardkingdom"`); strings.Contains(ck, "api-choice-off") || !strings.Contains(ck, `value="cardkingdom" checked disabled`) {
+		t.Errorf("Base Access cardkingdom %s", ck)
+	}
+	mc := chipIn(t, base, "api-stores-singles", `data-family="magiccorner"`)
+	if !strings.Contains(mc, `class="api-choice api-choice-off"`) || !strings.Contains(mc, `data-base="false"`) || !strings.Contains(mc, `value="magiccorner" disabled>`) || strings.Contains(mc, "checked") {
+		t.Errorf("Base Access magiccorner %s", mc)
+	}
+	for _, family := range []string{"tcg", "cardkingdom"} {
+		if l := chipIn(t, base, "api-stores-sealed", `data-family="`+family+`"`); !strings.Contains(l, "api-choice-off") || strings.Contains(l, "checked") {
+			t.Errorf("Base Access sealed %s lit: %s", family, l)
+		}
+	}
+
+	stubScrapers(t, magicStub)
+	starter := apiPlansPageAt(t, "", "/api-plans?package=starter")
+	if !strings.Contains(starter, `name="stores" value="abugames" checked>`) || !strings.Contains(starter, `name="stores" value="cardkingdom">`) {
+		t.Error("starter boxes are not live with the first checked")
+	}
+	if l := chipIn(t, starter, "api-stores-sealed", `data-family="cardkingdom"`); !strings.Contains(l, "api-choice-off") {
+		t.Errorf("starter sealed lit: %s", l)
+	}
+	if !strings.Contains(starter, `<span class="api-legend-note" data-when="explicit">`) || !strings.Contains(starter, `<span class="api-legend-note" data-when="preset" hidden>Lit stores are included in the package</span>`) {
+		t.Error("starter legend notes in the wrong state")
+	}
+}
+
+func TestAPIPlansSealedRowOnlyWhenServed(t *testing.T) {
+	stub := magicStub
+	stub.sellers = slices.DeleteFunc(slices.Clone(magicStub.sellers), func(sh string) bool {
+		return sh == "TCGSealed" || sh == "CKSealed" || sh == "CKBox"
+	})
+	stub.sealed = []string{"CKEV"}
+	stubScrapers(t, stub)
+	body := apiPlansPage(t, "")
+	if strings.Contains(body, `id="api-stores-sealed"`) {
+		t.Error("sealed row drawn with no sealed store served")
+	}
+	if !strings.Contains(body, `id="api-stores-singles"`) {
+		t.Error("singles row missing")
+	}
+}
+
+// A preset package submits no stores: every box is disabled and no paid box is kept.
+func TestAPIPlansPresetPackageSubmitsNoStores(t *testing.T) {
+	stubScrapers(t, magicStub)
+	body := apiPlansPageAt(t, "", "/api-plans?change=1&package=all_stores&stores=cardkingdom,retired")
+	boxes := strings.Split(body, `name="stores"`)[1:]
+	if len(boxes) == 0 {
+		t.Fatal("no store boxes")
+	}
+	for _, box := range boxes {
+		if box = box[:strings.Index(box, ">")]; !strings.Contains(box, "disabled") {
+			t.Errorf("live box on a preset package: %s", box)
+		}
+	}
+	if strings.Contains(body, `value="retired"`) {
+		t.Error("a paid store box on a preset package")
+	}
+}
+
+// A package with no store scope, the history one, lights no store chip.
+func TestAPIPlansHistoryScopeLightsNoStore(t *testing.T) {
+	withHistoryOnSale(t)
+	stubScrapers(t, magicStub)
+	body := apiPlansPageAt(t, "", "/api-plans?package=history")
+	parts := strings.Split(body, `name="stores"`)
+	if len(parts) < 2 {
+		t.Fatal("no store boxes")
+	}
+	for i := 1; i < len(parts); i++ {
+		label := parts[i-1][strings.LastIndex(parts[i-1], "<label"):]
+		box := parts[i][:strings.Index(parts[i], ">")]
+		if !strings.Contains(label, "api-choice-off") || !strings.Contains(box, "disabled") || strings.Contains(box, "checked") {
+			t.Errorf("history lights a store: %s name=\"stores\"%s", label, box)
+		}
+	}
+	for _, family := range []string{"tcg", "cardkingdom"} {
+		if l := chipIn(t, body, "api-stores-sealed", `data-family="`+family+`"`); !strings.Contains(l, "api-choice-off") {
+			t.Errorf("history sealed %s lit: %s", family, l)
+		}
+	}
+}
+
+func TestAPIPlansJSONCarriesScopeAndSealed(t *testing.T) {
+	body := apiPlansPage(t, "")
+	for key, want := range map[string]string{
+		"all_data":   `"scope":"ALL_ACCESS","sealed":true`,
+		"all_stores": `"scope":"BASE_ACCESS","sealed":false`,
+		"starter":    `"scope":"explicit"`,
+	} {
+		i := strings.Index(body, `{"key":"`+key+`"`)
+		if i < 0 {
+			t.Fatalf("no %s package in the configurator data", key)
+		}
+		if pkg := body[i : i+strings.Index(body[i:], "}")]; !strings.Contains(pkg, want) {
+			t.Errorf("%s: %s lacks %s", key, pkg, want)
+		}
 	}
 }
 
@@ -465,6 +619,9 @@ func TestAPIPlansKeepsAStoreTheCustomerPaysFor(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %q", want)
 		}
+	}
+	if !strings.Contains(body, `name="stores" value="retired" checked>`) || strings.Contains(body, `value="retired" checked disabled`) {
+		t.Error("the paid store box is not checked and live on starter")
 	}
 	if strings.Count(body, `value="cardkingdom"`) != 1 {
 		t.Error("an offered family was rendered twice")
