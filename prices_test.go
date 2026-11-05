@@ -8,7 +8,7 @@ import (
 
 // withPrices publishes sellers and vendors as testSite's served snapshot,
 // keeping the dumps listing, and puts the snapshot it replaced back when
-// the test ends.
+// the test ends. Never from a test that calls t.Parallel().
 func withPrices(tb testing.TB, sellers []mtgban.Seller, vendors []mtgban.Vendor) {
 	tb.Helper()
 	sitePrices(tb, testSite, sellers, vendors)
@@ -17,7 +17,8 @@ func withPrices(tb testing.TB, sellers []mtgban.Seller, vendors []mtgban.Vendor)
 // sitePrices publishes sellers and vendors as s's served snapshot, keeping
 // its dumps listing, and puts the snapshot it replaced back when the test
 // ends. It publishes the way a load does, newPrices then one Store, but
-// without scrapersMu, which a test may hold.
+// without scrapersMu, which a test may hold. Never from a test that calls
+// t.Parallel().
 func sitePrices(tb testing.TB, s *site, sellers []mtgban.Seller, vendors []mtgban.Vendor) {
 	tb.Helper()
 	prev := s.prices()
@@ -27,7 +28,7 @@ func sitePrices(tb testing.TB, s *site, sellers []mtgban.Seller, vendors []mtgba
 
 // keepPrices puts the snapshot testSite serves now back when the test ends,
 // for a test that registers its stores through updateSellers or
-// updateVendors.
+// updateVendors. Never from a test that calls t.Parallel().
 func keepPrices(tb testing.TB) {
 	tb.Helper()
 	keepSitePrices(tb, testSite)
@@ -42,7 +43,7 @@ func keepSitePrices(tb testing.TB, s *site) {
 
 // withScraperIndex publishes idx as testSite's dumps listing, an empty one
 // for nil, keeping both sides, and puts the snapshot it replaced back when
-// the test ends.
+// the test ends. Never from a test that calls t.Parallel().
 func withScraperIndex(tb testing.TB, idx *scraperIndex) {
 	tb.Helper()
 	if idx == nil {
