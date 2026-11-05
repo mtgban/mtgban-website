@@ -107,8 +107,9 @@ included, and `Cache-Control: no-store`:
 | 404 | a path under `newspaper/` that is neither `reports.json` nor `{report}.json` or `.csv`, `reports.csv` included |
 | 503 | no report's query has succeeded yet (startup, `-nonews`, or no newspaper database), with `Retry-After: 300`; and a report `reports.json` lists whose query has never succeeded, `report not loaded yet`, with the same header. A report whose query ran and found no rows is not a 503: it is a 200 with `rows: []` (CSV: the header alone), `meta.rows` 0 and no `date` |
 
-`enforceAPISigning` answers its own 503 while a host's stores are still
-loading, as on every v2 route.
+The route reads no store, so it serves before a host's stores load;
+the price API's 503 for that is its own handler's, not
+`enforceAPISigning`'s.
 
 ## Response shape
 
