@@ -136,12 +136,16 @@
         var parent = input.parentNode;
         var list = null;
         var rows = [];
+        var shown = [];
         var active = -1;
         var reqId = 0;
 
         function close() {
+            // An answer still on its way must not reopen what was just closed
+            reqId++;
             if (list && list.parentNode) list.parentNode.removeChild(list);
             list = null;
+            shown = [];
             active = -1;
         }
 
@@ -155,23 +159,37 @@
             submit();
         }
 
+        function addRow(idx) {
+            var row = document.createElement('div');
+            row.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                choose(idx);
+            });
+            list.appendChild(row);
+            return row;
+        }
+
+        // The open list is updated in place, touching only the rows that
+        // changed: a new list per keystroke is a new blurred layer and a new
+        // scroller for the browser to paint.
         function render() {
-            close();
-            if (!rows.length) return;
-            list = document.createElement('div');
-            list.className = 'autocomplete-items ac-dropdown';
-            for (var i = 0; i < rows.length; i++) {
-                var row = document.createElement('div');
-                row.innerHTML = rowHtml(rows[i]);
-                (function (idx) {
-                    row.addEventListener('mousedown', function (e) {
-                        e.preventDefault();
-                        choose(idx);
-                    });
-                })(i);
-                list.appendChild(row);
+            if (!rows.length) { close(); return; }
+            if (!list) {
+                list = document.createElement('div');
+                list.className = 'autocomplete-items ac-dropdown';
+                parent.appendChild(list);
             }
-            parent.appendChild(list);
+            if (active >= 0 && list.children[active]) list.children[active].classList.remove('autocomplete-active');
+            active = -1;
+            for (var i = 0; i < rows.length; i++) {
+                var html = rowHtml(rows[i]);
+                if (shown[i] === html) continue;
+                (list.children[i] || addRow(i)).innerHTML = html;
+                shown[i] = html;
+            }
+            while (list.children.length > rows.length) list.removeChild(list.children[rows.length]);
+            shown.length = rows.length;
+            list.scrollTop = 0;
         }
 
         function highlight(next) {

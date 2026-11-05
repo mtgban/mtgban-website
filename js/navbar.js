@@ -451,14 +451,16 @@
 
     var sealed = location.pathname.indexOf('/sealed') === 0;
     form.action = sealed ? '/sealed' : '/search';
-    var preferOffline = location.pathname !== '/offline' &&
-        window.OfflinePrefer && OfflinePrefer.get();
+    // The banner, not the path: with the network down the service worker
+    // answers /search and /sealed with this same shell.
+    var onShell = !!document.getElementById('offline-banner');
+    var preferOffline = !onShell && window.OfflinePrefer && OfflinePrefer.get();
     if (preferOffline) {
         // Keep the user in the fast local flow; the offline shell owns suggestions.
         form.action = '/offline';
     }
-    // On /offline the offline shell owns the navbar box with local suggestions.
-    if (location.pathname !== '/offline' && !preferOffline) {
+    // The offline shell owns the navbar box with local suggestions.
+    if (!onShell && !preferOffline) {
         autocomplete(form, input, sealed ? 'true' : 'false');
     }
 
