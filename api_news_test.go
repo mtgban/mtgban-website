@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -541,6 +542,33 @@ func TestNewspaperAPIUnsigned(t *testing.T) {
 		testSite.NewspaperAPI(rec, httptest.NewRequest(http.MethodGet, "/api/v2/newspaper/"+path, nil))
 		if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "plan does not include newspaper") {
 			t.Errorf("%s without sig: %d %s", path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// Behind the route's middleware a key whose mode was edited after signing
+// is a 401, a key signed without newspaper a 403, and a newspaper key a 200.
+func TestNewspaperAPIForgedMode(t *testing.T) {
+	withNewsFixture(t, newsFixtureNow.Add(-27*time.Minute))
+	signingEnabled(t, false)
+	mux := http.NewServeMux()
+	mux.Handle("/api/v2/newspaper/", enforceAPISigning(http.HandlerFunc(testSite.NewspaperAPI)))
+	retail := mintAPIKey(url.Values{"APImode": {"retail"}, "UserEmail": {"n@example.com"}})
+	for i, tc := range []struct {
+		name, sig string
+		status    int
+		want      string
+	}{
+		{"newspaper key", mintAPIKey(url.Values{"APImode": {"newspaper"}, "UserEmail": {"n@example.com"}}), 200, `"meta":`},
+		{"retail key", retail, 403, "plan does not include newspaper"},
+		{"forged all", forgeAPIMode(t, retail, "all"), 401, "invalid or expired signature"},
+		{"forged newspaper", forgeAPIMode(t, retail, "retail,newspaper"), 401, "invalid or expired signature"},
+	} {
+		for j, path := range []string{"reports.json", "spike_score.json"} {
+			rec := serveAPIKey(mux, fmt.Sprintf("198.51.100.%d", 40+2*i+j), "/api/v2/newspaper/"+path, tc.sig)
+			if rec.Code != tc.status || !strings.Contains(rec.Body.String(), tc.want) {
+				t.Errorf("%s %s: %d %s, want %d with %q", tc.name, path, rec.Code, rec.Body.String(), tc.status, tc.want)
+			}
 		}
 	}
 }
