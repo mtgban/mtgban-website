@@ -46,8 +46,8 @@ func TestArbitDefaultsMatchToday(t *testing.T) {
 		{"reverse", arbitMode{Reverse: true}, 10, 0, 0, ProfConst, 0, 0, false, false},
 		{"sealed arbit", arbitMode{Sealed: true}, -30, 0, math.Inf(-1), ProfConst, 0, 0, false, false},
 		{"sealed reverse", arbitMode{Reverse: true, Sealed: true}, -30, 0, math.Inf(-1), ProfConst, 0, 0, false, false},
-		{"global", arbitMode{Global: true}, 200, 1000, 5, ProfConst, 1, 1, true, true},
-		{"global with AnySpread", arbitMode{Global: true, AnySpread: true}, 50, 1000, 5, ProfConst, 1, 1, true, true},
+		{"global", arbitMode{Global: true}, 200, 1000 + shownStep, 5, ProfConst, 1, 1, true, true},
+		{"global with AnySpread", arbitMode{Global: true, AnySpread: true}, 50, 1000 + shownStep, 5, ProfConst, 1, 1, true, true},
 		{"global sealed", arbitMode{Global: true, Sealed: true}, 10, 0, 1, ProfConst, 0, 0, true, false},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
@@ -93,10 +93,10 @@ func TestArbitFloors(t *testing.T) {
 		{"arbit", arbitMode{}, "minspread=-500&mindiff=-500", -30, -100, 0},
 		{"reverse", arbitMode{Reverse: true}, "minspread=-500&mindiff=-500", -30, -100, 0},
 		{"sealed arbit has no difference floor", arbitMode{Sealed: true}, "minspread=-500&mindiff=-500", -30, -500, 0},
-		{"global", arbitMode{Global: true}, "minspread=0&mindiff=-5&maxspread=0", 200, 0, 1000},
-		{"global with AnySpread", arbitMode{Global: true, AnySpread: true}, "minspread=0&maxspread=5000", 50, 5, 1000},
+		{"global", arbitMode{Global: true}, "minspread=0&mindiff=-5&maxspread=0", 200, 0, 1000 + shownStep},
+		{"global with AnySpread", arbitMode{Global: true, AnySpread: true}, "minspread=0&maxspread=5000", 50, 5, 1000 + shownStep},
 		{"global sealed", arbitMode{Global: true, Sealed: true}, "minspread=-500&mindiff=-500", -30, -100, 0},
-		{"a value above the floor stands", arbitMode{Global: true}, "minspread=350&mindiff=12", 350, 12, 1000},
+		{"a value above the floor stands", arbitMode{Global: true}, "minspread=350&mindiff=12", 350, 12, 1000 + shownStep},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
 			opts, rows := parseArbitQuery(t, tt.query).apply(backend(), currentPrices(), tt.mode)
@@ -420,6 +420,38 @@ func TestArbitMinDiffAndSpreadAsShown(t *testing.T) {
 			if e.Difference >= 1 || fmt.Sprintf("%.2f %.2f", e.Difference, e.Spread) != "1.00 29.85" {
 				t.Errorf("the trade differs by %v and spreads %v, want just under the 1.00 it shows", e.Difference, e.Spread)
 			}
+		}
+	}
+}
+
+// TestArbitGlobalMaxSpreadAsShown keeps a Global row spreading 1000.004%,
+// shown as the 1000.00 the page caps it at, and drops one shown as 1000.01.
+func TestArbitGlobalMaxSpreadAsShown(t *testing.T) {
+	b := &matcher.Backend{UUIDs: map[string]*matcher.CardObject{
+		"card": {Card: matcher.Card{Name: "Plain Card", Rarity: "rare", SetCode: "AAA", Number: "10"}, Edition: "Alpha Set"},
+	}}
+	probe := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		"card": {{Conditions: "NM", Price: 1, Quantity: 1}},
+	}, mtgban.ScraperInfo{Name: "probe"})
+	m := arbitMode{Global: true}
+	opts, rows := parseArbitQuery(t, "").apply(b, currentPrices(), m)
+	// The Legit toggle, on by default, drops a card TCGMarket has no price for
+	opts.CustomPriceFilter = nil
+	for _, tt := range []struct {
+		price float64
+		keep  bool
+	}{
+		{11.00004, true},
+		{11.0001, false},
+	} {
+		reference := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			"card": {{Conditions: "NM", Price: tt.price, Quantity: 1}},
+		}, mtgban.ScraperInfo{Name: "reference"})
+		arbit := slices.DeleteFunc(compareStores(b, opts, m, probe, reference), func(e mtgban.ArbitEntry) bool {
+			return !rows.keep(e, false)
+		})
+		if (len(arbit) == 1) != tt.keep {
+			t.Errorf("against %v keeps %d rows, want the row kept: %v", tt.price, len(arbit), tt.keep)
 		}
 	}
 }
