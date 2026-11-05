@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -1235,8 +1236,9 @@ func TestNewspaperSalesJobRunsOnOneSite(t *testing.T) {
 	}
 }
 
-// TestVelocityRateOnInfoPages shows the rate and its tooltip on arbitrage and Global,
-// whatever the reader's tier, on the card selling fast enough alone.
+// TestVelocityRateOnInfoPages shows the rate and its tooltip on arbitrage, Global
+// and upload's optimizer, whatever the reader's tier, on the card selling fast
+// enough alone, and none on upload's results.
 func TestVelocityRateOnInfoPages(t *testing.T) {
 	cards := closeVendors(t)
 	for _, name := range []string{"Arbitrage", "Global"} {
@@ -1251,10 +1253,12 @@ func TestVelocityRateOnInfoPages(t *testing.T) {
 	stock := mtgban.InventoryRecord{}
 	probe := mtgban.InventoryRecord{}
 	ref := mtgban.InventoryRecord{}
+	rows := ""
 	for _, card := range cards {
 		stock[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 1, Quantity: 2, URL: "u"}}
 		probe[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 10, Quantity: 2, URL: "u"}}
 		ref[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 100}}
+		rows += card + "\t1\t\t0\t\n"
 	}
 	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(stock, sessionInfo("ZZS")),
@@ -1289,6 +1293,15 @@ func TestVelocityRateOnInfoPages(t *testing.T) {
 			testSite.Global(rec, req)
 			return rec.Body.String()
 		},
+		"upload": func(cookie *http.Cookie) string {
+			form := url.Values{"mode": {"true"}, "stores": {"ZZV", "ZZW"}, "rows": {rows}}
+			req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.AddCookie(cookie)
+			rec := httptest.NewRecorder()
+			testSite.Upload(rec, req)
+			return rec.Body.String()
+		},
 	}
 
 	signingEnabled(t, true)
@@ -1296,6 +1309,7 @@ func TestVelocityRateOnInfoPages(t *testing.T) {
 		fields := url.Values{
 			"UserEmail": {"reader@example.com"}, "UserTier": {"Test"},
 			"ArbitEnabled": {"ALL"}, "AnyEnabled": {"true"},
+			"UploadBuylistEnabled": {"true"}, "UploadChangeStoresEnabled": {"true"},
 		}
 		if news != "" {
 			fields.Set("NewsEnabled", news)
@@ -1317,6 +1331,9 @@ func TestVelocityRateOnInfoPages(t *testing.T) {
 		}
 		if !strings.Contains(page(reader("")), shown) {
 			t.Errorf("%s: the rate is hidden without the Newspaper", name)
+		}
+		if name == "upload" && regexp.MustCompile(`ures-card-set[^\n]*bl-velocity`).MatchString(got) {
+			t.Error("upload: a rate on the results table")
 		}
 		if !strings.Contains(got, "INFO</th>") {
 			t.Errorf("%s: no INFO column", name)
