@@ -87,6 +87,36 @@
         });
     }
 
+    // ensureKey returns the key the set rows are encrypted with, creating it if
+    // there is none. What a lost key encrypted can't be read again, so a new key
+    // takes the rows and the record of their sync with it, in one transaction:
+    // no reader sees a new key over old rows, and the next sync starts over.
+    function ensureKey() {
+        return getMeta('aesKey').then(function(key) {
+            if (key) return key;
+            return crypto.subtle.generateKey(
+                { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+            ).then(function(fresh) {
+                return withTx(['meta', 'sets'], 'readwrite', function(tx, out) {
+                    var meta = tx.objectStore('meta');
+                    var req = meta.get('aesKey');
+                    req.onsuccess = function() {
+                        // Another tab got here first; its key stands
+                        if (req.result) {
+                            out.result = req.result.v;
+                            return;
+                        }
+                        tx.objectStore('sets').clear();
+                        meta.delete('lastSync');
+                        meta.delete('missingSets');
+                        meta.put({ k: 'aesKey', v: fresh });
+                        out.result = fresh;
+                    };
+                });
+            });
+        });
+    }
+
     function putSet(row) {
         return withTx(['sets'], 'readwrite', function(tx) {
             tx.objectStore('sets').put(row);
@@ -234,6 +264,7 @@
         isGhostDb: isGhostDb,
         getMeta: getMeta,
         setMeta: setMeta,
+        ensureKey: ensureKey,
         putSet: putSet,
         getSet: getSet,
         hasSet: hasSet,

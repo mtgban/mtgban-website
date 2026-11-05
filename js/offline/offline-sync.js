@@ -87,18 +87,10 @@ async function runSync(msg) {
             .then(function(r) { return r.json(); });
         post({ type: 'progress', stage: 'manifest', done: 1, total: 1 });
 
-        // Opt-in provisions the key; regenerate defensively if it is missing.
         // msg.full is the settings "force resync" button: take everything the
         // manifest lists rather than only what changed since last time.
         var fullResync = !!msg.full;
-        var newKey = false;
-        var key = await self.OfflineDB.getMeta('aesKey');
-        if (!key) {
-            key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
-            await self.OfflineDB.setMeta('aesKey', key);
-            newKey = true;
-            fullResync = true; // Regenerated key cannot decrypt existing blobs.
-        }
+        var key = await self.OfflineDB.ensureKey();
 
         stage = 'catalog';
         var catalogVersion = await self.OfflineDB.getMeta('catalogVersion');
@@ -118,11 +110,8 @@ async function runSync(msg) {
         var storesKey = stores.slice().sort().join(',');
         fullResync = fullResync || storesKey !== await self.OfflineDB.getMeta('storesKey');
 
-        // A new key cannot decrypt what is stored, so none of it counts as here.
         var have = {};
-        if (!newKey) {
-            (await self.OfflineDB.listSetVersions()).forEach(function(row) { have[row.code] = row.version; });
-        }
+        (await self.OfflineDB.listSetVersions()).forEach(function(row) { have[row.code] = row.version; });
 
         var changed = Object.keys(manifest.sets || {}).filter(function(code) {
             if (editions.length > 0 && editions.indexOf(code) < 0) return false;
@@ -152,9 +141,9 @@ async function runSync(msg) {
                     state.failed++;
                     // A full resync can leave the failed set's row stamped with
                     // this version, which the next sync would skip: unstamp it,
-                    // keeping its prices for offline use unless the key is new
+                    // keeping its prices for offline use
                     if (fullResync) {
-                        try { await unstampSet(code, newKey); } catch (e2) {}
+                        try { await unstampSet(code); } catch (e2) {}
                     }
                 }
                 post({ type: 'progress', stage: 'prices', done: state.done + state.failed, total: changed.length, code: code });
@@ -201,15 +190,12 @@ async function runSync(msg) {
     }
 }
 
-// unstampSet makes the next sync fetch a set again: its row loses its version,
-// or goes whole when a new key cannot decrypt it. A kept row has the prices of
-// the stores it was last fetched for, until that next sync replaces them.
-async function unstampSet(code, newKey) {
-    var row = newKey ? null : await self.OfflineDB.getSet(code);
-    if (!row) {
-        await self.OfflineDB.deleteRow('sets', code);
-        return;
-    }
+// unstampSet makes the next sync fetch a set again: its row loses its version.
+// The row keeps the prices of the stores it was last fetched for, until that
+// next sync replaces them.
+async function unstampSet(code) {
+    var row = await self.OfflineDB.getSet(code);
+    if (!row) return;
     row.version = null;
     await self.OfflineDB.putSet(row);
 }
