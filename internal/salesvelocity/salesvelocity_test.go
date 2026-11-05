@@ -6,11 +6,9 @@ import (
 	"time"
 )
 
-// storeOf is a store whose last load is cards.
-func storeOf(cards map[string]*Sales) *Store {
-	s := &Store{}
-	s.Publish(&Snapshot{Day: time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC), Cards: cards, Window: Window})
-	return s
+// snapshotOf is a load of cards.
+func snapshotOf(cards map[string]*Sales) *Snapshot {
+	return &Snapshot{Day: time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC), Cards: cards, Window: Window}
 }
 
 // TestBuild keys the pairs by card, adds up pairs on one card,
@@ -114,7 +112,7 @@ func TestDue(t *testing.T) {
 // TestFor answers a loaded card's sales, and nothing for a card
 // not loaded or before any load.
 func TestFor(t *testing.T) {
-	s := storeOf(map[string]*Sales{"card": {Copies: 69, Orders: 31, Days: 18}})
+	s := snapshotOf(map[string]*Sales{"card": {Copies: 69, Orders: 31, Days: 18}})
 	got, found := s.For("card")
 	if !found || got != (Sales{Copies: 69, Orders: 31, Days: 18}) {
 		t.Errorf("card: got %+v, %v", got, found)
@@ -123,7 +121,7 @@ func TestFor(t *testing.T) {
 	if found {
 		t.Error("missing: found")
 	}
-	_, found = (&Store{}).For("card")
+	_, found = (*Snapshot)(nil).For("card")
 	if found {
 		t.Error("nothing loaded: found")
 	}
@@ -217,7 +215,7 @@ func TestText(t *testing.T) {
 // TestView words a loaded card and leaves a card with no data blank.
 func TestView(t *testing.T) {
 	v := Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
-	s := storeOf(map[string]*Sales{"card": &v})
+	s := snapshotOf(map[string]*Sales{"card": &v})
 	wantRate, wantDetail := text(v, Window)
 	rate, detail, _ := s.View("card")
 	if rate != wantRate || detail != wantDetail {
@@ -227,11 +225,18 @@ func TestView(t *testing.T) {
 	if rate != "" || detail != "" {
 		t.Errorf("missing: got %q, %q; want nothing", rate, detail)
 	}
+	rate, detail, _ = (*Snapshot)(nil).View("card")
+	if rate != "" || detail != "" {
+		t.Errorf("nothing loaded: got %q, %q; want nothing", rate, detail)
+	}
+	if rates := (*Snapshot)(nil).Rates([]string{"card"}); len(rates) != 0 {
+		t.Errorf("nothing loaded: got rates %v", rates)
+	}
 }
 
 // TestViewNotable leaves out every rate that prints as 0.1/day or less.
 func TestViewNotable(t *testing.T) {
-	s := storeOf(map[string]*Sales{
+	s := snapshotOf(map[string]*Sales{
 		"zero":  {},
 		"tenth": {Copies: 3},
 		"round": {Copies: 4},

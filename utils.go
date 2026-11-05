@@ -24,6 +24,7 @@ import (
 	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/notify"
+	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 	"github.com/mtgban/mtgban-website/internal/siteorigin"
 )
 
@@ -1061,7 +1062,6 @@ func uuid2card(b *matcher.Backend, p *prices, cardID string, preferFlavorName bo
 	if newHigh {
 		hotlistNewTip = ckNewHighTipFor(co)
 	}
-	velocity, velocityDetail, velocityNotable := salesVelocityStore.View(co.UUID)
 
 	return GenericCard{
 		UUID:           co.UUID,
@@ -1117,9 +1117,6 @@ func uuid2card(b *matcher.Backend, p *prices, cardID string, preferFlavorName bo
 		CKPause:           ck.PauseLabel,
 		CKPauseWait:       ck.PauseWait,
 		CKPauseTip:        ck.PauseTip,
-		Velocity:          velocity,
-		VelocityDetail:    velocityDetail,
-		VelocityNotable:   velocityNotable,
 		Newspaper:         newspaper,
 		HasContentWarning: co.Card.HasContentWarning,
 		CropURL:           cropURL,
@@ -1175,8 +1172,21 @@ func cardPrintings(b *matcher.Backend, cardID string) string {
 	return genCardPrintings(b, co)
 }
 
+// fillSales reads the card's rate and details from sales, none when it is nil.
+func (c *GenericCard) fillSales(sales *salesvelocity.Snapshot) {
+	c.Velocity, c.VelocityDetail, c.VelocityNotable = sales.View(c.UUID)
+}
+
 // cardMetadata is what a page shows of each card it lists, keyed by card id.
 type cardMetadata map[string]GenericCard
+
+// fillSales reads every card's rate and details from sales.
+func (m cardMetadata) fillSales(sales *salesvelocity.Snapshot) {
+	for cardID, card := range m {
+		card.fillSales(sales)
+		m[cardID] = card
+	}
+}
 
 // add reads a card's details into m, once: a card already there is kept.
 func (m cardMetadata) add(b *matcher.Backend, p *prices, cardID string, preferFlavor bool) {

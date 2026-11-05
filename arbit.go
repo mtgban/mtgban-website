@@ -1061,6 +1061,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 			pageVars.Metadata.add(b, p, arbit[i].CardID, preferFlavor)
 		}
 	}
+	pageVars.Metadata.fillSales(salesVelocityStore.Snapshot())
 
 	if len(pageVars.Arb) == 0 {
 		pageVars.InfoMessage = "No arbitrage available!"

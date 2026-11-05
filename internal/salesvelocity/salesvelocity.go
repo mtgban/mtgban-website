@@ -328,13 +328,12 @@ func build(rows []salesRow, last []lastRow, match func(productID int64, variant 
 	return cards, unmatched
 }
 
-// For is a copy of a card's loaded sales, false when it has none.
-func (s *Store) For(cardID string) (Sales, bool) {
-	snap := s.current.Load()
-	if snap == nil {
+// For is a copy of a card's sales, false when it has none or s is nil.
+func (s *Snapshot) For(cardID string) (Sales, bool) {
+	if s == nil {
 		return Sales{}, false
 	}
-	v, found := snap.Cards[cardID]
+	v, found := s.Cards[cardID]
 	if !found {
 		return Sales{}, false
 	}
@@ -382,7 +381,7 @@ const notableFloor = 0.15
 
 // View is a card's rate and details, both empty without data, and whether it
 // sells fast enough to show the rate on a table of cards.
-func (s *Store) View(cardID string) (rate, detail string, notable bool) {
+func (s *Snapshot) View(cardID string) (rate, detail string, notable bool) {
 	v, found := s.For(cardID)
 	if !found {
 		return "", "", false
@@ -392,7 +391,7 @@ func (s *Store) View(cardID string) (rate, detail string, notable bool) {
 }
 
 // Rates is the copies sold a day of each card with data.
-func (s *Store) Rates(cardIDs []string) map[string]float64 {
+func (s *Snapshot) Rates(cardIDs []string) map[string]float64 {
 	rates := make(map[string]float64, len(cardIDs))
 	for _, cardID := range cardIDs {
 		v, found := s.For(cardID)

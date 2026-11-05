@@ -69,10 +69,11 @@ Arbitrage, Reverse, Global and upload's optimizer show the rate as a line of
 text in the INFO column, beside Card Kingdom's signal where it shows, with the
 row's details as its tooltip. Upload's results table has no such column and shows
 no rate. A rate that prints as `0.1/day` or less is left out, being noise on these
-tables. The rows already carry the text from `uuid2card`, so the line costs only
-its own HTML. These pages check no tier: every tier with Arbitrage, Reverse or
-Global also has the Newspaper, and on upload's optimizer, which Pioneer also
-reaches without it, the rate is allowed through. These pages have no phone layout
+tables. Each page reads the loaded sales once and fills its rows' text from them
+(`cardMetadata.fillSales`), so the line costs only its own HTML. These pages
+check no tier: every tier with Arbitrage, Reverse or Global also has the
+Newspaper, and on upload's optimizer, which Pioneer also reaches without it,
+the rate is allowed through. These pages have no phone layout
 of their own, so a phone gets the same line.
 
 ## On the Sleepers page
@@ -107,6 +108,10 @@ handler set `SearchConfig.VelocitySort`, which Search and the export do for a
 `newspaperTier` reader. Others get the default order and, once sales are loaded,
 the pill greyed out with no link and the tooltip `Increase your tier to sort by
 sales velocity`, even after typing `sort:velocity`, which otherwise hides the pills.
+
+A search reads the loaded sales once, into `SearchConfig.Sales`, and
+`unlockVelocity` hands the filters the same load, so a load published
+mid-request cannot filter on one day and show or sort by another.
 
 ## The loader
 

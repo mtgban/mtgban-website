@@ -352,7 +352,7 @@ func TestSearchMetadataLabelsProducts(t *testing.T) {
 	co, product := randomSourceCard(t)
 
 	ds := currentDatastore()
-	metadata, _ := searchMetadata(ds, currentPrices(), []string{co.UUID}, false)
+	metadata, _ := searchMetadata(ds, currentPrices(), nil, []string{co.UUID}, false)
 	card, ok := metadata[co.UUID]
 	if !ok {
 		t.Fatal("searchMetadata returned no card")
@@ -386,7 +386,7 @@ func TestUUID2CardBuildsProductsOnce(t *testing.T) {
 	if labelled.NumProducts != plain.NumProducts {
 		t.Errorf("NumProducts %d with odds, %d without", labelled.NumProducts, plain.NumProducts)
 	}
-	metadata, _ := searchMetadata(ds, currentPrices(), []string{co.UUID}, false)
+	metadata, _ := searchMetadata(ds, currentPrices(), nil, []string{co.UUID}, false)
 	if metadata[co.UUID].Products != labelled.Products {
 		t.Errorf("searchMetadata's Products differ from uuid2card's with the same odds:\n%s\n%s",
 			metadata[co.UUID].Products, labelled.Products)
@@ -397,7 +397,7 @@ func TestSearchMetadataLeavesSealedProductsAlone(t *testing.T) {
 	skipWithoutDatastore(t)
 	uuids := sealedUUIDs(t, 1)
 
-	metadata, _ := searchMetadata(currentDatastore(), currentPrices(), uuids, false)
+	metadata, _ := searchMetadata(currentDatastore(), currentPrices(), nil, uuids, false)
 	card := metadata[uuids[0]]
 	plain := uuid2card(backend(), currentPrices(), uuids[0], false, nil)
 	if card.Products != plain.Products || card.NumProducts != plain.NumProducts {

@@ -18,6 +18,7 @@ import (
 	"github.com/mtgban/go-mtgban/matcher/magic"
 	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
 
 type SearchConfig struct {
@@ -84,6 +85,10 @@ type SearchConfig struct {
 	// Allow sorting by sales velocity, set by a handler that has checked the
 	// reader's tier
 	VelocitySort bool
+
+	// The sales the request shows and sorts by, read once where it starts;
+	// unlockVelocity hands the filters the same
+	Sales *salesvelocity.Snapshot
 }
 
 type FilterElem struct {
@@ -108,6 +113,9 @@ type FilterElem struct {
 	// The search resolves it, with the datastore in hand, into Members.
 	Pool    *SearchConfig
 	Members map[string]bool
+
+	// Sales is what a velocity filter judges cards by, set by unlockVelocity.
+	Sales *salesvelocity.Snapshot
 }
 
 type FilterStoreElem struct {
@@ -2588,10 +2596,6 @@ func applyCardFilter(b *matcher.Backend, p *prices, name string, filters []strin
 		return cardFilterOn(p, filters, co)
 	case "is":
 		return cardFilterIs(b, filters, co)
-	case "velocity_greater_than":
-		return cardFilterVelocityGreaterThan(filters, co)
-	case "velocity_less_than":
-		return cardFilterVelocityLessThan(filters, co)
 	}
 	panic(name + " option not found")
 }
@@ -3136,6 +3140,10 @@ func shouldSkipCard(b *matcher.Backend, p *prices, co *matcher.CardObject, filte
 		case "on":
 			// Members holds the cards of the backpacks it names.
 			res = cardFilterOn(p, filters[i].Values, co) && !filters[i].Members[co.UUID]
+		case "velocity_greater_than":
+			res = cardFilterVelocityGreaterThan(filters[i].Sales, filters[i].Values, co)
+		case "velocity_less_than":
+			res = cardFilterVelocityLessThan(filters[i].Sales, filters[i].Values, co)
 		default:
 			res = applyCardFilter(b, p, filters[i].Name, filters[i].Values, co)
 		}

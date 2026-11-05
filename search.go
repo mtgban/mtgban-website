@@ -28,6 +28,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
+	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 	"github.com/mtgban/mtgban-website/internal/siteorigin"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 )
@@ -718,9 +719,10 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	config := parseSearchPage(ds, p, query, pageVars.IsSealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)
-	pageVars.HasVelocity = salesVelocityStore.Snapshot() != nil
+	config.Sales = salesVelocityStore.Snapshot()
+	pageVars.HasVelocity = config.Sales != nil
 	if pageVars.CanVelocity {
-		unlockVelocity(config.CardFilters)
+		unlockVelocity(config.CardFilters, config.Sales)
 		config.VelocitySort = true
 	} else if lockedVelocity(config.CardFilters) {
 		pageVars.VelocityNotice = VelocityLockedMessage
@@ -765,14 +767,14 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sort sets as requested, default to chronological
-	shown := orderSearchKeys(r, ds, p, result, pageVars.SearchSort)
+	shown := orderSearchKeys(r, ds, p, result, config.Sales, pageVars.SearchSort)
 	pageVars.ReverseMode = shown.reversed
 	pageVars.Pagination = shown.pagination
 
 	result.sellers, result.vendors = collectOffers(b, p, r, config, shown.keys)
 	applyStoreFactors(result, readStoreFactors(r))
 
-	pageVars.Metadata, pageVars.Printings = searchMetadata(ds, p, shown.keys, preferFlavor)
+	pageVars.Metadata, pageVars.Printings = searchMetadata(ds, p, config.Sales, shown.keys, preferFlavor)
 
 	// Optionally sort according to price
 	if !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores" {
@@ -817,9 +819,9 @@ func searchTitle(title string, charting, sealed, editions bool) string {
 }
 
 // searchMetadata reads what the page shows of each card on it: its details,
-// and its printings row for the sidebar. It does not use cardMetadata.add,
-// because ChartID is set before the card is stored.
-func searchMetadata(ds *datastore, p *prices, keys []string, preferFlavor bool) (cardMetadata, map[string]string) {
+// its sales, and its printings row for the sidebar. It does not use
+// cardMetadata.add, because ChartID is set before the card is stored.
+func searchMetadata(ds *datastore, p *prices, sales *salesvelocity.Snapshot, keys []string, preferFlavor bool) (cardMetadata, map[string]string) {
 	b := ds.backend
 	metadata := cardMetadata{}
 	printings := map[string]string{}
@@ -837,6 +839,7 @@ func searchMetadata(ds *datastore, p *prices, keys []string, preferFlavor bool) 
 		// ban:<id> here rather than inside uuid2card, which also feeds pages
 		// that never chart.
 		card.ChartID = chartIDForCard(b, cardID)
+		card.fillSales(sales)
 		metadata[cardID] = card
 		printings[cardID] = cardPrintings(b, cardID)
 	}
@@ -911,7 +914,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 		oembedError(w, http.StatusNotFound)
 		return
 	}
-	keys := orderSearchKeys(page, ds, p, result, readSearchSort(page, config)).keys
+	keys := orderSearchKeys(page, ds, p, result, config.Sales, readSearchSort(page, config)).keys
 	result.sellers, result.vendors = collectOffers(b, p, page, config, keys)
 	sortOfferRows(page, keys, result)
 
@@ -1301,9 +1304,9 @@ func searchPageSize(r *http.Request) int {
 // orderSearchKeys sorts the results as the reader asked and returns the page
 // of them to show. The sort works in place: CardHashes is the same slice, and
 // the Uploader transfer posts it in this order.
-func orderSearchKeys(r *http.Request, ds *datastore, p *prices, result searchResults, sortMode string) searchPage {
+func orderSearchKeys(r *http.Request, ds *datastore, p *prices, result searchResults, sales *salesvelocity.Snapshot, sortMode string) searchPage {
 	var shown searchPage
-	shown.reversed = sortSearchKeys(r, ds, p, result.keys, result.odds, sortMode)
+	shown.reversed = sortSearchKeys(r, ds, p, result.keys, result.odds, sales, sortMode)
 
 	// If results can't fit in one page, chunk response and enable pagination
 	shown.keys = result.keys
@@ -1320,8 +1323,9 @@ func orderSearchKeys(r *http.Request, ds *datastore, p *prices, result searchRes
 }
 
 // sortSearchKeys orders keys in place as the reader asked, odds being what a
-// variable search's cards are expected at, and says whether it reversed them.
-func sortSearchKeys(r *http.Request, ds *datastore, p *prices, allKeys []string, odds map[string]float64, sortMode string) bool {
+// variable search's cards are expected at and sales what they sell at, and
+// says whether it reversed them.
+func sortSearchKeys(r *http.Request, ds *datastore, p *prices, allKeys []string, odds map[string]float64, sales *salesvelocity.Snapshot, sortMode string) bool {
 	b := ds.backend
 	sortData := resolveSortingData(b, allKeys)
 
@@ -1361,7 +1365,7 @@ func sortSearchKeys(r *http.Request, ds *datastore, p *prices, allKeys []string,
 	case "velocity":
 		// Fastest first. A card with no data is not one selling none, so as
 		// with odds it sorts last in either direction.
-		rates := salesVelocityStore.Rates(allKeys)
+		rates := sales.Rates(allKeys)
 		less = func(i, j int) bool {
 			rateI, hasI := rates[allKeys[i]]
 			rateJ, hasJ := rates[allKeys[j]]

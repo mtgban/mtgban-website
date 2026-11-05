@@ -111,7 +111,7 @@ func checkSetOrders(t *testing.T, b *matcher.Backend) {
 				r := httptest.NewRequest("GET", "/search?reverse="+strconv.FormatBool(reversed), nil)
 				for mode, less := range map[string]func(a, b *SortingData) bool{"chrono": chrono, "number": number} {
 					sorted := slices.Clone(keys)
-					sortSearchKeys(r, ds, currentPrices(), sorted, nil, mode)
+					sortSearchKeys(r, ds, currentPrices(), sorted, nil, nil, mode)
 					// Every pair is compared, so read each printing's data once
 					data := make([]*SortingData, len(sorted))
 					for i, key := range sorted {

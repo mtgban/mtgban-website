@@ -788,6 +788,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	fillUploadEntries(&pageVars.UploadVars, r, b, in, uploadName, uploadedData)
 
 	pageVars.Metadata = uploadMetadata(b, p, st, uploadedData)
+	pageVars.Metadata.fillSales(salesVelocityStore.Snapshot())
 
 	rows := priceUploadRows(b, blMode, st, prices, indexes, uploadedData)
 	pageVars.TotalEntries = rows.totalEntries
