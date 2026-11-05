@@ -654,6 +654,8 @@ override; phone UA detection via `mileusna/useragent`).
   no sale in the year. Shown only to the Newspaper tiers (`newspaperTier`,
   news.go, through `SearchVars.CanVelocity`); other readers get an upsell
   line in its place unless `noUpsell` is set. Never in the oEmbed preview.
+  Arbitrage and Reverse show a rate over `0.1/day` as text in the INFO
+  column, with the row's details as its tooltip, for whoever reaches them.
 
 ### 5.2 Upload (`upload.go`)
 

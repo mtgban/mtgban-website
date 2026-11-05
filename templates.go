@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"html/template"
 	"net/url"
 	"slices"
@@ -549,6 +550,14 @@ var funcMap = template.FuncMap{
 			return `<span class="bl-ck bl-ck-sell">Sell now</span>`
 		}
 		return ""
+	},
+	// velocity_rate is the rate a card sells at, for INFO, where it is worth showing.
+	"velocity_rate": func(card GenericCard) template.HTML {
+		if !card.VelocityNotable {
+			return ""
+		}
+		return template.HTML(fmt.Sprintf(`<span class="bl-velocity" title="%s" data-tip="%s">%s</span>`,
+			html.EscapeString(plainTip(card.VelocityDetail)), html.EscapeString(card.VelocityDetail), html.EscapeString(card.Velocity)))
 	},
 	// direct_stock is TCGplayer Direct's stock of a card in a grade, 0 where
 	// the last scrape did not see it.
