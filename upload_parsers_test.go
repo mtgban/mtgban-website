@@ -8,11 +8,16 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/xuri/excelize/v2"
 
 	"github.com/mtgban/mtgban-website/internal/docparse"
@@ -930,5 +935,102 @@ func TestReadCollectionPageReadsARowAsFarAsItGoes(t *testing.T) {
 				t.Errorf("row = %+v, want Ice Age, quantity 2", entries[0])
 			}
 		})
+	}
+}
+
+// toCollectionServer sends every request to srv in place of TCGplayer.
+type toCollectionServer struct {
+	next http.RoundTripper
+	srv  *url.URL
+}
+
+func (rt toCollectionServer) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	req.URL.Scheme = rt.srv.Scheme
+	req.URL.Host = rt.srv.Host
+	req.Host = ""
+	return rt.next.RoundTrip(req)
+}
+
+// useCollectionServer points the TCGplayer client at srv, with the given
+// timeout, for one test.
+func useCollectionServer(t *testing.T, srv *httptest.Server, timeout time.Duration) {
+	t.Helper()
+	target, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := tcgCollectionClient
+	tcgCollectionClient = mtgban.NewHTTPClient(
+		mtgban.WithHTTPTimeout(timeout),
+		mtgban.WithHTTPRetries(0),
+		mtgban.WithHTTPTransport(func(next http.RoundTripper) http.RoundTripper {
+			return toCollectionServer{next: next, srv: target}
+		}),
+	)
+	t.Cleanup(func() { tcgCollectionClient = saved })
+}
+
+const collectionLink = "https://store.tcgplayer.com/collection/view/1"
+
+func TestLoadCollectionReadsThePage(t *testing.T) {
+	quietUploadLog(t)
+
+	header := []string{"Name", "Set", "Printing", "Condition", "Quantity", "Notes"}
+	rows := map[string][]string{"9999": {"Counterspell", "Ice Age", "Normal", "LP", "2", ""}}
+	page, err := io.ReadAll(collectionPage(header, rows, []string{"9999"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write(page)
+	}))
+	defer srv.Close()
+	useCollectionServer(t, srv, 30*time.Second)
+
+	entries, name, err := loadCollection(context.Background(), collectionParser(), collectionLink, uploadRowLimit)
+	if err != nil || name != "Fuzz's Collection" || len(entries) != 1 {
+		t.Fatalf("got %d rows of %q, %v, want 1 row of Fuzz's Collection", len(entries), name, err)
+	}
+}
+
+// A page that stalls mid-body is cut off by the client's timeout.
+func TestLoadCollectionStalledBodyTimesOut(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><head><title>`))
+		err := http.NewResponseController(w).Flush()
+		if err != nil {
+			t.Error(err)
+		}
+		select {
+		case <-r.Context().Done():
+		case <-time.After(5 * time.Second):
+		}
+	}))
+	defer srv.Close()
+	useCollectionServer(t, srv, 200*time.Millisecond)
+
+	start := time.Now()
+	_, _, err := loadCollection(context.Background(), collectionParser(), collectionLink, uploadRowLimit)
+	if err == nil {
+		t.Fatal("a stalled page read without error")
+	}
+	elapsed := time.Since(start)
+	if elapsed > 2*time.Second {
+		t.Fatalf("stalled page took %v to fail, want about the 200ms timeout", elapsed)
+	}
+}
+
+// A page past the cap is refused, not parsed as however many rows fit.
+func TestLoadCollectionOversizePageErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(strings.Repeat(" ", maxCollectionPage+1)))
+	}))
+	defer srv.Close()
+	useCollectionServer(t, srv, 30*time.Second)
+
+	_, _, err := loadCollection(context.Background(), collectionParser(), collectionLink, uploadRowLimit)
+	if err == nil || !strings.Contains(err.Error(), "larger than") {
+		t.Fatalf("got %v, want a page past maxCollectionPage refused", err)
 	}
 }

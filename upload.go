@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/xuri/excelize/v2"
 	"gopkg.in/Iwark/spreadsheet.v2"
 
@@ -2965,6 +2965,18 @@ func resolveMoxItem(b *matcher.Backend, item moxfield.Item) (string, error) {
 	return b.MatchID(printings[0].UUID, item.IsFoil, item.IsEtched)
 }
 
+// tcgCollectionClient gives up on a stalled TCGplayer rather than holding
+// the upload, and retries nothing, so one that is down fails at once.
+var tcgCollectionClient = mtgban.NewHTTPClient(
+	mtgban.WithHTTPTimeout(30*time.Second),
+	mtgban.WithHTTPRetries(0),
+	mtgban.WithHTTPErrorHandler(retryablehttp.PassthroughErrorHandler),
+)
+
+// maxCollectionPage is the cap the other importers read a vendor's answer
+// under.
+const maxCollectionPage = 32 << 20
+
 func loadCollection(ctx context.Context, parser *docparse.Parser, link string, maxRows int) ([]UploadEntry, string, error) {
 	// Re-validate the URL locally rather than trusting the caller's host
 	// switch: parse it here and require the exact TCGplayer store host so
@@ -2985,13 +2997,22 @@ func loadCollection(ctx context.Context, parser *docparse.Parser, link string, m
 	if err != nil {
 		return nil, "", err
 	}
-	resp, err := cleanhttp.DefaultClient().Do(req)
+	resp, err := tcgCollectionClient.Do(req)
 	if err != nil {
 		return nil, "", err
 	}
 	defer resp.Body.Close()
 
-	return readCollectionPage(parser, resp.Body, maxRows)
+	// Read whole before parsing, since a cut-off page would parse as fewer rows
+	page, err := io.ReadAll(io.LimitReader(resp.Body, maxCollectionPage+1))
+	if err != nil {
+		return nil, "", err
+	}
+	if len(page) > maxCollectionPage {
+		return nil, "", fmt.Errorf("collection page larger than %d bytes", maxCollectionPage)
+	}
+
+	return readCollectionPage(parser, bytes.NewReader(page), maxRows)
 }
 
 // readCollectionPage parses a TCGplayer collection page: its title, and its
