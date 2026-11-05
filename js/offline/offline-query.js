@@ -200,14 +200,46 @@
         return false;
     }
 
+    // stillTyping says a query's last filter can't be read yet: s:ne is on its
+    // way to s:neo, and f:fo to f:foil, and neither means what it says.
+    function stillTyping(key, val, known, ladder, sets) {
+        var list = val.split(',');
+        switch (key) {
+        case 's':
+        case 'e':
+        case 'set':
+        case 'edition':
+            return !list.every(function (code) { return sets[code.toUpperCase()]; });
+        case 'cn':
+        case 'cns':
+        case 'number':
+            return /(^|[:,])$/.test(val);
+        case 'f':
+            return readFinishes(val, known) === null;
+        case 'r':
+            return !list.every(function (word) {
+                var name = rarityName(word);
+                if (name === '') return false;
+                if (!ladder.length || name.length === 1) return true;
+                return ladder.indexOf(name) !== -1;
+            });
+        }
+        return false;
+    }
+
     // parse reads a query. finishes is the catalog's finish list: a game's own
     // finish, or a short form of one, is taken where the catalog names it,
     // spelled the way it is stored. A card lists the short forms that reach
     // it, so one is matched as itself. rarities is the catalog's rarity list,
     // which a single r: letter is read against. sets is the catalog's set
     // dictionary, which tells a set code from the first word of a name.
-    function parse(str, finishes, rarities, sets) {
+    // options.draft reads a query still being typed: a last filter not finished
+    // is left out, nothing is said about what offline can't answer, and a last
+    // word that narrows to nothing can be dropped by the search (heldWord,
+    // heldNumber), since the next letter may be what it needs.
+    function parse(str, finishes, rarities, sets, options) {
         sets = sets || {};
+        var draft = !!(options && options.draft);
         var ladder = (rarities || []).map(function (rarity) { return rarity && rarity.value; }).filter(Boolean);
         var known = {};
         (finishes || []).forEach(function (finish) {
@@ -230,8 +262,10 @@
         var words = [];
         var digits = [];
         var quoted = false;
+        var lastTokenNumbers = 0;
         for (var i = 0; i < tokens.length; i++) {
             var tok = tokens[i];
+            if (i === tokens.length - 1) lastTokenNumbers = out.number.length;
             if (tok.quoted) {
                 if (tok.text.trim() !== '') {
                     quoted = true;
@@ -263,6 +297,7 @@
             // A leading - negates the filter, as it does online
             var negate = key.charAt(0) === '-';
             if (negate) key = key.slice(1);
+            if (draft && i === tokens.length - 1 && stillTyping(key, val, known, ladder, sets)) continue;
             if (at !== colon) {
                 // Online compares cn: and number: this way (FilterOperations)
                 if (key === 'cn' || key === 'number') {
@@ -317,6 +352,21 @@
             digits.forEach(function (text) { out.number.push(readNumber(text, false)); });
         }
         if (out.names.length) out.setsNamed = setsNamed(out.names.join(' '), sets);
+        if (draft) {
+            out.unsupported = [];
+            var lastTok = tokens[tokens.length - 1];
+            if (out.names.length > 1 && lastTok && !lastTok.quoted && lastTok.text === out.names[out.names.length - 1]) {
+                out.heldWord = true;
+                if (!out.setsNamed.length) out.setsNamed = setsNamed(out.names.slice(0, -1).join(' '), sets);
+            }
+            if (out.number.length > lastTokenNumbers) out.heldNumber = out.number[out.number.length - 1];
+            // A set's code and a dash, on the way to a number as Yu-Gi-Oh prints it
+            var printing = /^([^-]+)-[A-Za-z]{0,2}$/.exec(words.length === 1 ? words[0] : '');
+            if (printing && !out.set.length && sets[printing[1].toUpperCase()]) {
+                out.set = [printing[1].toUpperCase()];
+                out.names = [];
+            }
+        }
         return out;
     }
 
@@ -720,6 +770,18 @@
 
         out.results = toRows(await findCards(parsed, env, stored, out), stored);
 
+        // A last word that finds nothing may just be unfinished.
+        if (!out.results.length && parsed.heldWord) {
+            var shorter = Object.assign({}, parsed, {names: parsed.names.slice(0, -1)});
+            out.results = toRows(await findCards(shorter, env, stored, out), stored);
+        }
+        if (!out.results.length && parsed.heldNumber && (parsed.names.length || parsed.set.length)) {
+            var unnumbered = Object.assign({}, parsed, {
+                number: parsed.number.filter(function (filter) { return filter !== parsed.heldNumber; })
+            });
+            out.results = toRows(await findCards(unnumbered, env, stored, out), stored);
+        }
+
         // A query no name answers may name a set. One the query already
         // narrowed to is not up for reinterpretation.
         if (!out.results.length && !parsed.set.length && (parsed.setsNamed || []).length) {
@@ -736,6 +798,14 @@
         if (view.order) view.order(out.results);
         out.page = view.size === undefined ? out.results : out.results.slice(0, view.size);
         return priceRows(out.page, env);
+    }
+
+    // answerable says a query is worth asking while it is typed: a name needs the
+    // three letters the name scan reads, and without a name a set or a number will do.
+    function answerable(parsed, env) {
+        var needle = env.normName(parsed.names.join(' '));
+        if (needle !== '') return needle.length >= 3;
+        return parsed.set.length > 0 || parsed.number.length > 0;
     }
 
     // execute answers a query. Without a view every row is priced.
@@ -812,6 +882,7 @@
         parse: parse,
         execute: execute,
         showPage: showPage,
+        answerable: answerable,
         sortResults: sortResults,
         resetCaches: resetCaches,
     };
