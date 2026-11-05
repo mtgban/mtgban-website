@@ -7,6 +7,8 @@
         nonfoil: 'nonfoil', nf: 'nonfoil',
         etched: 'etched', e: 'etched'
     };
+    // The finish a query's last character asks for, as online
+    var SUFFIX_FINISH = {'&': 'nonfoil', '*': 'foil', '~': 'etched', '`': 'foil'};
     // INTEGER is what online's strconv.Atoi takes
     var INTEGER = /^[+-]?\d+$/;
 
@@ -72,12 +74,140 @@
         return tokens;
     }
 
+    var MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july',
+        'august', 'september', 'october', 'november', 'december'];
+
+    // extractNumber reads one word as matcher.ExtractNumberAny does: the
+    // number it spells, without its # or padding, or '' when it spells none.
+    // limit is the bound the number after a dash is held to, as ExtractNumber.
+    function extractNumber(word, limit) {
+        if (MONTHS.indexOf(word.toLowerCase()) !== -1) return '';
+        var field = word.replace(/[()#]/g, '');
+        if (field.split('/').length === 2) field = field.split('/')[0].trim();
+        if (/(th|st|nd|rd)$/i.test(field)) return '';
+        var num = field.replace(/^0+/, '');
+        function under(text) {
+            return INTEGER.test(text) && (limit === undefined || parseInt(text, 10) < limit);
+        }
+        if (under(num)) return num;
+        if (num.length < 2) return '';
+        if (!/\d$/.test(num) && under(num.replace(/\D.*$/, ''))) return num.toLowerCase();
+        if (!/^\d/.test(num) && num.charAt(0) !== 'M' && under(num.slice(1).replace(/^0+/, ''))) return num.toLowerCase();
+        var parts = field.split('-');
+        if (parts.length === 2 && extractNumber(parts[1], 1993) !== '') {
+            return parts[0] + '-' + parts[1].replace(/^0+/, '');
+        }
+        return '';
+    }
+
+    // A code ending in "a" does not count, as online's namesASetCode: 30A is
+    // both a set and the shape of a collector number with a letter suffix.
+    function namesASetCode(word, sets) {
+        return !/a$/i.test(word) && !!sets[word.toUpperCase()];
+    }
+
+    // typesSetTotal: a number written with its set total, "222/236", with a
+    // digit somewhere so that a name with a slash in it stays a name.
+    function typesSetTotal(word) {
+        var parts = word.split('/');
+        return parts.length === 2 && parts[0] !== '' && parts[1] !== '' && /\d/.test(word);
+    }
+
+    // writtenAsNumber: digits, after a # if any, then at most a few marks or
+    // letters, "123", "#17a", "107★". An id that starts with a digit is not one.
+    function writtenAsNumber(word) {
+        var bare = word.replace(/^#/, '');
+        var rest = bare.replace(/^\d+/, '');
+        return rest.length < bare.length && !/\d/.test(rest) && Array.from(rest).length <= 3;
+    }
+
+    // wordNumber is the number filter a word asks for, as online's
+    // numberValue: a plain number loosely, one saying more than that exactly
+    // as typed, or null for a word that is no number. The catalog carries no
+    // set total, so one is read as the number it comes with.
+    function wordNumber(word, sets) {
+        if (typesSetTotal(word) && !namesASetCode(word, sets)) {
+            return readNumber(extractNumber(word) || word.split('/')[0].replace(/^#/, '').toLowerCase(), false);
+        }
+        var number = extractNumber(word);
+        if (number === '' || namesASetCode(word, sets)) return null;
+        return /\D/.test(number) ? readNumber(word, true) : readNumber(number, false);
+    }
+
+    // setsNamed is the sets a query with no results could have meant, as
+    // online's setCodeMatches: an exact code or name alone, else every set
+    // whose name carries the query.
+    function setsNamed(query, sets) {
+        var needle = query.replace(/[ \-_']/g, '').toLowerCase();
+        if (needle.length < 3) return [];
+        var contains = [];
+        var codes = Object.keys(sets).sort();
+        for (var i = 0; i < codes.length; i++) {
+            var name = String(sets[codes[i]].n || '').replace(/[ \-_']/g, '').toLowerCase();
+            if (codes[i].toLowerCase() === needle || name === needle) return [codes[i]];
+            if (name.indexOf(needle) !== -1) contains.push(codes[i]);
+        }
+        return contains;
+    }
+
+    // readShortcut reads the free words of a query the way online's
+    // parseSearchOptionsDepth does, reporting whether they were all taken:
+    // "neo 234" and "plst c16-177" are a set and a number, "info-en067" a
+    // number as Yu-Gi-Oh prints it, "222/236" a number with its set total, and
+    // "123" or "17a" a number alone. A number after a name is left in the
+    // name, for execute to take if the whole name finds nothing.
+    function readShortcut(out, words, sets) {
+        var last = words[words.length - 1];
+        var filter;
+        if (words.length === 1 && !out.set.length) {
+            var printed = /^([^-]+)-([A-Za-z]{0,2})(\d+)$/.exec(last);
+            if (printed && sets[printed[1].toUpperCase()]) {
+                filter = readNumber(printed[3].replace(/^0+/, ''), false);
+                filter.values.push(last.toLowerCase());
+                out.set = [printed[1].toUpperCase()];
+                out.printed = last.toLowerCase();
+                out.number.push(filter);
+                out.names = [];
+                return true;
+            }
+        }
+        if (words.length === 2 && !out.set.length && sets[words[0].toUpperCase()]) {
+            filter = wordNumber(last, sets);
+            if (filter) {
+                out.set = [words[0].toUpperCase()];
+                out.number.push(filter);
+                out.names = [];
+                return true;
+            }
+        }
+        if (words.length === 1 && writtenAsNumber(last)) {
+            filter = wordNumber(last, sets);
+            if (filter) {
+                out.bareNumber = last;
+                out.number.push(filter);
+                out.names = [];
+                return true;
+            }
+        }
+        if (typesSetTotal(last) && !namesASetCode(last, sets)) {
+            out.number.push(wordNumber(last, sets));
+            out.names.pop();
+            return false;
+        }
+        if (words.length > 1 && writtenAsNumber(last) && !/^\d+$/.test(last)) {
+            out.trailingNumber = wordNumber(last, sets);
+        }
+        return false;
+    }
+
     // parse reads a query. finishes is the catalog's finish list: a game's own
     // finish, or a short form of one, is taken where the catalog names it,
     // spelled the way it is stored. A card lists the short forms that reach
     // it, so one is matched as itself. rarities is the catalog's rarity list,
-    // which a single r: letter is read against.
-    function parse(str, finishes, rarities) {
+    // which a single r: letter is read against. sets is the catalog's set
+    // dictionary, which tells a set code from the first word of a name.
+    function parse(str, finishes, rarities, sets) {
+        sets = sets || {};
         var ladder = (rarities || []).map(function (rarity) { return rarity && rarity.value; }).filter(Boolean);
         var known = {};
         (finishes || []).forEach(function (finish) {
@@ -86,11 +216,25 @@
             (finish.aliases || []).forEach(function (alias) { known[alias] = true; });
         });
         var out = {names: [], set: [], number: [], finish: [], rarity: [], not: {set: [], finish: [], rarity: []}, unsupported: []};
-        var tokens = tokenize(String(str || ''));
+        var query = String(str || '').trim();
+        // A last character asks for a finish, as it does online
+        var suffix = query.charAt(query.length - 1);
+        if (SUFFIX_FINISH[suffix]) {
+            query = query.replace(/[&*~`]+$/, '');
+            out.finish.push([SUFFIX_FINISH[suffix]]);
+            // The alternate foils are promo types the catalog does not list
+            if (suffix === '`') out.unsupported.push(suffix);
+        }
+        if (query.indexOf('|') !== -1) query = expandBotSyntax(query);
+        var tokens = tokenize(query);
+        var words = [];
+        var digits = [];
+        var quoted = false;
         for (var i = 0; i < tokens.length; i++) {
             var tok = tokens[i];
             if (tok.quoted) {
                 if (tok.text.trim() !== '') {
+                    quoted = true;
                     out.names.push(tok.text);
                 }
                 continue;
@@ -98,8 +242,9 @@
             var colon = tok.text.indexOf(':');
             var operatorish = colon > 0 || /[<>=]/.test(tok.text);
             if (!operatorish) {
+                words.push(tok.text);
                 if (/^\d+$/.test(tok.text)) {
-                    out.number.push(readNumber(tok.text, false));
+                    digits.push(tok.text);
                 } else {
                     out.names.push(tok.text);
                 }
@@ -133,11 +278,11 @@
             case 'set':
             case 'edition':
                 // A comma list names any of its sets, as it does online
-                var sets = val.split(',').filter(Boolean).map(function (code) { return code.toUpperCase(); });
+                var codes = val.split(',').filter(Boolean).map(function (code) { return code.toUpperCase(); });
                 if (negate) {
-                    out.not.set = out.not.set.concat(sets);
+                    out.not.set = out.not.set.concat(codes);
                 } else {
-                    out.set = sets;
+                    out.set = codes;
                 }
                 break;
             case 'cn':
@@ -168,7 +313,23 @@
                 out.unsupported.push(tok.text);
             }
         }
+        if (quoted || !words.length || !readShortcut(out, words, sets)) {
+            digits.forEach(function (text) { out.number.push(readNumber(text, false)); });
+        }
+        if (out.names.length) out.setsNamed = setsNamed(out.names.join(' '), sets);
         return out;
+    }
+
+    // expandBotSyntax spells name|set|number|finish|condition with the filters
+    // it stands for, as online reads the Pricefall bot's notation.
+    function expandBotSyntax(query) {
+        var fields = query.split('|');
+        var expanded = fields[0].trim();
+        ['s:', 'cn:', 'f:', 'cond:'].forEach(function (key, i) {
+            var field = (fields[i + 1] || '').trim();
+            if (field !== '') expanded += ' ' + key + field;
+        });
+        return expanded;
     }
 
     // readFinishes reads f:'s comma list, each value spelled the way the
@@ -354,51 +515,106 @@
         return true;
     }
 
-    async function execute(parsed, env) {
-        await dropStalePayloads(env);
-        var out = {results: [], truncated: false, missingSets: [], unsupported: parsed.unsupported};
-
+    async function cardsByName(parsed, env, out) {
         var cards = [];
-        if (parsed.names.length > 0) {
-            var uuids = await candidateUUIDs(parsed, env, out);
-            for (var i = 0; i < uuids.length; i++) {
-                var card = await env.getCard(uuids[i]);
-                if (card && matchesFilters(card, parsed)) {
-                    cards.push(card);
-                }
+        var uuids = await candidateUUIDs(parsed, env, out);
+        for (var i = 0; i < uuids.length; i++) {
+            var card = await env.getCard(uuids[i]);
+            if (card && matchesFilters(card, parsed)) {
+                cards.push(card);
             }
-        } else if (parsed.set.length > 0) {
-            var seen = {};
-            for (var n = 0; n < parsed.set.length; n++) {
-                var setCode = parsed.set[n];
-                if (!(await env.hasSet(setCode))) {
-                    out.missingSets.push(setCode);
-                    continue;
-                }
-                var payload;
-                try {
-                    payload = await cachedPayload(setCode, env);
-                } catch (err) {
-                    out.missingSets.push(setCode);
-                    continue;
-                }
-                var sections = [payload.retail, payload.buylist];
-                for (var s = 0; s < sections.length; s++) {
-                    for (var id in sections[s]) {
-                        if (seen[id]) continue;
-                        seen[id] = true;
-                        var c = await env.getCard(id);
-                        if (c && matchesFilters(c, parsed)) {
-                            cards.push(c);
-                        }
+        }
+        return cards;
+    }
+
+    async function cardsBySet(parsed, env, out) {
+        var cards = [];
+        var seen = {};
+        for (var n = 0; n < parsed.set.length; n++) {
+            var setCode = parsed.set[n];
+            if (!(await env.hasSet(setCode))) {
+                out.missingSets.push(setCode);
+                continue;
+            }
+            var payload;
+            try {
+                payload = await cachedPayload(setCode, env);
+            } catch (err) {
+                out.missingSets.push(setCode);
+                continue;
+            }
+            var sections = [payload.retail, payload.buylist];
+            for (var s = 0; s < sections.length; s++) {
+                for (var id in sections[s]) {
+                    if (seen[id]) continue;
+                    seen[id] = true;
+                    var c = await env.getCard(id);
+                    if (c && matchesFilters(c, parsed)) {
+                        cards.push(c);
                     }
                 }
             }
-        } else {
-            return out;
         }
+        return cards;
+    }
 
-        // Group by set so each payload is decoded once.
+    // cardsByNumber walks the catalog for a number no name or set narrows,
+    // keeping the sets on this device: the query named none of the others, so
+    // none of them is worth a notice.
+    async function cardsByNumber(parsed, env, out) {
+        var cards = (await env.allCards()).filter(function (card) { return matchesFilters(card, parsed); });
+        var synced = {};
+        var kept = [];
+        for (var i = 0; i < cards.length; i++) {
+            var code = cards[i].set;
+            if (synced[code] === undefined) synced[code] = await env.hasSet(code);
+            if (synced[code]) kept.push(cards[i]);
+        }
+        if (kept.length > MAX_TOTAL) {
+            kept = kept.slice(0, MAX_TOTAL);
+            out.truncated = true;
+        }
+        return kept;
+    }
+
+    function withoutNumber(parsed, name) {
+        return Object.assign({}, parsed, {names: [name], number: [], bareNumber: ''});
+    }
+
+    async function findCards(parsed, env, out) {
+        if (parsed.bareNumber && !parsed.set.length) {
+            // A card's own name, Yu-Gi-Oh's "7", stays a name, and so does a
+            // number no card carries
+            var asName = withoutNumber(parsed, parsed.bareNumber);
+            if ((await env.lookupName(env.normName(parsed.bareNumber))).length) {
+                return cardsByName(asName, env, out);
+            }
+            var numbered = await cardsByNumber(parsed, env, out);
+            return numbered.length ? numbered : cardsByName(asName, env, out);
+        }
+        if (parsed.names.length > 0) {
+            var cards = await cardsByName(parsed, env, out);
+            if (!cards.length && parsed.trailingNumber) {
+                cards = await cardsByName(Object.assign({}, parsed, {
+                    names: parsed.names.slice(0, -1),
+                    number: parsed.number.concat([parsed.trailingNumber])
+                }), env, out);
+            }
+            return cards;
+        }
+        if (parsed.set.length > 0) {
+            var inSet = await cardsBySet(parsed, env, out);
+            if (parsed.printed && inSet.some(function (card) { return (card.num || '').toLowerCase() === parsed.printed; })) {
+                // A word a card of its set carries is that number exactly
+                return inSet.filter(function (card) { return (card.num || '').toLowerCase() === parsed.printed; });
+            }
+            return inSet;
+        }
+        return parsed.number.length > 0 && env.allCards ? cardsByNumber(parsed, env, out) : [];
+    }
+
+    // addResults prices the cards, grouped by set so each payload is decoded once.
+    async function addResults(cards, env, out) {
         var bySet = {};
         cards.forEach(function (card) {
             (bySet[card.set] = bySet[card.set] || []).push(card);
@@ -426,6 +642,23 @@
                     buylist: (pl.buylist && pl.buylist[card.uuid]) || {},
                 });
             });
+        }
+    }
+
+    async function execute(parsed, env) {
+        await dropStalePayloads(env);
+        var out = {results: [], truncated: false, missingSets: [], unsupported: parsed.unsupported};
+
+        await addResults(await findCards(parsed, env, out), env, out);
+
+        // A query no name answers may name a set. One the query already
+        // narrowed to is not up for reinterpretation, and what the name search
+        // missed stops mattering once a set answers.
+        if (!out.results.length && !parsed.set.length && (parsed.setsNamed || []).length) {
+            var named = {results: [], missingSets: []};
+            await addResults(await cardsBySet(Object.assign({}, parsed, {set: parsed.setsNamed}), env, named), env, named);
+            out.results = named.results;
+            out.missingSets = named.results.length ? named.missingSets : out.missingSets.concat(named.missingSets);
         }
         return out;
     }
