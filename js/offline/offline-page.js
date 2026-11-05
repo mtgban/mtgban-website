@@ -257,6 +257,11 @@
                 runQuery(q).catch(showErrorNotice);
             });
 
+            // A sync brings new prices, so a settled answer is read again
+            document.addEventListener('offline:synced', function () {
+                if (exec && !typing) runQuery(lastQuery).catch(showErrorNotice);
+            });
+
             setup().then(function () {
                 searchDeps = {
                     normName: OfflineUtil.normName,

@@ -132,6 +132,7 @@ function loadPage(file, { search = '', ids = [], pills = [], navLinks = [], cook
         settle: () => new Promise((resolve) => setImmediate(resolve)),
         load: () => docListeners.DOMContentLoaded(),
         pop: () => winListeners.popstate(),
+        synced: () => docListeners['offline:synced'](),
         // Stands in for the box having sat still long enough.
         pause: async () => {
             const waiting = [...timers.values()];
@@ -214,6 +215,27 @@ for (const [file, ids, box, results] of [
         expect(page.log.mounted.deps.sealed).toBe(true);
         expect(page.log.executed.at(-1)).toEqual({ q: 'y', sealed: true });
         expect(page.log.pushed).toEqual([]);
+    });
+
+    test(file + ' reads the answer on screen again when a sync finishes', async () => {
+        const page = await started(file, { ids, search: '?q=bolt', queries: { bolt: [row('a')] } });
+        page.synced();
+        await page.settle();
+        expect(page.log.executed).toEqual([{ q: 'bolt', sealed: false }, { q: 'bolt', sealed: false }]);
+        expect(page.log.drafts).toEqual([false, false]);
+        expect(page.els[results].innerHTML).toBe('drawn 1');
+    });
+
+    test(file + ' leaves a sync alone while no answer is on screen yet', async () => {
+        let open;
+        const first = new Promise((resolve) => { open = resolve; });
+        const page = await started(file, { ids, search: '?q=bolt', queries: { bolt: [row('a')] }, gates: { bolt: first } });
+        page.synced();
+        await page.settle();
+        expect(page.log.executed).toHaveLength(1);
+        open();
+        await page.settle();
+        expect(page.els[results].innerHTML).toBe('drawn 1');
     });
 
     // gate holds a search open until the test lets it finish.
@@ -488,6 +510,21 @@ for (const [file, ids, box, results] of [
         expect(page.log.drafts.at(-1)).toBe(true);
         await page.pause();
         expect(page.els[results].innerHTML).toBe('drawn 100');
+        expect(page.log.drafts.at(-1)).toBe(false);
+    });
+
+    test(file + ' leaves a query being typed to its pause when a sync finishes', async () => {
+        const page = await liveStart({ queries: { sol: rows(3) } });
+        page.type('sol');
+        await page.settle();
+        page.synced();
+        await page.settle();
+        expect(page.log.executed).toHaveLength(1);
+        await page.pause();
+        expect(page.log.executed).toHaveLength(2);
+        page.synced();
+        await page.settle();
+        expect(page.log.executed).toHaveLength(3);
         expect(page.log.drafts.at(-1)).toBe(false);
     });
 
