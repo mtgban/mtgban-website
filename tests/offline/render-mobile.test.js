@@ -234,25 +234,18 @@ test('INDEX group appears before condition groups in sellers panel', () => {
 });
 
 test('notices: unsupported operator escaped', () => {
-    const html = R.noticesHTML({results: [], unsupported: ['date>2020'], missingSets: [], truncated: false}, CTX);
+    const html = R.noticesHTML({results: [], unsupported: ['date>2020'], truncated: false});
     expect(html).toContain('offline-notice-warn');
     expect(html).toContain('date&gt;2020');
 });
 
-test('notices: missing set shows set name and link', () => {
-    const html = R.noticesHTML({results: [], unsupported: [], missingSets: ['NEO'], truncated: false}, CTX);
-    expect(html).toContain('Kamigawa: Neon Dynasty');
-    expect(html).toContain('not synced');
-    expect(html).toContain('/search?settings=offline');
-});
-
 test('notices: empty results shows offline-empty', () => {
-    const html = R.noticesHTML({results: [], unsupported: [], missingSets: [], truncated: false}, CTX);
+    const html = R.noticesHTML({results: [], unsupported: [], truncated: false});
     expect(html).toContain('offline-empty');
 });
 
 test('notices: truncated shows truncation notice', () => {
-    const html = R.noticesHTML({results: [result()], unsupported: [], missingSets: [], truncated: true}, CTX);
+    const html = R.noticesHTML({results: [result()], unsupported: [], truncated: true});
     expect(html).toContain('truncated');
 });
 

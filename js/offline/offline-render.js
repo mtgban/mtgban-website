@@ -284,7 +284,7 @@
     }
 
     function render(container, exec, ctx) {
-        container.innerHTML = noticesHTML(exec, ctx) + buildHTML(exec.results, ctx);
+        container.innerHTML = noticesHTML(exec) + buildHTML(exec.results, ctx);
     }
 
     root.OfflineRender = {

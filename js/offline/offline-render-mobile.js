@@ -271,7 +271,7 @@
     }
 
     function render(container, exec, ctx) {
-        container.innerHTML = noticesHTML(exec, ctx) + buildHTML(exec.results, ctx);
+        container.innerHTML = noticesHTML(exec) + buildHTML(exec.results, ctx);
     }
 
     root.OfflineRenderMobile = {render: render, buildHTML: buildHTML, noticesHTML: noticesHTML, condPrices: condPrices, refRetail: refRetail, keyruneClasses: keyruneClasses};

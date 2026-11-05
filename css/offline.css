@@ -117,9 +117,6 @@
 .offline-notice-warn {
     border-left-color: var(--warning, #d4a03b);
 }
-.offline-notice-missing {
-    border-left-color: var(--error, #d43b3b);
-}
 
 .offline-empty {
     padding-top: 2em;

@@ -281,15 +281,11 @@ test('MetadataOnly buyer without SYP shorthand renders price before condition he
     expect(idxPos).toBeLessThan(nmPos);
 });
 
-test('notices: unsupported, missing set, empty', () => {
-    const ctx = CTX;
-    let html = R.noticesHTML({results: [], unsupported: ['date>2020'], missingSets: [], truncated: false}, ctx);
+test('notices: unsupported, empty', () => {
+    let html = R.noticesHTML({results: [], unsupported: ['date>2020'], truncated: false});
     expect(html).toContain('offline-notice');
     expect(html).toContain('date&gt;2020');
-    html = R.noticesHTML({results: [], unsupported: [], missingSets: ['NEO'], truncated: false}, ctx);
-    expect(html).toContain('Kamigawa: Neon Dynasty');
-    expect(html).toContain('not synced');
-    html = R.noticesHTML({results: [], unsupported: [], missingSets: [], truncated: false}, ctx);
+    html = R.noticesHTML({results: [], unsupported: [], truncated: false});
     expect(html).toContain('offline-empty');
 });
 
