@@ -22,149 +22,27 @@ import (
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/apisig"
+	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
 
-// setTestSalesVelocity files cards as the loaded sales, restoring the last load when the test ends.
-func setTestSalesVelocity(t *testing.T, cards map[string]*salesVelocity) {
+// setTestSalesVelocity files cards as the loaded sales in a store of the test's own.
+func setTestSalesVelocity(t *testing.T, cards map[string]*salesvelocity.Sales) {
 	t.Helper()
-	prev := salesVelocityPtr.Load()
-	t.Cleanup(func() { salesVelocityPtr.Store(prev) })
-	salesVelocityPtr.Store(&salesVelocitySnapshot{
+	store := &salesvelocity.Store{}
+	store.Publish(&salesvelocity.Snapshot{
 		Day:    time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC),
 		Cards:  cards,
-		Window: salesVelocityWindow,
+		Window: salesvelocity.Window,
 	})
+	setSalesVelocityStore(t, store)
 }
 
-// TestBuildSalesVelocity keys the pairs by card, adds up pairs on one card,
-// keeps a year's sale with no sale in the window, and drops unmatched pairs.
-func TestBuildSalesVelocity(t *testing.T) {
-	day := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
-	rows := []salesRow{
-		{ProductID: 1, Variant: "Normal", Copies: 69, Orders: 31, Days: 18},
-		{ProductID: 2, Variant: "Foil", Copies: 12, Orders: 9, Days: 4},
-		// Two products filed under one card: copies and orders add up.
-		{ProductID: 3, Variant: "Normal", Copies: 2, Orders: 2, Days: 2},
-		{ProductID: 4, Variant: "Normal", Copies: 3, Orders: 1, Days: 1},
-		// Their days keep the larger count, not the sum: the rows can't say which days overlap.
-		{ProductID: 7, Variant: "Normal", Copies: 40, Orders: 40, Days: 12},
-		{ProductID: 8, Variant: "Normal", Copies: 40, Orders: 40, Days: 20},
-		// No card.
-		{ProductID: 5, Variant: "Normal", Copies: 1, Orders: 1, Days: 1},
-	}
-	last := []lastRow{
-		{ProductID: 1, Variant: "Normal", Last: day(10, 11)},
-		{ProductID: 2, Variant: "Foil", Last: day(10, 12)},
-		{ProductID: 3, Variant: "Normal", Last: day(10, 10)},
-		{ProductID: 4, Variant: "Normal", Last: day(10, 12)},
-		{ProductID: 7, Variant: "Normal", Last: day(10, 12)},
-		{ProductID: 8, Variant: "Normal", Last: day(10, 11)},
-		{ProductID: 5, Variant: "Normal", Last: day(10, 12)},
-		// Sold in the year, not in the window.
-		{ProductID: 6, Variant: "Normal", Last: day(8, 2)},
-		// No card, and no sale in the window.
-		{ProductID: 9, Variant: "Foil", Last: day(3, 1)},
-	}
-	ids := map[salesPair]string{
-		{1, "Normal"}: "steady", {2, "Foil"}: "foil",
-		{3, "Normal"}: "merged", {4, "Normal"}: "merged",
-		{6, "Normal"}: "zero", {7, "Normal"}: "busy", {8, "Normal"}: "busy",
-	}
-	asked := map[salesPair]int{}
-	match := func(productID int64, variant string) string {
-		asked[salesPair{productID, variant}]++
-		return ids[salesPair{productID, variant}]
-	}
-
-	cards, unmatched := buildSalesVelocity(rows, last, match)
-	if unmatched != 2 {
-		t.Errorf("unmatched: got %d, want 2", unmatched)
-	}
-	want := map[string]salesVelocity{
-		"steady": {Copies: 69, Orders: 31, Days: 18, LastSale: day(10, 11)},
-		"foil":   {Copies: 12, Orders: 9, Days: 4, LastSale: day(10, 12)},
-		"merged": {Copies: 5, Orders: 3, Days: 2, LastSale: day(10, 12)},
-		"busy":   {Copies: 80, Orders: 80, Days: 20, LastSale: day(10, 12)},
-		"zero":   {LastSale: day(8, 2)},
-	}
-	if len(cards) != len(want) {
-		t.Fatalf("got %d cards, want %d: %+v", len(cards), len(want), cards)
-	}
-	for id, w := range want {
-		got := cards[id]
-		if got == nil || *got != w {
-			t.Errorf("%s: got %+v, want %+v", id, got, w)
-		}
-	}
-	for pair, n := range asked {
-		if n != 1 {
-			t.Errorf("%v: matched %d times, want once", pair, n)
-		}
-	}
-}
-
-// TestSalesVelocityDue loads a sale day once, and retries a day whose load
-// failed only after salesVelocityRetryAfter.
-func TestSalesVelocityDue(t *testing.T) {
-	day := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
-	prev := day.AddDate(0, 0, -1)
-	now := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
-	loaded := func(d time.Time) *salesVelocitySnapshot { return &salesVelocitySnapshot{Day: d} }
-	failed := func(d time.Time, ago time.Duration) *salesVelocityFailure {
-		return &salesVelocityFailure{Day: d, At: now.Add(-ago)}
-	}
-	for _, tc := range []struct {
-		desc    string
-		current *salesVelocitySnapshot
-		failed  *salesVelocityFailure
-		want    bool
-	}{
-		{"nothing loaded yet", nil, nil, true},
-		{"the day is loaded", loaded(day), nil, false},
-		{"a newer sale day landed", loaded(prev), nil, true},
-		{"the day failed an hour ago", loaded(prev), failed(day, time.Hour), false},
-		{"the day failed long enough ago", loaded(prev), failed(day, salesVelocityRetryAfter), true},
-		{"an older day failed", loaded(prev), failed(prev, time.Hour), true},
-		{"the first load failed an hour ago", nil, failed(day, time.Hour), false},
-	} {
-		got := salesVelocityDue(tc.current, tc.failed, day, now)
-		if got != tc.want {
-			t.Errorf("%s: due = %v, want %v", tc.desc, got, tc.want)
-		}
-	}
-}
-
-// TestSalesVelocityFor answers a loaded card's sales, and nothing for a card
-// not loaded or before any load.
-func TestSalesVelocityFor(t *testing.T) {
-	setTestSalesVelocity(t, map[string]*salesVelocity{"card": {Copies: 69, Orders: 31, Days: 18}})
-	got, found := salesVelocityFor("card")
-	if !found || got != (salesVelocity{Copies: 69, Orders: 31, Days: 18}) {
-		t.Errorf("card: got %+v, %v", got, found)
-	}
-	_, found = salesVelocityFor("missing")
-	if found {
-		t.Error("missing: found")
-	}
-	salesVelocityPtr.Store(nil)
-	_, found = salesVelocityFor("card")
-	if found {
-		t.Error("nothing loaded: found")
-	}
-}
-
-// TestSalesVelocityReport is the line the admin dashboard shows for a load.
-func TestSalesVelocityReport(t *testing.T) {
-	snap := &salesVelocitySnapshot{
-		Day:    time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC),
-		Cards:  map[string]*salesVelocity{"a": {Copies: 3}, "b": {Copies: 9}, "c": {}},
-		Window: salesVelocityWindow,
-	}
-	got := salesVelocityReport(snap, 7)
-	want := "3 cards over the 30 days to 2026-10-12, 7 not matched"
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
+// setSalesVelocityStore makes store the loaded sales until the test ends.
+func setSalesVelocityStore(t *testing.T, store *salesvelocity.Store) {
+	t.Helper()
+	prev := salesVelocityStore
+	t.Cleanup(func() { salesVelocityStore = prev })
+	salesVelocityStore = store
 }
 
 // TestLoadSalesVelocityWaitsForADatastore keeps the loader off the newspaper
@@ -293,44 +171,32 @@ func (r *fakeRows) Next(dest []driver.Value) error {
 	return nil
 }
 
-// TestReadSalesVelocity reads the 30-day window and the 365-day lookback, both
-// ending on the sale day, for one game in one read-only snapshot, and ends
-// that transaction before returning.
-func TestReadSalesVelocity(t *testing.T) {
-	day := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
-	lastSale := time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC)
+// TestLoadSalesVelocityReadsInOneSnapshot reads the window and the lookback in one
+// read-only repeatable read, over the dates each covers, and ends it.
+func TestLoadSalesVelocityReadsInOneSnapshot(t *testing.T) {
+	newest := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
-		if query == salesVelocityQuery {
-			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}, vals: [][]driver.Value{
-				{int64(1), "Normal", int64(69), int64(31), int64(18)},
-			}}, nil
+		switch query {
+		case salesvelocity.DayQuery:
+			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{newest}}}, nil
+		case salesvelocity.WindowQuery:
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}}, nil
 		}
-		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{int64(6), "Foil", lastSale}}}, nil
+		return &fakeRows{cols: []string{"p", "v", "l"}}, nil
 	}}
-	db := sql.OpenDB(f)
-	t.Cleanup(func() { db.Close() })
-
-	rows, last, err := readSales(context.Background(), db, "Magic: The Gathering", day)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Equal(rows, []salesRow{{ProductID: 1, Variant: "Normal", Copies: 69, Orders: 31, Days: 18}}) {
-		t.Errorf("rows: got %+v", rows)
-	}
-	if len(last) != 1 || last[0].ProductID != 6 || last[0].Variant != "Foil" || !last[0].Last.Equal(lastSale) {
-		t.Errorf("last: got %+v", last)
-	}
+	s := withFakeNewspaper(t, f)
+	s.loadSalesVelocity()
 
 	queries := f.seen()
 	want := []salesQuery{
-		{sql: salesVelocityQuery, args: []driver.Value{"2026-09-13", "2026-10-12", "Magic: The Gathering"}, inTx: true},
-		{sql: salesVelocityLastQuery, args: []driver.Value{"2025-10-13", "2026-10-12", "Magic: The Gathering"}, inTx: true},
+		{sql: salesvelocity.WindowQuery, args: []driver.Value{"2026-09-13", "2026-10-12", "Magic: The Gathering"}, inTx: true},
+		{sql: salesvelocity.LastQuery, args: []driver.Value{"2025-10-13", "2026-10-12", "Magic: The Gathering"}, inTx: true},
 	}
-	if len(queries) != len(want) {
-		t.Fatalf("got %d queries, want %d", len(queries), len(want))
+	if len(queries) != len(want)+1 {
+		t.Fatalf("got %d queries, want the day and %d more", len(queries), len(want))
 	}
 	for i, w := range want {
-		q := queries[i]
+		q := queries[i+1]
 		if q.sql != w.sql || !slices.Equal(q.args, w.args) || q.inTx != w.inTx {
 			t.Errorf("query %d: got args %v in a transaction %v, want %v, %v", i, q.args, q.inTx, w.args, w.inTx)
 		}
@@ -343,38 +209,19 @@ func TestReadSalesVelocity(t *testing.T) {
 	}
 }
 
-// TestSalesVelocitySQL keeps both queries bounded on both ends by the
-// arguments and to one game's products.
-func TestSalesVelocitySQL(t *testing.T) {
-	for name, query := range map[string]string{"window": salesVelocityQuery, "lookback": salesVelocityLastQuery} {
-		for _, part := range []string{
-			"sale_date BETWEEN $1::date AND $2::date",
-			"product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $3)",
-		} {
-			if !strings.Contains(query, part) {
-				t.Errorf("%s: missing %q", name, part)
-			}
-		}
-	}
-}
-
 // withFakeNewspaper makes f the newspaper of a magic site with a datastore, restoring the globals when the test ends.
 func withFakeNewspaper(t *testing.T, f *fakeNewspaper) *site {
 	t.Helper()
 	withConfigCopy(t)
 	prevDB, prevSkip := NewNewspaperDB, SkipNewspaper
-	prevSnap, prevFailed := salesVelocityPtr.Load(), salesVelocityFailed.Load()
 	db := sql.OpenDB(f)
 	t.Cleanup(func() {
 		db.Close()
 		NewNewspaperDB, SkipNewspaper = prevDB, prevSkip
-		salesVelocityPtr.Store(prevSnap)
-		salesVelocityFailed.Store(prevFailed)
 	})
 	NewNewspaperDB, SkipNewspaper = db, false
 	Config().Game = DefaultGame
-	salesVelocityPtr.Store(nil)
-	salesVelocityFailed.Store(nil)
+	setSalesVelocityStore(t, &salesvelocity.Store{})
 
 	s := newSite()
 	s.ds.Store(&datastore{backend: &matcher.Backend{AllUUIDs: []string{"a-card"}}})
@@ -387,12 +234,13 @@ func withFakeNewspaper(t *testing.T, f *fakeNewspaper) *site {
 func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 	day := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
-		if query == salesVelocityDayQuery {
+		if query == salesvelocity.DayQuery {
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{day}}}, nil
 		}
 		return &fakeRows{cols: []string{"p", "v", "l"}}, nil
 	}}
 	s := withFakeNewspaper(t, f)
+	setTestJobs(t)
 	Config().Game = matcher.GameLorcana
 
 	s.loadSalesVelocity()
@@ -400,7 +248,7 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 	if len(queries) != 3 {
 		t.Fatalf("got %d queries, want 3", len(queries))
 	}
-	if queries[0].sql != salesVelocityDayQuery || !slices.Equal(queries[0].args, []driver.Value{gameMap[matcher.GameLorcana], int64(salesVelocityWindow)}) {
+	if queries[0].sql != salesvelocity.DayQuery || !slices.Equal(queries[0].args, []driver.Value{gameMap[matcher.GameLorcana], int64(salesvelocity.Window)}) {
 		t.Errorf("first query: got %q %v, want the day query scoped to %q", queries[0].sql, queries[0].args, gameMap[matcher.GameLorcana])
 	}
 	for _, q := range queries[1:] {
@@ -408,13 +256,22 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 			t.Errorf("got args %v, want the day and %q", q.args, gameMap[matcher.GameLorcana])
 		}
 	}
-	failed := salesVelocityFailed.Load()
-	if failed == nil || !failed.Day.Equal(lastCompleteSaleDay(day)) {
-		t.Errorf("a load matching no card: failure got %+v, want one for the day before %s", failed, day.Format(time.DateOnly))
+	problem := ""
+	for _, row := range backgroundJobs.Rows() {
+		if row.Name == jobSalesVelocity {
+			problem = row.Problem
+		}
+	}
+	if !strings.HasPrefix(problem, "failed to load 2026-10-11") {
+		t.Errorf("a load matching no card: reported %q, want a failure on the day before %s", problem, day.Format(time.DateOnly))
+	}
+	s.loadSalesVelocity()
+	if n := len(f.seen()); n != 4 {
+		t.Errorf("the failed day retried at once: got %d queries, want only one more day query", n)
 	}
 }
 
-// TestLoadSalesVelocityNoSalesYet leaves the snapshot and the failure alone
+// TestLoadSalesVelocityNoSalesYet reports no problem and stores no snapshot
 // when the day query finds no sales for this deployment's game.
 func TestLoadSalesVelocityNoSalesYet(t *testing.T) {
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
@@ -432,11 +289,8 @@ func TestLoadSalesVelocityNoSalesYet(t *testing.T) {
 			t.Errorf("reported a problem: %s", row.Problem)
 		}
 	}
-	if snap := salesVelocityPtr.Load(); snap != nil {
+	if snap := salesVelocityStore.Snapshot(); snap != nil {
 		t.Errorf("stored a snapshot: %+v", snap)
-	}
-	if failed := salesVelocityFailed.Load(); failed != nil {
-		t.Errorf("recorded a failure: %+v", failed)
 	}
 }
 
@@ -449,7 +303,7 @@ func TestRefreshNewspaperLoadsSalesVelocity(t *testing.T) {
 	s := withFakeNewspaper(t, f)
 	s.refreshNewspaper()
 	queries := f.seen()
-	if len(queries) == 0 || queries[len(queries)-1].sql != salesVelocityDayQuery {
+	if len(queries) == 0 || queries[len(queries)-1].sql != salesvelocity.DayQuery {
 		t.Errorf("the refresh ended without the day query: %d queries", len(queries))
 	}
 
@@ -510,14 +364,17 @@ func counterspellProduct(t *testing.T, b *matcher.Backend) (cardID string, produ
 	if err != nil {
 		t.Fatal(err)
 	}
-	match := salesVelocityMatcher(b)
 	for _, id := range ids {
 		co, err := b.GetUUID(id)
 		if err != nil || co.Foil || co.Etched {
 			continue
 		}
 		pid, err := strconv.ParseInt(co.Identifiers["tcgplayerProductId"], 10, 64)
-		if err == nil && match(pid, "Normal") == co.UUID {
+		if err != nil {
+			continue
+		}
+		matched, err := b.Match(&matcher.InputCard{ID: strconv.FormatInt(pid, 10), Finish: "Normal"})
+		if err == nil && matched == co.UUID {
 			return co.UUID, pid
 		}
 	}
@@ -534,9 +391,9 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 	lastSale := day.AddDate(0, 0, -1)
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
 		switch query {
-		case salesVelocityDayQuery:
+		case salesvelocity.DayQuery:
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{day}}}, nil
-		case salesVelocityQuery:
+		case salesvelocity.WindowQuery:
 			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}, vals: [][]driver.Value{
 				{productID, "Normal", int64(69), int64(31), int64(18)},
 			}}, nil
@@ -550,67 +407,19 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 	if n := len(f.seen()); n != 3 {
 		t.Fatalf("got %d queries, want the day, the window and the lookback", n)
 	}
-	got, found := salesVelocityFor(cardID)
-	want := salesVelocity{Copies: 69, Orders: 31, Days: 18, LastSale: lastSale}
+	got, found := salesVelocityStore.For(cardID)
+	want := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: lastSale}
 	if !found || got != want {
 		t.Errorf("%s: got %+v, %v; want %+v", cardID, got, found, want)
 	}
-	if snap := salesVelocityPtr.Load(); snap == nil || !snap.Day.Equal(lastCompleteSaleDay(day)) {
+	if snap := salesVelocityStore.Snapshot(); snap == nil || !snap.Day.Equal(day.AddDate(0, 0, -1)) {
 		t.Errorf("snapshot: got %+v, want one for the day before %s", snap, day.Format(time.DateOnly))
 	}
 
 	s.loadSalesVelocity()
 	queries := f.seen()
-	if len(queries) != 4 || queries[3].sql != salesVelocityDayQuery || len(queries[3].args) != 2 {
+	if len(queries) != 4 || queries[3].sql != salesvelocity.DayQuery || len(queries[3].args) != 2 {
 		t.Errorf("second run on the same day: got %d queries, want only the day query, scoped to the game, after the first 3", len(queries))
-	}
-}
-
-// TestVelocityText words each state: a rate to one decimal, under a tenth, and
-// zero with the last sale.
-func TestVelocityText(t *testing.T) {
-	last := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
-	const head = "**Sold on TCGplayer, last 30 days**\n"
-	for _, tc := range []struct {
-		desc         string
-		v            salesVelocity
-		window       int
-		rate, detail string
-	}{
-		{"a rate", salesVelocity{Copies: 69, Orders: 31, Days: 18, LastSale: last}, 30, "2.3/day",
-			head + "|copies|69\n|orders|31\n|days with a sale|18\n|last sale|2026-10-11"},
-		{"rounded to one decimal", salesVelocity{Copies: 74, Orders: 60, Days: 25, LastSale: last}, 30, "2.5/day",
-			head + "|copies|74\n|orders|60\n|days with a sale|25\n|last sale|2026-10-11"},
-		{"a whole number keeps its decimal", salesVelocity{Copies: 60, Orders: 50, Days: 30, LastSale: last}, 30, "2.0/day",
-			head + "|copies|60\n|orders|50\n|days with a sale|30\n|last sale|2026-10-11"},
-		{"a tenth", salesVelocity{Copies: 3, Orders: 3, Days: 3, LastSale: last}, 30, "0.1/day",
-			head + "|copies|3\n|orders|3\n|days with a sale|3\n|last sale|2026-10-11"},
-		{"under a tenth", salesVelocity{Copies: 2, Orders: 2, Days: 1, LastSale: last}, 30, "<0.1/day",
-			head + "|copies|2\n|orders|2\n|days with a sale|1\n|last sale|2026-10-11"},
-		{"zero", salesVelocity{LastSale: time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)}, 30, "0/day",
-			head + "no sale in the window; last sold 2026-09-02"},
-		{"another window", salesVelocity{Copies: 7, Orders: 7, Days: 5, LastSale: last}, 7, "1.0/day",
-			"**Sold on TCGplayer, last 7 days**\n|copies|7\n|orders|7\n|days with a sale|5\n|last sale|2026-10-11"},
-	} {
-		rate, detail := velocityText(tc.v, tc.window)
-		if rate != tc.rate || detail != tc.detail {
-			t.Errorf("%s: got %q, %q; want %q, %q", tc.desc, rate, detail, tc.rate, tc.detail)
-		}
-	}
-}
-
-// TestSalesVelocityView words a loaded card and leaves a card with no data blank.
-func TestSalesVelocityView(t *testing.T) {
-	v := salesVelocity{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
-	setTestSalesVelocity(t, map[string]*salesVelocity{"card": &v})
-	wantRate, wantDetail := velocityText(v, salesVelocityWindow)
-	rate, detail := salesVelocityView("card")
-	if rate != wantRate || detail != wantDetail {
-		t.Errorf("card: got %q, %q; want %q, %q", rate, detail, wantRate, wantDetail)
-	}
-	rate, detail = salesVelocityView("missing")
-	if rate != "" || detail != "" {
-		t.Errorf("missing: got %q, %q; want nothing", rate, detail)
 	}
 }
 
@@ -624,15 +433,18 @@ func TestUUID2CardCarriesSalesVelocity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v := salesVelocity{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
-	setTestSalesVelocity(t, map[string]*salesVelocity{co.UUID: &v})
-	wantRate, wantDetail := velocityText(v, salesVelocityWindow)
+	v := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{co.UUID: &v})
+	wantRate, wantDetail := salesVelocityStore.View(co.UUID)
+	if wantRate == "" {
+		t.Fatal("the store has no rate for the card")
+	}
 	card := uuid2card(b, currentPrices(), cardID, false, nil)
 	if card.Velocity != wantRate || card.VelocityDetail != wantDetail {
 		t.Errorf("got %q, %q; want %q, %q", card.Velocity, card.VelocityDetail, wantRate, wantDetail)
 	}
 
-	setTestSalesVelocity(t, map[string]*salesVelocity{})
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{})
 	card = uuid2card(b, currentPrices(), cardID, false, nil)
 	if card.Velocity != "" || card.VelocityDetail != "" {
 		t.Errorf("no data: got %q, %q", card.Velocity, card.VelocityDetail)
@@ -642,7 +454,7 @@ func TestUUID2CardCarriesSalesVelocity(t *testing.T) {
 // velocityPageVars is one card on a results page, its velocity read from the snapshot.
 func velocityPageVars(canVelocity, showUpsell bool) PageVars {
 	const cardID = "velocity-card"
-	rate, detail := salesVelocityView(cardID)
+	rate, detail := salesVelocityStore.View(cardID)
 	return PageVars{
 		ShowUpsell: showUpsell,
 		SearchVars: SearchVars{
@@ -669,7 +481,7 @@ func velocityPages(t *testing.T, vars PageVars) map[string]string {
 // TestSearchShowsSalesVelocity shows the row to a reader with the flag, the
 // upsell to one without, and neither for a card with no data.
 func TestSearchShowsSalesVelocity(t *testing.T) {
-	setTestSalesVelocity(t, map[string]*salesVelocity{
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{
 		"velocity-card": {Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)},
 	})
 	for name, page := range velocityPages(t, velocityPageVars(true, true)) {
@@ -700,7 +512,7 @@ func TestSearchShowsSalesVelocity(t *testing.T) {
 		}
 	}
 
-	setTestSalesVelocity(t, map[string]*salesVelocity{})
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{})
 	for _, canVelocity := range []bool{true, false} {
 		for name, page := range velocityPages(t, velocityPageVars(canVelocity, true)) {
 			if strings.Contains(page, "TCGplayer sales") || strings.Contains(page, velocityUpsell) {
@@ -713,7 +525,7 @@ func TestSearchShowsSalesVelocity(t *testing.T) {
 // TestMobileSalesRowOpensBuyers gives a card with no buylist a Buyers panel to
 // hold the row, saying there are no offers, and no panel without a row.
 func TestMobileSalesRowOpensBuyers(t *testing.T) {
-	setTestSalesVelocity(t, map[string]*salesVelocity{"velocity-card": {Copies: 69, Orders: 31, Days: 18}})
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{"velocity-card": {Copies: 69, Orders: 31, Days: 18}})
 	sellers := func(vars PageVars) PageVars {
 		vars.FoundSellers = map[string]map[mtgban.Condition][]SearchEntry{
 			"velocity-card": {"NM": {{ScraperName: "Some Store", Price: 1}}},
@@ -737,9 +549,9 @@ func setCounterspellVelocity(t *testing.T) {
 	if err != nil || len(ids) == 0 {
 		t.Fatalf("no Counterspell printings to file sales for: %v", err)
 	}
-	cards := map[string]*salesVelocity{}
+	cards := map[string]*salesvelocity.Sales{}
 	for _, id := range ids {
-		cards[id] = &salesVelocity{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
+		cards[id] = &salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
 	}
 	setTestSalesVelocity(t, cards)
 }
@@ -872,7 +684,7 @@ func TestVelocityFilterParses(t *testing.T) {
 // TestVelocityFilterCompares judges the rate the row shows, skips a card with
 // no data, and matches nothing until unlocked.
 func TestVelocityFilterCompares(t *testing.T) {
-	setTestSalesVelocity(t, map[string]*salesVelocity{"velocity-card": {Copies: 69, Orders: 31, Days: 18}})
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{"velocity-card": {Copies: 69, Orders: 31, Days: 18}})
 	co := velocityCard()
 	missing := &matcher.CardObject{}
 	missing.UUID = "no-data"
@@ -1003,7 +815,7 @@ func TestSearchExportGatesVelocityFilter(t *testing.T) {
 	skipWithoutDatastore(t)
 	name := searchStores(t)
 	id, _ := plainCard(t)
-	setTestSalesVelocity(t, map[string]*salesVelocity{id: {Copies: 69, Orders: 31, Days: 18}})
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{id: {Copies: 69, Orders: 31, Days: 18}})
 	signingEnabled(t, false)
 	withAPIUserSecret(t, "plan@example.com", "plan-secret")
 
@@ -1077,7 +889,7 @@ func TestSortSearchKeysByVelocity(t *testing.T) {
 		t.Skip("matcher data not loaded")
 	}
 	fast, slow, none, zero := ids[0], ids[1], ids[2], ids[3]
-	setTestSalesVelocity(t, map[string]*salesVelocity{
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{
 		fast: {Copies: 90},
 		slow: {Copies: 3},
 		zero: {LastSale: time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)},
@@ -1147,7 +959,7 @@ func TestSearchGatesVelocitySortByTier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	setTestSalesVelocity(t, map[string]*salesVelocity{fastest: {Copies: 90}})
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{fastest: {Copies: 90}})
 	signingEnabled(t, true)
 	fields := func(news string) url.Values {
 		reader := url.Values{"UserEmail": {"reader@example.com"}, "UserTier": {"Test"}}
@@ -1215,8 +1027,7 @@ func TestSearchGatesVelocitySortByTier(t *testing.T) {
 	if !strings.Contains(activeTag, "sort=number") {
 		t.Errorf("the pill picked past a refused sort:velocity is not the active one: %s", activeTag)
 	}
-	setTestSalesVelocity(t, nil)
-	salesVelocityPtr.Store(nil)
+	setSalesVelocityStore(t, &salesvelocity.Store{})
 	if strings.Contains(page("/search?q=Counterspell&sort=velocity", lower), velocitySortTip) {
 		t.Error("the pill shows with no sales loaded")
 	}
@@ -1248,7 +1059,7 @@ func TestSearchExportGatesVelocitySort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	setTestSalesVelocity(t, map[string]*salesVelocity{fastest: {Copies: 90}})
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{fastest: {Copies: 90}})
 	firstRow := func(news string) string {
 		fields := url.Values{"SearchDownloadCSV": {"true"}}
 		if news != "" {
@@ -1276,7 +1087,7 @@ func TestSearchExportGatesVelocitySort(t *testing.T) {
 // TestVelocitySortPillShowsLocked greys the pill out, on both layouts, for a
 // reader without the tier, the upsell setting aside, and only with sales loaded.
 func TestVelocitySortPillShowsLocked(t *testing.T) {
-	setTestSalesVelocity(t, map[string]*salesVelocity{"velocity-card": {Copies: 69}})
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{"velocity-card": {Copies: 69}})
 	const locked, linked = "sort-pill-locked", "sort=velocity"
 	vars := func(canVelocity, loaded bool) PageVars {
 		page := velocityPageVars(canVelocity, false)
@@ -1298,6 +1109,128 @@ func TestVelocitySortPillShowsLocked(t *testing.T) {
 	for name, page := range velocityPages(t, vars(false, false)) {
 		if strings.Contains(page, locked) {
 			t.Errorf("%s: the pill shows with no sales loaded", name)
+		}
+	}
+}
+
+// newspaperSalesAnswers answers checkNewspaperSales's queries: the newest day,
+// then each day in turn, as rows and those over five orders.
+func newspaperSalesAnswers(newest driver.Value, days ...[2]int64) func(string) (*fakeRows, error) {
+	return func(query string) (*fakeRows, error) {
+		if query == salesvelocity.NewestSaleQuery {
+			return &fakeRows{cols: []string{"max"}, vals: [][]driver.Value{{newest}}}, nil
+		}
+		day := days[0]
+		days = days[1:]
+		return &fakeRows{cols: []string{"rows", "over"}, vals: [][]driver.Value{{day[0], day[1]}}}, nil
+	}
+}
+
+// newspaperSalesRow runs the check and returns the job's dashboard row.
+func newspaperSalesRow(t *testing.T) (result, problem string) {
+	t.Helper()
+	checkNewspaperSales()
+	for _, row := range backgroundJobs.Rows() {
+		if row.Name == jobNewspaperSales {
+			return row.Result, row.Problem
+		}
+	}
+	t.Fatal("the job has no row")
+	return "", ""
+}
+
+// TestCheckNewspaperSales judges the newest day once it has rows enough, else
+// the day before, across every game, and the job's row clears when the pull is
+// healthy again.
+func TestCheckNewspaperSales(t *testing.T) {
+	setTestJobs(t)
+	yesterday := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -1)
+	newest := yesterday.Format(time.DateOnly)
+	before := yesterday.AddDate(0, 0, -1).Format(time.DateOnly)
+	f := &fakeNewspaper{}
+	withFakeNewspaper(t, f)
+	for _, tc := range []struct {
+		desc   string
+		days   [][2]int64
+		read   []string
+		result string
+		alarm  bool
+	}{
+		{"newest signed out, with rows enough", [][2]int64{{10606, 0}}, []string{newest}, "0 of 10606", true},
+		{"newest signed in, measured partway", [][2]int64{{10606, 372}}, []string{newest}, "372 of 10606", false},
+		{"newest just started", [][2]int64{{4423, 141}, {94075, 9142}}, []string{newest, before}, "9142 of 94075", false},
+		{"newest just started, the day before signed out", [][2]int64{{4423, 141}, {86093, 0}}, []string{newest, before}, "0 of 86093", true},
+	} {
+		f.queries = nil
+		f.answer = newspaperSalesAnswers(yesterday, tc.days...)
+		result, problem := newspaperSalesRow(t)
+		if !strings.Contains(result, tc.result) {
+			t.Errorf("%s: got result %q, want %q", tc.desc, result, tc.result)
+		}
+		if (problem != "") != tc.alarm {
+			t.Errorf("%s: got problem %q, want one: %v", tc.desc, problem, tc.alarm)
+		}
+		var read []string
+		for _, q := range f.seen()[1:] {
+			read = append(read, q.args[0].(string))
+		}
+		if !slices.Equal(read, tc.read) {
+			t.Errorf("%s: read %v, want %v", tc.desc, read, tc.read)
+		}
+		if args := f.seen()[0].args; len(args) != 0 {
+			t.Errorf("%s: the newest day's query has args %v, want it across every game", tc.desc, args)
+		}
+	}
+}
+
+// TestCheckNewspaperSalesReportsAFailedRead tells a broken database, and a table
+// with no sales, apart from a clean run.
+func TestCheckNewspaperSalesReportsAFailedRead(t *testing.T) {
+	setTestJobs(t)
+	f := &fakeNewspaper{answer: func(string) (*fakeRows, error) { return nil, errors.New("connection lost") }}
+	withFakeNewspaper(t, f)
+	_, problem := newspaperSalesRow(t)
+	if !strings.Contains(problem, "connection lost") {
+		t.Errorf("got problem %q", problem)
+	}
+
+	f.answer = newspaperSalesAnswers(nil)
+	_, problem = newspaperSalesRow(t)
+	if !strings.Contains(problem, "no sales") {
+		t.Errorf("no sales: got problem %q", problem)
+	}
+}
+
+// TestNewspaperSalesJobRunsOnOneSite schedules the check only on the Magic site
+// with a newspaper: every site reads the same table, so one alarm is enough.
+func TestNewspaperSalesJobRunsOnOneSite(t *testing.T) {
+	withConfigCopy(t)
+	prevDB, prevSkip := NewNewspaperDB, SkipNewspaper
+	t.Cleanup(func() { NewNewspaperDB, SkipNewspaper = prevDB, prevSkip })
+	db := sql.OpenDB(&fakeNewspaper{})
+	t.Cleanup(func() { db.Close() })
+	for _, tc := range []struct {
+		desc string
+		game matcher.Game
+		db   *sql.DB
+		skip bool
+		want bool
+	}{
+		{"magic", DefaultGame, db, false, true},
+		{"another game", matcher.GameLorcana, db, false, false},
+		{"no database", DefaultGame, nil, false, false},
+		{"-nonews", DefaultGame, db, true, false},
+	} {
+		setTestJobs(t)
+		Config().Game = tc.game
+		NewNewspaperDB, SkipNewspaper = tc.db, tc.skip
+		testSite.scheduleCrons()
+		got := false
+		for _, row := range backgroundJobs.Rows() {
+			got = got || row.Name == jobNewspaperSales
+		}
+		if got != tc.want {
+			t.Errorf("%s: scheduled %v, want %v", tc.desc, got, tc.want)
 		}
 	}
 }

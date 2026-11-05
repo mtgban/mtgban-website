@@ -1,4 +1,4 @@
-package main
+package salesvelocity
 
 import (
 	"cmp"
@@ -9,20 +9,32 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
+	_ "github.com/mtgban/go-mtgban/matcher/games"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 // TestSalesVelocityLive times the sales velocity load on the newspaper and
 // prints the tables docs/search-sales-velocity.md quotes. Read-only, and
-// skipped unless asked for:
+// skipped unless asked for. The test runs in this directory, so the config is an
+// absolute path, or the repo's config.json by default:
 //
-//	NEWSPAPER_LIVE=1 NEWSPAPER_LIVE_CONFIG=config.json go test -run TestSalesVelocityLive -v
+//	NEWSPAPER_LIVE=1 NEWSPAPER_LIVE_CONFIG=<absolute path> go test ./internal/salesvelocity -run TestSalesVelocityLive -v
 func TestSalesVelocityLive(t *testing.T) {
 	if os.Getenv("NEWSPAPER_LIVE") != "1" {
 		t.Skip("NEWSPAPER_LIVE not set; skipping the live sales velocity test")
 	}
-	skipWithoutDatastore(t)
-	path := cmp.Or(os.Getenv("NEWSPAPER_LIVE_CONFIG"), "config.json")
+	datastore, err := os.Open("../../allprintings5.json")
+	if err != nil {
+		t.Skip("no local datastore: ", err)
+	}
+	defer datastore.Close()
+	b, err := matcher.Open(matcher.GameMagic, datastore)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path := cmp.Or(os.Getenv("NEWSPAPER_LIVE_CONFIG"), "../../config.json")
 	blob, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
@@ -51,11 +63,11 @@ func TestSalesVelocityLive(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	game := gameMap[Config().Game]
+	const game = "Magic: The Gathering"
 
 	start := time.Now()
 	var newest time.Time
-	err = db.QueryRowContext(ctx, salesVelocityDayQuery, game, salesVelocityWindow).Scan(&newest)
+	err = db.QueryRowContext(ctx, DayQuery, game, Window).Scan(&newest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,9 +91,9 @@ func TestSalesVelocityLive(t *testing.T) {
 	}
 	lastTook := time.Since(start)
 
-	match := salesVelocityMatcher(testSite.backend())
+	match := cardMatcher(b)
 	start = time.Now()
-	cards, unmatched := buildSalesVelocity(rows, last, match)
+	cards, unmatched := build(rows, last, match)
 	buildTook := time.Since(start)
 	if len(cards) == 0 {
 		t.Fatal("no cards matched")
@@ -127,8 +139,8 @@ func TestSalesVelocityLive(t *testing.T) {
 
 	fmt.Print("| query | ms | rows |\n|---|---:|---:|\n")
 	fmt.Printf("| newest sale day | %d | 1 |\n", dayTook.Milliseconds())
-	fmt.Printf("| %d-day window | %d | %d |\n", salesVelocityWindow, rowsTook.Milliseconds(), len(rows))
-	fmt.Printf("| last sale over %d days | %d | %d |\n", salesVelocityLookback, lastTook.Milliseconds(), len(last))
+	fmt.Printf("| %d-day window | %d | %d |\n", Window, rowsTook.Milliseconds(), len(rows))
+	fmt.Printf("| last sale over %d days | %d | %d |\n", lookback, lastTook.Milliseconds(), len(last))
 	fmt.Printf("| match and build (cards) | %d | %d |\n\n", buildTook.Milliseconds(), len(cards))
 	fmt.Print("| entries | zero | unmatched pairs | this game's pairs unmatched |\n|---:|---:|---:|---:|\n")
 	fmt.Printf("| %d | %d | %d | %d of %d |\n", len(cards), zero, unmatched, gameUnmatched, gamePairs)

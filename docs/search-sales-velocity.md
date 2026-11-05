@@ -39,7 +39,7 @@ The rate is the copies over 30, to one decimal.
 | Zero | sales in the year, none in the window | `0/day` | `no sale in the window; last sold` and the date |
 | A rate | copies in the window | `2.3/day`, or `<0.1/day` under a tenth | copies, orders, days with a sale, last sale |
 
-`velocityText` (salesvelocity.go) writes both. The details open with
+`text` (`internal/salesvelocity`) writes both. The details open with
 `Sold on TCGplayer, last 30 days`.
 
 The row is a `<details>` on both layouts, showing the rate and opening on a
@@ -86,7 +86,8 @@ sales velocity`, even after typing `sort:velocity`, which otherwise hides the pi
 
 ## The loader
 
-`salesvelocity.go`, modeled on the listings loader (`tcglistings.go`).
+`internal/salesvelocity`, modeled on the listings loader (`tcglistings.go`).
+`salesvelocity.go` wires it to the site and holds the filters and their locks.
 It runs right after the Newspaper pages refresh, every three hours and
 after each datastore load, because the newspaper writes one sale day a day.
 It reads the newest sale day and stops if that day is already loaded, or
@@ -125,14 +126,17 @@ appears, which is also when the one before it is complete.
 
 ## What it costs
 
-`TestSalesVelocityLive` (`salesvelocity_live_test.go`) runs the queries
+`TestSalesVelocityLive` (`internal/salesvelocity/live_test.go`) runs the queries
 against the configured newspaper database, read-only, builds the snapshot
 on the local datastore and prints the two tables below. They were
 measured on the Magic datastore when the feature was built, the window
 ending on the last complete sale day; rerun the test to refresh them. It skips
 unless `NEWSPAPER_LIVE` is set, and without the datastore:
 
-    NEWSPAPER_LIVE=1 NEWSPAPER_LIVE_CONFIG=<config> go test -run TestSalesVelocityLive -v
+    NEWSPAPER_LIVE=1 NEWSPAPER_LIVE_CONFIG=<absolute path> go test ./internal/salesvelocity -run TestSalesVelocityLive -v
+
+The test runs in its package directory, so a relative path would resolve there;
+with none set it reads the repo's `config.json`.
 
 The queries, timed apart rather than in one transaction, and the match
 and build in Go:
@@ -156,7 +160,7 @@ it shows the semi-join kept to the game.
 
 ## Watching the pull
 
-The rates are only as good as the newspaper's TCGplayer logins. `newspaper_sales.go`
+The rates are only as good as the newspaper's TCGplayer logins. `CheckPull`
 checks hourly, on the Magic site alone since every site reads the same table,
 and reports on the `Newspaper sales` job's row, so the admin dashboard shows it
 and `checkJobHealth` announces it and its recovery on Discord. It looks across

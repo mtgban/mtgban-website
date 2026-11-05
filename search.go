@@ -719,7 +719,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	config := parseSearchPage(ds, p, query, pageVars.IsSealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)
-	pageVars.HasVelocity = salesVelocityPtr.Load() != nil
+	pageVars.HasVelocity = salesVelocityStore.Snapshot() != nil
 	if pageVars.CanVelocity {
 		unlockVelocity(config.CardFilters)
 		config.VelocitySort = true
@@ -1359,7 +1359,7 @@ func sortSearchKeys(r *http.Request, ds *datastore, p *prices, allKeys []string,
 	case "velocity":
 		// Fastest first. A card with no data is not one selling none, so as
 		// with odds it sorts last in either direction.
-		rates := salesVelocityRates(allKeys)
+		rates := salesVelocityStore.Rates(allKeys)
 		less = func(i, j int) bool {
 			rateI, hasI := rates[allKeys[i]]
 			rateJ, hasJ := rates[allKeys[j]]
