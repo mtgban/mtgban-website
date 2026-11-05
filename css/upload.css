@@ -1124,6 +1124,11 @@
 }
 .ures-table th.r { text-align: right; }
 .ures-table th.c { text-align: center; }
+/* Every column sorts on a click of its header; the arrow says which way. */
+.ures-table thead th { cursor: pointer; user-select: none; }
+.ures-table thead th:hover { color: var(--text-primary); }
+.ures-table thead th[aria-sort]::after { content: ' \25BE'; }
+.ures-table thead th[aria-sort="ascending"]::after { content: ' \25B4'; }
 .ures-table td {
     padding: 8px 10px;
     border-bottom: 1px solid var(--border-subtle);

@@ -450,13 +450,13 @@
     <thead>
         <tr>
             <th style="width:380px;">Card</th>
-            <th class="r">Your Price</th>
-            <th class="c">Cond</th>
-            <th class="c">Qty</th>
+            <th class="r" data-sort-method="number" data-sort-descending>Your Price</th>
+            <th class="c" data-sort-method="number">Cond</th>
+            <th class="c" data-sort-method="number" data-sort-descending>Qty</th>
             {{range $storeKeys}}
-                <th class="r"{{with index $.Root.CustomTips .}} title="{{.}}"{{end}}>{{index $.Root.StoreNames .}}</th>
+                <th class="r" data-sort-method="number" data-sort-descending{{with index $.Root.CustomTips .}} title="{{.}}"{{end}}>{{index $.Root.StoreNames .}}</th>
             {{end}}
-            {{if $indexKeys}}<th title="Reference prices for the printing as a whole. Unlike the store columns, these are not adjusted for the condition in the Cond column.">Index<span class="ures-index-note">per printing</span></th>{{end}}
+            {{if $indexKeys}}<th data-sort-method="number" data-sort-descending title="Reference prices for the printing as a whole. Unlike the store columns, these are not adjusted for the condition in the Cond column.">Index<span class="ures-index-note">per printing</span></th>{{end}}
         </tr>
     </thead>
     <tbody>
@@ -471,7 +471,7 @@
             <tr data-hash="{{.CardID}}" data-qtys="{{.Quantity}}" data-cond="{{or .OriginalCondition .IgnoredCondition}}" data-price="{{.OriginalPrice}}" data-notes="{{.Notes}}"
                 data-from="{{.UnpackedFrom}}" data-fromqty="{{.UnpackedQuantity}}"
                 {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
-                <td>
+                <td data-sort="{{$card.Name}} {{$card.Edition}} {{$card.Number}}">
                     <div class="ures-card-cell">
                         <div class="foil-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}" data-etched="{{$card.Etched}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed')"{{end}}>
                             <img class="card-art" src="{{$card.ImageURL}}" loading="lazy">
@@ -494,12 +494,12 @@
                     </div>
                 </td>
                 <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
-                <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
+                <td style="text-align:center" data-sort="{{cond_rank .OriginalCondition}}"><span class="cond-badge">{{.OriginalCondition}}</span></td>
                 <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{.Quantity}}</td>
                 {{range $storeKeys}}
                     {{$price := (index $scraperEntries .)}}
                     {{/* The legend's green: a buylist offer above the price the list came with. */}}
-                    <td class="ures-price {{if and $root.IsBuylist (ne $loadedPrice 0.0) (gt $price $loadedPrice)}}best{{end}}">
+                    <td class="ures-price {{if and $root.IsBuylist (ne $loadedPrice 0.0) (gt $price $loadedPrice)}}best{{end}}" data-sort="{{if ne $price 0.0}}{{printf "%.2f" $price}}{{end}}">
                         {{if ne $price 0.0}}
                             <a href="https://mtgban.com/go/{{if $root.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}" target="_blank">$ {{printf "%.2f" $price}}</a>
                         {{else}}
@@ -508,7 +508,10 @@
                     </td>
                 {{end}}
                 {{if $indexKeys}}
-                <td>
+                {{/* The column sorts by the first index listed. */}}
+                {{$firstIndex := 0.0}}
+                {{range $indexKeys}}{{$idxPrice := (index $scraperEntries .)}}{{if and $idxPrice (eq $firstIndex 0.0)}}{{$firstIndex = $idxPrice}}{{end}}{{end}}
+                <td data-sort="{{if $firstIndex}}{{printf "%.2f" $firstIndex}}{{end}}">
                     <div class="ures-index">
                         {{range $indexKeys}}
                             {{$indexName := .}}
@@ -648,15 +651,15 @@
     <thead>
         <tr>
             <th style="width:380px;">Card</th>
-            <th class="r">Your Price</th>
-            <th class="c">Cond</th>
-            <th class="c">Qty</th>
+            <th class="r" data-sort-method="number" data-sort-descending>Your Price</th>
+            <th class="c" data-sort-method="number">Cond</th>
+            <th class="c" data-sort-method="number" data-sort-descending>Qty</th>
         </tr>
     </thead>
     <tbody>
         {{range .Entries}}
         <tr class="ures-error-row" data-hash="" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}" data-notes="{{.Notes}}">
-            <td>
+            <td data-sort="{{.Card.Name}}">
                 <div class="ures-card-cell">
                     <img src="{{card_back}}" loading="lazy">
                     <div class="ures-card-info">
@@ -666,7 +669,7 @@
                 </div>
             </td>
             <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
-            <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
+            <td style="text-align:center" data-sort="{{cond_rank .OriginalCondition}}"><span class="cond-badge">{{.OriginalCondition}}</span></td>
             <td style="text-align:center">{{.Quantity}}</td>
         </tr>
         {{end}}
@@ -1152,6 +1155,7 @@
     </form>
 
     <script type="text/javascript" src="/js/upload-exports.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/upload-sort.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-share.js?hash={{.Hash}}" defer></script>
 
     <!-- Reload button (hidden until a pick or remove is made) -->

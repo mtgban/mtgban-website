@@ -460,3 +460,15 @@ func TestStoreFactorOptionsSealedLast(t *testing.T) {
 		t.Errorf("sealed flags wrong: %s", got)
 	}
 }
+
+func TestCondRank(t *testing.T) {
+	rank, ok := funcMap["cond_rank"].(func(mtgban.Condition) string)
+	if !ok {
+		t.Fatalf("cond_rank is %T, not func(mtgban.Condition) string", funcMap["cond_rank"])
+	}
+	for cond, want := range map[mtgban.Condition]string{"NM": "0", "SP": "1", "PO": "4", "": "", "Mint": ""} {
+		if got := rank(cond); got != want {
+			t.Errorf("cond_rank(%q) = %q, want %q", cond, got, want)
+		}
+	}
+}

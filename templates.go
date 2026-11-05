@@ -473,6 +473,15 @@ var funcMap = template.FuncMap{
 	"grade": func(s string) mtgban.Condition {
 		return mtgban.Condition(s)
 	},
+	// cond_rank is a grade's place among the conditions, best first, which
+	// the upload table's Cond column sorts by; empty for one it does not know.
+	"cond_rank": func(cond mtgban.Condition) string {
+		i := slices.Index(mtgban.FullGradeTags, cond)
+		if i < 0 {
+			return ""
+		}
+		return strconv.Itoa(i)
+	},
 	// buylist_state is how a buylist price is highlighted. Card Kingdom's NM
 	// offer follows CK's signal ("best" to take it, "wait" when CK is likely
 	// to pay more soon; ckbuylist.go), any other store's offer is "best" at or
