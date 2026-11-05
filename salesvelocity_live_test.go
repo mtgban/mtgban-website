@@ -55,7 +55,7 @@ func TestSalesVelocityLive(t *testing.T) {
 
 	start := time.Now()
 	var newest time.Time
-	err = db.QueryRowContext(ctx, salesVelocityDayQuery, game).Scan(&newest)
+	err = db.QueryRowContext(ctx, salesVelocityDayQuery, game, salesVelocityWindow).Scan(&newest)
 	if err != nil {
 		t.Fatal(err)
 	}

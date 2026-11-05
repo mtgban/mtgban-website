@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -16,7 +17,7 @@ import (
 // TCGplayer's copies sold a day per card, from the newspaper's sales table.
 
 const (
-	// Days the rate is taken over, ending on the newest sale day.
+	// Days the rate is taken over, ending on the last complete sale day.
 	salesVelocityWindow = 30
 	// Days back the last sale is looked for.
 	salesVelocityLookback = 365
@@ -55,8 +56,16 @@ type salesVelocityFailure struct {
 
 var salesVelocityFailed atomic.Pointer[salesVelocityFailure]
 
-// The newest day this game has a sale; the scrape lags today by a day.
-const salesVelocityDayQuery = `SELECT max(sale_date) FROM tcgplayersalesdata WHERE product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $1)`
+// The newest day this game has a sale, none over the window; the scrape lags
+// today by a day. Walks the date index down to the first sale: a max() has to
+// read every row a game has, which for Magic is a scan of the whole table.
+const salesVelocityDayQuery = `
+	SELECT sale_date
+	  FROM tcgplayersalesdata
+	 WHERE sale_date > current_date - $2::int
+	   AND product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $1)
+	 ORDER BY sale_date DESC
+	 LIMIT 1`
 
 // Copies, orders and sale days per product and printing of one game.
 const salesVelocityQuery = `
@@ -95,7 +104,7 @@ type salesPair struct {
 	variant   string
 }
 
-// loadSalesVelocity loads the newspaper's newest sale day once it is new.
+// loadSalesVelocity loads the newspaper's last complete sale day once it is new.
 func (s *site) loadSalesVelocity() {
 	game, found := gameMap[Config().Game]
 	if !found || SkipNewspaper || NewNewspaperDB == nil {
@@ -114,18 +123,18 @@ func (s *site) loadSalesVelocity() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	var newest sql.NullTime
-	err := NewNewspaperDB.QueryRowContext(ctx, salesVelocityDayQuery, game).Scan(&newest)
+	var newest time.Time
+	err := NewNewspaperDB.QueryRowContext(ctx, salesVelocityDayQuery, game, salesVelocityWindow).Scan(&newest)
+	if errors.Is(err, sql.ErrNoRows) {
+		log.Printf("sales velocity: no sales in the last %d days", salesVelocityWindow)
+		return
+	}
 	if err != nil {
 		log.Println("sales velocity:", err)
 		backgroundJobs.Report(jobSalesVelocity, "", "cannot read the newspaper: "+err.Error())
 		return
 	}
-	if !newest.Valid {
-		log.Println("sales velocity: the newspaper has no sales")
-		return
-	}
-	day := lastCompleteSaleDay(newest.Time)
+	day := lastCompleteSaleDay(newest)
 	if !salesVelocityDue(salesVelocityPtr.Load(), salesVelocityFailed.Load(), day, time.Now()) {
 		return
 	}

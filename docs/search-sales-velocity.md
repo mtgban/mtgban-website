@@ -92,6 +92,12 @@ through the listings loader's semi-join on `tcgplayerproductinfomodel`'s
 That keeps each deployment to its own game and makes the unmatched
 count mean something. A product with sales but no info row is left out.
 
+The day query walks the date index down from the newest sale and stops at
+this game's first. A `max()` has to read every row the game has, which for
+Magic is a scan of the whole table. It looks back over the window only, so a
+game that stops selling costs a few seconds rather than a walk of the whole
+index; such a game loads nothing and keeps its last load.
+
 Each pair resolves to a card through `b.Match` with the product id and
 the printing, as TCGplayer's own prices are filed. Two pairs on one card
 add their copies and orders; their days with a sale keep the larger
@@ -114,7 +120,7 @@ appears, which is also when the one before it is complete.
 against the configured newspaper database, read-only, builds the snapshot
 on the local datastore and prints the two tables below. They were
 measured on the Magic datastore when the feature was built, the window
-ending on the newest sale day; rerun the test to refresh them. It skips
+ending on the last complete sale day; rerun the test to refresh them. It skips
 unless `NEWSPAPER_LIVE` is set, and without the datastore:
 
     NEWSPAPER_LIVE=1 NEWSPAPER_LIVE_CONFIG=<config> go test -run TestSalesVelocityLive -v
@@ -124,10 +130,10 @@ and build in Go:
 
 | query | ms | rows |
 |---|---:|---:|
-| newest sale day | 12794 | 1 |
-| 30-day window | 3897 | 144841 |
-| last sale over 365 days | 21453 | 163985 |
-| match and build (cards) | 583 | 157501 |
+| newest sale day | 185 | 1 |
+| 30-day window | 18488 | 144841 |
+| last sale over 365 days | 47987 | 163985 |
+| match and build (cards) | 701 | 157501 |
 
 Entries are the cards with a sale in the year, and zero counts the cards with no sale in the window. Unmatched pairs
 count the product and printing pairs no card matches. The last column
