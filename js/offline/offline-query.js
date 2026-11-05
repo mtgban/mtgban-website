@@ -527,20 +527,16 @@
         return cards;
     }
 
-    async function cardsBySet(parsed, env, out) {
+    async function cardsBySet(parsed, env) {
         var cards = [];
         var seen = {};
         for (var n = 0; n < parsed.set.length; n++) {
             var setCode = parsed.set[n];
-            if (!(await env.hasSet(setCode))) {
-                out.missingSets.push(setCode);
-                continue;
-            }
+            if (!(await env.hasSet(setCode))) continue;
             var payload;
             try {
                 payload = await cachedPayload(setCode, env);
             } catch (err) {
-                out.missingSets.push(setCode);
                 continue;
             }
             var sections = [payload.retail, payload.buylist];
@@ -559,8 +555,7 @@
     }
 
     // cardsByNumber walks the catalog for a number no name or set narrows,
-    // keeping the sets on this device: the query named none of the others, so
-    // none of them is worth a notice.
+    // keeping the sets on this device, so the others don't use up the limit.
     async function cardsByNumber(parsed, env, out) {
         var cards = (await env.allCards()).filter(function (card) { return matchesFilters(card, parsed); });
         var synced = {};
@@ -603,7 +598,7 @@
             return cards;
         }
         if (parsed.set.length > 0) {
-            var inSet = await cardsBySet(parsed, env, out);
+            var inSet = await cardsBySet(parsed, env);
             if (parsed.printed && inSet.some(function (card) { return (card.num || '').toLowerCase() === parsed.printed; })) {
                 // A word a card of its set carries is that number exactly
                 return inSet.filter(function (card) { return (card.num || '').toLowerCase() === parsed.printed; });
@@ -622,15 +617,11 @@
         var codes = Object.keys(bySet).sort();
         for (var k = 0; k < codes.length; k++) {
             var code = codes[k];
-            if (!(await env.hasSet(code))) {
-                out.missingSets.push(code);
-                continue;
-            }
+            if (!(await env.hasSet(code))) continue;
             var pl;
             try {
                 pl = await cachedPayload(code, env);
             } catch (err) {
-                out.missingSets.push(code);
                 continue;
             }
             bySet[code].forEach(function (card) {
@@ -647,18 +638,14 @@
 
     async function execute(parsed, env) {
         await dropStalePayloads(env);
-        var out = {results: [], truncated: false, missingSets: [], unsupported: parsed.unsupported};
+        var out = {results: [], truncated: false, unsupported: parsed.unsupported};
 
         await addResults(await findCards(parsed, env, out), env, out);
 
         // A query no name answers may name a set. One the query already
-        // narrowed to is not up for reinterpretation, and what the name search
-        // missed stops mattering once a set answers.
+        // narrowed to is not up for reinterpretation.
         if (!out.results.length && !parsed.set.length && (parsed.setsNamed || []).length) {
-            var named = {results: [], missingSets: []};
-            await addResults(await cardsBySet(Object.assign({}, parsed, {set: parsed.setsNamed}), env, named), env, named);
-            out.results = named.results;
-            out.missingSets = named.results.length ? named.missingSets : out.missingSets.concat(named.missingSets);
+            await addResults(await cardsBySet(Object.assign({}, parsed, {set: parsed.setsNamed}), env), env, out);
         }
         return out;
     }

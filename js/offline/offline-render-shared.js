@@ -129,23 +129,16 @@
         return best;
     }
 
-    function noticesHTML(exec, ctx) {
+    function noticesHTML(exec) {
         var html = '';
         if (exec.unsupported && exec.unsupported.length > 0) {
             html += '<div class="offline-notice offline-notice-warn">Not available offline: ' +
                 exec.unsupported.map(escapeHtml).join(', ') + '</div>';
         }
-        (exec.missingSets || []).forEach(function (code) {
-            var set = ctx.sets[code];
-            html += '<div class="offline-notice offline-notice-missing">' +
-                escapeHtml(set && set.n ? set.n : code) + ' is not synced offline. ' +
-                '<a href="/search?settings=offline">Choose synced editions in Settings</a> (requires connectivity).' +
-                '</div>';
-        });
         if (exec.truncated) {
             html += '<div class="offline-notice">Too many matches, showing a truncated list.</div>';
         }
-        if (exec.results.length === 0 && (exec.missingSets || []).length === 0) {
+        if (exec.results.length === 0) {
             html += '<div class="offline-empty"><em>No results found in offline data</em></div>';
         }
         return html;

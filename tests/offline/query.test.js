@@ -258,7 +258,6 @@ test('exact name lookup plus substring scan', async () => {
     const out = await Q.execute(Q.parse('boseiju'), env);
     const uuids = out.results.map(r => r.uuid).sort();
     expect(uuids).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
-    expect(out.missingSets).toEqual(['OLD']);
 });
 
 test('a game finish reaches only the printings that carry it', async () => {
@@ -291,12 +290,10 @@ test('a set list reads every set it names', async () => {
     Q.resetCaches();
     let out = await Q.execute(Q.parse('s:neo,mh2'), fakeEnv());
     expect(out.results.map(r => r.uuid).sort()).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
-    expect(out.missingSets).toEqual([]);
 
     Q.resetCaches();
     out = await Q.execute(Q.parse('s:neo,old'), fakeEnv());
     expect(out.results.map(r => r.uuid).sort()).toEqual(['u-neo-1', 'u-neo-1f']);
-    expect(out.missingSets).toEqual(['OLD']);
 });
 
 test('a finish list keeps a card any of its finishes reaches', async () => {
@@ -484,7 +481,6 @@ test('set-only query on an unsynced set reports missing', async () => {
     Q.resetCaches();
     const out = await Q.execute(Q.parse('s:OLD'), fakeEnv());
     expect(out.results).toEqual([]);
-    expect(out.missingSets).toEqual(['OLD']);
 });
 
 test('payload LRU avoids reloading within the cap', async () => {
@@ -702,7 +698,6 @@ test('rejection degradation: one set fails, others succeed', async () => {
     var out = await Q.execute(Q.parse('card'), env);
     expect(out.results.length).toBe(1);
     expect(out.results[0].uuid).toBe('u-good-1');
-    expect(out.missingSets).toEqual(['BAD']);
 });
 
 // Online scopes a search with in:(...); offline cannot, and says so as one
@@ -881,16 +876,16 @@ function numberEnv() {
 async function found(q, env) {
     Q.resetCaches();
     const out = await Q.execute(ps(q), env || numberEnv());
-    return {uuids: out.results.map(r => r.uuid).sort(), missing: out.missingSets};
+    return out.results.map(r => r.uuid).sort();
 }
 
 test('a set and a number find the printing', async () => {
-    expect(await found('spm 66')).toEqual({uuids: ['s66'], missing: []});
+    expect(await found('spm 66')).toEqual(['s66']);
 });
 
 test('a number alone reaches every synced set, with no notice for the others', async () => {
-    expect(await found('66')).toEqual({uuids: ['n66', 's66'], missing: []});
-    expect(await found('cn:66')).toEqual({uuids: ['n66', 's66'], missing: []});
+    expect(await found('66')).toEqual(['n66', 's66']);
+    expect(await found('cn:66')).toEqual(['n66', 's66']);
 });
 
 test('cards in other sets do not use up the result limit', async () => {
@@ -906,19 +901,19 @@ test('cards in other sets do not use up the result limit', async () => {
 test('a card named the number stays a name', async () => {
     const env = numberEnv();
     env.lookupName = async (key) => key === '66' ? ['s67'] : [];
-    expect(await found('66', env)).toEqual({uuids: ['s67'], missing: []});
+    expect(await found('66', env)).toEqual(['s67']);
 });
 
 test('a number no card carries is read as a name', async () => {
     const env = numberEnv();
     env.allNames = async () => [{key: 'game of 2048', uuids: ['s67']}];
-    expect(await found('2048', env)).toEqual({uuids: ['s67'], missing: []});
+    expect(await found('2048', env)).toEqual(['s67']);
 });
 
 test('a printed number a card carries is that number exactly', async () => {
-    expect(await found('info-en067')).toEqual({uuids: ['y1'], missing: []});
+    expect(await found('info-en067')).toEqual(['y1']);
     // One no card carries is the set and ordinal
-    expect(await found('info-067')).toEqual({uuids: ['y1', 'y2'], missing: []});
+    expect(await found('info-067')).toEqual(['y1', 'y2']);
 });
 
 test('a number after a name is taken only when the whole name finds nothing', async () => {
@@ -926,20 +921,21 @@ test('a number after a name is taken only when the whole name finds nothing', as
     env.allNames = async () => [{key: 'the soul stone', uuids: ['s66']}];
     env.lookupName = async (key) => key === 'stone 66a' ? ['s67'] : [];
     expect(ps('soul stone #66').trailingNumber).toMatchObject({values: ['66']});
-    expect(await found('soul stone #66', env)).toEqual({uuids: ['s66'], missing: []});
-    expect(await found('soul stone #67', env)).toEqual({uuids: [], missing: []});
-    expect(await found('stone 66a', env)).toEqual({uuids: ['s67'], missing: []});
+    expect(await found('soul stone #66', env)).toEqual(['s66']);
+    expect(await found('soul stone #67', env)).toEqual([]);
+    expect(await found('stone 66a', env)).toEqual(['s67']);
 });
 
 test('a query no name answers falls back to the sets it names', async () => {
     const env = numberEnv();
-    expect((await found('spm', env)).uuids).toEqual(['s66', 's67']);
-    expect((await found("marvel's spider-man", env)).uuids).toEqual(['s66', 's67']);
-    expect((await found('shadows', env)).missing).toEqual(['SIR', 'SOI']);
+    expect(await found('spm', env)).toEqual(['s66', 's67']);
+    expect(await found("marvel's spider-man", env)).toEqual(['s66', 's67']);
+    // Sets this device lacks answer nothing, and say nothing here
+    expect(await found('shadows', env)).toEqual([]);
     // A name found only in a set this device lacks does not hide the set
     env.allNames = async () => [{key: 'wasp mantis spmx', uuids: ['o66']}];
-    expect(await found('spm', env)).toEqual({uuids: ['s66', 's67'], missing: []});
+    expect(await found('spm', env)).toEqual(['s66', 's67']);
     env.allNames = async () => [];
     // A set the query narrowed to is not reinterpreted
-    expect(await found('shadows s:spm', env)).toEqual({uuids: [], missing: []});
+    expect(await found('shadows s:spm', env)).toEqual([]);
 });
