@@ -12,29 +12,45 @@ function load() {
 // Mirrors products.json on the api-products-page branch.
 const data = {
     packages: [
-        {key: 'starter', monthly: 20000, explicit: true, includedStores: 1},
-        {key: 'all_stores', monthly: 50000, explicit: false, includedStores: 0},
-        {key: 'all_data', monthly: 80000, explicit: false, includedStores: 0},
+        {key: 'starter', monthly: 19900, explicit: true, includedStores: 1},
+        {key: 'all_stores', monthly: 49900, explicit: false, includedStores: 0},
+        {key: 'all_data', monthly: 79900, explicit: false, includedStores: 0},
     ],
-    addons: {extra_store: 15000, extra_game: 15000},
+    addons: {extra_store: 5000, extra_game: 10000},
+    addons_first: {extra_store: 15000, extra_game: 25000},
     intervals: [{key: 'monthly', count: 1}, {key: 'quarterly', count: 3}],
     includedGames: 1,
 };
 
 test('starter with one store and magic is the base amount', () => {
     const {computeTotal} = load();
-    expect(computeTotal(data, {package: 'starter', interval: 'monthly', stores: 1, games: 1}).cents).toBe(20000);
+    expect(computeTotal(data, {package: 'starter', interval: 'monthly', stores: 1, games: 1}).cents).toBe(19900);
 });
 
-test('extra stores and games add on, quarterly multiplies', () => {
+test('extra stores and games step down, quarterly multiplies', () => {
     const {computeTotal} = load();
-    expect(computeTotal(data, {package: 'starter', interval: 'monthly', stores: 3, games: 2}).cents).toBe(20000 + 2 * 15000 + 15000);
-    expect(computeTotal(data, {package: 'all_data', interval: 'quarterly', stores: 5, games: 1}).cents).toBe(3 * 80000);
+    expect(computeTotal(data, {package: 'starter', interval: 'monthly', stores: 3, games: 2}).cents).toBe(19900 + 15000 + 5000 + 25000);
+    expect(computeTotal(data, {package: 'all_data', interval: 'quarterly', stores: 5, games: 3}).cents).toBe(344700);
+    expect(computeTotal(data, {package: 'all_data', interval: 'quarterly', stores: 5, games: 1}).cents).toBe(3 * 79900);
+});
+
+test('the first extra unit costs more than the ones after it', () => {
+    const {computeTotal} = load();
+    expect(computeTotal(data, {package: 'starter', interval: 'monthly', stores: 2, games: 1}).cents).toBe(34900);
+    expect(computeTotal(data, {package: 'starter', interval: 'monthly', stores: 4, games: 1}).cents).toBe(44900);
+    expect(computeTotal(data, {package: 'starter', interval: 'monthly', stores: 1, games: 2}).cents).toBe(44900);
+    expect(computeTotal(data, {package: 'starter', interval: 'monthly', stores: 1, games: 3}).cents).toBe(54900);
+});
+
+test('a flat add-on (no addons_first) still multiplies', () => {
+    const {computeTotal} = load();
+    const flat = Object.assign({}, data, {addons_first: undefined});
+    expect(computeTotal(flat, {package: 'starter', interval: 'monthly', stores: 3, games: 1}).cents).toBe(19900 + 2 * 5000);
 });
 
 test('non-explicit packages ignore stores', () => {
     const {computeTotal} = load();
-    expect(computeTotal(data, {package: 'all_stores', interval: 'monthly', stores: 4, games: 1}).cents).toBe(50000);
+    expect(computeTotal(data, {package: 'all_stores', interval: 'monthly', stores: 4, games: 1}).cents).toBe(49900);
 });
 
 test('formatUSD matches the Go helper', () => {
@@ -47,17 +63,17 @@ test('formatUSD matches the Go helper', () => {
 test('a checked mode add-on adds its monthly once; an unlisted key adds nothing', () => {
     const {computeTotal} = load();
     const withNews = Object.assign({}, data, {addons: Object.assign({}, data.addons, {newspaper: 100}), mode_addons: ['newspaper'], addon_applies: {newspaper: ['all_data']}});
-    expect(computeTotal(withNews, {package: 'all_data', interval: 'monthly', stores: 0, games: 1, modeAddons: ['newspaper']}).cents).toBe(80100);
-    expect(computeTotal(withNews, {package: 'all_data', interval: 'quarterly', stores: 0, games: 1, modeAddons: ['newspaper']}).cents).toBe(3 * 80100);
-    expect(computeTotal(withNews, {package: 'all_data', interval: 'monthly', stores: 0, games: 1, modeAddons: ['extra_game']}).cents).toBe(80000);
-    expect(computeTotal(data, {package: 'all_data', interval: 'monthly', stores: 0, games: 1, modeAddons: ['newspaper']}).cents).toBe(80000);
-    expect(computeTotal(withNews, {package: 'all_data', interval: 'monthly', stores: 0, games: 1}).cents).toBe(80000);
+    expect(computeTotal(withNews, {package: 'all_data', interval: 'monthly', stores: 0, games: 1, modeAddons: ['newspaper']}).cents).toBe(80000);
+    expect(computeTotal(withNews, {package: 'all_data', interval: 'quarterly', stores: 0, games: 1, modeAddons: ['newspaper']}).cents).toBe(3 * 80000);
+    expect(computeTotal(withNews, {package: 'all_data', interval: 'monthly', stores: 0, games: 1, modeAddons: ['extra_game']}).cents).toBe(79900);
+    expect(computeTotal(data, {package: 'all_data', interval: 'monthly', stores: 0, games: 1, modeAddons: ['newspaper']}).cents).toBe(79900);
+    expect(computeTotal(withNews, {package: 'all_data', interval: 'monthly', stores: 0, games: 1}).cents).toBe(79900);
 });
 
 test('computeTotal counts a mode add-on once however many boxes carry it', () => {
     const {computeTotal} = load();
     const withNews = Object.assign({}, data, {addons: Object.assign({}, data.addons, {newspaper: 20000}), mode_addons: ['newspaper'], addon_applies: {newspaper: ['starter', 'all_stores']}});
-    expect(computeTotal(withNews, {package: 'starter', interval: 'monthly', stores: 1, games: 1, modeAddons: ['newspaper', 'newspaper']}).cents).toBe(40000);
+    expect(computeTotal(withNews, {package: 'starter', interval: 'monthly', stores: 1, games: 1, modeAddons: ['newspaper', 'newspaper']}).cents).toBe(39900);
 });
 
 // Minimal fake DOM so the configurator's non-pure wiring code runs under
@@ -196,11 +212,12 @@ function buildFakeForm(storesChecked, gameChecked, search, storeKeys, opts) {
 
     const planData = {
         packages: [
-            {key: 'starter', name: 'Starter', monthly: 20000, explicit: true, includedStores: 1, scope: 'explicit', sealed: false},
-            {key: 'all_stores', name: 'Base Access', monthly: 50000, explicit: false, includedStores: 0, scope: 'BASE_ACCESS', sealed: false},
-            {key: 'all_data', name: 'All Access', monthly: 80000, explicit: false, includedStores: 0, scope: 'ALL_ACCESS', sealed: true},
+            {key: 'starter', name: 'Starter', monthly: 19900, explicit: true, includedStores: 1, scope: 'explicit', sealed: false},
+            {key: 'all_stores', name: 'Base Access', monthly: 49900, explicit: false, includedStores: 0, scope: 'BASE_ACCESS', sealed: false},
+            {key: 'all_data', name: 'All Access', monthly: 79900, explicit: false, includedStores: 0, scope: 'ALL_ACCESS', sealed: true},
         ],
-        addons: {extra_store: 15000, extra_game: 15000, newspaper: 20000},
+        addons: {extra_store: 5000, extra_game: 10000, newspaper: 20000},
+        addons_first: {extra_store: 15000, extra_game: 25000},
         mode_addons: ['newspaper'],
         addon_applies: {newspaper: 'addonApplies' in opts ? opts.addonApplies : ['starter', 'all_stores']},
         intervals: [{key: 'monthly', count: 1}],
@@ -331,7 +348,7 @@ test('the newspaper boxes stay in step and only the chosen card submits', () => 
 
     expect(addons[1].checked).toBe(true);
     expect(addons[1].disabled).toBe(true);
-    expect(total.textContent).toBe('$550');
+    expect(total.textContent).toBe('$549');
 });
 
 test('switching to a package the add-on does not apply to disables its box and drops it from the total', () => {
@@ -343,12 +360,12 @@ test('switching to a package the add-on does not apply to disables its box and d
 
     expect(addons.every(function (a) { return a.disabled; })).toBe(true);
     expect(addons.every(function (a) { return a.checked; })).toBe(true);
-    expect(total.textContent).toBe('$800');
+    expect(total.textContent).toBe('$799');
 
     pick('all_stores');
 
     expect(addons.map(function (a) { return a.disabled; })).toEqual([true, false]);
-    expect(total.textContent).toBe('$700');
+    expect(total.textContent).toBe('$699');
 });
 
 // A nil applies_to on the backend serializes as null, not an empty array.
@@ -361,7 +378,7 @@ test('an add-on with a missing or null applies list stays disabled and adds noth
         change(addons[0]);
 
         expect(addons.every(function (a) { return a.disabled; })).toBe(true);
-        expect(total.textContent).toBe('$350');
+        expect(total.textContent).toBe('$349');
     });
 });
 
@@ -444,16 +461,16 @@ test('store prefill prefers the keys the server resolved from legacy shorthands'
 
 test('checking the newspaper box adds its monthly to the total', () => {
     const {addons, total, change} = buildFakeForm();
-    expect(total.textContent).toBe('$350');
+    expect(total.textContent).toBe('$349');
 
     addons[0].checked = true;
     change(addons[0]);
 
-    expect(total.textContent).toBe('$550');
+    expect(total.textContent).toBe('$549');
 });
 
 test('a change link prefills the add-on box', () => {
     const {addons, total} = buildFakeForm([true, true], true, '?change=1&package=starter&addons=newspaper');
     expect(addons.map(function (a) { return a.checked; })).toEqual([true, true]);
-    expect(total.textContent).toBe('$550');
+    expect(total.textContent).toBe('$549');
 });

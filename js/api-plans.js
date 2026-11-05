@@ -1,8 +1,7 @@
 // Configurator total for the API plans page. The gateway recomputes it.
 (function () {
-    // computeTotal mirrors billing.Plan.LineItems: package, extra stores past
-    // the included count on an explicit package, extra games past the
-    // included count, each checked mode add-on once, all times the interval count.
+    // computeTotal mirrors billing.Plan.Total: package, each counted add-on through the
+    // catalog's step (first unit, then repeat), each checked mode add-on once, times the interval count.
     function computeTotal(data, choice) {
         var pkg = null;
         for (var i = 0; i < data.packages.length; i++) {
@@ -14,12 +13,18 @@
             if (data.intervals[j].key === choice.interval) count = data.intervals[j].count;
         }
         var monthly = pkg.monthly;
+        function addonAmount(key, n) {
+            if (n <= 0) return 0;
+            var rest = data.addons[key] || 0;
+            if (data.addons_first && data.addons_first[key]) return data.addons_first[key] + (n - 1) * rest;
+            return n * rest;
+        }
         if (pkg.explicit) {
             var extraStores = Math.max(0, choice.stores - pkg.includedStores);
-            monthly += extraStores * (data.addons.extra_store || 0);
+            monthly += addonAmount('extra_store', extraStores);
         }
         var extraGames = Math.max(0, choice.games - data.includedGames);
-        monthly += extraGames * (data.addons.extra_game || 0);
+        monthly += addonAmount('extra_game', extraGames);
         var modeAddons = choice.modeAddons || [];
         var applies = data.addon_applies || {};
         for (var m = 0; m < modeAddons.length; m++) {
