@@ -73,10 +73,10 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 	withHistoryOnSale(t)
 	body := apiPlansPage(t, "")
 	for _, want := range []string{
-		"À la carte", "$200", "Base Access", "$500", "All Access", "$800", "$150",
+		"À la carte", "$199", "Base Access", "$499", "All Access", "$799", "$150",
 		"No Sealed or EV data", "Single region market overview", "Priority support", "Choose All Access",
-		"one included, $150/month for each additional",
-		`id="api-total-package">All Access</span> <strong id="api-total">$800</strong>`,
+		"one included, the next is $250/month and each after it $100/month",
+		`id="api-total-package">All Access</span> <strong id="api-total">$799</strong>`,
 		`action="https://api.example/checkout"`,
 		`name="package" id="api-package-all_data" value="all_data" checked`,
 		`name="games" value="pokemon"`,
@@ -103,7 +103,7 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 	if strings.Contains(body, "Patreon bundle") || strings.Contains(body, "Magic is included") {
 		t.Error("page still mentions the Patreon bundle or an included game")
 	}
-	// Podium order: 500, 800, 200.
+	// Podium order: 499, 799, 199.
 	base, all, carte := strings.Index(body, "Base Access"), strings.Index(body, "All Access"), strings.Index(body, "À la carte")
 	if !(base < all && all < carte) {
 		t.Errorf("cards out of podium order: base %d all %d carte %d", base, all, carte)
@@ -421,7 +421,7 @@ func TestStoreFamiliesEmptyWithNothingServed(t *testing.T) {
 func TestAPIPlansStoreRowComesFromTheServedScrapers(t *testing.T) {
 	stubScrapers(t, magicStub)
 	body := apiPlansPage(t, "")
-	if !strings.Contains(body, "TCGplayer always included, your first store is on us, each additional is $150/month") {
+	if !strings.Contains(body, "TCGplayer always included, your first store is on us, the next is $150/month and each after it $50/month") {
 		t.Error("legend lacks the implied family")
 	}
 	for _, want := range []string{`name="stores" value="abugames" checked disabled> ABU Games`, `name="stores" value="cardkingdom" checked disabled> Card Kingdom`, `name="stores" value="starcitygames" checked disabled> Star City Games`} {
@@ -864,6 +864,114 @@ func TestEveryPackageIconIsDrawn(t *testing.T) {
 	for _, p := range apiProducts.Packages {
 		if _, ok := tierIcons[p.Icon]; !ok {
 			t.Errorf("package %s: the page has no %q icon", p.Key, p.Icon)
+		}
+	}
+}
+
+// The legends quote both steps; a flat add-on keeps the one-price sentence.
+func TestAPIPlansLegendsQuoteTheSteps(t *testing.T) {
+	body := apiPlansPage(t, "")
+	for _, want := range []string{
+		"your first store is on us, the next is $150/month and each after it $50/month",
+		"one included, the next is $250/month and each after it $100/month",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page lacks %q", want)
+		}
+	}
+	saved := apiProducts
+	t.Cleanup(func() { apiProducts = saved })
+	flat := *saved
+	flat.Addons = slices.Clone(saved.Addons)
+	for i := range flat.Addons {
+		if flat.Addons[i].Key == "extra_store" {
+			flat.Addons[i].FirstMonthly = 0
+		}
+	}
+	apiProducts = &flat
+	body = apiPlansPage(t, "")
+	if !strings.Contains(body, "your first store is on us, each additional is $50/month") || strings.Contains(body, "on us, the next is") {
+		t.Error("flat extra_store legend should read each additional is $50/month")
+	}
+}
+
+func TestAPIPlansJSONCarriesFirstAmounts(t *testing.T) {
+	body := apiPlansPage(t, "")
+	for _, want := range []string{
+		`"addons_first":{"extra_game":25000,"extra_store":15000}`,
+		`"addons":{"extra_game":10000,"extra_store":5000`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page lacks %s", want)
+		}
+	}
+}
+
+type planChoice struct {
+	pkg, interval string
+	stores, games int64
+	modeAddons    []string
+}
+
+// apiplansGatewayTotal is the total the gateway bills for a choice, from the embedded list.
+func apiplansGatewayTotal(t *testing.T, c planChoice) int64 {
+	t.Helper()
+	p, ok := apiProducts.Package(c.pkg)
+	if !ok {
+		t.Fatalf("no package %s", c.pkg)
+	}
+	iv, ok := apiProducts.Interval(c.interval)
+	if !ok {
+		t.Fatalf("no interval %s", c.interval)
+	}
+	total, err := iv.Amount(p.Monthly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	add := func(key string, qty int64) {
+		a, ok := apiProducts.Addon(key)
+		if !ok {
+			t.Fatalf("no addon %s", key)
+		}
+		n, err := a.Amount(iv, qty)
+		if err != nil {
+			t.Fatal(err)
+		}
+		total += n
+	}
+	if p.StoreScope == apiproductlist.StoreScopeExplicit {
+		add("extra_store", c.stores-int64(p.IncludedStores))
+	}
+	add("extra_game", c.games-int64(apiProducts.IncludedGames))
+	for _, k := range c.modeAddons {
+		a, ok := apiProducts.Addon(k)
+		if !ok {
+			t.Fatalf("no addon %s", k)
+		}
+		n, err := iv.Amount(a.Monthly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		total += n
+	}
+	return total
+}
+
+func TestStepTotalsMatchGatewayFormula(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		c    planChoice
+		want int64
+	}{
+		{"starter one store one game", planChoice{pkg: "starter", interval: "monthly", stores: 1, games: 1}, 19900},
+		{"starter two stores", planChoice{pkg: "starter", interval: "monthly", stores: 2, games: 1}, 34900},
+		{"starter four stores", planChoice{pkg: "starter", interval: "monthly", stores: 4, games: 1}, 44900},
+		{"all_data quarterly three games", planChoice{pkg: "all_data", interval: "quarterly", games: 3}, 344700},
+		{"starter one store two games", planChoice{pkg: "starter", interval: "monthly", stores: 1, games: 2}, 44900},
+		{"all_stores plus newspaper", planChoice{pkg: "all_stores", interval: "monthly", games: 1, modeAddons: []string{"newspaper"}}, 69900},
+	} {
+		if got := apiplansGatewayTotal(t, tc.c); got != tc.want {
+			t.Errorf("%s: %d, want %d", tc.name, got, tc.want)
 		}
 	}
 }

@@ -43,9 +43,11 @@ type APIPlansVars struct {
 	ExtraGameMonthly int64
 	// ExtraStoreMonthly is the add-on price for a store past the included count, in cents.
 	ExtraStoreMonthly int64
-	Games             []APIPlanGame
-	ReturnTo          string
-	Invite            string
+	// ExtraGameFirst and ExtraStoreFirst are the first unit's price when it differs, else 0.
+	ExtraGameFirst, ExtraStoreFirst int64
+	Games                           []APIPlanGame
+	ReturnTo                        string
+	Invite                          string
 	// Change is set when the account page sent the reader here to change a plan
 	Change bool
 	// Email is the signed-in reader, empty for anonymous
@@ -198,10 +200,10 @@ func apiPlansVars(p *prices, r *http.Request, sig string) *APIPlansVars {
 	v.DefaultScope = v.Default.StoreScope
 	v.DefaultSealed = slices.Contains(v.Default.Modes, "sealed")
 	if a, ok := apiProducts.Addon("extra_game"); ok {
-		v.ExtraGameMonthly = a.Monthly
+		v.ExtraGameMonthly, v.ExtraGameFirst = a.Monthly, a.FirstMonthly
 	}
 	if a, ok := apiProducts.Addon("extra_store"); ok {
-		v.ExtraStoreMonthly = a.Monthly
+		v.ExtraStoreMonthly, v.ExtraStoreFirst = a.Monthly, a.FirstMonthly
 	}
 	for _, a := range apiProducts.Addons {
 		if modeAddonOnSale(a) {
@@ -474,6 +476,7 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 	out := struct {
 		Packages      []pkg               `json:"packages"`
 		Addons        map[string]int64    `json:"addons"`
+		AddonsFirst   map[string]int64    `json:"addons_first,omitempty"`
 		ModeAddons    []string            `json:"mode_addons,omitempty"`
 		AddonApplies  map[string][]string `json:"addon_applies,omitempty"`
 		Intervals     []interval          `json:"intervals"`
@@ -493,6 +496,12 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 			continue
 		}
 		out.Addons[a.Key] = a.Monthly
+		if a.Stepped() {
+			if out.AddonsFirst == nil {
+				out.AddonsFirst = map[string]int64{}
+			}
+			out.AddonsFirst[a.Key] = a.FirstMonthly
+		}
 	}
 	for _, a := range v.ModeAddons {
 		out.ModeAddons = append(out.ModeAddons, a.Key)

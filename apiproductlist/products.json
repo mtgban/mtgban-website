@@ -4,7 +4,7 @@
     {
       "key": "starter",
       "name": "À la carte",
-      "monthly": 20000,
+      "monthly": 19900,
       "store_scope": "explicit",
       "included_stores": 1,
       "modes": ["retail", "buylist"],
@@ -20,7 +20,7 @@
     {
       "key": "all_stores",
       "name": "Base Access",
-      "monthly": 50000,
+      "monthly": 49900,
       "store_scope": "BASE_ACCESS",
       "included_stores": 0,
       "modes": ["retail", "buylist"],
@@ -35,7 +35,7 @@
     {
       "key": "all_data",
       "name": "All Access",
-      "monthly": 80000,
+      "monthly": 79900,
       "store_scope": "ALL_ACCESS",
       "included_stores": 0,
       "modes": ["retail", "buylist", "sealed", "newspaper"],
@@ -69,13 +69,15 @@
     {
       "key": "extra_store",
       "name": "Additional store",
-      "monthly": 15000,
+      "monthly": 5000,
+      "first_monthly": 15000,
       "applies_to": ["starter"]
     },
     {
       "key": "extra_game",
       "name": "Additional game",
-      "monthly": 15000,
+      "monthly": 10000,
+      "first_monthly": 25000,
       "applies_to": ["starter", "all_stores", "all_data", "history"]
     },
     {
