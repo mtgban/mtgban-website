@@ -934,6 +934,8 @@ var FilterOperations = map[string][]string{
 	"region":    {":"},
 	"quantity":  {">", "<"},
 	"qty":       {">", "<"},
+	"v":         {">", "<"},
+	"velocity":  {">", "<"},
 }
 
 func init() {
@@ -1789,6 +1791,20 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 				Name:          "empty",
 				OnlyForVendor: true,
 			})
+		case "v", "velocity":
+			limit, err := strconv.ParseFloat(code, 64)
+			if err != nil || math.IsNaN(limit) || math.IsInf(limit, 0) {
+				continue
+			}
+			opt := "locked_velocity_greater_than"
+			if operation == "<" {
+				opt = "locked_velocity_less_than"
+			}
+			filters = append(filters, FilterElem{
+				Name:   opt,
+				Negate: negate,
+				Values: []string{code},
+			})
 		case "price", "buy_price", "arb_price", "rev_price":
 			var isSeller, isVendor bool
 			var price4store func(*prices, string, string) float64
@@ -2568,6 +2584,10 @@ func applyCardFilter(b *matcher.Backend, p *prices, name string, filters []strin
 		return cardFilterOn(p, filters, co)
 	case "is":
 		return cardFilterIs(b, filters, co)
+	case "velocity_greater_than":
+		return cardFilterVelocityGreaterThan(filters, co)
+	case "velocity_less_than":
+		return cardFilterVelocityLessThan(filters, co)
 	}
 	panic(name + " option not found")
 }
@@ -3102,6 +3122,9 @@ func shouldSkipCard(b *matcher.Backend, p *prices, co *matcher.CardObject, filte
 
 		var res bool
 		switch filters[i].Name {
+		case "locked_velocity_greater_than", "locked_velocity_less_than":
+			// Nothing, negated too.
+			return true
 		case "name_regexp", "edition_regexp", "number_regexp":
 			res = cardFilterRegexp(filters[i].Name, filters[i].Regexp, co)
 		case "pool":

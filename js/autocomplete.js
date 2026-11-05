@@ -14,7 +14,7 @@ var __acCardMetaInflight = {};
  * searchfilter.go): a token shaped like one of these is a search filter, not
  * part of a card name, so suggestions match on the remaining words only and
  * the completed value carries the filters along. */
-var __acFilterToken = /^-?(in|format|legal|sm|skip|sort|edition|set|e|s|se|ee|number|cn|cns|cne|date|year|name|namee|r|t|f|c|color|unpack|contents|container|decklist|ci|identity|cond|condr|condb|id|is|not|on|price|buy_price|arb_price|rev_price|ratio|store|seller|vendor|region|quantity|qty)[:<>]\S/i;
+var __acFilterToken = /^-?(in|format|legal|sm|skip|sort|edition|set|e|s|se|ee|number|cn|cns|cne|date|year|name|namee|r|t|f|c|color|unpack|contents|container|decklist|ci|identity|cond|condr|condb|id|is|not|on|price|buy_price|arb_price|rev_price|ratio|store|seller|vendor|region|quantity|qty|v|velocity)[:<>]\S/i;
 
 /* An in:(...) pool is one filter, to its matching paren: split on spaces it
  * would hand its own filters to the name. Pushes each span onto filters and

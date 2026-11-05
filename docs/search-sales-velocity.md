@@ -66,6 +66,19 @@ row's place, linking to Patreon, on the cards that have data and so would
 show a row. The `noUpsell` search setting hides it, as it does the other
 upsell lines.
 
+## Searching by it
+
+`v>1` or `velocity>1` finds the cards selling more than once a day, and `<`
+those selling less, by the same copies over 30 the row shows; a capped card
+compares at its floor. A card with no data matches neither, and `-v>1` keeps
+it. Each printing is judged on its own finish.
+
+The filter parses locked, and a locked one matches nothing, negated or not,
+because the parser has readers that check no tier: Discord, oEmbed, the API,
+the popular searches and the search suggestions. Search and the site's export unlock it for a
+`newspaperTier` reader, sharing the row's rule; anyone else searching with it
+finds nothing and is told `Increase your tier to filter by sales velocity`.
+
 ## The loader
 
 `salesvelocity.go`, modeled on the listings loader (`tcglistings.go`).

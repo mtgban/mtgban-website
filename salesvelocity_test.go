@@ -21,6 +21,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/apisig"
 )
 
 // setTestSalesVelocity files cards as the loaded sales, restoring the last load when the test ends.
@@ -799,5 +800,232 @@ func TestOEmbedLeavesOutSalesVelocity(t *testing.T) {
 		if strings.Contains(w.Body.String(), mark) {
 			t.Errorf("the preview carries %q", mark)
 		}
+	}
+}
+
+// velocityCard is a card object filed under the uuid the tests file sales for.
+func velocityCard() *matcher.CardObject {
+	co := &matcher.CardObject{}
+	co.UUID = "velocity-card"
+	return co
+}
+
+// TestVelocityFilterParses reads both keys and operators, any case and negated,
+// always locked, and drops what is not a rate.
+func TestVelocityFilterParses(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+	for _, tc := range []struct {
+		query, name, value string
+		negate             bool
+	}{
+		{"v>1", "locked_velocity_greater_than", "1", false},
+		{"velocity>0.5", "locked_velocity_greater_than", "0.5", false},
+		{"v<2", "locked_velocity_less_than", "2", false},
+		{"VELOCITY<2", "locked_velocity_less_than", "2", false},
+		{"-v>1", "locked_velocity_greater_than", "1", true},
+	} {
+		config := parseSearchPage(ds, currentPrices(), tc.query, false, false, nil, nil, nil)
+		if len(config.CardFilters) != 1 {
+			t.Fatalf("%s: got %d filters", tc.query, len(config.CardFilters))
+		}
+		got := config.CardFilters[0]
+		if got.Name != tc.name || got.Negate != tc.negate || !slices.Equal(got.Values, []string{tc.value}) {
+			t.Errorf("%s: got %+v", tc.query, got)
+		}
+	}
+	for _, query := range []string{"v>fast", "v:1", "velocity:1", "v>nan", "v<NaN", "v>inf", "v<-Inf"} {
+		config := parseSearchPage(ds, currentPrices(), query, false, false, nil, nil, nil)
+		if len(config.CardFilters) != 0 {
+			t.Errorf("%s: got filters %+v", query, config.CardFilters)
+		}
+	}
+}
+
+// TestVelocityFilterCompares judges the rate the row shows, skips a card with
+// no data, and matches nothing until unlocked.
+func TestVelocityFilterCompares(t *testing.T) {
+	setTestSalesVelocity(t, map[string]*salesVelocity{"velocity-card": {Copies: 69, Orders: 31, Days: 18}})
+	co := velocityCard()
+	missing := &matcher.CardObject{}
+	missing.UUID = "no-data"
+	for _, tc := range []struct {
+		desc string
+		name string
+		neg  bool
+		card *matcher.CardObject
+		val  string
+		skip bool
+	}{
+		{"over the limit", "velocity_greater_than", false, co, "1", false},
+		{"at the limit", "velocity_greater_than", false, co, "2.3", true},
+		{"under the limit", "velocity_greater_than", false, co, "5", true},
+		{"less than a higher rate", "velocity_less_than", false, co, "5", false},
+		{"at the limit, less than", "velocity_less_than", false, co, "2.3", true},
+		{"less than a lower rate", "velocity_less_than", false, co, "1", true},
+		{"negated", "velocity_greater_than", true, co, "5", false},
+		{"no data, greater", "velocity_greater_than", false, missing, "0", true},
+		{"no data, less", "velocity_less_than", false, missing, "5", true},
+		{"no data, negated", "velocity_greater_than", true, missing, "1", false},
+		{"locked, greater", "locked_velocity_greater_than", false, co, "1", true},
+		{"locked, less", "locked_velocity_less_than", false, co, "5", true},
+		{"locked, negated", "locked_velocity_greater_than", true, co, "5", true},
+		{"locked, negated, no data", "locked_velocity_greater_than", true, missing, "5", true},
+	} {
+		filters := []FilterElem{{Name: tc.name, Negate: tc.neg, Values: []string{tc.val}}}
+		got := shouldSkipCard(nil, nil, tc.card, filters)
+		if got != tc.skip {
+			t.Errorf("%s: skip = %v, want %v", tc.desc, got, tc.skip)
+		}
+	}
+}
+
+// TestUnlockVelocityReachesPools opens the filters of a pool's subquery too,
+// and says whether any stayed locked.
+func TestUnlockVelocityReachesPools(t *testing.T) {
+	locked := func() []FilterElem {
+		return []FilterElem{{Name: "pool", Pool: &SearchConfig{CardFilters: []FilterElem{{Name: "locked_velocity_greater_than"}}}}}
+	}
+	filters := locked()
+	if !lockedVelocity(filters) {
+		t.Error("a pool's locked filter reads as unlocked")
+	}
+	unlockVelocity(filters)
+	if lockedVelocity(filters) || filters[0].Pool.CardFilters[0].Name != "velocity_greater_than" {
+		t.Errorf("still locked: %+v", filters[0].Pool.CardFilters[0])
+	}
+	if lockedVelocity([]FilterElem{{Name: "name"}}) {
+		t.Error("a query with no velocity filter reads as locked")
+	}
+}
+
+// TestSearchGatesVelocityFilterByTier finds the cards for a newspaper tier on
+// the page and the export, and nothing, with the notice, for anyone else.
+func TestSearchGatesVelocityFilterByTier(t *testing.T) {
+	skipWithoutDatastore(t)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Search")
+	}
+	setCounterspellVelocity(t)
+	const results = `class="result-card-name"`
+	render := func(query, cookie string, mobile bool) string {
+		req := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query), nil)
+		if cookie != "" {
+			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+		}
+		if mobile {
+			req.AddCookie(&http.Cookie{Name: "MobileView", Value: "true"})
+		}
+		w := httptest.NewRecorder()
+		testSite.Search(w, req)
+		return w.Body.String()
+	}
+	page := func(query, cookie string) string { return render(query, cookie, false) }
+
+	signingEnabled(t, true)
+	fields := func(news string) url.Values {
+		reader := url.Values{"UserEmail": {"reader@example.com"}, "UserTier": {"Test"}}
+		if news != "" {
+			reader.Set("NewsEnabled", news)
+		}
+		return reader
+	}
+	tier := signedAs(t, fields("1day"), time.Now().Add(time.Hour))
+	got := page("Counterspell v>1", tier)
+	if !strings.Contains(got, results) || strings.Contains(got, VelocityLockedMessage) {
+		t.Error("a newspaper tier finds nothing over the rate, or sees the notice")
+	}
+	if strings.Contains(page("Counterspell v>5", tier), results) {
+		t.Error("a newspaper tier finds cards under the rate")
+	}
+	if strings.Contains(page(`in:(Counterspell v>5)`, tier), results) {
+		t.Error("a pool's filter stays locked or does not apply")
+	}
+
+	for name, cookie := range map[string]string{
+		"anonymous":              "",
+		"signed, no NewsEnabled": signedAs(t, fields(""), time.Now().Add(time.Hour)),
+	} {
+		got := page("Counterspell v>1", cookie)
+		if strings.Contains(got, results) {
+			t.Errorf("%s: the filter finds cards", name)
+		}
+		negated := page("Counterspell -v>1", cookie)
+		if strings.Contains(negated, results) || !strings.Contains(negated, VelocityLockedMessage) {
+			t.Errorf("%s: the negated filter finds cards, or shows no notice", name)
+		}
+		if !strings.Contains(got, VelocityLockedMessage) {
+			t.Errorf("%s: no notice", name)
+		}
+		if !strings.Contains(render("Counterspell v>1", cookie, true), VelocityLockedMessage) {
+			t.Errorf("%s: no notice on a phone", name)
+		}
+		if strings.Contains(page("Counterspell", cookie), VelocityLockedMessage) {
+			t.Errorf("%s: the notice shows on a search without the filter", name)
+		}
+	}
+}
+
+// TestSearchExportGatesVelocityFilter holds the export to the page's rule, and
+// a key to none of it: the API does not read the filter, whatever the key carries.
+func TestSearchExportGatesVelocityFilter(t *testing.T) {
+	skipWithoutDatastore(t)
+	name := searchStores(t)
+	id, _ := plainCard(t)
+	setTestSalesVelocity(t, map[string]*salesVelocity{id: {Copies: 69, Orders: 31, Days: 18}})
+	signingEnabled(t, false)
+	withAPIUserSecret(t, "plan@example.com", "plan-secret")
+
+	rows := func(query, news string) int {
+		fields := url.Values{"SearchDownloadCSV": {"true"}}
+		if news != "" {
+			fields.Set("NewsEnabled", news)
+		}
+		req := httptest.NewRequest(http.MethodGet, "/search/export/retail/"+url.PathEscape(query)+".csv?id=mtgjson", nil)
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: signedAs(t, fields, time.Now().Add(time.Hour))})
+		w := httptest.NewRecorder()
+		testSite.SearchExport(w, req)
+		return strings.Count(w.Body.String(), "\n") - 1
+	}
+	for _, tc := range []struct {
+		query, news string
+		found       bool
+	}{
+		{name, "", true},
+		{name + " v>1", "1day", true},
+		{name + " v>5", "1day", false},
+		{name + " v>1", "", false},
+	} {
+		if (rows(tc.query, tc.news) > 0) != tc.found {
+			t.Errorf("%q with NewsEnabled=%q: found %v, want %v", tc.query, tc.news, !tc.found, tc.found)
+		}
+	}
+
+	handler := enforceAPISigning(http.HandlerFunc(testSite.SearchAPI))
+	key := apisig.Mint([]byte("plan-secret"), signatureLink(), apisig.Claims{
+		API:     "ALL_ACCESS",
+		Fields:  url.Values{"APImode": {"all"}, "UserEmail": {"plan@example.com"}, "NewsEnabled": {"1day"}},
+		Expires: time.Now().Add(time.Hour).Unix(),
+	})
+	requests := 0
+	api := func(query string) string {
+		target := "/api/mtgban/search/retail/" + url.PathEscape(query) + ".json?sig=" + url.QueryEscape(key)
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		// The API limiter is shared and keyed on the address.
+		requests++
+		req.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", 80+requests)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		return w.Body.String()
+	}
+	if !strings.Contains(api(name), "Card Kingdom") {
+		t.Fatal("the API lists no store for the card, so the rest proves nothing")
+	}
+	if body := api(name + " v>1"); strings.Contains(body, "Card Kingdom") {
+		t.Errorf("the API reads the filter: %s", body)
 	}
 }

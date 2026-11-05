@@ -643,6 +643,7 @@
                  bar it did search on is named right below. */}}
             {{if .SearchQuery}}
                 <p class="m-no-results-msg">No results for &ldquo;{{.SearchQuery}}&rdquo;.</p>
+                {{with .VelocityNotice}}<p class="m-no-results-hint">{{.}}</p>{{end}}
             {{else}}
                 <p class="m-no-results-msg">{{range $i, $n := .Notices}}{{if $i}}<br>{{end}}{{$n}}{{end}}</p>
             {{end}}
