@@ -381,8 +381,9 @@ func withFakeNewspaper(t *testing.T, f *fakeNewspaper) *site {
 	return s
 }
 
-// TestLoadSalesVelocityReadsOneGame reads the newest sale day for the
-// site's own game, then that day's sales for the same game only.
+// TestLoadSalesVelocityReadsOneGame reads the newest sale day for the site's
+// own game, then the sales to the day before it, the last complete one, for the
+// same game only.
 func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 	day := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
@@ -403,13 +404,13 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 		t.Errorf("first query: got %q %v, want the day query scoped to %q", queries[0].sql, queries[0].args, gameMap[matcher.GameLorcana])
 	}
 	for _, q := range queries[1:] {
-		if len(q.args) != 3 || q.args[1] != "2026-10-12" || q.args[2] != gameMap[matcher.GameLorcana] {
+		if len(q.args) != 3 || q.args[1] != "2026-10-11" || q.args[2] != gameMap[matcher.GameLorcana] {
 			t.Errorf("got args %v, want the day and %q", q.args, gameMap[matcher.GameLorcana])
 		}
 	}
 	failed := salesVelocityFailed.Load()
-	if failed == nil || !failed.Day.Equal(day) {
-		t.Errorf("a load matching no card: failure got %+v, want one for %s", failed, day.Format(time.DateOnly))
+	if failed == nil || !failed.Day.Equal(lastCompleteSaleDay(day)) {
+		t.Errorf("a load matching no card: failure got %+v, want one for the day before %s", failed, day.Format(time.DateOnly))
 	}
 }
 
@@ -524,8 +525,8 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 	if !found || got != want {
 		t.Errorf("%s: got %+v, %v; want %+v", cardID, got, found, want)
 	}
-	if snap := salesVelocityPtr.Load(); snap == nil || !snap.Day.Equal(day) {
-		t.Errorf("snapshot: got %+v, want one for %s", snap, day.Format(time.DateOnly))
+	if snap := salesVelocityPtr.Load(); snap == nil || !snap.Day.Equal(lastCompleteSaleDay(day)) {
+		t.Errorf("snapshot: got %+v, want one for the day before %s", snap, day.Format(time.DateOnly))
 	}
 
 	s.loadSalesVelocity()

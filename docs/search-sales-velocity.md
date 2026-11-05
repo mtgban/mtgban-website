@@ -24,8 +24,8 @@ low on the busiest cards.
 
 Per card uuid, a printing in one finish:
 
-- copies and orders summed over the 30 days ending on the newest
-  `sale_date` in the table, not today, since the scrape lags a day;
+- copies and orders summed over the 30 days ending on the last complete
+  sale day, the one before the newest `sale_date` in the table;
 - the days in that window with a sale;
 - the last sale over the 365 days ending on the same day.
 
@@ -72,9 +72,9 @@ it. Each printing is judged on its own finish.
 
 The filter parses locked, and a locked one matches nothing, negated or not,
 because the parser has readers that check no tier: Discord, oEmbed, the API,
-the popular searches and the search suggestions. Search and the site's export unlock it for a
-`newspaperTier` reader, sharing the row's rule; anyone else searching with it
-finds nothing and is told `Increase your tier to filter by sales velocity`.
+the popular searches and the search suggestions. Search and the site's export
+unlock it for a `newspaperTier` reader, sharing the row's rule; anyone else
+searching with it finds nothing and is told `Increase your tier to filter by sales velocity`.
 
 ## The loader
 
@@ -101,10 +101,12 @@ printing lacks, or a product the datastore does not carry, such as a
 sealed item. A load that matches no card fails and keeps the
 previous one.
 
-The newspaper looks to write a sale day in one batch: two probes nine
-hours apart on the same day saw the same row count for the newest sale
-day, and the day after it had no rows yet. So a day has not been seen
-half written, and the loader reruns only when a new sale day appears.
+The newspaper writes a sale day as it pulls each product, over hours, so the
+newest `sale_date` holds only part of its sales while that runs. So the window
+ends on the day before it, and the rates run a day behind the newest sales. A
+pull keeps only sales dated the day before it runs, so that day takes no more
+rows once the newest has its first. The loader reruns once a new sale day
+appears, which is also when the one before it is complete.
 
 ## What it costs
 
@@ -122,10 +124,10 @@ and build in Go:
 
 | query | ms | rows |
 |---|---:|---:|
-| newest sale day | 13032 | 1 |
-| 30-day window | 15608 | 144625 |
-| last sale over 365 days | 23612 | 163867 |
-| match and build (cards) | 705 | 157385 |
+| newest sale day | 12794 | 1 |
+| 30-day window | 3897 | 144841 |
+| last sale over 365 days | 21453 | 163985 |
+| match and build (cards) | 583 | 157501 |
 
 Entries are the cards with a sale in the year, and zero counts the cards with no sale in the window. Unmatched pairs
 count the product and printing pairs no card matches. The last column
@@ -135,7 +137,7 @@ it shows the semi-join kept to the game.
 
 | entries | zero | unmatched pairs | this game's pairs unmatched |
 |---:|---:|---:|---:|
-| 157385 | 17020 | 6477 | 6477 of 163867 |
+| 157501 | 16959 | 6479 | 6479 of 163985 |
 
 ## Watching the pull
 

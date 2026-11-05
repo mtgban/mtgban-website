@@ -37,7 +37,7 @@ func (v salesVelocity) perDay(window int) float64 {
 
 // salesVelocitySnapshot is one load of the sales, keyed by card uuid.
 type salesVelocitySnapshot struct {
-	// The newest sale_date, which the window ends on.
+	// The last complete sale day, which the window ends on.
 	Day    time.Time
 	Cards  map[string]*salesVelocity
 	Window int
@@ -114,33 +114,40 @@ func (s *site) loadSalesVelocity() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	var day sql.NullTime
-	err := NewNewspaperDB.QueryRowContext(ctx, salesVelocityDayQuery, game).Scan(&day)
+	var newest sql.NullTime
+	err := NewNewspaperDB.QueryRowContext(ctx, salesVelocityDayQuery, game).Scan(&newest)
 	if err != nil {
 		log.Println("sales velocity:", err)
 		backgroundJobs.Report(jobSalesVelocity, "", "cannot read the newspaper: "+err.Error())
 		return
 	}
-	if !day.Valid {
+	if !newest.Valid {
 		log.Println("sales velocity: the newspaper has no sales")
 		return
 	}
-	if !salesVelocityDue(salesVelocityPtr.Load(), salesVelocityFailed.Load(), day.Time, time.Now()) {
+	day := lastCompleteSaleDay(newest.Time)
+	if !salesVelocityDue(salesVelocityPtr.Load(), salesVelocityFailed.Load(), day, time.Now()) {
 		return
 	}
 
-	cards, unmatched, err := querySalesVelocity(ctx, b, game, day.Time)
+	cards, unmatched, err := querySalesVelocity(ctx, b, game, day)
 	if err != nil {
 		log.Println("sales velocity:", err)
-		salesVelocityFailed.Store(&salesVelocityFailure{Day: day.Time, At: time.Now()})
-		backgroundJobs.Report(jobSalesVelocity, "", "failed to load "+day.Time.Format(time.DateOnly)+": "+err.Error())
+		salesVelocityFailed.Store(&salesVelocityFailure{Day: day, At: time.Now()})
+		backgroundJobs.Report(jobSalesVelocity, "", "failed to load "+day.Format(time.DateOnly)+": "+err.Error())
 		return
 	}
-	snap := &salesVelocitySnapshot{Day: day.Time, Cards: cards, Window: salesVelocityWindow}
+	snap := &salesVelocitySnapshot{Day: day, Cards: cards, Window: salesVelocityWindow}
 	salesVelocityPtr.Store(snap)
 	result := salesVelocityReport(snap, unmatched)
 	log.Println("sales velocity:", result)
 	backgroundJobs.Report(jobSalesVelocity, result, "")
+}
+
+// lastCompleteSaleDay is the day before the newest: the newspaper writes a day
+// as it pulls each product, so for hours the newest holds only part of its sales.
+func lastCompleteSaleDay(newest time.Time) time.Time {
+	return newest.AddDate(0, 0, -1)
 }
 
 // salesVelocityDue reports whether day should load, given the loaded and the last failed one.

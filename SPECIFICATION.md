@@ -159,7 +159,7 @@ Boot sequence (`main()`):
      queries only if no day is loaded yet
    - `55 * * * *` - `s.loadSalesVelocity()` (salesvelocity.go): reloads
      TCGplayer's copies sold per card over the 30 days to the newspaper's
-     newest sale day, and each card's last sale in the year before, for
+     last complete sale day, and each card's last sale in the year before, for
      search's sales velocity row, once the newspaper adds a sale day;
      retries a day whose load failed every 6 hours; every datastore load
      also runs it

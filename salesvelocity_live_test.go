@@ -54,12 +54,13 @@ func TestSalesVelocityLive(t *testing.T) {
 	game := gameMap[Config().Game]
 
 	start := time.Now()
-	var day time.Time
-	err = db.QueryRowContext(ctx, salesVelocityDayQuery, game).Scan(&day)
+	var newest time.Time
+	err = db.QueryRowContext(ctx, salesVelocityDayQuery, game).Scan(&newest)
 	if err != nil {
 		t.Fatal(err)
 	}
 	dayTook := time.Since(start)
+	day := lastCompleteSaleDay(newest)
 	t.Logf("the window ends on %s", day.Format(time.DateOnly))
 
 	// Timed apart, not through readSales (which wraps both in one
