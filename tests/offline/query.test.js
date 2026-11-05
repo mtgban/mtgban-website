@@ -36,8 +36,14 @@ test('every spelling of the set operator is read', () => {
 
 test('cn operator and bare digits both set number', () => {
     expect(p('cn:123').number).toMatchObject([{values: ['123'], strict: false}]);
-    expect(p('sol ring 4').number).toMatchObject([{values: ['4'], strict: false}]);
-    expect(p('sol ring 4').names).toEqual(['sol', 'ring']);
+    expect(p('4 sol ring').number).toMatchObject([{values: ['4'], strict: false}]);
+    expect(p('4 sol ring').names).toEqual(['sol', 'ring']);
+});
+
+// Online reads "pyromancy 101" as a name before a name and a number, so a
+// name's last digits stay in the name, with the number to fall back to.
+test('digits after a name stay in the name', () => {
+    expect(p('sol ring 4')).toMatchObject({names: ['sol', 'ring', '4'], number: [], trailingNumber: {values: ['4'], strict: false}});
 });
 
 // Every link the site builds for one printing spells the number cns: - it is
@@ -806,10 +812,10 @@ test('words that are not a set and a number stay a name', () => {
     expect(ps('neo may').names).toEqual(['neo', 'may']);
     expect(ps('neo 1st').names).toEqual(['neo', '1st']);
     expect(ps('sol ring').set).toEqual([]);
-    expect(ps('sol 66')).toMatchObject({names: ['sol'], set: [], number: [{values: ['66']}]});
+    expect(ps('sol 66')).toMatchObject({names: ['sol', '66'], set: [], number: [], trailingNumber: {values: ['66']}});
     // A quoted name is a name, and a set already asked for is not replaced
     expect(ps('"spm" 66')).toMatchObject({names: ['spm'], set: []});
-    expect(ps('spm 66 s:neo')).toMatchObject({names: ['spm'], set: ['NEO']});
+    expect(ps('spm 66 s:neo')).toMatchObject({names: ['spm', '66'], set: ['NEO']});
     // 30A is both a set code and a number's shape: as the second word, a number
     expect(ps('neo 30a')).toMatchObject({names: [], set: ['NEO'], number: [{values: ['30a']}]});
 });
@@ -1177,7 +1183,7 @@ test.each([
     expect(Q.answerable(draft(typed), {normName: (t) => t.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim()})).toBe(want);
 });
 
-function typingEnv() {
+function typingEnv(extra) {
     const all = [
         {uuid: 'sr1', n: 'Sol Ring', num: '161', set: 'NEO', r: 'rare', f: false},
         {uuid: 'sr2', n: 'Sol Ring', num: '66', set: 'SPM', r: 'mythic', f: true},
@@ -1187,7 +1193,7 @@ function typingEnv() {
         {uuid: 'yu', n: 'Yugi', num: 'INFO-EN067', pn: '67', set: 'INFO', r: 'rare', f: false},
         // So that typing 66 passes through a number some card carries, as on any real catalog
         {uuid: 'six', n: 'Six', num: '6', set: 'NEO', r: 'common', f: false},
-    ];
+    ].concat(extra || []);
     const byId = Object.fromEntries(all.map(c => [c.uuid, c]));
     const keys = {};
     all.forEach((c) => {
@@ -1250,6 +1256,39 @@ test('a last number that finds nothing is dropped while it may be unfinished', a
     // The finished query keeps its exact answer
     Q.resetCaches();
     expect((await Q.execute(Q.parse('spm 6', [], magic, DRAFT_SETS), env)).results).toEqual([]);
+});
+
+const settled = async (typed, env) => {
+    Q.resetCaches();
+    const out = await Q.execute(Q.parse(typed, DRAFT_FINISHES, magic, DRAFT_SETS), env);
+    return out.results.map(r => r.uuid).sort();
+};
+
+const numberedNames = [
+    {uuid: 'pyro', n: 'Pyromancy 101', num: '120', set: 'NEO', r: 'rare', f: false},
+    {uuid: 'sky', n: 'Skyscraper 2 - Hero City', num: 'INFO-EN050', pn: '50', set: 'INFO', r: 'rare', f: false},
+];
+
+test('digits after a name are the name first, as online', async () => {
+    const env = typingEnv(numberedNames);
+    expect(await settled('pyromancy 101', env)).toEqual(['pyro']);
+    expect(await settled('pyromancy 10', env)).toEqual(['pyro']);
+    expect(await settled('skyscraper 2', env)).toEqual(['sky']);
+    // A name no card carries with the number falls back to the number
+    expect(await settled('sol ring 161', env)).toEqual(['sr1']);
+    expect(await settled('sol ring 66', env)).toEqual(['sr2']);
+    expect(await settled('pyromancy 120', env)).toEqual(['pyro']);
+});
+
+test('a query settles to what it showed while typed', async () => {
+    const env = typingEnv(numberedNames);
+    for (const typed of ['pyromancy 10', 'pyromancy 101', '16 sol ring', '161 sol ring', 'sol ring 161']) {
+        expect(await drafted(typed, env)).toEqual(await settled(typed, env));
+    }
+    // Only a number typed last is held
+    expect(draft('161 sol ri').heldNumber).toBeUndefined();
+    expect(draft('sol ri 161').heldNumber).toBeUndefined();
+    expect(draft('sol ri cn:161').heldNumber).toMatchObject({values: ['161']});
 });
 
 // Typing to any of these never says anything, and whenever the query is worth

@@ -194,7 +194,7 @@
             out.names.pop();
             return false;
         }
-        if (words.length > 1 && writtenAsNumber(last) && !/^\d+$/.test(last)) {
+        if (words.length > 1 && writtenAsNumber(last)) {
             out.trailingNumber = wordNumber(last, sets);
         }
         return false;
@@ -263,6 +263,7 @@
         var digits = [];
         var quoted = false;
         var lastTokenNumbers = 0;
+        var endsInWord = false;
         for (var i = 0; i < tokens.length; i++) {
             var tok = tokens[i];
             if (i === tokens.length - 1) lastTokenNumbers = out.number.length;
@@ -277,6 +278,7 @@
             var operatorish = colon > 0 || /[<>=]/.test(tok.text);
             if (!operatorish) {
                 words.push(tok.text);
+                endsInWord = i === tokens.length - 1;
                 if (/^\d+$/.test(tok.text)) {
                     digits.push(tok.text);
                 } else {
@@ -348,8 +350,17 @@
                 out.unsupported.push(tok.text);
             }
         }
-        if (quoted || !words.length || !readShortcut(out, words, sets)) {
+        // Only the last thing typed can be a number still being typed
+        var held = out.number.length > lastTokenNumbers ? out.number[out.number.length - 1] : null;
+        // A name's last word stays in the name, digits too, as it does online
+        var trailing = !quoted && words.length > 1 && /^\d+$/.test(words[words.length - 1]);
+        if (trailing) out.names.push(digits.pop());
+        var taken = out.number.length;
+        var shortcut = !quoted && words.length && readShortcut(out, words, sets);
+        if (endsInWord && out.number.length > taken) held = out.number[taken];
+        if (!shortcut) {
             digits.forEach(function (text) { out.number.push(readNumber(text, false)); });
+            if (endsInWord && !trailing && /^\d+$/.test(words[words.length - 1])) held = out.number[out.number.length - 1];
         }
         if (out.names.length) out.setsNamed = setsNamed(out.names.join(' '), sets);
         if (draft) {
@@ -359,7 +370,7 @@
                 out.heldWord = true;
                 if (!out.setsNamed.length) out.setsNamed = setsNamed(out.names.slice(0, -1).join(' '), sets);
             }
-            if (out.number.length > lastTokenNumbers) out.heldNumber = out.number[out.number.length - 1];
+            if (held) out.heldNumber = held;
             // A set's code and a dash, on the way to a number as Yu-Gi-Oh prints it
             var printing = /^([^-]+)-[A-Za-z]{0,2}$/.exec(words.length === 1 ? words[0] : '');
             if (printing && !out.set.length && sets[printing[1].toUpperCase()]) {
@@ -774,7 +785,7 @@
 
         // A last word that finds nothing may just be unfinished.
         if (!out.results.length && parsed.heldWord) {
-            var shorter = Object.assign({}, parsed, {names: parsed.names.slice(0, -1)});
+            var shorter = Object.assign({}, parsed, {names: parsed.names.slice(0, -1), trailingNumber: null});
             out.results = toRows(await findCards(shorter, env, stored, out), stored);
         }
         if (!out.results.length && parsed.heldNumber && (parsed.names.length || parsed.set.length)) {
