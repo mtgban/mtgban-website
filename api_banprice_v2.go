@@ -205,7 +205,7 @@ func sellerSearchV2(b *matcher.Backend, p *prices, mode string, cardIDs []string
 		found := map[string][]mtgban.InventoryEntry{}
 		for _, cardID := range section.cardIDs {
 			for _, entry := range inventory[cardID] {
-				if sellerEntryFound(p, info, cardID, entry, config) {
+				if sellerEntryFound(p, info, cardID, entry, &config) {
 					found[cardID] = append(found[cardID], entry)
 				}
 			}
@@ -231,7 +231,7 @@ func vendorSearchV2(b *matcher.Backend, p *prices, mode string, cardIDs []string
 		found := map[string][]mtgban.BuylistEntry{}
 		for _, cardID := range section.cardIDs {
 			for _, entry := range buylist[cardID] {
-				if vendorEntryFound(p, info, cardID, entry, config) {
+				if vendorEntryFound(p, info, cardID, entry, &config) {
 					found[cardID] = append(found[cardID], entry)
 				}
 			}

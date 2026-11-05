@@ -192,7 +192,7 @@ func (s *postStores) withoutVendorListings(pending []string, names []string) []s
 // than INDEX.
 func (store *postSeller) offers(cardID string, p *prices, config *SearchConfig) bool {
 	for _, entry := range store.inventory[cardID] {
-		if sellerEntryFound(p, store.info, cardID, entry, *config) && offersUnder(sellerOfferCondition(store.info, entry)) {
+		if sellerEntryFound(p, store.info, cardID, entry, config) && offersUnder(sellerOfferCondition(store.info, entry)) {
 			return true
 		}
 	}
@@ -202,7 +202,7 @@ func (store *postSeller) offers(cardID string, p *prices, config *SearchConfig) 
 // lists reports whether the seller lists the card under a known condition.
 func (store *postSeller) lists(cardID string, p *prices, config *SearchConfig) bool {
 	for _, entry := range store.inventory[cardID] {
-		if sellerEntryFound(p, store.info, cardID, entry, *config) && listsUnder(sellerOfferCondition(store.info, entry)) {
+		if sellerEntryFound(p, store.info, cardID, entry, config) && listsUnder(sellerOfferCondition(store.info, entry)) {
 			return true
 		}
 	}
@@ -213,7 +213,7 @@ func (store *postSeller) lists(cardID string, p *prices, config *SearchConfig) b
 // than INDEX.
 func (store *postVendor) offers(cardID string, p *prices, config *SearchConfig) bool {
 	for _, entry := range store.buylist[cardID] {
-		if vendorEntryFound(p, store.info, cardID, entry, *config) && offersUnder(vendorOfferCondition(store.info, entry)) {
+		if vendorEntryFound(p, store.info, cardID, entry, config) && offersUnder(vendorOfferCondition(store.info, entry)) {
 			return true
 		}
 	}
@@ -223,7 +223,7 @@ func (store *postVendor) offers(cardID string, p *prices, config *SearchConfig) 
 // lists reports whether the vendor buys the card under a known condition.
 func (store *postVendor) lists(cardID string, p *prices, config *SearchConfig) bool {
 	for _, entry := range store.buylist[cardID] {
-		if vendorEntryFound(p, store.info, cardID, entry, *config) && listsUnder(vendorOfferCondition(store.info, entry)) {
+		if vendorEntryFound(p, store.info, cardID, entry, config) && listsUnder(vendorOfferCondition(store.info, entry)) {
 			return true
 		}
 	}
