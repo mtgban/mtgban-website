@@ -7,11 +7,10 @@
         return q ? '/offline?q=' + encodeURIComponent(q) : '/offline';
     }
 
-    function paintModePills() {
+    function paintModePills(q) {
         var s = document.getElementById('offline-pill-singles');
         var p = document.getElementById('offline-pill-sealed');
         if (!s || !p) return;
-        var q = (document.getElementById('navsearchbox') || {}).value || '';
         var sealed = page.sealed();
         s.href = singlesUrl(q);
         p.href = '/offline?sealed=1' + (q ? '&q=' + encodeURIComponent(q) : '');
@@ -50,8 +49,7 @@
         boxId: 'navsearchbox',
         formId: 'navsearchform',
         resultsId: 'm-offline-results',
-        ready: paintModePills,
-        modeChanged: paintModePills,
+        queryChanged: paintModePills,
         render: function (el, shown, exec, ctx) {
             OfflineRenderMobile.render(el, shown, ctx);
             wireCardInteractions(el);

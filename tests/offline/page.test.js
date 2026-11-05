@@ -308,8 +308,35 @@ test('mobile mode pills carry the query and mark the mode', async () => {
     const sealed = page.els['offline-pill-sealed'];
     expect(sealed.classList.names.has('active')).toBe(true);
     expect(singles.classList.names.has('active')).toBe(false);
-    page.els.navsearchbox.value = 'sol ring';
     page.log.mounted.onSubmit('sol ring');
     expect(singles.href).toBe('/offline?q=sol%20ring');
     expect(sealed.href).toBe('/offline?sealed=1&q=sol%20ring');
+});
+
+test('mobile mode pills carry the query from the moment the page loads', () => {
+    const page = loadPage('offline-page-mobile.js', { ids: MOBILE, search: '?q=spm%2066' });
+    page.load();
+    expect(page.els['offline-pill-singles'].href).toBe('/offline?q=spm%2066');
+    expect(page.els['offline-pill-sealed'].href).toBe('/offline?sealed=1&q=spm%2066');
+});
+
+test('mobile mode pills follow Back to the query it lands on', async () => {
+    const page = await started('offline-page-mobile.js', { ids: MOBILE, search: '?q=sol' });
+    page.log.mounted.onSubmit('bolt');
+    page.location.search = '?q=sol';
+    page.pop();
+    expect(page.els['offline-pill-singles'].href).toBe('/offline?q=sol');
+    expect(page.els['offline-pill-sealed'].href).toBe('/offline?sealed=1&q=sol');
+    await page.settle();
+    page.location.search = '?sealed=1&q=bolt';
+    page.pop();
+    expect(page.els['offline-pill-sealed'].classList.names.has('active')).toBe(true);
+    expect(page.els['offline-pill-singles'].href).toBe('/offline?q=bolt');
+});
+
+test('mobile mode pills drop the query when the box empties', async () => {
+    const page = await started('offline-page-mobile.js', { ids: MOBILE, search: '?q=sol' });
+    page.log.mounted.onSubmit('');
+    expect(page.els['offline-pill-singles'].href).toBe('/offline');
+    expect(page.els['offline-pill-sealed'].href).toBe('/offline?sealed=1');
 });

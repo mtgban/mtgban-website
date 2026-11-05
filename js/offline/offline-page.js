@@ -13,7 +13,8 @@
     // start runs a page. hooks names its boxId, formId and resultsId, and how it
     // draws: render(el, page, exec, ctx), with order(results, ctx) first if it
     // sorts. Optional are ready() at page load, cleared() when the box empties,
-    // and modeChanged() when the singles or sealed mode or the query may have.
+    // and queryChanged(q) when the query or the singles or sealed mode may have,
+    // page load included.
     function start(hooks) {
         var dicts = null;
         var env = null;
@@ -28,6 +29,14 @@
 
         function call(name) {
             if (hooks[name]) hooks[name]();
+        }
+
+        function queryChanged(q) {
+            if (hooks.queryChanged) hooks.queryChanged(q);
+        }
+
+        function urlQuery() {
+            return new URLSearchParams(location.search).get('q') || '';
         }
 
         function resultsEl() {
@@ -102,14 +111,14 @@
 
         document.addEventListener('DOMContentLoaded', function () {
             call('ready');
+            queryChanged(urlQuery());
             var box = document.getElementById(hooks.boxId);
             var form = document.getElementById(hooks.formId);
 
             window.addEventListener('popstate', function () {
-                var params = new URLSearchParams(location.search);
-                var q = params.get('q') || '';
-                sealedMode = params.get('sealed') === '1';
-                call('modeChanged');
+                var q = urlQuery();
+                sealedMode = new URLSearchParams(location.search).get('sealed') === '1';
+                queryChanged(q);
                 if (searchDeps) searchDeps.sealed = sealedMode;
                 if (box) box.value = q;
                 runQuery(q).catch(showErrorNotice);
@@ -129,12 +138,11 @@
                     deps: searchDeps,
                     onSubmit: function (q) {
                         history.pushState(null, '', buildUrl(q));
-                        call('modeChanged');
+                        queryChanged(q);
                         runQuery(q).catch(showErrorNotice);
                     }
                 });
-                call('modeChanged');
-                var q = new URLSearchParams(location.search).get('q') || '';
+                var q = urlQuery();
                 if (box) box.value = q;
                 return runQuery(q);
             }).catch(showErrorNotice);
