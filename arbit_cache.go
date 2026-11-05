@@ -148,6 +148,13 @@ func (p *prices) arbitRows(b *matcher.Backend, view arbitView, opts *mtgban.Arbi
 		}
 		c.mu.Unlock()
 	})
+	// A request that waited on a comparison that panicked compares itself
+	c.mu.Lock()
+	done := entry.done
+	c.mu.Unlock()
+	if !done {
+		return compareStores(b, opts, view.mode, source, scraper)
+	}
 	return entry.rows
 }
 
