@@ -146,6 +146,60 @@ func TestOptimizerCountsTheStoreItKept(t *testing.T) {
 	}
 }
 
+// TestOptimizerKeepsWhatTheRowLoaded carries the row's own price and grade
+// past settings that compare it to an index and skip conditions: a share of
+// the section sends those.
+func TestOptimizerKeepsWhatTheRowLoaded(t *testing.T) {
+	rows := uploadRows{
+		resultPrices:     map[string]map[string]float64{"card": {"CK": 2}},
+		optimizedResults: map[string][]OptimizedUploadEntry{},
+		optimizedAt:      map[optimizedKey]int{},
+		optimizedTotals:  map[string]float64{},
+		optimizedQtys:    map[string]int{},
+	}
+	row := uploadRow{
+		UploadEntry: &UploadEntry{CardID: "card", OriginalPrice: 3.5, IgnoredCondition: mtgban.SP},
+		priceKey:    "card",
+		qty:         1,
+	}
+	st := uploadSettings{skipPrices: true, altPriceSource: "TCGLow"}
+	indexes := uploadIndexes{results: map[string]map[string]*BanPrice{
+		"card": {"TCGLow": {Regular: 9}},
+	}}
+	rows.optimizeRow(row, map[string]float64{"CK": 2}, []string{"CK"}, st, indexes)
+
+	got := rows.optimizedResults["CK"]
+	if len(got) != 1 {
+		t.Fatalf("listed %v, want one row", got)
+	}
+	if got[0].Price != 9 || got[0].Condition != "" {
+		t.Errorf("compared against %v in %q, want the index's 9 and no grade", got[0].Price, got[0].Condition)
+	}
+	if got[0].LoadedPrice != 3.5 || got[0].LoadedCondition != mtgban.SP {
+		t.Errorf("loaded %v in %q, want 3.5 in SP", got[0].LoadedPrice, got[0].LoadedCondition)
+	}
+}
+
+// TestOptimizerShareButton draws a store's share button for a reader who may
+// share, and its rows carry what the button sends.
+func TestOptimizerShareButton(t *testing.T) {
+	for _, canShare := range []bool{true, false} {
+		out := renderUpload(t, PageVars{UploadVars: UploadVars{
+			CanShare:            canShare,
+			Optimized:           map[string][]OptimizedUploadEntry{"CK": {{CardID: "a", Quantity: 2, LoadedPrice: 3.5, LoadedCondition: mtgban.SP}}},
+			OptimizedKeys:       []string{"CK"},
+			OptimizedTotals:     map[string]float64{"CK": 1},
+			OptimizedQuantities: map[string]int{"CK": 2},
+		}})
+		if got := strings.Contains(out, "opt-share-btn"); got != canShare {
+			t.Errorf("CanShare %v: button drawn %v", canShare, got)
+		}
+		if !strings.Contains(out, `data-share-price="3.5" data-share-cond="SP"`) {
+			t.Errorf("CanShare %v: the row carries no loaded price and grade", canShare)
+		}
+	}
+}
+
 // TestOptimizerMergesOpenedCopies lists a card opened from several products
 // once per store, its copies added up and capped as one card's, while each
 // product's section still counts its own copy.

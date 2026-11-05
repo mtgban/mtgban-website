@@ -20,10 +20,11 @@ function load(rows) {
     }));
     const count = text();
     const total = text();
+    const share = { hidden: false };
     const section = {
         id: 'opt-CK',
         querySelectorAll: () => trs,
-        querySelector: (sel) => ({ '.opt-count': count, '.opt-total': total })[sel],
+        querySelector: (sel) => ({ '.opt-count': count, '.opt-total': total, '.opt-share-btn': share })[sel],
     };
     const tocStats = text();
     const tocTotal = text();
@@ -46,7 +47,7 @@ function load(rows) {
     const change = (inSection) => document.listeners.change({
         target: { closest: (sel) => (inSection && sel === '.opt-store' ? section : null) },
     });
-    return { update: () => updateOptTotals(section), change, untick, count, total, tocStats, tocTotal, otherStats };
+    return { update: () => updateOptTotals(section), change, untick, count, total, share, tocStats, tocTotal, otherStats };
 }
 
 test('unticking a row takes its copies and offer off the store', () => {
@@ -68,6 +69,15 @@ test('a store left with one card, or none, says so', () => {
     t.untick(0);
     t.update();
     expect([t.count.textContent, t.total.textContent]).toEqual(['0 cards', '$ 0.00']);
+});
+
+test('a store with no ticked card has no share button, and gets it back', () => {
+    const t = load([[3, 2]]);
+    t.update();
+    expect(t.share.hidden).toBe(false);
+    t.untick(0);
+    t.update();
+    expect(t.share.hidden).toBe(true);
 });
 
 test('a tick change in a store recounts it, and one elsewhere does not', () => {

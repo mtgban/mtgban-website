@@ -296,6 +296,11 @@ type OptimizedUploadEntry struct {
 	// Price of the card provided in the source data (or TCGLow)
 	Price float64
 
+	// The price and condition the row was loaded with, whatever the settings
+	// compare and grade it against: what a share of the section sends
+	LoadedPrice     float64
+	LoadedCondition mtgban.Condition
+
 	// Key of the source of alternative (comparison) pricing
 	CompareSource string
 
@@ -1096,15 +1101,17 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 				rows.optimizedAt[key] = len(rows.optimizedResults[bestStore])
 			}
 			rows.optimizedResults[bestStore] = append(rows.optimizedResults[bestStore], OptimizedUploadEntry{
-				CardID:        row.CardID,
-				Condition:     row.conds,
-				Price:         comparePrice,
-				CompareSource: st.altPriceSource,
-				Spread:        factor,
-				BestPrice:     price,
-				Quantity:      row.qty,
-				VisualPrice:   comparePrice * st.visualPerc / 100.0,
-				Profitability: profitability(comparePrice, price, factor, row.qty),
+				CardID:          row.CardID,
+				Condition:       row.conds,
+				Price:           comparePrice,
+				LoadedPrice:     row.OriginalPrice,
+				LoadedCondition: cmp.Or(row.OriginalCondition, row.IgnoredCondition),
+				CompareSource:   st.altPriceSource,
+				Spread:          factor,
+				BestPrice:       price,
+				Quantity:        row.qty,
+				VisualPrice:     comparePrice * st.visualPerc / 100.0,
+				Profitability:   profitability(comparePrice, price, factor, row.qty),
 			})
 		}
 

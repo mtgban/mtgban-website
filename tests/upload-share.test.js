@@ -96,3 +96,41 @@ test('a click during the flash is ignored, and the timer restores the link', asy
     await window.copyShareLink(el);
     expect(calls.length).toBe(2);
 });
+
+// A store's optimizer section as templates/upload.html lays it out, and its
+// share button.
+function section(rows) {
+    const trs = rows.map(([data, removed]) => ({
+        dataset: data,
+        classList: { contains: (c) => removed && c === 'opt-removed' },
+    }));
+    const store = { querySelectorAll: () => trs };
+    return { innerHTML: '<svg></svg>', title: 'Copy a link', closest: (sel) => (sel === '.opt-store' ? store : null) };
+}
+
+test('a store shares its ticked rows alone, in the seven fields a row has', async () => {
+    const { window, calls, copied } = share(201, { key: 'k', url: '/upload?share=k' });
+    const btn = section([
+        [{ optId: 'uuid-1', loadQty: '4', shareCond: 'SP', sharePrice: '1.5' }],
+        [{ optId: 'uuid-2', loadQty: '1', shareCond: '', sharePrice: '0' }, true],
+        [{ optId: 'uuid-3', loadQty: '1', shareCond: '', sharePrice: '0' }],
+    ]);
+    await window.copySectionShareLink(btn);
+    expect(JSON.parse(calls[0].init.body)).toEqual({ rows: 'uuid-1\t4\tSP\t1.5\t\t\t\nuuid-3\t1\t\t0\t\t\t', buylist: true });
+    expect(copied).toEqual(['https://example.test/upload?share=k']);
+    expect(btn.innerHTML).toContain('Copied!');
+});
+
+test('a store can share while another one flashes, and each restores itself', async () => {
+    const { window, calls, timers } = share(201, { key: 'k', url: '/upload?share=k' });
+    const row = [{ optId: 'uuid-1', loadQty: '1', shareCond: '', sharePrice: '0' }];
+    const first = section([row]);
+    const second = section([row]);
+    await window.copySectionShareLink(first);
+    expect(window.copySectionShareLink(first)).toBeUndefined();
+    await window.copySectionShareLink(second);
+    expect(calls.length).toBe(2);
+    timers.forEach((fn) => fn());
+    expect(first.innerHTML).toBe('<svg></svg>');
+    expect(second.innerHTML).toBe('<svg></svg>');
+});
