@@ -36,6 +36,9 @@ type APIPlansVars struct {
 	DefaultPackage string
 	// DefaultExplicit is true when the package on arrival lets the reader pick stores.
 	DefaultExplicit bool
+	// DefaultScope is the default package's store scope; DefaultSealed is set when it grants sealed.
+	DefaultScope  string
+	DefaultSealed bool
 	// ExtraGameMonthly is the add-on price for a game past the included count, in cents.
 	ExtraGameMonthly int64
 	// ExtraStoreMonthly is the add-on price for a store past the included count, in cents.
@@ -192,6 +195,8 @@ func apiPlansVars(p *prices, r *http.Request, sig string) *APIPlansVars {
 	}
 	v.DefaultPackage = v.Default.Key
 	v.DefaultExplicit = v.Default.StoreScope == apiproductlist.StoreScopeExplicit
+	v.DefaultScope = v.Default.StoreScope
+	v.DefaultSealed = slices.Contains(v.Default.Modes, "sealed")
 	if a, ok := apiProducts.Addon("extra_game"); ok {
 		v.ExtraGameMonthly = a.Monthly
 	}
@@ -459,6 +464,8 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 		Monthly        int64  `json:"monthly"`
 		Explicit       bool   `json:"explicit"`
 		IncludedStores int    `json:"includedStores"`
+		Scope          string `json:"scope"`
+		Sealed         bool   `json:"sealed"`
 	}
 	type interval struct {
 		Key   string `json:"key"`
@@ -478,7 +485,7 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 		if p.IsHistory() && !Config().APIGateway.HistoryOnSale {
 			continue
 		}
-		out.Packages = append(out.Packages, pkg{p.Key, p.Name, p.Monthly, p.StoreScope == apiproductlist.StoreScopeExplicit, p.IncludedStores})
+		out.Packages = append(out.Packages, pkg{p.Key, p.Name, p.Monthly, p.StoreScope == apiproductlist.StoreScopeExplicit, p.IncludedStores, p.StoreScope, slices.Contains(p.Modes, "sealed")})
 	}
 	for _, a := range v.Products.Addons {
 		// Off sale, a mode add-on stays out of the page source too.
