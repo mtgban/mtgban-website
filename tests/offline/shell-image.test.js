@@ -23,3 +23,8 @@ test('the service worker precaches the game card back', () => {
     expect(sw).toContain("SHELL_URLS.push('/img/backs/' + GAME + '.webp')");
     expect(sw).toContain("var GAME = self.__GAME || ''");
 });
+
+// An empty count collapses its line, and the sidebar image rides on it.
+test('the shell counts an empty result as well', () => {
+    expect(shell).toContain("el.textContent = n + ' result' + (n === 1 ? '' : 's') + ' found'");
+});
