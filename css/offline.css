@@ -137,5 +137,38 @@
     contain-intrinsic-size: auto 530px;
 }
 
+/* The navbar's box is the only one this page has, so unlike other pages it
+   shows on an upright phone too, taking the place of the wordmark. Its
+   suggestions span the nav and open over the singles and sealed pills. */
+body:has(#m-offline-results) .m-nav {
+    z-index: 102;
+}
+body:has(#m-offline-results) .m-nav-search {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    flex: 1;
+    min-width: 0;
+    margin: 0 0.5em;
+}
+body:has(#m-offline-results) .m-nav-search form {
+    flex: 1;
+    min-width: 0;
+    position: static;
+}
+body:has(#m-offline-results) .m-nav-search .autocomplete-items {
+    left: 0;
+    right: 0;
+    width: auto;
+}
+body:has(#m-offline-results) .m-nav-filter-btn {
+    display: none;
+}
+@media (orientation: portrait) {
+    body:has(#m-offline-results) .m-nav-logo-lockup {
+        display: none;
+    }
+}
+
 /* Condition label for sealed offline results (mirrors search.html condHeader) */
 .m-page .m-cond-label { padding: 0.3em 0.75em; font-size: 0.8em; color: var(--activetext); }
