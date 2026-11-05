@@ -73,14 +73,14 @@
             <p>Most buylist growth over the past 3 months. Spot emerging trends early.</p>
         </a>
         {{if .HasVelocity}}
-        {{if .CanVelocity}}<a class="card sleepers-tool" href="?page=velocity">{{else}}<span class="card sleepers-tool sleepers-tool-locked" title="Increase your tier to rank cards by sales velocity">{{end}}
+        <a class="card sleepers-tool" href="?page=velocity">
             <div class="tool-top">
                 <span class="tool-icon" style="background:rgba(127,191,255,0.15); color:var(--tier-d);">&#9889;</span>
                 <span class="tool-arrow">&rarr;</span>
             </div>
             <h3>Sales Velocity</h3>
             <p>Copies sold a day on TCGplayer over the last 30 days. The fastest sellers rank highest.</p>
-        {{if .CanVelocity}}</a>{{else}}</span>{{end}}
+        </a>
         {{end}}
     </div>
 

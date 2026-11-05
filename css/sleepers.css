@@ -102,15 +102,6 @@
     transform: translateX(2px);
 }
 
-.sleepers-tool-locked,
-.sleepers-tool-locked:hover {
-    opacity: 0.45;
-    cursor: help;
-    transform: none;
-    border-color: var(--border-subtle);
-    background: var(--surface-1);
-}
-
 .sleepers-tool h3 {
     font-size: var(--text-2xl);
     font-weight: 600;
