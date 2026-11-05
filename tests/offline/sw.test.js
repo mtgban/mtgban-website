@@ -59,17 +59,50 @@ test('dev goes to the network before the cache', async () => {
     }
 });
 
-// A script the shell loads but the worker never cached fails only offline,
-// which is when nobody is looking.
-test('the worker caches every script the offline pages load', async () => {
+// The base with the default body of each block the page defines taken out,
+// as the page renders it: a {{block}} default the page overrides never loads.
+function renderedBase(base, page) {
+    const defined = new Set([...page.matchAll(/{{define "([^"]+)"}}/g)].map((m) => m[1]));
+    const tags = /{{-?\s*(block|if|range|with|define|end)\b[^}]*}}/g;
+    let out = '';
+    let at = 0;
+    let skip = 0;
+    let depth = 0;
+    for (const m of base.matchAll(tags)) {
+        if (!skip) out += base.slice(at, m.index);
+        at = m.index + m[0].length;
+        if (m[1] !== 'end') {
+            depth++;
+            const name = /"([^"]+)"/.exec(m[0]);
+            if (!skip && m[1] === 'block' && name && defined.has(name[1])) skip = depth;
+        } else {
+            if (skip === depth) skip = 0;
+            depth--;
+        }
+    }
+    return out + base.slice(at);
+}
+
+// A script or sheet the shell loads but the worker never cached fails only
+// offline, which is when nobody is looking. The page's own and its base's
+// count alike.
+test('the worker caches every script and sheet the offline pages load', async () => {
     const w = loadWorker('b1', false, answer);
     await install(w);
     const cached = new Set(Object.keys(w.stored).map((url) => url.split('?')[0]));
     const root = join(import.meta.dir, '..', '..', 'templates');
-    for (const file of ['offline.html', 'mobile/offline.html']) {
-        const html = readFileSync(join(root, file), 'utf8');
-        const scripts = [...html.matchAll(/src="(\/js\/[^"?]+)/g)].map((m) => m[1]);
-        expect(scripts.length).toBeGreaterThan(5);
-        expect(scripts.filter((path) => !cached.has(path))).toEqual([]);
+    const read = (file) => readFileSync(join(root, file), 'utf8');
+    for (const [file, base] of [['offline.html', 'base.html'], ['mobile/offline.html', 'mobile/base-mobile.html']]) {
+        const page = read(file);
+        const html = page + renderedBase(read(base), page);
+        const assets = [...html.matchAll(/(?:src|href)="(\/(?:js|css)\/[^"?]+)/g)].map((m) => m[1]);
+        expect(assets.length).toBeGreaterThan(5);
+        expect(assets.filter((path) => !cached.has(path))).toEqual([]);
     }
+});
+
+test('a block the page defines drops the base default', () => {
+    const base = '<a src="/js/a.js">{{block "icons" .}}<b src="/js/b.js">{{if .X}}x{{end}}{{end}}<c src="/js/c.js">';
+    expect(renderedBase(base, '{{define "icons"}}none{{end}}')).toBe('<a src="/js/a.js"><c src="/js/c.js">');
+    expect(renderedBase(base, '')).toBe('<a src="/js/a.js"><b src="/js/b.js">x<c src="/js/c.js">');
 });
