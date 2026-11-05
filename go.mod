@@ -19,7 +19,7 @@ require (
 	github.com/mtgban/go-mtgban v0.14.0
 	github.com/mtgban/simplecloud v0.1.1
 	github.com/richardlehane/mscfb v1.0.9
-	github.com/xuri/excelize/v2 v2.11.1-0.20261020033641-611b222fd8f7
+	github.com/xuri/excelize/v2 v2.11.1
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/sys v0.49.0
@@ -86,7 +86,7 @@ require (
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
 	github.com/ulikunitz/xz v0.5.17 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
-	github.com/xuri/efp v0.0.2 // indirect
+	github.com/xuri/efp v0.0.3-0.20260924042702-217b81952dec // indirect
 	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.46.0 // indirect
