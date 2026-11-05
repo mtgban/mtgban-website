@@ -229,6 +229,7 @@ function fakeEnv() {
     };
     var env = {
         loads: [],
+        lastSync: async function () { return env.synced; },
         normName: function (s) {
             return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
                 .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
@@ -515,6 +516,7 @@ function sealedEnv() {
     };
     return {
         loads: [],
+        lastSync: async function () {},
         normName: function (s) {
             return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
                 .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -588,6 +590,7 @@ test('LRU eviction on 9 sets (size=8)', async () => {
     names.push({key: 'card', uuids: Object.keys(cards)});
     var env = {
         loads: [],
+        lastSync: async function () { return env.synced; },
         normName: function (s) {
             return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
                 .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
@@ -637,6 +640,7 @@ test('2-char needle: exact match returns, substring scan skipped', async () => {
         TST: {setCode: 'TST', retail: {'u-bo-1': {CK: {regular: 0.5}}, 'u-bog-1': {CK: {regular: 0.3}}}, buylist: {}},
     };
     const env = {
+        lastSync: async function () {},
         normName: function (s) {
             return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
                 .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
@@ -673,6 +677,7 @@ test('rejection degradation: one set fails, others succeed', async () => {
         GOOD: {setCode: 'GOOD', retail: {'u-good-1': {CK: {regular: 1}}}, buylist: {}},
     };
     var env = {
+        lastSync: async function () {},
         normName: function (s) {
             return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
                 .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
@@ -717,4 +722,60 @@ test('an in: pool is one unsupported token', () => {
     expect(q.unsupported).toEqual(['in:(sm:regexp ^"Ach)']);
     expect(q.names).toEqual(['sol ring']);
     expect(p('in:(s:"A (B)") x').unsupported).toEqual(['in:(s:"A (B)")']);
+});
+
+// A sync rewrites a set in the database, where the page's cache cannot see it.
+test('a finished sync replaces the cached prices', async () => {
+    Q.resetCaches();
+    const env = fakeEnv();
+    const price = async () => (await Q.execute(Q.parse('s:mh2'), env)).results[0].retail.CK.regular;
+    expect(await price()).toBe(20);
+    expect(await price()).toBe(20);
+    expect(env.loads).toEqual(['MH2']);
+
+    const realLoad = env.loadSetPayload;
+    env.loadSetPayload = async (code) => {
+        await realLoad(code);
+        return {setCode: 'MH2', retail: {'u-mh2-1': {CK: {regular: 25}}}, buylist: {}};
+    };
+    env.synced = '2026-11-05T00:00:00Z';
+    expect(await price()).toBe(25);
+    expect(await price()).toBe(25);
+    expect(env.loads).toEqual(['MH2', 'MH2']);
+});
+
+// Searches overlap: one may still be reading a set when the next sees the sync.
+test('a load from before the sync does not fill the cache after it', async () => {
+    Q.resetCaches();
+    const env = fakeEnv();
+    const priced = (regular) => ({setCode: 'MH2', retail: {'u-mh2-1': {CK: {regular}}}, buylist: {}});
+    const price = (out) => out.results[0].retail.CK.regular;
+    const search = () => Q.execute(Q.parse('s:mh2'), env);
+    // A stamp of its own, so what earlier tests cached is not in play
+    env.synced = 'before overlap';
+
+    let reached, release;
+    const reading = new Promise((resolve) => { reached = resolve; });
+    const held = new Promise((resolve) => { release = resolve; });
+    env.loadSetPayload = async () => {
+        reached();
+        await held;
+        return priced(20);
+    };
+    const first = search();
+    await reading;
+
+    env.synced = 'after overlap';
+    let loads = 0;
+    env.loadSetPayload = async () => {
+        loads++;
+        return priced(25);
+    };
+    expect(price(await search())).toBe(25);
+    expect(loads).toBe(1);
+
+    release();
+    await first;
+    expect(price(await search())).toBe(25);
+    expect(loads).toBe(1);
 });

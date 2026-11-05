@@ -271,8 +271,22 @@
 
     var payloadCache = new Map();
 
+    // The sync the cached payloads were read under.
+    var payloadCacheSync;
+
     function resetCaches() {
         payloadCache = new Map();
+    }
+
+    // dropStalePayloads forgets the cached sets once a sync has finished, here
+    // or in another tab: the sync rewrites them in the database, out of this
+    // cache's sight, and the stamp is what the banner's refresh time reads.
+    async function dropStalePayloads(env) {
+        var sync = await env.lastSync();
+        if (sync !== payloadCacheSync) {
+            payloadCacheSync = sync;
+            resetCaches();
+        }
     }
 
     // cachedPayload is an LRU over decoded set payloads.
@@ -283,7 +297,11 @@
             payloadCache.set(code, hit);
             return hit;
         }
+        // A load the cache was reset under may hold what the sync replaced, so
+        // it answers its own search and is not kept.
+        var cache = payloadCache;
         var payload = await env.loadSetPayload(code);
+        if (cache !== payloadCache) return payload;
         payloadCache.set(code, payload);
         while (payloadCache.size > LRU_SIZE) {
             payloadCache.delete(payloadCache.keys().next().value);
@@ -337,6 +355,7 @@
     }
 
     async function execute(parsed, env) {
+        await dropStalePayloads(env);
         var out = {results: [], truncated: false, missingSets: [], unsupported: parsed.unsupported};
 
         var cards = [];
