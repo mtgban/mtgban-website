@@ -76,6 +76,10 @@ Newspaper, and on upload's optimizer, which Pioneer also reaches without it,
 the rate is allowed through. These pages have no phone layout
 of their own, so a phone gets the same line.
 
+That rests on the ACL alone, and nothing in the code checks it: an
+`acl.json` edit that gives a tier Arbitrage, Reverse, Global or Sleepers
+has to give it the Newspaper too, or that tier reads the rates without it.
+
 ## On the Sleepers page
 
 `?page=velocity` ranks cards by the same copies over 30: the S tier starts at about
