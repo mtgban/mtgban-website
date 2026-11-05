@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -96,5 +97,39 @@ func TestSearchAPIStopsAtItsCap(t *testing.T) {
 	rows := strings.Count(strings.TrimSpace(rec.Body.String()), "\n")
 	if rows != MaxAPISearchResults {
 		t.Errorf("the CSV export holds %d rows, want %d", rows, MaxAPISearchResults)
+	}
+	cut, err := strconv.Atoi(rec.Header().Get("X-MTGBAN-Cut"))
+	if err != nil || cut < 1 {
+		t.Errorf("the CSV export says it cut %q cards, want at least 1", rec.Header().Get("X-MTGBAN-Cut"))
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/search/export/retail/"+url.PathEscape("s:M10")+".csv", nil)
+	req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
+	rec = httptest.NewRecorder()
+	testSite.SearchExport(rec, req)
+	if rec.Header().Get("X-MTGBAN-Cut") != "" {
+		t.Errorf("the CSV export of one set says it cut %s cards", rec.Header().Get("X-MTGBAN-Cut"))
+	}
+}
+
+// The export counts what it leaves out from every card the search found:
+// past the page's cap that is the total the search counted, and a
+// decklist's repeats are not cards.
+func TestExportCutCountsTheCardsLeftOut(t *testing.T) {
+	keys := func(n int) []string { return make([]string, n) }
+	for _, c := range []struct {
+		name   string
+		result searchResults
+		want   int
+	}{
+		{"under the cap", searchResults{keys: keys(MaxAPISearchResults)}, 0},
+		{"a page that fills the cap", searchResults{keys: keys(MaxSearchTotalResults)}, MaxSearchTotalResults - MaxAPISearchResults},
+		{"a search past the page's cap", searchResults{keys: keys(MaxSearchTotalResults), total: 15000, message: TooManyMessage}, 15000 - MaxAPISearchResults},
+		{"a decklist with repeats", searchResults{keys: keys(MaxAPISearchResults), total: MaxAPISearchResults + 40}, 0},
+	} {
+		got := exportCut(c.result)
+		if got != c.want {
+			t.Errorf("%s: cuts %d, want %d", c.name, got, c.want)
+		}
 	}
 }

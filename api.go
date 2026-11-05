@@ -815,16 +815,21 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 
 // writeSearchCSV downloads the search as the page lists it: the same post
 // filters and order, with the offers the page shows, keyed by BAN UUID so
-// foil and nonfoil stay separate, up to MaxAPISearchResults cards. CSV is
-// never the demo mode.
+// foil and nonfoil stay separate, up to MaxAPISearchResults cards, with
+// X-MTGBAN-Cut naming how many it left out when it left any. CSV is never
+// the demo mode.
 func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datastore, p *prices, config SearchConfig, sig string, retail, buylist bool, tagName string) {
 	b := ds.backend
 	result := runSearch(r, ds, p, config)
 	sortSearchKeys(r, ds, p, result.keys, result.odds, readSearchSort(r, config))
+	cut := exportCut(result)
 	result.keys = result.keys[:min(len(result.keys), MaxAPISearchResults)]
 	result.sellers, result.vendors = collectOffers(b, p, r, config, result.keys)
 
 	setCSVDownloadHeaders(w, "ban_search.csv")
+	if cut > 0 {
+		w.Header().Set("X-MTGBAN-Cut", strconv.Itoa(cut))
+	}
 	var results map[string]map[string]*BanPrice
 	if retail {
 		results = banPricesFromRows(b, p, result.keys, result.sellers, "", tagName, true, true, false)
@@ -835,12 +840,24 @@ func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datasto
 	err := BanPrice2CSV(b, p, w, results, result.keys)
 	if err != nil {
 		dropDownloadHeaders(w)
+		w.Header().Del("X-MTGBAN-Cut")
 		UserNotify("search", err.Error())
 		pageVars := genPageNav(s, r, "Error", sig)
 		pageVars.Title = "Error"
 		pageVars.InfoMessage = "Unable to download CSV right now"
 		render(w, "home.html", pageVars)
 	}
+}
+
+// exportCut is how many of the cards a search found its export leaves out
+// past MaxAPISearchResults. Past MaxSearchTotalResults the search counted
+// them before its price filters, which judge only the cards it kept.
+func exportCut(result searchResults) int {
+	n := len(result.keys)
+	if result.message == TooManyMessage {
+		n = result.total
+	}
+	return max(0, n-MaxAPISearchResults)
 }
 
 // validStoreName matches the names bantool publishes stores under;
