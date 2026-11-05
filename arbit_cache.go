@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 	"weak"
 
 	"github.com/mtgban/go-mtgban/matcher"
@@ -75,7 +76,7 @@ type arbitCache struct {
 
 // arbitHeldFor is next's cache: the comparisons of prev's that next still
 // publishes both stores of, and the same price sources of their view as
-// prev.
+// prev, built from the current Direct listings or none.
 // prev is nil before the first publish.
 func arbitHeldFor(prev, next *prices) *arbitCache {
 	c := &arbitCache{budget: arbitHeldRows, entries: map[arbitKey]*arbitRows{}}
@@ -85,8 +86,12 @@ func arbitHeldFor(prev, next *prices) *arbitCache {
 	prev.arbit.mu.Lock()
 	defer prev.arbit.mu.Unlock()
 	c.budget, c.backend, c.clock = prev.arbit.budget, prev.arbit.backend, prev.arbit.clock
+	direct := tcgDirectSnapshot(time.Now())
 	for key, entry := range prev.arbit.entries {
 		if !entry.done || !next.publishes(key.source) || !next.publishes(key.scraper) || !next.sameStores(prev, key.view.priceSources) {
+			continue
+		}
+		if key.direct != nil && key.direct != direct {
 			continue
 		}
 		// Each cache counts its own entries under its own mutex

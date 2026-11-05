@@ -275,6 +275,59 @@ func TestArbitCacheKeysDirectStock(t *testing.T) {
 	}
 }
 
+// TestArbitCacheDropsReplacedListings carries a comparison built from the
+// current Direct listings, or none, to the next snapshot, and drops one
+// built from listings a reload replaced.
+func TestArbitCacheDropsReplacedListings(t *testing.T) {
+	b := fixtureBackend("FIXA", "Fixture Arbit", "2024-01-01", [][2]string{{"Fixture Arbit", "1"}})
+	direct := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		"FIXA-1": {{Conditions: "NM", Price: 5, Quantity: 1}},
+	}, mtgban.ScraperInfo{Shorthand: tcgDirectStore})
+	seller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		"FIXA-1": {{Conditions: "NM", Price: 5, Quantity: 1}},
+	}, mtgban.ScraperInfo{Shorthand: "SEL"})
+	vendor := fixtureBuys("VEN", map[string]float64{"FIXA-1": 8})
+	opts := &mtgban.ArbitOpts{MinSpread: MinSpread}
+	stores := []mtgban.Seller{direct, seller}
+	vendors := []mtgban.Vendor{vendor}
+
+	setTestTCGDirect(t, map[string]*tcgListings{})
+	withPrices(t, stores, vendors)
+	p := currentPrices()
+	stocked := withDirectStock(direct)
+	p.arbitRows(b, arbitView{}, opts, stocked, vendor)
+	p.arbitRows(b, arbitView{}, opts, seller, vendor)
+	replaced := stocked.(*directStockSeller).snap
+	if replaced == nil {
+		t.Fatal("the stock was built from no listings")
+	}
+
+	setTestTCGDirect(t, map[string]*tcgListings{})
+	withPrices(t, stores, vendors)
+	p = currentPrices()
+	_, found := p.arbit.entries[arbitKey{source: direct, scraper: vendor, direct: replaced}]
+	if found {
+		t.Error("a comparison built from replaced listings was carried")
+	}
+	_, found = p.arbit.entries[arbitKey{source: seller, scraper: vendor}]
+	if !found {
+		t.Error("a comparison built from no listings was dropped")
+	}
+
+	stocked = withDirectStock(direct)
+	p.arbitRows(b, arbitView{}, opts, stocked, vendor)
+	current := stocked.(*directStockSeller).snap
+	if current == replaced {
+		t.Fatal("the stock was built from the replaced listings")
+	}
+	withPrices(t, stores, vendors)
+	p = currentPrices()
+	_, found = p.arbit.entries[arbitKey{source: direct, scraper: vendor, direct: current}]
+	if !found {
+		t.Error("a comparison built from the current listings was dropped")
+	}
+}
+
 // BenchmarkArbitPages is the arbit and reverse pages end to end for CK,
 // after one view has filled whatever they keep. It needs stores loaded,
 // which TestMain does from a B2 key pair in the environment.
