@@ -693,7 +693,17 @@ describe('the backpack tabs', () => {
         ids['backpack-undo'].click();
         expect(saved().map((t) => [t.pack, t.name, t.m, t.del])).toEqual([[1, 'Main', 5, undefined], [2, 'Trades', 300, undefined], [3, 'Gone', 6, true]]);
         p.window.Backpack.addTab();
-        expect(saved().map((t) => [t.pack, t.name, t.m, t.del])).toEqual([[1, 'Main', 5, undefined], [2, 'Trades', 300, undefined], [3, 'Backpack 3', 300, undefined]]);
+        expect(saved().map((t) => [t.pack, t.name, t.m, t.del])).toEqual([[1, 'Main', 5, undefined], [2, 'Trades', 300, undefined], [4, 'Backpack 4', 300, undefined], [3, 'Gone', 6, true]]);
+    });
+
+    test('a new backpack is numbered past the deleted ones too', () => {
+        const p = page({ store: two.slice(0, 1), tabs: 4, tabList: [{ pack: 1, m: 5 }, { pack: 2, del: true, m: 6 }, { pack: 3, m: 5 }] });
+        p.window.UserState = { now: () => 100 };
+        p.window.Backpack.addTab();
+        expect(p.window.Backpack.tabs().map((t) => [t.pack, t.name])).toEqual([[1, 'Backpack 1'], [3, 'Backpack 3'], [4, 'Backpack 4']]);
+        const q = page({ store: [], tabs: 2, tabList: [] });
+        q.window.Backpack.addTab();
+        expect(q.window.Backpack.tabs().map((t) => t.pack)).toEqual([1, 2]);
     });
 
     test('deleting a backpack the list had deleted, or never named, stamps its delete now', () => {
