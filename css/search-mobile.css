@@ -147,6 +147,10 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     transition: transform 0.1s ease, background-color 0.1s ease;
 }
 
+.m-sort-pill.sort-pill-locked {
+    opacity: 0.45;
+}
+
 .m-sort-pill::before {
     content: '';
     position: absolute;

@@ -220,7 +220,8 @@
                 { value: 'alpha', label: 'Alphabetical' },
                 { value: 'number', label: 'Collector number' },
                 { value: 'retail', label: 'Retail price' },
-                { value: 'buylist', label: 'Buylist price' }
+                { value: 'buylist', label: 'Buylist price' },
+                { value: 'velocity', label: 'Sales velocity' }
             ];
             return filterEntries(base, query);
         }

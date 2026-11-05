@@ -76,6 +76,14 @@ the popular searches and the search suggestions. Search and the site's export
 unlock it for a `newspaperTier` reader, sharing the row's rule; anyone else
 searching with it finds nothing and is told `Increase your tier to filter by sales velocity`.
 
+`sort:velocity`, or the pill beside the other sorts, ranks any search fastest
+first, with reverse for slowest first. Cards with no data sort last either way.
+An order says which cards sell fastest as surely as a filter, so `readSearchSort` falls back to the default unless a
+handler set `SearchConfig.VelocitySort`, which Search and the export do for a
+`newspaperTier` reader. Others get the default order and, once sales are loaded,
+the pill greyed out with no link and the tooltip `Increase your tier to sort by
+sales velocity`, even after typing `sort:velocity`, which otherwise hides the pills.
+
 ## The loader
 
 `salesvelocity.go`, modeled on the listings loader (`tcglistings.go`).

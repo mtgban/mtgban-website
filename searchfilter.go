@@ -80,6 +80,10 @@ type SearchConfig struct {
 	// Append the reader's custom buylist, set by a handler that has checked
 	// the reader's signature
 	CustomBuylist bool
+
+	// Allow sorting by sales velocity, set by a handler that has checked the
+	// reader's tier
+	VelocitySort bool
 }
 
 type FilterElem struct {
@@ -1372,7 +1376,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 		case "sort":
 			code = strings.ToLower(code)
 			switch code {
-			case "chrono", "hybrid", "alpha", "number", "retail", "buylist":
+			case "chrono", "hybrid", "alpha", "number", "retail", "buylist", "velocity":
 				config.SortMode = code
 			}
 

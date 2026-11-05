@@ -375,6 +375,18 @@ func cardFilterVelocityLessThan(filters []string, co *matcher.CardObject) bool {
 	return v.perDay(salesVelocityWindow) >= limit
 }
 
+// salesVelocityRates is the copies sold a day of each card with data.
+func salesVelocityRates(cardIDs []string) map[string]float64 {
+	rates := make(map[string]float64, len(cardIDs))
+	for _, cardID := range cardIDs {
+		v, found := salesVelocityFor(cardID)
+		if found {
+			rates[cardID] = v.perDay(salesVelocityWindow)
+		}
+	}
+	return rates
+}
+
 // A velocity filter parses locked and a locked one matches nothing, so no way
 // into the parser reveals which cards sell without having read the reader's tier.
 const lockedFilterPrefix = "locked_"

@@ -575,7 +575,7 @@ override; phone UA detection via `mileusna/useragent`).
   ~35**: search-engine
   modifiers (`sm:` mode override incl. `sm:scryfall`, `skip:`
   retail/buylist/empty/index, `sort:` chrono/hybrid/alpha/number/retail/
-  buylist), identity (`s:`/`set:`/`edition:`/`e:`, `cn:`/`number:` with
+  buylist/velocity), identity (`s:`/`set:`/`edition:`/`e:`, `cn:`/`number:` with
   ranges and `cns:` strict, `r:`, `f:`, `t:`, `c:`/`color:`, `ci:`/
   `identity:`, `name:`, regex variants `se:`/`ee:`/`cne:`/`namee:`), format
   legality (`format:`/`legal:`, new), tags (`is:`/`not:` promo, reserved,
