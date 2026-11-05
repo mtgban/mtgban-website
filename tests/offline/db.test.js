@@ -174,7 +174,7 @@ test('a scan that fails is not kept: the next read under the same stamp scans ag
 });
 
 // A small stand-in for IndexedDB: enough of a transaction for ensureKey.
-const KEY_PATHS = { meta: 'k', sets: 'code' };
+const KEY_PATHS = { meta: 'k', sets: 'code', cards: 'uuid' };
 let stores = {};
 
 function fakeTransaction() {
@@ -187,6 +187,28 @@ function fakeTransaction() {
             pending++;
             queueMicrotask(() => {
                 req.result = stores[name].get(key);
+                pending--;
+                if (req.onsuccess) req.onsuccess();
+                settle();
+            });
+            return req;
+        },
+        getAll() {
+            const req = {};
+            pending++;
+            queueMicrotask(() => {
+                req.result = [...stores[name].values()];
+                pending--;
+                if (req.onsuccess) req.onsuccess();
+                settle();
+            });
+            return req;
+        },
+        getAllKeys() {
+            const req = {};
+            pending++;
+            queueMicrotask(() => {
+                req.result = [...stores[name].keys()];
                 pending--;
                 if (req.onsuccess) req.onsuccess();
                 settle();
@@ -262,4 +284,25 @@ test('only the database creates the key', () => {
     for (const file of ['offline-mode.js', 'offline-sync.js']) {
         expect(readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', file), 'utf8')).not.toContain('generateKey');
     }
+});
+
+test('a search reads what it needs in one go', async () => {
+    seed({ lastSync: 'then', catalogVersion: 'c1', aesKey: 'k' });
+    expect(await globalThis.OfflineDB.searchState()).toEqual({ lastSync: 'then', catalogVersion: 'c1', stored: ['NEO', 'MH2'] });
+    seed({});
+    expect(await globalThis.OfflineDB.searchState()).toEqual({ lastSync: undefined, catalogVersion: undefined, stored: ['NEO', 'MH2'] });
+});
+
+test('the catalog is read once per version', async () => {
+    seed({});
+    stores.cards = new Map([['a', { uuid: 'a', n: 'First' }]]);
+    const first = await globalThis.OfflineDB.catalog('v1');
+    expect(first.list).toHaveLength(1);
+    expect(first.byId.get('a').n).toBe('First');
+
+    stores.cards.set('b', { uuid: 'b', n: 'Second' });
+    expect(await globalThis.OfflineDB.catalog('v1')).toBe(first);
+    const next = await globalThis.OfflineDB.catalog('v2');
+    expect(next.list).toHaveLength(2);
+    expect(next.byId.get('b').n).toBe('Second');
 });

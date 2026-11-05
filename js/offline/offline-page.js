@@ -26,6 +26,10 @@
         // The latest search. One still running when a newer one starts, or the
         // box empties, is left to finish unseen.
         var latestSearch = 0;
+        // The latest draw, as a new sort of the same answer also has to price
+        // rows and can be overtaken.
+        var latestDraw = 0;
+        var lastQuery = '';
 
         function call(name) {
             if (hooks[name]) hooks[name]();
@@ -55,16 +59,33 @@
             // Warm the shared connection; rejects when IndexedDB is unavailable.
             await OfflineDB.open();
             dicts = await OfflineUtil.loadCatalogDicts();
+            var version;
+            var cards = null;
+            var reads = 0;
+            var applied = 0;
             env = {
                 normName: OfflineUtil.normName,
-                lastSync: function () { return OfflineDB.getMeta('lastSync'); },
+                // A slower, older read must not take a newer search back to the
+                // catalog it replaced.
+                searchState: async function () {
+                    var read = ++reads;
+                    var state = await OfflineDB.searchState();
+                    var loaded = await OfflineDB.catalog(state.catalogVersion);
+                    if (read > applied) {
+                        applied = read;
+                        version = state.catalogVersion;
+                        cards = loaded;
+                    }
+                    return state;
+                },
                 lookupName: OfflineDB.lookupName,
-                allNames: OfflineDB.allNames,
-                getCard: OfflineDB.getCard,
-                hasSet: OfflineDB.hasSet,
-                allCards: function () { return OfflineDB.getAllRows('cards'); },
+                allNames: function () { return OfflineDB.allNames(version); },
+                getCard: function (uuid) { return cards.byId.get(uuid); },
+                allCards: function () { return cards.list; },
                 loadSetPayload: OfflineUtil.loadSetPayload
             };
+            // In the background, so the first search doesn't wait on it.
+            env.searchState().then(function () { return env.allNames(); }).catch(function () {});
             ctx = {
                 sets: dicts.sets,
                 stores: dicts.stores,
@@ -75,14 +96,34 @@
             };
         }
 
-        function paint() {
-            if (hooks.order) hooks.order(exec.results, ctx);
-            var page = Object.assign({}, exec, {results: exec.results.slice(0, PAGE_SIZE)});
+        // What this page shows of an answer, read when it is priced.
+        function view() {
+            return {
+                size: PAGE_SIZE,
+                order: hooks.order && function (results) { hooks.order(results, ctx); },
+                allPrices: hooks.needsAllPrices
+            };
+        }
+
+        function draw() {
+            var page = Object.assign({}, exec, {results: exec.page});
             hooks.render(resultsEl(), page, exec, ctx);
+        }
+
+        async function redraw() {
+            var turn = ++latestDraw;
+            var shown = exec;
+            var complete = await OfflineQuery.showPage(shown, env, view());
+            if (turn !== latestDraw || shown !== exec) return;
+            // A set that could not be opened changes the answer itself
+            if (complete) draw();
+            else runQuery(lastQuery).catch(showErrorNotice);
         }
 
         async function runQuery(q) {
             var search = ++latestSearch;
+            latestDraw++;
+            lastQuery = q;
             if (!q) {
                 exec = null;
                 resultsEl().innerHTML = '';
@@ -93,14 +134,15 @@
             parsed.sealed = sealedMode;
             var answer;
             try {
-                answer = await OfflineQuery.execute(parsed, env);
+                answer = await OfflineQuery.execute(parsed, env, view());
             } catch (err) {
                 if (search === latestSearch) throw err;
                 return;
             }
             if (search !== latestSearch) return;
+            latestDraw++;
             exec = answer;
-            paint();
+            draw();
         }
 
         function showErrorNotice(err) {
@@ -150,11 +192,9 @@
 
         return {
             sealed: function () { return sealedMode; },
-            // Draw the last answer again, as a new sort asks; false without one.
+            // Draw the last answer again, as a new sort asks.
             repaint: function () {
-                if (!exec) return false;
-                paint();
-                return true;
+                if (exec) redraw().catch(showErrorNotice);
             }
         };
     }

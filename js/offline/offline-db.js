@@ -130,13 +130,6 @@
         });
     }
 
-    function hasSet(code) {
-        return withTx(['sets'], 'readonly', function(tx, out) {
-            var req = tx.objectStore('sets').count(code);
-            req.onsuccess = function() { out.result = req.result > 0; };
-        });
-    }
-
     // Cheap count without fetching blobs.
     function countSets() {
         return withTx(['sets'], 'readonly', function(tx, out) {
@@ -189,8 +182,9 @@
 
     // The name index in key order, backing the suggestion and search name
     // scans: scanned once per catalog version, not on every keystroke.
-    function allNames() {
-        return getMeta('catalogVersion').then(function(version) {
+    function allNames(knownVersion) {
+        var read = knownVersion !== undefined ? Promise.resolve(knownVersion) : getMeta('catalogVersion');
+        return read.then(function(version) {
             if (names && names.version === version) return names.list;
             var list = scanNames();
             names = { version: version, list: list };
@@ -212,6 +206,41 @@
                 cur.continue();
             };
         });
+    }
+
+    // What one search needs to know, read in a single transaction rather than
+    // one per matched set. Read for each search, not kept: a first sync adds
+    // sets long before lastSync moves.
+    function searchState() {
+        return withTx(['meta', 'sets'], 'readonly', function(tx, out) {
+            out.result = {};
+            var meta = tx.objectStore('meta');
+            ['lastSync', 'catalogVersion'].forEach(function(k) {
+                var req = meta.get(k);
+                req.onsuccess = function() { out.result[k] = req.result ? req.result.v : undefined; };
+            });
+            var keys = tx.objectStore('sets').getAllKeys();
+            keys.onsuccess = function() { out.result.stored = keys.result; };
+        });
+    }
+
+    // The cards as last read, and the catalog version they were read under.
+    var catalogCards = null;
+
+    // catalog holds every card in memory, once per catalog version, so a search
+    // doesn't go to the database per card.
+    function catalog(version) {
+        if (catalogCards && catalogCards.version === version) return catalogCards.loaded;
+        var loaded = getAllRows('cards').then(function(list) {
+            var byId = new Map();
+            list.forEach(function(card) { byId.set(card.uuid, card); });
+            return { list: list, byId: byId };
+        });
+        catalogCards = { version: version, loaded: loaded };
+        loaded.catch(function() {
+            if (catalogCards && catalogCards.loaded === loaded) catalogCards = null;
+        });
+        return loaded;
     }
 
     function checkStore(store) {
@@ -267,13 +296,14 @@
         ensureKey: ensureKey,
         putSet: putSet,
         getSet: getSet,
-        hasSet: hasSet,
         countSets: countSets,
         listSetVersions: listSetVersions,
         putCards: putCards,
         getCard: getCard,
         lookupName: lookupName,
         allNames: allNames,
+        searchState: searchState,
+        catalog: catalog,
         getAllRows: getAllRows,
         putRow: putRow,
         deleteRow: deleteRow,

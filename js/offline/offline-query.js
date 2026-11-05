@@ -428,44 +428,70 @@
 
     // Mirrors MaxSearchTotalResults (search.go:36).
     var MAX_TOTAL = 10000;
-    var LRU_SIZE = 8;
+    // Store prices kept decoded, most recently used last. A page of 100 rows can
+    // need over 500,000, and this many cost roughly 100 MB. Counted rather than
+    // sets, as one set can hold a hundred times what another does.
+    var CACHE_ENTRIES = 1000000;
 
     var payloadCache = new Map();
+    var payloadCacheEntries = 0;
+    // Sets that could not be opened, so a search stops offering their cards.
+    var unreadableSets = new Set();
 
     // The sync the cached payloads were read under.
     var payloadCacheSync;
 
     function resetCaches() {
         payloadCache = new Map();
+        payloadCacheEntries = 0;
+        unreadableSets = new Set();
+    }
+
+    // payloadEntries counts the store prices a set holds.
+    function payloadEntries(payload) {
+        var entries = 0;
+        [payload.retail, payload.buylist].forEach(function (section) {
+            for (var id in section) entries += Object.keys(section[id]).length;
+        });
+        return entries;
     }
 
     // dropStalePayloads forgets the cached sets once a sync has finished, here
     // or in another tab: the sync rewrites them in the database, out of this
     // cache's sight, and the stamp is what the banner's refresh time reads.
-    async function dropStalePayloads(env) {
-        var sync = await env.lastSync();
+    function dropStalePayloads(sync) {
         if (sync !== payloadCacheSync) {
             payloadCacheSync = sync;
             resetCaches();
         }
     }
 
-    // cachedPayload is an LRU over decoded set payloads.
+    function usePayload(code) {
+        var hit = payloadCache.get(code);
+        payloadCache.delete(code);
+        payloadCache.set(code, hit);
+        return hit.payload;
+    }
+
+    // cachedPayload is an LRU over decoded set payloads. It rejects for a set
+    // that has gone from the database as well as one that won't decode.
     async function cachedPayload(code, env) {
-        if (payloadCache.has(code)) {
-            var hit = payloadCache.get(code);
-            payloadCache.delete(code);
-            payloadCache.set(code, hit);
-            return hit;
-        }
+        if (payloadCache.has(code)) return usePayload(code);
         // A load the cache was reset under may hold what the sync replaced, so
         // it answers its own search and is not kept.
         var cache = payloadCache;
         var payload = await env.loadSetPayload(code);
+        if (!payload) throw new Error('no stored set ' + code);
         if (cache !== payloadCache) return payload;
-        payloadCache.set(code, payload);
-        while (payloadCache.size > LRU_SIZE) {
-            payloadCache.delete(payloadCache.keys().next().value);
+        // Another search loaded this set in the meantime
+        if (payloadCache.has(code)) return usePayload(code);
+        var entries = payloadEntries(payload);
+        payloadCache.set(code, {payload: payload, entries: entries});
+        payloadCacheEntries += entries;
+        while (payloadCacheEntries > CACHE_ENTRIES && payloadCache.size > 1) {
+            var oldest = payloadCache.keys().next().value;
+            payloadCacheEntries -= payloadCache.get(oldest).entries;
+            payloadCache.delete(oldest);
         }
         return payload;
     }
@@ -527,16 +553,18 @@
         return cards;
     }
 
-    async function cardsBySet(parsed, env) {
+    async function cardsBySet(parsed, env, stored) {
         var cards = [];
         var seen = {};
         for (var n = 0; n < parsed.set.length; n++) {
             var setCode = parsed.set[n];
-            if (!(await env.hasSet(setCode))) continue;
+            if (!stored.has(setCode)) continue;
             var payload;
             try {
                 payload = await cachedPayload(setCode, env);
             } catch (err) {
+                unreadableSets.add(setCode);
+                stored.delete(setCode);
                 continue;
             }
             var sections = [payload.retail, payload.buylist];
@@ -554,17 +582,47 @@
         return cards;
     }
 
+    // The cards by the number they print and the plain one they reduce to, each
+    // list in catalog order, for one list of cards.
+    var numberIndexes = new WeakMap();
+
+    function numberIndex(list) {
+        var index = numberIndexes.get(list);
+        if (index) return index;
+        index = new Map();
+        function file(key, card) {
+            var bucket = index.get(key);
+            if (bucket) bucket.push(card);
+            else index.set(key, [card]);
+        }
+        list.forEach(function (card) {
+            var printed = (card.num || '').toLowerCase();
+            file(printed, card);
+            if (typeof card.pn === 'string' && card.pn.toLowerCase() !== printed) file(card.pn.toLowerCase(), card);
+        });
+        numberIndexes.set(list, index);
+        return index;
+    }
+
+    // numberCandidates narrows the catalog to one number when a filter asks for
+    // exactly that, so a search needn't walk every card. Filters still decide.
+    function numberCandidates(list, parsed) {
+        for (var i = 0; i < parsed.number.length; i++) {
+            var filter = parsed.number[i];
+            if (filter.values.length === 1 && !filter.negate && !filter.sets.length) {
+                return numberIndex(list).get(filter.values[0]) || [];
+            }
+        }
+        return list;
+    }
+
     // cardsByNumber walks the catalog for a number no name or set narrows,
     // keeping the sets on this device, so the others don't use up the limit.
-    async function cardsByNumber(parsed, env, out) {
-        var cards = (await env.allCards()).filter(function (card) { return matchesFilters(card, parsed); });
-        var synced = {};
-        var kept = [];
-        for (var i = 0; i < cards.length; i++) {
-            var code = cards[i].set;
-            if (synced[code] === undefined) synced[code] = await env.hasSet(code);
-            if (synced[code]) kept.push(cards[i]);
-        }
+    async function cardsByNumber(parsed, env, stored, out) {
+        var list = await env.allCards();
+        var kept = numberCandidates(list, parsed).filter(function (card) {
+            return stored.has(card.set) && matchesFilters(card, parsed);
+        });
         if (kept.length > MAX_TOTAL) {
             kept = kept.slice(0, MAX_TOTAL);
             out.truncated = true;
@@ -576,7 +634,7 @@
         return Object.assign({}, parsed, {names: [name], number: [], bareNumber: ''});
     }
 
-    async function findCards(parsed, env, out) {
+    async function findCards(parsed, env, stored, out) {
         if (parsed.bareNumber && !parsed.set.length) {
             // A card's own name, Yu-Gi-Oh's "7", stays a name, and so does a
             // number no card carries
@@ -584,7 +642,7 @@
             if ((await env.lookupName(env.normName(parsed.bareNumber))).length) {
                 return cardsByName(asName, env, out);
             }
-            var numbered = await cardsByNumber(parsed, env, out);
+            var numbered = await cardsByNumber(parsed, env, stored, out);
             return numbered.length ? numbered : cardsByName(asName, env, out);
         }
         if (parsed.names.length > 0) {
@@ -598,56 +656,97 @@
             return cards;
         }
         if (parsed.set.length > 0) {
-            var inSet = await cardsBySet(parsed, env);
+            var inSet = await cardsBySet(parsed, env, stored);
             if (parsed.printed && inSet.some(function (card) { return (card.num || '').toLowerCase() === parsed.printed; })) {
                 // A word a card of its set carries is that number exactly
                 return inSet.filter(function (card) { return (card.num || '').toLowerCase() === parsed.printed; });
             }
             return inSet;
         }
-        return parsed.number.length > 0 && env.allCards ? cardsByNumber(parsed, env, out) : [];
+        return parsed.number.length > 0 && env.allCards ? cardsByNumber(parsed, env, stored, out) : [];
     }
 
-    // addResults prices the cards, grouped by set so each payload is decoded once.
-    async function addResults(cards, env, out) {
+    // toRows keeps the cards of stored sets, grouped by set: the sorts break
+    // their ties on this order. A row has no prices until priceRows gives it some.
+    function toRows(cards, stored) {
         var bySet = {};
         cards.forEach(function (card) {
             (bySet[card.set] = bySet[card.set] || []).push(card);
         });
-        var codes = Object.keys(bySet).sort();
-        for (var k = 0; k < codes.length; k++) {
-            var code = codes[k];
-            if (!(await env.hasSet(code))) continue;
-            var pl;
-            try {
-                pl = await cachedPayload(code, env);
-            } catch (err) {
-                continue;
-            }
+        var rows = [];
+        Object.keys(bySet).sort().forEach(function (code) {
+            if (!stored.has(code)) return;
             bySet[code].forEach(function (card) {
-                out.results.push({
-                    uuid: card.uuid,
-                    i: card.i,
-                    card: card,
-                    retail: (pl.retail && pl.retail[card.uuid]) || {},
-                    buylist: (pl.buylist && pl.buylist[card.uuid]) || {},
-                });
+                rows.push({uuid: card.uuid, i: card.i, card: card, retail: null, buylist: null});
             });
-        }
+        });
+        return rows;
     }
 
-    async function execute(parsed, env) {
-        await dropStalePayloads(env);
-        var out = {results: [], truncated: false, unsupported: parsed.unsupported};
+    // priceRows opens the sets the rows need, and reports whether it could: a set
+    // that won't open changes what the search should have found.
+    async function priceRows(rows, env) {
+        var bySet = {};
+        rows.forEach(function (row) {
+            if (!row.retail) (bySet[row.card.set] = bySet[row.card.set] || []).push(row);
+        });
+        var complete = true;
+        var codes = Object.keys(bySet);
+        for (var k = 0; k < codes.length; k++) {
+            var pl;
+            try {
+                pl = await cachedPayload(codes[k], env);
+            } catch (err) {
+                unreadableSets.add(codes[k]);
+                complete = false;
+                continue;
+            }
+            bySet[codes[k]].forEach(function (row) {
+                row.retail = (pl.retail && pl.retail[row.uuid]) || {};
+                row.buylist = (pl.buylist && pl.buylist[row.uuid]) || {};
+            });
+        }
+        return complete;
+    }
 
-        await addResults(await findCards(parsed, env, out), env, out);
+    // find answers a query from the catalog and the list of stored sets, opening
+    // only what a set search has to. Its rows aren't priced yet.
+    async function find(parsed, env) {
+        var state = await env.searchState();
+        dropStalePayloads(state.lastSync);
+        var stored = new Set(state.stored);
+        unreadableSets.forEach(function (code) { stored.delete(code); });
+        var out = {results: [], page: [], truncated: false, unsupported: parsed.unsupported};
+
+        out.results = toRows(await findCards(parsed, env, stored, out), stored);
 
         // A query no name answers may name a set. One the query already
         // narrowed to is not up for reinterpretation.
         if (!out.results.length && !parsed.set.length && (parsed.setsNamed || []).length) {
-            await addResults(await cardsBySet(Object.assign({}, parsed, {set: parsed.setsNamed}), env), env, out);
+            out.results = toRows(await cardsBySet(Object.assign({}, parsed, {set: parsed.setsNamed}), env, stored), stored);
         }
         return out;
+    }
+
+    // showPage orders an answer and prices what view asks: size rows, or every
+    // row if allPrices says a sort needs them. False means a set wouldn't open,
+    // and the query has to be asked again.
+    async function showPage(out, env, view) {
+        if (view.allPrices && view.allPrices() && !(await priceRows(out.results, env))) return false;
+        if (view.order) view.order(out.results);
+        out.page = view.size === undefined ? out.results : out.results.slice(0, view.size);
+        return priceRows(out.page, env);
+    }
+
+    // execute answers a query. Without a view every row is priced.
+    async function execute(parsed, env, view) {
+        for (;;) {
+            var out = await find(parsed, env);
+            var known = unreadableSets.size;
+            if (await showPage(out, env, view || {})) return out;
+            // Each round must rule out another set, or asking again won't help
+            if (unreadableSets.size === known) throw new Error('offline sets keep failing to open');
+        }
     }
 
     function bestPrice(section) {
@@ -712,6 +811,7 @@
     root.OfflineQuery = {
         parse: parse,
         execute: execute,
+        showPage: showPage,
         sortResults: sortResults,
         resetCaches: resetCaches,
     };

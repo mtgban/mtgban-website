@@ -229,7 +229,6 @@ function fakeEnv() {
     };
     var env = {
         loads: [],
-        lastSync: async function () { return env.synced; },
         normName: function (s) {
             return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
                 .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
@@ -243,7 +242,7 @@ function fakeEnv() {
         },
         allNames: async function () { return names; },
         getCard: async function (uuid) { return cards[uuid] || null; },
-        hasSet: async function (code) { return !!payloads[code]; },
+        searchState: async function () { return {lastSync: this.synced, stored: Object.keys(payloads)}; },
         loadSetPayload: async function (code) {
             env.loads.push(code);
             return payloads[code];
@@ -512,7 +511,6 @@ function sealedEnv() {
     };
     return {
         loads: [],
-        lastSync: async function () {},
         normName: function (s) {
             return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
                 .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -523,7 +521,7 @@ function sealedEnv() {
         },
         allNames: async function () { return names; },
         getCard: async function (uuid) { return cards[uuid] || null; },
-        hasSet: async function (code) { return !!payloads[code]; },
+        searchState: async function () { return {lastSync: this.synced, stored: Object.keys(payloads)}; },
         loadSetPayload: async function (code) { return payloads[code]; },
     };
 }
@@ -572,53 +570,57 @@ test('sortResults modes', () => {
     expect(rs[0].uuid).toBe('a'); // reverse flips
 });
 
-test('LRU eviction on 9 sets (size=8)', async () => {
-    Q.resetCaches();
-    var cards = {};
-    var names = [];
-    var payloads = {};
-    var setCodes = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9'];
-    setCodes.forEach((code, idx) => {
-        var uuid = 'u-' + code + '-1';
-        cards[uuid] = {uuid: uuid, n: 'Card' + code, num: '1', r: 'rare', set: code, f: false, e: false, s: false};
-        payloads[code] = {setCode: code, retail: {[uuid]: {CK: {regular: 1}}}, buylist: {}};
+// One set per code, each holding one findable card plus padding store prices.
+function manySetsEnv(codes, padding) {
+    const cards = {};
+    const payloads = {};
+    // One section shared by every set, as only its size matters
+    const retail = {};
+    for (let i = 0; i < padding; i++) retail['pad' + i] = {CK: {regular: 1}};
+    codes.forEach((code) => {
+        const uuid = 'u-' + code;
+        cards[uuid] = {uuid, n: 'Card' + code, num: '1', r: 'rare', set: code, f: false, e: false, s: false};
+        retail[uuid] = {CK: {regular: 1}};
+        payloads[code] = {setCode: code, retail, buylist: {}};
     });
-    names.push({key: 'card', uuids: Object.keys(cards)});
-    var env = {
+    const names = [{key: 'card', uuids: Object.keys(cards)}];
+    const env = {
         loads: [],
-        lastSync: async function () { return env.synced; },
-        normName: function (s) {
-            return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
-                .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
-                .replace(/\s+/g, ' ').trim();
-        },
-        lookupName: async function (key) {
-            for (var i = 0; i < names.length; i++) {
-                if (names[i].key === key) return names[i].uuids.slice();
-            }
-            return [];
-        },
-        allNames: async function () { return names; },
-        getCard: async function (uuid) { return cards[uuid] || null; },
-        hasSet: async function (code) { return !!payloads[code]; },
-        loadSetPayload: async function (code) {
-            env.loads.push(code);
-            return payloads[code];
-        },
+        searchState: async () => ({lastSync: env.synced, stored: Object.keys(payloads)}),
+        normName: (t) => t.toLowerCase().trim(),
+        lookupName: async (key) => (key === 'card' ? names[0].uuids.slice() : []),
+        allNames: async () => names,
+        getCard: async (uuid) => cards[uuid] || null,
+        loadSetPayload: async (code) => { env.loads.push(code); return payloads[code]; },
     };
+    return env;
+}
+
+test('the price cache is limited by how much it holds, not how many sets', async () => {
+    Q.resetCaches();
+    const many = Array.from({length: 30}, (_, i) => 'T' + i);
+    const small = manySetsEnv(many, 0);
+    await Q.execute(Q.parse('card'), small);
+    await Q.execute(Q.parse('card'), small);
+    expect(small.loads).toHaveLength(30);
+
+    Q.resetCaches();
+    const big = manySetsEnv(['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9'], 125000);
+    await Q.execute(Q.parse('card'), big);
+    expect(big.loads).toHaveLength(9);
+    // The oldest went to make room, the newest stayed
+    await Q.execute(Q.parse('card s:S9'), big);
+    expect(big.loads).toHaveLength(9);
+    await Q.execute(Q.parse('card s:S1'), big);
+    expect(big.loads).toHaveLength(10);
+});
+
+test('the one set in the cache stays, however large', async () => {
+    Q.resetCaches();
+    const env = manySetsEnv(['HUGE'], 1100000);
     await Q.execute(Q.parse('card'), env);
-    var s1LoadCount = env.loads.filter(c => c === 'S1').length;
-    var s8LoadCount = env.loads.filter(c => c === 'S8').length;
-    var s9LoadCount = env.loads.filter(c => c === 'S9').length;
-    expect(s1LoadCount).toBe(1);
-    expect(s8LoadCount).toBe(1);
-    expect(s9LoadCount).toBe(1);
-    expect(env.loads.length).toBe(9);
-    await Q.execute(Q.parse('card s:S1'), env);
-    s1LoadCount = env.loads.filter(c => c === 'S1').length;
-    expect(s1LoadCount).toBe(2);
-    var s9LoadCountAfter = env.loads.filter(c => c === 'S9').length;
-    expect(s9LoadCountAfter).toBe(1);
+    await Q.execute(Q.parse('card'), env);
+    expect(env.loads).toEqual(['HUGE']);
 });
 
 test('2-char needle: exact match returns, substring scan skipped', async () => {
@@ -636,7 +638,6 @@ test('2-char needle: exact match returns, substring scan skipped', async () => {
         TST: {setCode: 'TST', retail: {'u-bo-1': {CK: {regular: 0.5}}, 'u-bog-1': {CK: {regular: 0.3}}}, buylist: {}},
     };
     const env = {
-        lastSync: async function () {},
         normName: function (s) {
             return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
                 .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
@@ -650,7 +651,7 @@ test('2-char needle: exact match returns, substring scan skipped', async () => {
         },
         allNames: async function () { allNamesCalls++; return names; },
         getCard: async function (uuid) { return cards[uuid] || null; },
-        hasSet: async function (code) { return !!payloads[code]; },
+        searchState: async function () { return {lastSync: this.synced, stored: Object.keys(payloads)}; },
         loadSetPayload: async function (code) { return payloads[code]; },
     };
     const out = await Q.execute(Q.parse('bo'), env);
@@ -673,7 +674,6 @@ test('rejection degradation: one set fails, others succeed', async () => {
         GOOD: {setCode: 'GOOD', retail: {'u-good-1': {CK: {regular: 1}}}, buylist: {}},
     };
     var env = {
-        lastSync: async function () {},
         normName: function (s) {
             return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
                 .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
@@ -687,7 +687,7 @@ test('rejection degradation: one set fails, others succeed', async () => {
         },
         allNames: async function () { return names; },
         getCard: async function (uuid) { return cards[uuid] || null; },
-        hasSet: async function (code) { return code === 'GOOD' || code === 'BAD'; },
+        searchState: async function () { return {stored: ['GOOD', 'BAD']}; },
         loadSetPayload: async function (code) {
             if (code === 'BAD') {
                 throw new Error('BAD set fails to load');
@@ -865,7 +865,7 @@ function numberEnv() {
     Object.assign(env, {
         getCard: async (uuid) => byId[uuid] || null,
         allCards: async () => all,
-        hasSet: async (code) => !!payloads[code],
+        searchState: async () => ({lastSync: env.synced, stored: Object.keys(payloads)}),
         loadSetPayload: async (code) => payloads[code],
         lookupName: async () => [],
         allNames: async () => [],
@@ -938,4 +938,160 @@ test('a query no name answers falls back to the sets it names', async () => {
     env.allNames = async () => [];
     // A set the query narrowed to is not reinterpreted
     expect(await found('shadows s:spm', env)).toEqual([]);
+});
+
+// A page opens the sets on it and no others, however many the answer reaches.
+
+test('a page opens only the sets its rows are in', async () => {
+    Q.resetCaches();
+    const env = manySetsEnv(['A1', 'B1', 'C1'], 0);
+    const out = await Q.execute(Q.parse('card'), env, {size: 1});
+    expect(env.loads).toEqual(['A1']);
+    expect(out.results.map(r => r.uuid)).toEqual(['u-A1', 'u-B1', 'u-C1']);
+    expect(out.page.map(r => r.uuid)).toEqual(['u-A1']);
+    expect(out.page[0].retail).toEqual({CK: {regular: 1}});
+    expect(out.results[1].retail).toBeNull();
+});
+
+test('a new sort prices the rows it brings onto the page, and only those', async () => {
+    Q.resetCaches();
+    const env = manySetsEnv(['A1', 'B1', 'C1'], 0);
+    const out = await Q.execute(Q.parse('card'), env, {size: 1});
+    const backwards = (results) => results.sort((a, b) => (a.uuid < b.uuid ? 1 : -1));
+    expect(await Q.showPage(out, env, {size: 1, order: backwards})).toBe(true);
+    expect(out.page.map(r => r.uuid)).toEqual(['u-C1']);
+    expect(env.loads).toEqual(['A1', 'C1']);
+    expect(out.results.find(r => r.uuid === 'u-B1').retail).toBeNull();
+});
+
+test('a sort that needs every price gets them before it runs', async () => {
+    Q.resetCaches();
+    const env = manySetsEnv(['A1', 'B1', 'C1'], 0);
+    let priced = null;
+    await Q.execute(Q.parse('card'), env, {
+        size: 1,
+        allPrices: () => true,
+        order: (results) => { priced = results.every(r => r.retail); },
+    });
+    expect(priced).toBe(true);
+    expect(env.loads).toEqual(['A1', 'B1', 'C1']);
+});
+
+test('results come in set order, whatever order the names found them', async () => {
+    Q.resetCaches();
+    const env = manySetsEnv(['A1', 'B1', 'C1'], 0);
+    env.lookupName = async () => ['u-C1', 'u-A1', 'u-B1'];
+    const out = await Q.execute(Q.parse('card'), env);
+    expect(out.results.map(r => r.uuid)).toEqual(['u-A1', 'u-B1', 'u-C1']);
+});
+
+test('the count leaves out a matching card whose set is not stored', async () => {
+    Q.resetCaches();
+    const env = manySetsEnv(['A1', 'B1'], 0);
+    const state = env.searchState;
+    env.searchState = async () => ({...(await state()), stored: ['B1']});
+    const out = await Q.execute(Q.parse('card'), env, {size: 10});
+    expect(out.results.map(r => r.uuid)).toEqual(['u-B1']);
+    expect(env.loads).toEqual(['B1']);
+});
+
+function failingEnv(bad) {
+    const env = manySetsEnv(['A1', 'B1', 'C1'], 0);
+    const load = env.loadSetPayload;
+    env.loadSetPayload = async (code) => {
+        if (bad.includes(code)) {
+            env.loads.push(code);
+            throw new Error('decrypt failed');
+        }
+        return load(code);
+    };
+    return env;
+}
+
+test('a set that fails to open drops out, and the page refills', async () => {
+    Q.resetCaches();
+    const env = failingEnv(['A1']);
+    const out = await Q.execute(Q.parse('card'), env, {size: 1});
+    expect(out.results.map(r => r.uuid)).toEqual(['u-B1', 'u-C1']);
+    expect(out.page.map(r => r.uuid)).toEqual(['u-B1']);
+    expect(out.page[0].retail).toEqual({CK: {regular: 1}});
+});
+
+test('a set that fails to open is not tried again until the next sync', async () => {
+    Q.resetCaches();
+    const env = failingEnv(['A1']);
+    await Q.execute(Q.parse('card'), env, {size: 1});
+    await Q.execute(Q.parse('card'), env, {size: 1});
+    expect(env.loads.filter(code => code === 'A1')).toHaveLength(1);
+    env.synced = 'later';
+    await Q.execute(Q.parse('card'), env, {size: 1});
+    expect(env.loads.filter(code => code === 'A1')).toHaveLength(2);
+});
+
+test('a set gone from the database counts as failing to open', async () => {
+    Q.resetCaches();
+    const env = manySetsEnv(['A1', 'B1'], 0);
+    const load = env.loadSetPayload;
+    env.loadSetPayload = async (code) => (code === 'A1' ? null : load(code));
+    const out = await Q.execute(Q.parse('card'), env, {size: 1});
+    expect(out.results.map(r => r.uuid)).toEqual(['u-B1']);
+});
+
+test('showPage says when a set would not open, so the search can be asked again', async () => {
+    Q.resetCaches();
+    const env = failingEnv(['B1']);
+    const out = await Q.execute(Q.parse('card'), env, {size: 1});
+    expect(out.results).toHaveLength(3);
+    const backwards = (results) => results.sort((a, b) => (a.uuid === 'u-B1' ? -1 : b.uuid === 'u-B1' ? 1 : 0));
+    expect(await Q.showPage(out, env, {size: 1, order: backwards})).toBe(false);
+    const again = await Q.execute(Q.parse('card'), env, {size: 1});
+    expect(again.results.map(r => r.uuid)).toEqual(['u-A1', 'u-C1']);
+});
+
+test('a name found only in a set that will not open still falls back to the set named', async () => {
+    Q.resetCaches();
+    const env = numberEnv();
+    env.allNames = async () => [{key: 'spm named', uuids: ['y1']}];
+    const load = env.loadSetPayload;
+    env.loadSetPayload = async (code) => {
+        if (code === 'INFO') throw new Error('decrypt failed');
+        return load(code);
+    };
+    expect(await found('spm', env)).toEqual(['s66', 's67']);
+});
+
+// The number index narrows the walk; these must read as the filters do without it.
+test('numbers read the same through the index', async () => {
+    const uuids = async (q) => {
+        Q.resetCaches();
+        const out = await Q.execute(ps(q), numberEnv());
+        return out.results.map(r => r.uuid).sort();
+    };
+    expect(await uuids('cn:66')).toEqual(['n66', 's66']);
+    expect(await uuids('cn:67')).toEqual(['s67', 'y1', 'y2']);
+    expect(await uuids('cn:INFO-EN067')).toEqual(['y1']);
+    expect(await uuids('cns:67')).toEqual(['s67']);
+    expect(await uuids('cn:66,67')).toEqual(['n66', 's66', 's67', 'y1', 'y2']);
+    expect(await uuids('cn:66 -s:neo')).toEqual(['s66']);
+    expect(await uuids('cn:999')).toEqual([]);
+});
+
+// Overlapping searches can both find a set missing and both load it.
+test('a set two searches loaded at once counts once against the limit', async () => {
+    Q.resetCaches();
+    const env = manySetsEnv(['BIG', 'SMALL'], 0);
+    const load = env.loadSetPayload;
+    const retail = {'u-BIG': {CK: {regular: 1}}};
+    for (let i = 0; i < 600000; i++) retail['pad' + i] = {CK: {regular: 1}};
+    env.loadSetPayload = async (code) => {
+        if (code !== 'BIG') return load(code);
+        env.loads.push(code);
+        return {setCode: code, retail, buylist: {}};
+    };
+    await Promise.all([Q.execute(Q.parse('card s:BIG'), env), Q.execute(Q.parse('card s:BIG'), env)]);
+    expect(env.loads).toEqual(['BIG', 'BIG']);
+    // Counted twice, BIG would be over the limit and go to make room for this
+    await Q.execute(Q.parse('card s:SMALL'), env);
+    await Q.execute(Q.parse('card s:BIG'), env);
+    expect(env.loads.filter(code => code === 'BIG')).toHaveLength(2);
 });

@@ -73,6 +73,9 @@
         order: function (results, ctx) {
             OfflineQuery.sortResults(results, sortMode, reverse, ctx.sets);
         },
+        needsAllPrices: function () {
+            return sortMode === 'retail' || sortMode === 'buylist';
+        },
         render: function (el, shown, exec, ctx) {
             OfflineRender.render(el, shown, ctx);
             paintCount(exec.results.length, shown.results.length);

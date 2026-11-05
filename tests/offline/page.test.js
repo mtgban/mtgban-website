@@ -32,12 +32,13 @@ function makeEl(attrs = {}) {
 
 // Runs the page's real scripts against stand-ins for the document, the database
 // and the query. Each query answers with the rows queries[q] names.
-function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queries = {}, broken = false, gates = {} } = {}) {
+function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queries = {}, broken = false, gates = {}, states = [] } = {}) {
     const els = Object.fromEntries(ids.map((id) => [id, makeEl()]));
     const docListeners = {};
     const winListeners = {};
     const location = { search, pathname: '/offline' };
-    const log = { pushed: [], parsed: [], executed: [], rendered: [], sorted: [], mounted: null, errors: [], art: [] };
+    const hold = { draw: null, fail: false, views: [] };
+    const log = { namesRead: [], pushed: [], parsed: [], executed: [], rendered: [], sorted: [], mounted: null, errors: [], art: [] };
 
     const document = {
         getElementById: (id) => els[id] || null,
@@ -53,9 +54,14 @@ function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queri
     };
     const OfflineDB = {
         open: () => (broken ? Promise.reject(new Error('no db')) : Promise.resolve()),
+        searchState: async () => states.shift() || { catalogVersion: 'c1', stored: [] },
+        catalog: async (version) => {
+            const card = { uuid: 'a', n: 'from ' + version };
+            return { list: [card], byId: new Map([['a', card]]) };
+        },
         getMeta: async () => undefined,
         lookupName: async () => [],
-        allNames: async () => [],
+        allNames: async (version) => { log.namesRead.push(version); return []; },
         getCard: async () => null,
         hasSet: async () => true,
         getAllRows: async () => [],
@@ -64,10 +70,20 @@ function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queri
     const OfflineUtil = { normName: (s) => s, loadCatalogDicts: async () => dicts, loadSetPayload: async () => null };
     const OfflineQuery = {
         parse: (q) => { log.parsed.push(q); return { q }; },
-        execute: async (parsed) => {
+        execute: async (parsed, env, view) => {
             log.executed.push(parsed);
+            log.env = env;
             await gates[parsed.q];
-            return { results: (queries[parsed.q] || []).slice(), unsupported: [], truncated: false };
+            const out = { results: (queries[parsed.q] || []).slice(), unsupported: [], truncated: false };
+            await OfflineQuery.showPage(out, env, view);
+            return out;
+        },
+        showPage: async (out, _env, view) => {
+            hold.views.push(view.allPrices ? view.allPrices() : false);
+            if (view.order) view.order(out.results);
+            out.page = out.results.slice(0, view.size);
+            if (hold.draw) await hold.draw;
+            return !hold.fail;
         },
         sortResults: (results, mode, reverse) => log.sorted.push({ mode, reverse, n: results.length }),
     };
@@ -84,6 +100,7 @@ function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queri
     return {
         els,
         log,
+        hold,
         location,
         // Lets the page's setup and first query finish: nothing here is timed.
         settle: () => new Promise((resolve) => setImmediate(resolve)),
@@ -241,6 +258,37 @@ test('desktop counts results, naming how many are shown', async () => {
     expect(await count('')).toBe('');
 });
 
+test('a slower, older read does not take a search back to the old catalog', async () => {
+    const states = [];
+    const page = await started('offline-page-desktop.js', {
+        ids: DESKTOP, search: '?q=x', states, queries: { x: [{ uuid: 'a' }] },
+    });
+    const env = page.log.env;
+    let finishOlder;
+    states.push(new Promise((resolve) => { finishOlder = resolve; }), { catalogVersion: 'new', stored: [] });
+    const older = env.searchState();
+    await env.searchState();
+    expect(env.getCard('a').n).toBe('from new');
+
+    finishOlder({ catalogVersion: 'old', stored: [] });
+    await older;
+    expect(env.getCard('a').n).toBe('from new');
+    expect(env.allCards()[0].n).toBe('from new');
+    await env.allNames();
+    expect(page.log.namesRead.at(-1)).toBe('new');
+});
+
+test('a newer read moves a search to the new catalog', async () => {
+    const states = [];
+    const page = await started('offline-page-desktop.js', {
+        ids: DESKTOP, search: '?q=x', states, queries: { x: [{ uuid: 'a' }] },
+    });
+    const env = page.log.env;
+    states.push({ catalogVersion: 'next', stored: [] });
+    await env.searchState();
+    expect(env.getCard('a').n).toBe('from next');
+});
+
 test('desktop sort pills keep the answer on screen while a newer search runs', async () => {
     const slow = new Promise(() => {});
     const pill = makeEl({ 'data-sort': 'alpha' });
@@ -254,8 +302,51 @@ test('desktop sort pills keep the answer on screen while a newer search runs', a
     page.log.mounted.onSubmit('slow');
     await page.settle();
     pill.fire('click');
+    await page.settle();
     expect(page.els['offline-results'].innerHTML).toBe('drawn 1');
     expect(page.log.sorted.at(-1)).toMatchObject({ mode: 'alpha', n: 1 });
+});
+
+test('desktop asks for every price only under a price sort', async () => {
+    const pill = makeEl({ 'data-sort': 'retail' });
+    const page = await started('offline-page-desktop.js', {
+        ids: DESKTOP, pills: [pill], search: '?q=x', queries: { x: [{ uuid: 'a' }] },
+    });
+    expect(page.hold.views.at(-1)).toBe(false);
+    pill.fire('click');
+    await page.settle();
+    expect(page.hold.views.at(-1)).toBe(true);
+});
+
+test('a price sort still pricing does not draw over a newer search', async () => {
+    const pill = makeEl({ 'data-sort': 'retail' });
+    const queries = { x: [{ uuid: 'a' }], y: [{ uuid: 'b' }, { uuid: 'c' }] };
+    const page = await started('offline-page-desktop.js', { ids: DESKTOP, pills: [pill], search: '?q=x', queries });
+    let finish;
+    page.hold.draw = new Promise((resolve) => { finish = resolve; });
+    pill.fire('click');
+    await page.settle();
+    page.hold.draw = null;
+    page.log.mounted.onSubmit('y');
+    await page.settle();
+    expect(page.els['offline-results'].innerHTML).toBe('drawn 2');
+    const drawn = page.log.rendered.length;
+    finish();
+    await page.settle();
+    expect(page.log.rendered).toHaveLength(drawn);
+    expect(page.els['offline-results'].innerHTML).toBe('drawn 2');
+});
+
+test('a sort that hits a set which will not open asks the query again', async () => {
+    const pill = makeEl({ 'data-sort': 'alpha' });
+    const page = await started('offline-page-desktop.js', {
+        ids: DESKTOP, pills: [pill], search: '?q=x', queries: { x: [{ uuid: 'a' }] },
+    });
+    expect(page.log.executed).toHaveLength(1);
+    page.hold.fail = true;
+    pill.fire('click');
+    await page.settle();
+    expect(page.log.executed).toHaveLength(2);
 });
 
 test('desktop sort pills sort the last answer, reversing on a second click', async () => {
@@ -266,6 +357,7 @@ test('desktop sort pills sort the last answer, reversing on a second click', asy
     await page.settle();
     // No answer yet, so nothing to draw
     pills[1].fire('click');
+    await page.settle();
     expect(page.log.sorted).toEqual([]);
     expect(pills[1].classList.names.has('active')).toBe(false);
 
@@ -273,9 +365,11 @@ test('desktop sort pills sort the last answer, reversing on a second click', asy
     await page.settle();
     expect(page.log.sorted.at(-1)).toMatchObject({ mode: 'alpha', reverse: false });
     pills[1].fire('click');
+    await page.settle();
     expect(page.log.sorted.at(-1)).toMatchObject({ mode: 'alpha', reverse: true });
     expect(pills[1].classList.names.has('reversed')).toBe(true);
     pills[0].fire('click');
+    await page.settle();
     expect(page.log.sorted.at(-1)).toMatchObject({ mode: 'chrono', reverse: false });
     expect(pills[0].classList.names.has('active')).toBe(true);
     expect(pills[1].classList.names.has('active')).toBe(false);
