@@ -472,7 +472,7 @@ func (st arbitState) apply(b *matcher.Backend, p *prices, m arbitMode) (*mtgban.
 	}
 	switch {
 	case m.Global && !m.Sealed:
-		opts.MaxSpread = MaxSpreadGlobal
+		opts.MaxSpread = MaxSpreadGlobal + shownStep
 		opts.MaxPriceRatio = MaxPriceRatio
 		opts.Editions = FilteredEditions
 	}
