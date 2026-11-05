@@ -49,6 +49,7 @@ var SleeperColors = []string{
 //
 // Listed rather than derived by dropping the flagged languages, so a
 // language nobody has seen yet stays out until someone looks at it.
+// TestSleepersLanguagesFollowDatastore logs when that happens.
 var sleepersLanguages = []string{
 	"English",
 	"Ancient Greek",
