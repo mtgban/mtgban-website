@@ -46,6 +46,8 @@
     }
 
     var page = root.OfflinePage.start({
+        surface: 'mobile',
+        closeKeyboard: true,
         boxId: 'navsearchbox',
         formId: 'navsearchform',
         resultsId: 'm-offline-results',

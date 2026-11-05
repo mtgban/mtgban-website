@@ -8,6 +8,8 @@
     var sortMode = getCookie('SearchDefaultSort') || 'chrono';
     var reverse = false;
     if (sortMode === 'hybrid') sortMode = 'alpha';
+    // The result the arrow keys are on, and the first one starts out showing.
+    var cursor = 0;
 
     function paintCount(n, shown) {
         document.getElementById('offline-count').textContent =
@@ -47,18 +49,59 @@
         }
     }
 
+    function needsAllPrices() {
+        return sortMode === 'retail' || sortMode === 'buylist';
+    }
+
+    function showRowImage(row) {
+        showImage(row.getAttribute('data-image-url'), row.getAttribute('data-foil') === 'true',
+            row.getAttribute('data-etched') === 'true', row.getAttribute('data-set-code'));
+    }
+
+    // Lands a result's header where it sticks. A stuck header can't say where it
+    // belongs, but the body above it can.
+    function scrollToHeader(headers, i) {
+        if (i === 0) {
+            window.scrollTo(0, 0);
+            return;
+        }
+        var above = headers[i - 1].nextElementSibling.getBoundingClientRect().bottom;
+        window.scrollBy(0, above - parseFloat(getComputedStyle(headers[i]).top));
+    }
+
+    function moveCursor(step) {
+        var headers = document.getElementById('offline-results').querySelectorAll('.result-header');
+        var next = cursor + step;
+        if (next < 0 || next >= headers.length) return;
+        headers[cursor].classList.remove('offline-cursor');
+        cursor = next;
+        headers[cursor].classList.add('offline-cursor');
+        scrollToHeader(headers, cursor);
+        showRowImage(headers[cursor]);
+    }
+
+    // The navbar's Search and Sealed links keep the current query.
+    function paintNavLinks(q) {
+        document.querySelectorAll('.offline-mode-btn').forEach(function (a) {
+            var url = new URL(a.href);
+            if (q) url.searchParams.set('q', q);
+            else url.searchParams.delete('q');
+            a.setAttribute('href', url.pathname + url.search);
+        });
+    }
+
     var page = root.OfflinePage.start({
+        surface: 'desktop',
         boxId: 'nav-searchbox',
         formId: 'nav-searchform',
         resultsId: 'offline-results',
+        queryChanged: paintNavLinks,
+        move: moveCursor,
         ready: function () {
             // Sidebar image follows the hovered result, like search.html.
             document.getElementById('offline-results').addEventListener('mouseover', function (e) {
                 var row = e.target.closest('[data-image-url]');
-                if (row) {
-                    showImage(row.getAttribute('data-image-url'), row.getAttribute('data-foil') === 'true',
-                        row.getAttribute('data-etched') === 'true', row.getAttribute('data-set-code'));
-                }
+                if (row) showRowImage(row);
             });
 
             document.querySelectorAll('.search-sort-pill').forEach(function (b) {
@@ -70,21 +113,19 @@
                 });
             });
         },
-        order: function (results, ctx) {
-            OfflineQuery.sortResults(results, sortMode, reverse, ctx.sets);
+        // A price sort needs every row priced, so it waits for the pause.
+        order: function (results, ctx, typing) {
+            if (typing && needsAllPrices()) OfflineQuery.sortResults(results, 'chrono', false, ctx.sets);
+            else OfflineQuery.sortResults(results, sortMode, reverse, ctx.sets);
         },
-        needsAllPrices: function () {
-            return sortMode === 'retail' || sortMode === 'buylist';
-        },
+        needsAllPrices: needsAllPrices,
         render: function (el, shown, exec, ctx) {
             OfflineRender.render(el, shown, ctx);
-            paintCount(exec.results.length, shown.results.length);
+            paintCount(exec.results.length, shown.pageRows);
             paintPills();
+            cursor = 0;
             var first = el.querySelector('.result-header');
-            if (first) {
-                showImage(first.getAttribute('data-image-url'), first.getAttribute('data-foil') === 'true',
-                    first.getAttribute('data-etched') === 'true', first.getAttribute('data-set-code'));
-            }
+            if (first && !shown.typing) showRowImage(first);
         },
         cleared: function () {
             document.getElementById('offline-count').textContent = '';

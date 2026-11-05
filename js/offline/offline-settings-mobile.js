@@ -26,8 +26,17 @@
         toggle.classList.toggle('on', OfflineMode.enabled());
     }
 
+    function paintLive() {
+        var row = document.getElementById('m-offline-live-row');
+        var toggle = document.getElementById('m-offline-live-toggle');
+        if (!row || !toggle || !window.OfflineMode) return;
+        row.hidden = !OfflineMode.enabled();
+        toggle.classList.toggle('on', OfflineLive.on('mobile'));
+    }
+
     function repaint() {
         paintToggle();
+        paintLive();
         paintAuthNotice();
         paintUsage();
     }
@@ -49,6 +58,12 @@
             el.classList.remove('m-toggle-busy');
             paintStatus('Error: ' + (err && err.message || 'unknown'));
         });
+    }
+
+    // Called by the onclick in the HTML template.
+    function handleLive() {
+        OfflineLive.set(!OfflineLive.on('mobile'));
+        paintLive();
     }
 
     function init() {
@@ -82,7 +97,7 @@
         });
     }
 
-    self.OfflineSettingsMobile = { init: init, handleToggle: handleToggle };
+    self.OfflineSettingsMobile = { init: init, handleToggle: handleToggle, handleLive: handleLive };
 
     // Deferred ahead of offline-mode.js, which only exists by DOM ready.
     document.addEventListener('DOMContentLoaded', init);

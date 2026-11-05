@@ -4,11 +4,12 @@ import { join } from 'path';
 
 const src = readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', 'offline-settings-mobile.js'), 'utf8');
 
-afterEach(() => { delete globalThis.OfflineMode; });
+afterEach(() => { delete globalThis.OfflineMode; delete globalThis.OfflineLive; });
 
 // Runs the script as the page does: deferred, so the document is interactive
 // and offline-mode.js, tagged later, has not run yet.
 function loadPage() {
+    globalThis.OfflineLive = liveSetting(false);
     const listeners = {};
     const el = (extra = {}) => ({
         style: {},
@@ -23,6 +24,8 @@ function loadPage() {
         'm-offline-toggle': el(),
         'm-offline-auth-notice': el(),
         'm-offline-status': el(),
+        'm-offline-live-row': el({ hidden: true }),
+        'm-offline-live-toggle': el({ on: false, classList: { toggle(_name, on) { elements['m-offline-live-toggle'].on = on; } } }),
     };
     const doc = {
         readyState: 'interactive',
@@ -130,4 +133,30 @@ test('turning offline mode off clears the status it set', async () => {
     await finished;
     await Promise.resolve();
     expect(page.elements['m-offline-status'].textContent).toBe('');
+});
+
+function liveSetting(initial) {
+    let value = initial;
+    return { on: () => value, set: (next) => { value = next; } };
+}
+
+test('the live search row shows with offline mode on, and flips the setting', () => {
+    const page = loadPage();
+    globalThis.OfflineMode = offlineMode();
+    globalThis.OfflineLive = liveSetting(false);
+    page.fire('DOMContentLoaded');
+    expect(page.elements['m-offline-live-row'].hidden).toBe(false);
+    expect(page.elements['m-offline-live-toggle'].on).toBe(false);
+
+    page.binder.OfflineSettingsMobile.handleLive();
+    expect(globalThis.OfflineLive.on()).toBe(true);
+    expect(page.elements['m-offline-live-toggle'].on).toBe(true);
+});
+
+test('the live search row stays hidden with offline mode off', () => {
+    const page = loadPage();
+    globalThis.OfflineMode = offlineMode({ enabled: false });
+    globalThis.OfflineLive = liveSetting(false);
+    page.fire('DOMContentLoaded');
+    expect(page.elements['m-offline-live-row'].hidden).toBe(true);
 });

@@ -317,3 +317,68 @@ test('an answer that arrives after Enter does not reopen the list', async () => 
     await type('sol ');
     expect(open()).toBeDefined();
 });
+
+function mountLive(isLive) {
+    const parent = fakeElement('div');
+    const input = fakeElement('input');
+    input.parentNode = parent;
+    const log = { typed: [], arrows: [], submitted: [] };
+    OfflineSearch.mount({
+        input,
+        deps: deps(),
+        live: () => isLive(),
+        onType: (value) => log.typed.push(value),
+        onArrow: (step) => log.arrows.push(step),
+        onSubmit: (q) => log.submitted.push(q),
+    });
+    return { input, parent, log };
+}
+
+test('live, typing runs the page instead of suggesting', async () => {
+    const m = mountLive(() => true);
+    m.input.value = 'bos';
+    m.input.fire('input');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(m.log.typed).toEqual(['bos']);
+    expect(m.parent.children).toEqual([]);
+});
+
+test('live, the arrows go to the page', () => {
+    const m = mountLive(() => true);
+    let prevented = 0;
+    const key = (k) => ({ key: k, preventDefault: () => { prevented++; } });
+    m.input.fire('keydown', key('ArrowDown'));
+    m.input.fire('keydown', key('ArrowUp'));
+    expect(m.log.arrows).toEqual([1, -1]);
+    expect(prevented).toBe(2);
+});
+
+test('live, Enter submits once with the box trimmed', () => {
+    const m = mountLive(() => true);
+    m.input.value = ' bolt ';
+    m.input.fire('keydown', { key: 'Enter', preventDefault: () => {} });
+    expect(m.log.submitted).toEqual(['bolt']);
+});
+
+test('switching the setting takes effect on the next keystroke, both ways', async () => {
+    let on = false;
+    const m = mountLive(() => on);
+    m.input.value = 'bos';
+    m.input.fire('input');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(m.log.typed).toEqual([]);
+    expect(m.parent.children.length).toBe(1);
+
+    on = true;
+    m.input.value = 'bose';
+    m.input.fire('input');
+    expect(m.log.typed).toEqual(['bose']);
+    expect(m.parent.children).toEqual([]);
+
+    on = false;
+    m.input.value = 'bos';
+    m.input.fire('input');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(m.log.typed).toEqual(['bose']);
+    expect(m.parent.children.length).toBe(1);
+});

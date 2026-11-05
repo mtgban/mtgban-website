@@ -964,6 +964,12 @@
                     <span>Enable offline mode</span>
                     <div class="m-settings-toggle" id="m-offline-toggle" onclick="window.OfflineSettingsMobile && OfflineSettingsMobile.handleToggle(this)"><span class="m-toggle-knob"></span></div>
                 </div>
+                <div id="m-offline-live-row" hidden>
+                    <div class="m-settings-row">
+                        <span>Show results as you type</span>
+                        <div class="m-settings-toggle" id="m-offline-live-toggle" onclick="window.OfflineSettingsMobile && OfflineSettingsMobile.handleLive(this)"><span class="m-toggle-knob"></span></div>
+                    </div>
+                </div>
                 <div id="m-offline-status" class="m-offline-status" aria-live="polite"></div>
                 <p class="m-offline-usage" id="m-offline-usage"></p>
             </div>

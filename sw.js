@@ -46,6 +46,7 @@ var SHELL_URLS = [
     '/js/offline/offline-db.js?hash=' + BUILD,
     '/js/offline/offline-mode.js?hash=' + BUILD,
     '/js/offline/offline-prefer.js?hash=' + BUILD,
+    '/js/offline/offline-live.js?hash=' + BUILD,
     '/js/offline/offline-format.js?hash=' + BUILD,
     '/js/offline/offline-util.js?hash=' + BUILD,
     '/js/offline/offline-query.js?hash=' + BUILD,
