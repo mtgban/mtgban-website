@@ -374,9 +374,14 @@
         if (!sections.length) return;
         pending = {};
         // Joined to inflight, so the next flush waits for them and a failed
-        // one is queued again, keeping dirty set until it lands.
+        // one, a write that threw too, is queued again, keeping dirty set
+        // until it lands. Each is sent now, before the page goes.
         var writes = sections.map(function(section) {
-            return patchSection(section, true).then(function(ok) {
+            return new Promise(function(resolve) {
+                resolve(patchSection(section, true));
+            }).catch(function() {
+                return false;
+            }).then(function(ok) {
                 if (!ok) pending[section] = true;
             });
         });

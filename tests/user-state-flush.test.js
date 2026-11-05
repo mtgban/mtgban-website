@@ -416,3 +416,40 @@ test('a keepalive write that fails is sent again by the next flush', async () =>
     expect(sent.filter((u) => u.endsWith('/favorites')).length).toBe(2);
     expect(m.mtgban_userstate_dirty).toBe('0');
 });
+
+test('a keepalive write that throws leaves the other sections sent and itself queued', async () => {
+    const m = {};
+    class Storage {
+        getItem(k) { return k in m ? m[k] : null; }
+        setItem(k, v) { m[k] = String(v); }
+        removeItem(k) { delete m[k]; }
+    }
+    const storage = new Storage();
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const listeners = {};
+    const window = { addEventListener(type, fn) { listeners[type] = fn; }, Storage, localStorage: storage };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
+    const sent = [];
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PATCH') {
+            sent.push(url);
+            return Promise.resolve({ status: 200, ok: true, headers: { get: () => null }, json: () => Promise.resolve({ version: 1 }) });
+        }
+        return Promise.resolve({ status: 401, ok: false, headers: { get: () => null }, json: () => Promise.resolve(null) });
+    };
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
+        window, document, storage, session, fetch, realListStorage(), () => 1, () => {});
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    // The backpack is queued first, and its null entry throws in trimBackpack.
+    storage.setItem('mtgban_backpack', '[null]');
+    storage.setItem('mtgban_favorites', JSON.stringify([{ id: 'x', name: 'X', query: 'q' }]));
+    listeners.pagehide();
+    for (let i = 0; i < 10; i++) await turn();
+    expect(sent).toEqual(['/api/userstate/favorites']);
+    expect(m.mtgban_userstate_dirty).toBe('1');
+    // Once it reads, the next flush sends the backpack, and only it.
+    storage.setItem('mtgban_backpack', JSON.stringify([{ id: 'a', qty: 1, t: 1, m: 1 }]));
+    await window.UserStateSync.flush();
+    expect(sent).toEqual(['/api/userstate/favorites', '/api/userstate/backpack']);
+    expect(m.mtgban_userstate_dirty).toBe('0');
+});
