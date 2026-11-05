@@ -1095,3 +1095,182 @@ test('a set two searches loaded at once counts once against the limit', async ()
     await Q.execute(Q.parse('card s:BIG'), env);
     expect(env.loads.filter(code => code === 'BIG')).toHaveLength(2);
 });
+
+// ---- a query still being typed ----
+
+const DRAFT_SETS = {NEO: {n: 'Kamigawa: Neon Dynasty'}, SPM: {n: "Marvel's Spider-Man"}, INFO: {n: 'The Infinite Forbidden'}, OLD: {n: 'Old Set'}};
+const DRAFT_FINISHES = [{value: 'foil'}, {value: 'nonfoil'}, {value: 'etched'}];
+function draft(q) { return Q.parse(q, DRAFT_FINISHES, magic, DRAFT_SETS, {draft: true}); }
+
+test.each([
+    ['s:', {set: []}],
+    ['s:n', {set: []}],
+    ['s:ne', {set: []}],
+    ['-s:ne', {not: {set: [], finish: [], rarity: []}}],
+    ['s:neo,', {set: []}],
+    ['s:neo,sp', {set: []}],
+    ['f:', {finish: []}],
+    ['f:fo', {finish: []}],
+    ['r:', {rarity: []}],
+    ['r:my', {rarity: []}],
+    ['r:mythic,', {rarity: []}],
+    ['cn:', {number: []}],
+    ['cn:1,', {number: []}],
+    ['cn:neo:', {number: []}],
+    ['cn>', {number: []}],
+])('%s is left out until it is finished', (typed, want) => {
+    expect(draft('sol ' + typed)).toMatchObject({names: ['sol'], unsupported: [], ...want});
+});
+
+test.each([
+    ['s:neo', {set: ['NEO']}],
+    ['s:neo,spm', {set: ['NEO', 'SPM']}],
+    ['-s:neo', {not: {set: ['NEO'], finish: [], rarity: []}}],
+    ['f:foil', {finish: [['foil']]}],
+    ['f:f', {finish: [['foil']]}],
+    ['r:m', {rarity: ['mythic']}],
+    ['r:mythic', {rarity: ['mythic']}],
+    ['cn:12', {number: [{values: ['12']}]}],
+    ['cn>1', {number: [{compare: '>'}]}],
+])('%s reads as soon as it is complete', (typed, want) => {
+    expect(draft('sol ' + typed)).toMatchObject(want);
+});
+
+test('a filter is only held back as the last thing typed', () => {
+    expect(draft('s:ne sol').set).toEqual(['NE']);
+    expect(draft('f:fo sol').finish).toEqual([]);
+});
+
+test('nothing is said about what offline cannot answer until typing stops', () => {
+    expect(draft('sol date>2020').unsupported).toEqual([]);
+    expect(draft('date>2020 sol').unsupported).toEqual([]);
+    expect(draft('sol ring`').unsupported).toEqual([]);
+    expect(Q.parse('date>2020 sol', [], magic, DRAFT_SETS).unsupported).toEqual(['date>2020']);
+});
+
+test('an ordinary parse is not affected', () => {
+    const typed = Q.parse('sol s:ne', DRAFT_FINISHES, magic, DRAFT_SETS);
+    expect(typed.set).toEqual(['NE']);
+    expect(typed.heldWord).toBeUndefined();
+    expect(typed.heldNumber).toBeUndefined();
+});
+
+test.each([
+    ['sol', true],
+    ['sol ring', true],
+    ['so', false],
+    ['s', false],
+    ['', false],
+    ['s:', false],
+    ['s:ne', false],
+    ['f:foil', false],
+    ['r:m', false],
+    ['s:neo', true],
+    ['spm 6', true],
+    ['66', true],
+    ['6', true],
+    ['cn:1', true],
+    ['so s:neo', false],
+    ['so f:foil', false],
+    ['sol f:foil', true],
+])('answerable: %s is %p', (typed, want) => {
+    expect(Q.answerable(draft(typed), {normName: (t) => t.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim()})).toBe(want);
+});
+
+function typingEnv() {
+    const all = [
+        {uuid: 'sr1', n: 'Sol Ring', num: '161', set: 'NEO', r: 'rare', f: false},
+        {uuid: 'sr2', n: 'Sol Ring', num: '66', set: 'SPM', r: 'mythic', f: true},
+        {uuid: 'ss', n: 'The Soul Stone', num: '66', set: 'SPM', r: 'mythic', f: false},
+        {uuid: 'bolt', n: 'Lightning Bolt', num: '123', set: 'NEO', r: 'common', f: false},
+        {uuid: 'cn', n: 'Sol Cn Master', num: '9', set: 'NEO', r: 'rare', f: false},
+        {uuid: 'yu', n: 'Yugi', num: 'INFO-EN067', pn: '67', set: 'INFO', r: 'rare', f: false},
+        // So that typing 66 passes through a number some card carries, as on any real catalog
+        {uuid: 'six', n: 'Six', num: '6', set: 'NEO', r: 'common', f: false},
+    ];
+    const byId = Object.fromEntries(all.map(c => [c.uuid, c]));
+    const keys = {};
+    all.forEach((c) => {
+        const key = c.n.toLowerCase();
+        (keys[key] = keys[key] || []).push(c.uuid);
+    });
+    const names = Object.entries(keys).map(([key, uuids]) => ({key, uuids}));
+    const section = (code) => Object.fromEntries(all.filter(c => c.set === code).map(c => [c.uuid, {CK: {regular: 1}}]));
+    const payloads = {NEO: {retail: section('NEO'), buylist: {}}, SPM: {retail: section('SPM'), buylist: {}}, INFO: {retail: section('INFO'), buylist: {}}};
+    return {
+        normName: (t) => t.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(),
+        searchState: async () => ({stored: Object.keys(payloads)}),
+        lookupName: async (key) => keys[key] || [],
+        allNames: async () => names,
+        getCard: (uuid) => byId[uuid],
+        allCards: () => all,
+        loadSetPayload: async (code) => payloads[code],
+    };
+}
+
+const drafted = async (typed, env) => {
+    Q.resetCaches();
+    const out = await Q.execute(draft(typed), env);
+    return out.results.map(r => r.uuid).sort();
+};
+
+test('a last word is dropped only if it finds nothing', async () => {
+    const env = typingEnv();
+    expect(draft('sol cn').heldWord).toBe(true);
+    expect(await drafted('sol cn', env)).toEqual(['cn']);
+    expect(await drafted('bolt cn', env)).toEqual(['bolt']);
+    expect(await drafted('lightning r', env)).toEqual(['bolt']);
+    expect(await drafted('lightning zzz', env)).toEqual(['bolt']);
+    expect(draft('sol').heldWord).toBeUndefined();
+    expect(draft('"sol" "cn"').heldWord).toBeUndefined();
+    expect(draft('sol cn f:foil').heldWord).toBeUndefined();
+});
+
+test('a set code and a dash reads as the set, on its way to a printed number', () => {
+    expect(draft('info-')).toMatchObject({names: [], set: ['INFO']});
+    expect(draft('info-e')).toMatchObject({names: [], set: ['INFO']});
+    expect(draft('fire-i')).toMatchObject({names: ['fire-i'], set: []});
+    expect(Q.parse('info-e', [], magic, DRAFT_SETS)).toMatchObject({names: ['info-e'], set: []});
+});
+
+test('a word on its way to a set falls back to the words before it', () => {
+    expect(draft('spm #').setsNamed).toEqual(['SPM']);
+    expect(Q.parse('spm #', [], magic, DRAFT_SETS).setsNamed).toEqual([]);
+});
+
+test('a last number that finds nothing is dropped while it may be unfinished', async () => {
+    const env = typingEnv();
+    expect(await drafted('sol ring 1', env)).toEqual(['sr1', 'sr2']);
+    expect(await drafted('sol ring 16', env)).toEqual(['sr1', 'sr2']);
+    expect(await drafted('sol ring 161', env)).toEqual(['sr1']);
+    expect(await drafted('spm 6', env)).toEqual(['sr2', 'ss']);
+    expect(await drafted('spm 66', env)).toEqual(['sr2', 'ss']);
+    expect(await drafted('s:spm cn:6', env)).toEqual(['sr2', 'ss']);
+    expect(await drafted('info-en0', env)).toEqual(['yu']);
+    // The finished query keeps its exact answer
+    Q.resetCaches();
+    expect((await Q.execute(Q.parse('spm 6', [], magic, DRAFT_SETS), env)).results).toEqual([]);
+});
+
+// Typing to any of these never says anything, and whenever the query is worth
+// asking, never shows an empty page the finished query would not.
+test.each([
+    'sol ring', 'the soul stone', 'lightning bolt', 'sol ring 161', 's:neo sol', 'sol s:neo', 'sol f:foil',
+    'sol r:mythic', 'sol cn:161', 'sol cns:161', 'spm 66', 'spm #066', 'info-en067', 's:spm cn:66', '66',
+    'sol ring*', 'bolt -s:spm', '-s:spm bolt', 'sol|neo', 'lightning bolt|neo|123', 'sol date>2020',
+])('every prefix of %s', async (finished) => {
+    const env = typingEnv();
+    Q.resetCaches();
+    const end = await Q.execute(Q.parse(finished, DRAFT_FINISHES, magic, DRAFT_SETS), env);
+    expect(end.results.length).toBeGreaterThan(0);
+    for (let i = 1; i <= finished.length; i++) {
+        const typed = finished.slice(0, i);
+        const parsed = draft(typed);
+        expect(parsed.unsupported).toEqual([]);
+        if (!Q.answerable(parsed, env)) continue;
+        Q.resetCaches();
+        const out = await Q.execute(parsed, env);
+        if (!out.results.length) throw new Error(typed + ' found nothing on its way to ' + finished);
+    }
+});
+
