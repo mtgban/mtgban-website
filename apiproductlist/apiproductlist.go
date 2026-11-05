@@ -73,6 +73,8 @@ type Package struct {
 	Icon     string   `json:"icon"`
 	Subtitle string   `json:"subtitle"`
 	Bullets  []string `json:"bullets"`
+	// Caveats are what the package lacks, drawn as crosses; may be empty.
+	Caveats []string `json:"caveats,omitempty"`
 }
 
 // IsHistory reports whether the package is the price-history one.
@@ -85,8 +87,10 @@ type Addon struct {
 	Key  string `json:"key"`
 	Name string `json:"name"`
 	// Monthly is the price per unit per month in the smallest unit of the currency (cents for usd).
-	Monthly   int64    `json:"monthly"`
-	AppliesTo []string `json:"applies_to"`
+	Monthly int64 `json:"monthly"`
+	// FirstMonthly is the first unit's price per month; 0 means every unit costs Monthly.
+	FirstMonthly int64    `json:"first_monthly,omitempty"`
+	AppliesTo    []string `json:"applies_to"`
 	// GrantsMode is the mode a bought-once add-on grants; empty on a counted one.
 	GrantsMode string `json:"grants_mode,omitempty"`
 }
@@ -185,6 +189,11 @@ func (c *ProductList) Validate() error {
 				return fmt.Errorf("package %s: bullet %d is empty", p.Key, i+1)
 			}
 		}
+		for i, c := range p.Caveats {
+			if strings.TrimSpace(c) == "" {
+				return fmt.Errorf("package %s: caveat %d is empty", p.Key, i+1)
+			}
+		}
 		if p.Monthly <= 0 {
 			return fmt.Errorf("package %s: monthly must be positive", p.Key)
 		}
@@ -235,6 +244,19 @@ func (c *ProductList) Validate() error {
 		}
 		if a.GrantsMode != "" && !isMode(a.GrantsMode) {
 			return fmt.Errorf("addon %s: grants_mode %q must be one of %v", a.Key, a.GrantsMode, Modes)
+		}
+		if a.FirstMonthly < 0 {
+			return fmt.Errorf("addon %s: first_monthly must not be negative", a.Key)
+		}
+		if a.FirstMonthly > 0 && a.GrantsMode != "" {
+			return fmt.Errorf("addon %s: first_monthly applies to a counted add-on only", a.Key)
+		}
+		if a.GrantsMode != "" {
+			for _, key := range a.AppliesTo {
+				if p, ok := c.Package(key); ok && slices.Contains(p.Modes, a.GrantsMode) {
+					return fmt.Errorf("addon %s: applies to %s, which already grants %s", a.Key, key, a.GrantsMode)
+				}
+			}
 		}
 	}
 	if len(c.Intervals) == 0 {
@@ -391,6 +413,30 @@ func (iv Interval) Amount(monthly int64) (int64, error) {
 		return monthly * iv.Count, nil
 	}
 	return 0, fmt.Errorf("apiproductlist: interval %s: unsupported unit %q", iv.Key, iv.Interval)
+}
+
+// Stepped reports whether the first unit costs differently from the rest.
+func (a Addon) Stepped() bool {
+	return a.FirstMonthly > 0
+}
+
+// Amount is what qty units of the add-on cost over one interval.
+func (a Addon) Amount(iv Interval, qty int64) (int64, error) {
+	if qty <= 0 {
+		return 0, nil
+	}
+	rest, err := iv.Amount(a.Monthly)
+	if err != nil {
+		return 0, err
+	}
+	if !a.Stepped() {
+		return rest * qty, nil
+	}
+	first, err := iv.Amount(a.FirstMonthly)
+	if err != nil {
+		return 0, err
+	}
+	return first + rest*(qty-1), nil
 }
 
 // LookupKey is the Stripe lookup_key for an item billed at an interval.

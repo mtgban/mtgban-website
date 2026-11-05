@@ -76,7 +76,7 @@ func TestAdminDemoKeyPerPackage(t *testing.T) {
 	cases := []struct {
 		pkg, store, scope, modes string
 	}{
-		{"all_data", "", "ALL_ACCESS", "retail,buylist,sealed"},
+		{"all_data", "", "ALL_ACCESS", "retail,buylist,sealed,newspaper"},
 		{"all_stores", "", "BASE_ACCESS", "retail,buylist"},
 		{"starter", "cardkingdom", "CK,CKBLLast,CKGraded,SYP,TCGLow,TCGMarket", "retail,buylist"},
 	}
