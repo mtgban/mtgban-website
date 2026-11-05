@@ -299,7 +299,8 @@ add-on to the price plans:
 - a lookback in days on the package. The gateway mints it into the
   signature it forwards as `APIlookback`, the API key's own field beside
   `APImode` and `UserEmail` (`apisig.APIFields`); a key without it gets 30
-  days. The site's `SearchChartLoopback`, which its own charts read, is
+  days, the admin's demo key among them, which carries none on purpose.
+  The site's `SearchChartLoopback`, which its own charts read, is
   unrelated and means nothing to the history endpoint.
   The package is `history` in `apiproductlist/products.json`, 365 days;
   its price is a placeholder until the maintainers set it.
