@@ -2769,6 +2769,7 @@ body.m-setpicker-lock {
 }
 
 #m-offline-section .m-offline-usage {
+    white-space: pre-line;
     font-size: 0.8em;
     color: var(--text-muted, #666);
     margin: 0.25em 0 0;

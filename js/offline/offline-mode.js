@@ -324,9 +324,15 @@
 
     // Sync-status suffix for the storage line: last-sync date, first-sync-in-progress, or not yet synced.
     function syncStatusText(s) {
-        if (s.lastSync) return 'last sync ' + new Date(s.lastSync).toLocaleString();
-        if (s.syncing) return 'enabling offline mode';
-        return 'not synced yet';
+        if (s.lastSync) return 'Last sync ' + new Date(s.lastSync).toLocaleString();
+        if (s.syncing) return 'First sync in progress';
+        return 'Not synced yet';
+    }
+
+    // The quota is what the browser would allow, not what a sync will download.
+    function usageText(s) {
+        var limit = s.quota ? ' (browser limit ' + fmtBytes(s.quota) + ')' : '';
+        return 'Stored on this device: ' + fmtBytes(s.bytes) + limit + '.\n' + syncStatusText(s) + '.';
     }
 
     // Repaint the settings storage line from current status; safe to call anytime.
@@ -334,9 +340,7 @@
         var usage = document.getElementById('settings-offline-usage');
         if (!usage) return;
         if (!enabled()) { usage.textContent = ''; return; }
-        var s = status();
-        var of = s.quota ? ' of ' + fmtBytes(s.quota) : '';
-        usage.textContent = 'Using ' + fmtBytes(s.bytes) + of + ', ' + syncStatusText(s);
+        usage.textContent = usageText(status());
     }
 
     // Re-measures and repaints the usage line, for the modal reopening or a
@@ -514,6 +518,7 @@
         releaseUnloadGuard: releaseUnloadGuard,
         status: status,
         syncStatusText: syncStatusText,
+        usageText: usageText,
         doneStatusText: doneStatusText,
         refreshUsage: refreshUsage,
         initSettingsUI: initSettingsUI,

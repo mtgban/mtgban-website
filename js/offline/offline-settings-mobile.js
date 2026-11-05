@@ -2,14 +2,6 @@
 (function () {
     'use strict';
 
-    function mFmtBytes(n) {
-        if (!n) return '0 B';
-        var units = ['B', 'KB', 'MB', 'GB'];
-        var i = 0;
-        while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
-        return (i === 0 ? n : n.toFixed(1)) + ' ' + units[i];
-    }
-
     function paintStatus(text) {
         var el = document.getElementById('m-offline-status');
         if (el) el.textContent = text || '';
@@ -19,9 +11,7 @@
         var el = document.getElementById('m-offline-usage');
         if (!el || !window.OfflineMode) return;
         if (!OfflineMode.enabled()) { el.textContent = ''; return; }
-        var s = OfflineMode.status();
-        el.textContent = 'Using ' + mFmtBytes(s.bytes) +
-            (s.lastSync ? ', last sync ' + new Date(s.lastSync).toLocaleString() : ', not synced yet');
+        el.textContent = OfflineMode.usageText(OfflineMode.status());
     }
 
     function paintAuthNotice() {

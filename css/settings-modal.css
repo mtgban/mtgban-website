@@ -704,6 +704,7 @@ body.settings-open {
 /* Offline image corpus picker */
 .editions-group-size { font-size: 0.8em; opacity: 0.7; margin-right: 0.5em; white-space: nowrap; }
 .offline-img-estimate { margin: 0.75em 0 0.25em; font-size: 0.9em; }
+#settings-offline-usage { white-space: pre-line; }
 .offline-maintenance { display: flex; flex-wrap: wrap; gap: 0.5em; margin: 0.5em 0; }
 .offline-maintenance .settings-btn.caution {
     background: color-mix(in srgb, var(--settings-amber) 10%, transparent);
