@@ -322,3 +322,11 @@ test('mythic card renders ss-mythic on the result icon', () => {
     const html = R.buildHTML([r], CTX);
     expect(html).toContain('class="ss ss-neo ss-mythic ss-2x ss-fw result-set-icon"');
 });
+
+// A row priceRows left unpriced carries no price objects, and renders as no offers.
+test('a row with no price objects renders as no offers', () => {
+    const empty = R.buildHTML([result({retail: {}, buylist: {}})], CTX);
+    expect(R.buildHTML([result({retail: null, buylist: null})], CTX)).toBe(empty);
+    expect(R.buildHTML([result({retail: null})], CTX))
+        .toBe(R.buildHTML([result({retail: {}})], CTX));
+});

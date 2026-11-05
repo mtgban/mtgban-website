@@ -51,7 +51,7 @@
     // condGroupsForSellers returns {indexRows, groups, hasAny} for the sellers side.
     function condGroupsForSellers(res, ctx) {
         var card = res.card;
-        var shorts = Object.keys(res.retail).filter(function (s) {
+        var shorts = Object.keys(res.retail || {}).filter(function (s) {
             return ctx.hiddenSellers.indexOf(s) === -1;
         });
         var indexRows = [];
@@ -91,7 +91,7 @@
 
     function condGroupsForBuyers(res, ctx) {
         var card = res.card;
-        var shorts = Object.keys(res.buylist).filter(function (s) {
+        var shorts = Object.keys(res.buylist || {}).filter(function (s) {
             return ctx.hiddenVendors.indexOf(s) === -1;
         });
         var indexRows = [];
