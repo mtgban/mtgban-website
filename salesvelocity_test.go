@@ -304,7 +304,7 @@ func TestLoadSalesVelocityEndsOnEveryGamesCompleteDay(t *testing.T) {
 	if snap == nil || !snap.Day.Equal(gameNewest) {
 		t.Fatalf("snapshot: got %+v, want one for %s, the day before every game's newest", snap, gameNewest.Format(time.DateOnly))
 	}
-	_, found := salesVelocityStore.For(cardID)
+	_, found := salesVelocityStore.Snapshot().For(cardID)
 	if !found {
 		t.Errorf("%s: no sales filed", cardID)
 	}
@@ -496,7 +496,7 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 	if n := len(f.seen()); n != 4 {
 		t.Fatalf("got %d queries, want the two days, the window and the lookback", n)
 	}
-	got, found := salesVelocityStore.For(cardID)
+	got, found := salesVelocityStore.Snapshot().For(cardID)
 	want := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: lastSale}
 	if !found || got != want {
 		t.Errorf("%s: got %+v, %v; want %+v", cardID, got, found, want)
@@ -512,29 +512,30 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 	}
 }
 
-// TestUUID2CardCarriesSalesVelocity fills a card's rate and details from the
-// loaded sales, and leaves them empty without.
-func TestUUID2CardCarriesSalesVelocity(t *testing.T) {
+// TestSearchMetadataCarriesSalesVelocity fills a card's rate and details from
+// the sales it is handed, and leaves them empty without.
+func TestSearchMetadataCarriesSalesVelocity(t *testing.T) {
 	skipWithoutDatastore(t)
-	b := backend()
-	cardID := randomUUID(b, false)
-	co, err := b.GetUUID(cardID)
+	ds := currentDatastore()
+	cardID := randomUUID(ds.backend, false)
+	co, err := ds.backend.GetUUID(cardID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	v := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
-	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{co.UUID: &v})
-	wantRate, wantDetail, _ := salesVelocityStore.View(co.UUID)
+	sales := &salesvelocity.Snapshot{Cards: map[string]*salesvelocity.Sales{co.UUID: &v}, Window: salesvelocity.Window}
+	wantRate, wantDetail, _ := sales.View(co.UUID)
 	if wantRate == "" {
-		t.Fatal("the store has no rate for the card")
+		t.Fatal("the snapshot has no rate for the card")
 	}
-	card := uuid2card(b, currentPrices(), cardID, false, nil)
+	metadata, _ := searchMetadata(ds, currentPrices(), sales, []string{cardID}, false)
+	card := metadata[cardID]
 	if card.Velocity != wantRate || card.VelocityDetail != wantDetail {
 		t.Errorf("got %q, %q; want %q, %q", card.Velocity, card.VelocityDetail, wantRate, wantDetail)
 	}
 
-	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{})
-	card = uuid2card(b, currentPrices(), cardID, false, nil)
+	metadata, _ = searchMetadata(ds, currentPrices(), nil, []string{cardID}, false)
+	card = metadata[cardID]
 	if card.Velocity != "" || card.VelocityDetail != "" {
 		t.Errorf("no data: got %q, %q", card.Velocity, card.VelocityDetail)
 	}
@@ -543,7 +544,7 @@ func TestUUID2CardCarriesSalesVelocity(t *testing.T) {
 // velocityPageVars is one card on a results page, its velocity read from the snapshot.
 func velocityPageVars(canVelocity, showUpsell bool) PageVars {
 	const cardID = "velocity-card"
-	rate, detail, _ := salesVelocityStore.View(cardID)
+	rate, detail, _ := salesVelocityStore.Snapshot().View(cardID)
 	return PageVars{
 		ShowUpsell: showUpsell,
 		SearchVars: SearchVars{
@@ -800,7 +801,7 @@ func TestVelocityFilterCompares(t *testing.T) {
 		{"locked, negated", "locked_velocity_greater_than", true, co, "5", true},
 		{"locked, negated, no data", "locked_velocity_greater_than", true, missing, "5", true},
 	} {
-		filters := []FilterElem{{Name: tc.name, Negate: tc.neg, Values: []string{tc.val}}}
+		filters := []FilterElem{{Name: tc.name, Negate: tc.neg, Values: []string{tc.val}, Sales: salesVelocityStore.Snapshot()}}
 		got := shouldSkipCard(nil, nil, tc.card, filters)
 		if got != tc.skip {
 			t.Errorf("%s: skip = %v, want %v", tc.desc, got, tc.skip)
@@ -818,9 +819,11 @@ func TestUnlockVelocityReachesPools(t *testing.T) {
 	if !lockedVelocity(filters) {
 		t.Error("a pool's locked filter reads as unlocked")
 	}
-	unlockVelocity(filters)
-	if lockedVelocity(filters) || filters[0].Pool.CardFilters[0].Name != "velocity_greater_than" {
-		t.Errorf("still locked: %+v", filters[0].Pool.CardFilters[0])
+	sales := &salesvelocity.Snapshot{}
+	unlockVelocity(filters, sales)
+	opened := filters[0].Pool.CardFilters[0]
+	if lockedVelocity(filters) || opened.Name != "velocity_greater_than" || opened.Sales != sales {
+		t.Errorf("still locked, or judging other sales: %+v", opened)
 	}
 	if lockedVelocity([]FilterElem{{Name: "name"}}) {
 		t.Error("a query with no velocity filter reads as locked")
@@ -965,7 +968,7 @@ func velocitySortKeys(keys []string, reversed bool) []string {
 		target += "?reverse=true"
 	}
 	sorted := slices.Clone(keys)
-	sortSearchKeys(httptest.NewRequest(http.MethodGet, target, nil), currentDatastore(), currentPrices(), sorted, nil, "velocity")
+	sortSearchKeys(httptest.NewRequest(http.MethodGet, target, nil), currentDatastore(), currentPrices(), sorted, nil, salesVelocityStore.Snapshot(), "velocity")
 	return sorted
 }
 
@@ -989,6 +992,50 @@ func TestSortSearchKeysByVelocity(t *testing.T) {
 	}
 	if got, want := velocitySortKeys(keys, true), []string{zero, slow, fast, none}; !slices.Equal(got, want) {
 		t.Errorf("slowest first: got %v, want %v", got, want)
+	}
+}
+
+// TestSearchKeepsItsSalesSnapshot filters, sorts and shows a search from the
+// sales it started with, though a new load is published partway through.
+func TestSearchKeepsItsSalesSnapshot(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := currentDatastore()
+	p := currentPrices()
+	ids, err := ds.backend.SearchEquals("Counterspell")
+	if err != nil || len(ids) < 2 {
+		t.Skip("matcher data not loaded")
+	}
+	fast, slow := ids[0], ids[1]
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{
+		fast: {Copies: 90},
+		slow: {Copies: 60},
+	})
+	started := salesVelocityStore.Snapshot()
+
+	config := parseSearchPage(ds, p, "Counterspell v>1", false, false, nil, nil, nil)
+	config.Sales = salesVelocityStore.Snapshot()
+	unlockVelocity(config.CardFilters, config.Sales)
+	config.VelocitySort = true
+
+	// The next load has the two the other way round, and neither over the limit.
+	salesVelocityStore.Publish(&salesvelocity.Snapshot{
+		Cards:  map[string]*salesvelocity.Sales{fast: {Copies: 3}, slow: {Copies: 6}},
+		Window: salesvelocity.Window,
+	})
+	if config.Sales != started || config.CardFilters[0].Sales != started {
+		t.Fatal("the request holds a snapshot it did not start with")
+	}
+
+	r := httptest.NewRequest(http.MethodGet, "/search", nil)
+	result := runSearch(r, ds, p, config)
+	keys := orderSearchKeys(r, ds, p, result, config.Sales, "velocity").keys
+	if !slices.Equal(keys, []string{fast, slow}) {
+		t.Fatalf("filtered and sorted %v, want %v", keys, []string{fast, slow})
+	}
+	metadata, _ := searchMetadata(ds, p, config.Sales, keys, false)
+	got := metadata[fast].Velocity
+	if got != "3.0/day" {
+		t.Errorf("shows %q, want the rate it started with", got)
 	}
 }
 
@@ -1125,7 +1172,7 @@ func TestSearchGatesVelocitySortByTier(t *testing.T) {
 // velocitySortChrono is keys in the default order.
 func velocitySortChrono(keys []string) []string {
 	sorted := slices.Clone(keys)
-	sortSearchKeys(httptest.NewRequest(http.MethodGet, "/search", nil), currentDatastore(), currentPrices(), sorted, nil, "")
+	sortSearchKeys(httptest.NewRequest(http.MethodGet, "/search", nil), currentDatastore(), currentPrices(), sorted, nil, nil, "")
 	return sorted
 }
 

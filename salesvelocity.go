@@ -10,7 +10,8 @@ import (
 	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
 
-// salesVelocityStore holds the loaded sales, read by search's row, filters and sort.
+// salesVelocityStore holds the loaded sales. A request reads its snapshot once
+// and hands it to the row, filters and sort.
 var salesVelocityStore = &salesvelocity.Store{}
 
 // refreshNewspaper reloads what the site reads from the newspaper: its pages,
@@ -55,8 +56,8 @@ func checkNewspaperSales() {
 
 // cardFilterVelocityGreaterThan skips a card selling at most the rate asked,
 // and one with no data, which is not the same as selling none.
-func cardFilterVelocityGreaterThan(filters []string, co *matcher.CardObject) bool {
-	v, found := salesVelocityStore.For(co.UUID)
+func cardFilterVelocityGreaterThan(sales *salesvelocity.Snapshot, filters []string, co *matcher.CardObject) bool {
+	v, found := sales.For(co.UUID)
 	if !found {
 		return true
 	}
@@ -66,8 +67,8 @@ func cardFilterVelocityGreaterThan(filters []string, co *matcher.CardObject) boo
 
 // cardFilterVelocityLessThan skips a card selling at least the rate asked, and
 // one with no data.
-func cardFilterVelocityLessThan(filters []string, co *matcher.CardObject) bool {
-	v, found := salesVelocityStore.For(co.UUID)
+func cardFilterVelocityLessThan(sales *salesvelocity.Snapshot, filters []string, co *matcher.CardObject) bool {
+	v, found := sales.For(co.UUID)
 	if !found {
 		return true
 	}
@@ -80,13 +81,14 @@ func cardFilterVelocityLessThan(filters []string, co *matcher.CardObject) bool {
 const lockedFilterPrefix = "locked_"
 
 // unlockVelocity opens a query's velocity filters, those in its pools too, for
-// a handler that checked the reader's signature.
-func unlockVelocity(filters []FilterElem) {
+// a handler that checked the reader's signature, to judge cards by sales.
+func unlockVelocity(filters []FilterElem, sales *salesvelocity.Snapshot) {
 	for i := range filters {
 		if filters[i].Pool != nil {
-			unlockVelocity(filters[i].Pool.CardFilters)
+			unlockVelocity(filters[i].Pool.CardFilters, sales)
 		}
 		filters[i].Name = strings.TrimPrefix(filters[i].Name, lockedFilterPrefix)
+		filters[i].Sales = sales
 	}
 }
 
