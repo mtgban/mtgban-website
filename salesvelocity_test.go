@@ -388,7 +388,7 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 	day := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
 		if query == salesVelocityDayQuery {
-			return &fakeRows{cols: []string{"max"}, vals: [][]driver.Value{{day}}}, nil
+			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{day}}}, nil
 		}
 		return &fakeRows{cols: []string{"p", "v", "l"}}, nil
 	}}
@@ -400,7 +400,7 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 	if len(queries) != 3 {
 		t.Fatalf("got %d queries, want 3", len(queries))
 	}
-	if queries[0].sql != salesVelocityDayQuery || len(queries[0].args) != 1 || queries[0].args[0] != gameMap[matcher.GameLorcana] {
+	if queries[0].sql != salesVelocityDayQuery || !slices.Equal(queries[0].args, []driver.Value{gameMap[matcher.GameLorcana], int64(salesVelocityWindow)}) {
 		t.Errorf("first query: got %q %v, want the day query scoped to %q", queries[0].sql, queries[0].args, gameMap[matcher.GameLorcana])
 	}
 	for _, q := range queries[1:] {
@@ -418,13 +418,19 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 // when the day query finds no sales for this deployment's game.
 func TestLoadSalesVelocityNoSalesYet(t *testing.T) {
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
-		return &fakeRows{cols: []string{"max"}, vals: [][]driver.Value{{nil}}}, nil
+		return &fakeRows{cols: []string{"sale_date"}}, nil
 	}}
 	s := withFakeNewspaper(t, f)
+	setTestJobs(t)
 
 	s.loadSalesVelocity()
 	if n := len(f.seen()); n != 1 {
 		t.Fatalf("got %d queries, want only the day query", n)
+	}
+	for _, row := range backgroundJobs.Rows() {
+		if row.Name == jobSalesVelocity && row.Problem != "" {
+			t.Errorf("reported a problem: %s", row.Problem)
+		}
 	}
 	if snap := salesVelocityPtr.Load(); snap != nil {
 		t.Errorf("stored a snapshot: %+v", snap)
@@ -505,7 +511,7 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
 		switch query {
 		case salesVelocityDayQuery:
-			return &fakeRows{cols: []string{"max"}, vals: [][]driver.Value{{day}}}, nil
+			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{day}}}, nil
 		case salesVelocityQuery:
 			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}, vals: [][]driver.Value{
 				{productID, "Normal", int64(69), int64(31), int64(18)},
@@ -531,7 +537,7 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 
 	s.loadSalesVelocity()
 	queries := f.seen()
-	if len(queries) != 4 || queries[3].sql != salesVelocityDayQuery || len(queries[3].args) != 1 {
+	if len(queries) != 4 || queries[3].sql != salesVelocityDayQuery || len(queries[3].args) != 2 {
 		t.Errorf("second run on the same day: got %d queries, want only the day query, scoped to the game, after the first 3", len(queries))
 	}
 }
