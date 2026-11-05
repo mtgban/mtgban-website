@@ -14,7 +14,8 @@ import (
 )
 
 // A request can raise more than one notice: a chart roster cut to the cap,
-// then a search that finds nothing or too much, then a chart with no data.
+// then a search that finds nothing or too much, with the transfer it cuts,
+// then a chart with no data.
 // The page shows every one, in the order raised, each on its own line.
 func TestSearchPageShowsEveryNotice(t *testing.T) {
 	skipWithoutDatastore(t)
@@ -53,8 +54,8 @@ func TestSearchPageShowsEveryNotice(t *testing.T) {
 		want   []string
 	}{
 		{"a capped roster and a search that finds nothing", "/search?q=zzzqx&chart=" + eleven, false, []string{capped, NoCardsMessage}},
-		{"a capped roster and a search that finds too much", "/search?q=" + url.QueryEscape("t:creature") + "&chart=" + eleven, false, []string{capped, TooManyMessage}},
-		{"on a phone, a capped roster and a search that finds too much", "/search?q=" + url.QueryEscape("t:creature") + "&chart=" + eleven, true, []string{capped, TooManyMessage}},
+		{"a capped roster and a search that finds too much", "/search?q=" + url.QueryEscape("t:creature") + "&chart=" + eleven, false, []string{capped, TooManyMessage, TransferCutMessage}},
+		{"on a phone, a capped roster and a search that finds too much", "/search?q=" + url.QueryEscape("t:creature") + "&chart=" + eleven, true, []string{capped, TooManyMessage, TransferCutMessage}},
 		{"a capped roster, an unmatched card and no chart data", "/search?chart=" + strings.Join(ids[:9], ",") + "," + unmatched + "," + strings.Join(ids[9:], ","), false, []string{capped, dropped, "No chart data available"}},
 		{"a capped roster in the chart picker with a pinned bar that finds nothing", "/search?modal=1&scope=" + url.QueryEscape("s:LEA cn:99999") + "&chart=" + eleven, true, []string{capped, NoResultsMessage}},
 	} {

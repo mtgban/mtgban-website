@@ -72,6 +72,10 @@ paths:
   /search/{mode}/{query}.json:
     get:
       summary: Prices for every card matching a search
+      description: >-
+        Up to 9,999 cards. Replace .json with .csv for CSV, whose
+        X-MTGBAN-Cut header, when present, counts the matching cards it
+        leaves out.
       parameters:
         - name: mode
           in: path

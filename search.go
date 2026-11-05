@@ -39,6 +39,7 @@ const (
 	MaxSearchResultsMobile = 25
 	TooLongMessage         = "Your query planeswalked away, try a shorter one"
 	TooManyMessage         = "Too many results, try adjusting your filters"
+	TransferCutMessage     = "Only the first 9,999 results go to the Uploader and the CSV download"
 	NoResultsMessage       = "No products matching your search could be found"
 	NoPromosMessage        = "No products matching your search could be found - some promos may be hidden"
 	NoCardsMessage         = "No products matching your search could be found"
@@ -751,6 +752,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pageVars.CardHashes = result.hashes[:min(len(result.hashes), MaxUploadTransfer)]
+	if len(result.hashes) > MaxUploadTransfer {
+		pageVars.Notices = append(pageVars.Notices, TransferCutMessage)
+	}
 
 	// Allow displaying the "search all" link only when something
 	// was searched and no options were specified for it
