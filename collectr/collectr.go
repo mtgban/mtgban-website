@@ -11,12 +11,29 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 
-	"github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-retryablehttp"
 )
+
+// client gives up on a stalled page rather than holding the upload, and
+// retries nothing, since the walk already moves on to the next page.
+var client = mtgban.NewHTTPClient(
+	mtgban.WithHTTPTimeout(30*time.Second),
+	mtgban.WithHTTPRetries(0),
+	// Hand back a 5xx as it came, for the status check to report
+	mtgban.WithHTTPErrorHandler(retryablehttp.PassthroughErrorHandler),
+)
+
+// maxBody is the cap the other importers read a vendor's answer under.
+const maxBody = 32 << 20
+
+// loadTimeout bounds a whole showcase walk: up to 24 pages, two modes by
+// two product types by six sort orders, each through the proxy.
+var loadTimeout = 2 * time.Minute
 
 // CategoryID maps game names to Collectr category IDs.
 var CategoryID = map[matcher.Game]string{
@@ -138,7 +155,9 @@ func Load(ctx context.Context, proxyBase, link string, game matcher.Game, maxRow
 	}
 	catName := CategoryFilter[game]
 
-	client := cleanhttp.DefaultClient()
+	// One deadline for every page; what was read before it is kept
+	ctx, cancel := context.WithTimeout(ctx, loadTimeout)
+	defer cancel()
 
 	// Fetch both cards and sealed products
 	cardTypes := []string{"cards", "sealed"}
@@ -178,7 +197,7 @@ func Load(ctx context.Context, proxyBase, link string, game matcher.Game, maxRow
 				}
 
 				pageURL := baseURL + variant
-				body, err := fetchPage(ctx, client, pageURL)
+				body, err := fetchPage(ctx, pageURL)
 				if err != nil {
 					lastErr = fmt.Errorf("fetch %s/%s: %w", mode, cardType, err)
 					continue
@@ -240,7 +259,7 @@ func Load(ctx context.Context, proxyBase, link string, game matcher.Game, maxRow
 	return allItems, nil
 }
 
-func fetchPage(ctx context.Context, client *http.Client, pageURL string) (string, error) {
+func fetchPage(ctx context.Context, pageURL string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, http.NoBody)
 	if err != nil {
 		return "", err
@@ -255,9 +274,12 @@ func fetchPage(ctx context.Context, client *http.Client, pageURL string) (string
 		return "", fmt.Errorf("status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if err != nil {
 		return "", err
+	}
+	if len(body) > maxBody {
+		return "", fmt.Errorf("page larger than %d bytes", maxBody)
 	}
 	return string(body), nil
 }
