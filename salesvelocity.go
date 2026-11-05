@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"strconv"
 	"strings"
 	"time"
 
@@ -56,23 +55,21 @@ func checkNewspaperSales() {
 
 // cardFilterVelocityGreaterThan skips a card selling at most the rate asked,
 // and one with no data, which is not the same as selling none.
-func cardFilterVelocityGreaterThan(sales *salesvelocity.Snapshot, filters []string, co *matcher.CardObject) bool {
+func cardFilterVelocityGreaterThan(sales *salesvelocity.Snapshot, limit float64, co *matcher.CardObject) bool {
 	v, found := sales.For(co.UUID)
 	if !found {
 		return true
 	}
-	limit, _ := strconv.ParseFloat(filters[0], 64)
 	return v.PerDay(salesvelocity.Window) <= limit
 }
 
 // cardFilterVelocityLessThan skips a card selling at least the rate asked, and
 // one with no data.
-func cardFilterVelocityLessThan(sales *salesvelocity.Snapshot, filters []string, co *matcher.CardObject) bool {
+func cardFilterVelocityLessThan(sales *salesvelocity.Snapshot, limit float64, co *matcher.CardObject) bool {
 	v, found := sales.For(co.UUID)
 	if !found {
 		return true
 	}
-	limit, _ := strconv.ParseFloat(filters[0], 64)
 	return v.PerDay(salesvelocity.Window) >= limit
 }
 

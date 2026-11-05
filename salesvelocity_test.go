@@ -746,20 +746,21 @@ func TestVelocityFilterParses(t *testing.T) {
 	ds := testSite.datastore()
 	for _, tc := range []struct {
 		query, name, value string
+		limit              float64
 		negate             bool
 	}{
-		{"v>1", "locked_velocity_greater_than", "1", false},
-		{"velocity>0.5", "locked_velocity_greater_than", "0.5", false},
-		{"v<2", "locked_velocity_less_than", "2", false},
-		{"VELOCITY<2", "locked_velocity_less_than", "2", false},
-		{"-v>1", "locked_velocity_greater_than", "1", true},
+		{"v>1", "locked_velocity_greater_than", "1", 1, false},
+		{"velocity>0.5", "locked_velocity_greater_than", "0.5", 0.5, false},
+		{"v<2", "locked_velocity_less_than", "2", 2, false},
+		{"VELOCITY<2", "locked_velocity_less_than", "2", 2, false},
+		{"-v>1", "locked_velocity_greater_than", "1", 1, true},
 	} {
 		config := parseSearchPage(ds, currentPrices(), tc.query, false, false, nil, nil, nil)
 		if len(config.CardFilters) != 1 {
 			t.Fatalf("%s: got %d filters", tc.query, len(config.CardFilters))
 		}
 		got := config.CardFilters[0]
-		if got.Name != tc.name || got.Negate != tc.negate || !slices.Equal(got.Values, []string{tc.value}) {
+		if got.Name != tc.name || got.Negate != tc.negate || !slices.Equal(got.Values, []string{tc.value}) || got.Value != tc.limit {
 			t.Errorf("%s: got %+v", tc.query, got)
 		}
 	}
@@ -783,25 +784,25 @@ func TestVelocityFilterCompares(t *testing.T) {
 		name string
 		neg  bool
 		card *matcher.CardObject
-		val  string
+		val  float64
 		skip bool
 	}{
-		{"over the limit", "velocity_greater_than", false, co, "1", false},
-		{"at the limit", "velocity_greater_than", false, co, "2.3", true},
-		{"under the limit", "velocity_greater_than", false, co, "5", true},
-		{"less than a higher rate", "velocity_less_than", false, co, "5", false},
-		{"at the limit, less than", "velocity_less_than", false, co, "2.3", true},
-		{"less than a lower rate", "velocity_less_than", false, co, "1", true},
-		{"negated", "velocity_greater_than", true, co, "5", false},
-		{"no data, greater", "velocity_greater_than", false, missing, "0", true},
-		{"no data, less", "velocity_less_than", false, missing, "5", true},
-		{"no data, negated", "velocity_greater_than", true, missing, "1", false},
-		{"locked, greater", "locked_velocity_greater_than", false, co, "1", true},
-		{"locked, less", "locked_velocity_less_than", false, co, "5", true},
-		{"locked, negated", "locked_velocity_greater_than", true, co, "5", true},
-		{"locked, negated, no data", "locked_velocity_greater_than", true, missing, "5", true},
+		{"over the limit", "velocity_greater_than", false, co, 1, false},
+		{"at the limit", "velocity_greater_than", false, co, 2.3, true},
+		{"under the limit", "velocity_greater_than", false, co, 5, true},
+		{"less than a higher rate", "velocity_less_than", false, co, 5, false},
+		{"at the limit, less than", "velocity_less_than", false, co, 2.3, true},
+		{"less than a lower rate", "velocity_less_than", false, co, 1, true},
+		{"negated", "velocity_greater_than", true, co, 5, false},
+		{"no data, greater", "velocity_greater_than", false, missing, 0, true},
+		{"no data, less", "velocity_less_than", false, missing, 5, true},
+		{"no data, negated", "velocity_greater_than", true, missing, 1, false},
+		{"locked, greater", "locked_velocity_greater_than", false, co, 1, true},
+		{"locked, less", "locked_velocity_less_than", false, co, 5, true},
+		{"locked, negated", "locked_velocity_greater_than", true, co, 5, true},
+		{"locked, negated, no data", "locked_velocity_greater_than", true, missing, 5, true},
 	} {
-		filters := []FilterElem{{Name: tc.name, Negate: tc.neg, Values: []string{tc.val}, Sales: salesVelocityStore.Snapshot()}}
+		filters := []FilterElem{{Name: tc.name, Negate: tc.neg, Value: tc.val, Sales: salesVelocityStore.Snapshot()}}
 		got := shouldSkipCard(nil, nil, tc.card, filters)
 		if got != tc.skip {
 			t.Errorf("%s: skip = %v, want %v", tc.desc, got, tc.skip)
