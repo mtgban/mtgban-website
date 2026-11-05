@@ -941,7 +941,14 @@ least 60 s; 60 s while the cache predates the last scheduled run; 300 s
 once stale) with an `ETag` over the body, compared weakly for a 304,
 and `Last-Modified` from the refresh. The mode is sold as the
 `newspaper` add-on in `apiproductlist` (`grants_mode`), which the plans
-page shows only with `api_gateway.newspaper_on_sale`.
+page shows only with `api_gateway.newspaper_on_sale`. It is $200 a month, a
+checkbox on the À la carte and Base Access cards and included in All
+Access. The page reads a `stores.json` of its own, which carries `base` per
+family (true when Base Access covers at least one of its singles scrapers)
+and a top-level `sealed` list of the families selling sealed, both ignored
+by the gateway. It shows the Singles and Sealed store rows on every
+package, TCGplayer locked, the chips lit by the package's scope and picked
+by hand on À la carte.
 `docs/api-v2-newspaper.md` has the design and the read-cost table.
 
 `/api/v2/history/` (`HistoryAPI`, `api_history.go`), one route, serves

@@ -253,17 +253,17 @@ read is cheaper than a price read, which walks every store's prices.
 
 ## Plans
 
-The newspaper is an add-on to any price package, not a package of its
-own: `newspaper` in `apiproductlist/products.json`, with
-`grants_mode: newspaper`, applying to the three price packages,
-`starter`, `all_stores` and `all_data`. An add-on with `grants_mode` is
-bought once and grants that mode, unlike the counted `extra_store` and
-`extra_game`; `Validate` refuses a `grants_mode` outside `Modes`. Its
-price, $1 a month, is a placeholder for the maintainers to set.
+The newspaper is an add-on, not a package of its own: `newspaper` in
+`apiproductlist/products.json`, with `grants_mode: newspaper`, applying
+to `starter` and `all_stores`. All Access, `all_data`, grants the mode
+itself. An add-on with `grants_mode` is bought once and grants that
+mode, unlike the counted `extra_store` and `extra_game`; `Validate`
+refuses a `grants_mode` outside `Modes`. Its price is $200 a month on
+À la carte and Base Access.
 
-The plans page shows a checkbox for it below the games picker, adding
-its monthly to the total and submitting `addons=newspaper` to the
-gateway's checkout, only where the config sets
+The plans page shows a checkbox for it inside the À la carte and Base
+Access cards, adding its monthly to the total and submitting
+`addons=newspaper` to the gateway's checkout, only where the config sets
 `api_gateway.newspaper_on_sale`: the gateway cannot sell it until it
 re-pins this module and seeds Stripe. Off, the add-on is left out of the
 page and of the configurator's data.
@@ -310,5 +310,5 @@ a request made with an API key (step 3 of Rollout).
    `Cache-Control: private` on proxied newspaper responses. Then re-pin
    this module in the gateway's `go.mod` and seed Stripe from the
    catalog.
-4. The maintainers set the price, then `api_gateway.newspaper_on_sale`
-   on the sites.
+4. With the price set at $200 a month, set
+   `api_gateway.newspaper_on_sale` on the sites.
