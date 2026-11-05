@@ -63,6 +63,16 @@
             </div>
             <span class="m-sleep-tool-arrow">&rsaquo;</span>
         </a>
+        {{if .HasVelocity}}
+        {{if .CanVelocity}}<a class="m-sleep-tool" href="?page=velocity">{{else}}<span class="m-sleep-tool m-sleep-tool-locked" title="Increase your tier to rank cards by sales velocity">{{end}}
+            <span class="m-sleep-tool-icon" style="color:var(--tier-d, #7fbfff);">&#9889;</span>
+            <div class="m-sleep-tool-text">
+                <span class="m-sleep-tool-title">Sales Velocity</span>
+                <span class="m-sleep-tool-desc">Copies sold a day on TCGplayer.</span>
+            </div>
+            <span class="m-sleep-tool-arrow">&rsaquo;</span>
+        {{if .CanVelocity}}</a>{{else}}</span>{{end}}
+        {{end}}
     </div>
 
     {{/* Ocean Gap */}}

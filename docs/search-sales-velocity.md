@@ -63,6 +63,19 @@ row's place, linking to Patreon, on the cards that have data and so would
 show a row. The `noUpsell` search setting hides it, as it does the other
 upsell lines.
 
+## On the Sleepers page
+
+`?page=velocity` ranks cards by the same copies over 30: the S tier starts at about
+25 a day, then 13, 6, 3 and 1, the E tier holds the rest, and the F tier the slowest
+the page ranks, a card with two copies in the window. A single copy is left out. The
+log and the cap at 50 a day (`velocityTierCap`) set those bands; without the cap one
+card far ahead of the rest would have S to itself. Like every Sleepers tier, each shows its 34
+priciest cards, so a tier is the most valuable of what sells that fast.
+
+The order is as revealing as the sort, so a reader without the tier gets the index,
+where the page's card is greyed out with a tooltip. With no sales loaded, the card is
+not there at all.
+
 ## Searching by it
 
 `v>1` or `velocity>1` finds the cards selling more than once a day, and `<`

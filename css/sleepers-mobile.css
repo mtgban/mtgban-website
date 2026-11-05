@@ -74,6 +74,10 @@
     border-color: rgba(0, 0, 0, 0.12);
 }
 
+.m-sleep-tool-locked {
+    opacity: 0.45;
+}
+
 .m-sleep-tool-icon {
     font-size: 1.2rem;
     flex-shrink: 0;

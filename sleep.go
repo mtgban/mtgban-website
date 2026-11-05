@@ -107,11 +107,18 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
 	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)
 
+	pageVars.CanVelocity = newspaperTier(sig)
+	pageVars.HasVelocity = salesVelocityStore.Snapshot() != nil
+
 	var tiers map[string]int
 
 	start := time.Now()
 
 	page := r.FormValue("page")
+	// Which cards sell fastest is the Newspaper tiers' to read: anyone else gets the index.
+	if page == "velocity" && !pageVars.CanVelocity {
+		page = ""
+	}
 	switch page {
 	default:
 		pageVars.Subtitle = "Index"
@@ -144,6 +151,10 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 		pageVars.Subtitle = "Highest buylist growth"
 
 		tiers = getHotlist(b, p, skipEditions)
+	case "velocity":
+		pageVars.Subtitle = "Sales Velocity"
+
+		tiers = getVelocity(b, skipEditions)
 	}
 
 	sleepers, err := sleepersLayout(b, p, tiers)
@@ -313,6 +324,30 @@ func getHotlist(b *matcher.Backend, p *prices, skipEditions []string) map[string
 		tiers[cardID] = int(100 * difference / (currentPrice + 10) * math.Log(1+spread))
 	}
 
+	return tiers
+}
+
+// velocityTierCap is the copies a day that reach the S tier's top. Past it a
+// single outlier would stretch the scale and leave S to itself. With the log in
+// getVelocity it makes the tiers start at about 25, 13, 6, 3 and 1 a day.
+const velocityTierCap = 50
+
+// getVelocity scores the cards by copies sold a day, on a log scale since a few
+// sell hundreds of times what most do.
+func getVelocity(b *matcher.Backend, skipEditions []string) map[string]int {
+	snap := salesVelocityStore.Snapshot()
+	if snap == nil {
+		return nil
+	}
+
+	tiers := map[string]int{}
+	for cardID, sales := range snap.Cards {
+		co, err := b.GetUUID(cardID)
+		if err != nil || co.Sealed || slices.Contains(skipEditions, co.SetCode) {
+			continue
+		}
+		tiers[cardID] = int(100 * math.Log10(1+min(sales.PerDay(snap.Window), velocityTierCap)))
+	}
 	return tiers
 }
 
