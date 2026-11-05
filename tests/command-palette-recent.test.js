@@ -122,3 +122,24 @@ test('removing a recent search leaves a tombstone for the sync', () => {
     expect(searches[0].del).toBeGreaterThan(0);
     expect(searches[0].m).toBe(searches[0].del);
 });
+
+test('the palette shows its toast in the one the guide already made', () => {
+    const guideToast = { id: 'cp-toast' };
+    const made = [];
+    const document = {
+        body: fakeElement(),
+        head: fakeElement(),
+        activeElement: null,
+        createElement: () => { const el = fakeElement(); made.push(el); return el; },
+        getElementById: id => (id === 'cp-toast' ? guideToast : null),
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        addEventListener: () => {},
+    };
+    const localStorage = { getItem: () => null, setItem() {} };
+    const location = { href: 'https://mtgban.test/guide', origin: 'https://mtgban.test', pathname: '/guide', search: '' };
+    const window = { __BAN_PALETTE: { nav: [] }, innerWidth: 1280, location, addEventListener: () => {} };
+    new Function('window', 'document', 'localStorage', 'location', 'setTimeout', 'clearTimeout', utils + '\n' + source)(
+        window, document, localStorage, location, () => 0, () => {});
+    expect(made.filter(el => el.id === 'cp-toast')).toHaveLength(0);
+});

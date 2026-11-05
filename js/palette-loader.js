@@ -15,6 +15,8 @@
 
     function stylesheet(path) {
         return new Promise(function (resolve, reject) {
+            // The guide page links the palette's sheet itself
+            if (document.querySelector('link[href^="' + path + '"]')) { resolve(); return; }
             var link = document.createElement('link');
             link.rel = 'stylesheet';
             link.type = 'text/css';
