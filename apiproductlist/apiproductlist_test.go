@@ -54,9 +54,9 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	// The 500 tier is BASE_ACCESS per issue 230; the 800 tier adds sealed and
 	// every region; history is its own package, with a lookback and no stores.
 	want := []wantPackage{
-		{"starter", 20000, StoreScopeExplicit, 1, []string{"retail", "buylist"}, 0, []string{"No Sealed or EV data"}},
-		{"all_stores", 50000, StoreScopeBase, 0, []string{"retail", "buylist"}, 0, []string{"No Sealed or EV data"}},
-		{"all_data", 80000, StoreScopeAll, 0, []string{"retail", "buylist", "sealed", "newspaper"}, 0, nil},
+		{"starter", 19900, StoreScopeExplicit, 1, []string{"retail", "buylist"}, 0, []string{"No Sealed or EV data"}},
+		{"all_stores", 49900, StoreScopeBase, 0, []string{"retail", "buylist"}, 0, []string{"No Sealed or EV data"}},
+		{"all_data", 79900, StoreScopeAll, 0, []string{"retail", "buylist", "sealed", "newspaper"}, 0, nil},
 		{"history", 30000, "", 0, []string{"history"}, 365, nil},
 	}
 	if len(c.Packages) != len(want) {
@@ -78,8 +78,8 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	}
 	// The newspaper is bought once for its mode, and All Access includes it.
 	wantAddons := []Addon{
-		{Key: "extra_store", Monthly: 15000, AppliesTo: []string{"starter"}},
-		{Key: "extra_game", Monthly: 15000, AppliesTo: []string{"starter", "all_stores", "all_data", "history"}},
+		{Key: "extra_store", Monthly: 5000, FirstMonthly: 15000, AppliesTo: []string{"starter"}},
+		{Key: "extra_game", Monthly: 10000, FirstMonthly: 25000, AppliesTo: []string{"starter", "all_stores", "all_data", "history"}},
 		{Key: "newspaper", Monthly: 20000, AppliesTo: []string{"starter", "all_stores"}, GrantsMode: ModeNewspaper},
 	}
 	if len(c.Addons) != len(wantAddons) {
@@ -87,8 +87,13 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	}
 	for i, w := range wantAddons {
 		a := c.Addons[i]
-		if a.Key != w.Key || a.Monthly != w.Monthly || !slices.Equal(a.AppliesTo, w.AppliesTo) || a.GrantsMode != w.GrantsMode {
+		if a.Key != w.Key || a.Monthly != w.Monthly || a.FirstMonthly != w.FirstMonthly || !slices.Equal(a.AppliesTo, w.AppliesTo) || a.GrantsMode != w.GrantsMode {
 			t.Errorf("addon %d: %+v, want %+v", i, a, w)
+		}
+	}
+	for key, want := range map[string]bool{"extra_store": true, "extra_game": true, "newspaper": false} {
+		if a, _ := c.Addon(key); a.Stepped() != want {
+			t.Errorf("%s Stepped() = %v, want %v", key, a.Stepped(), want)
 		}
 	}
 	// Every package takes an extra game, so a new one cannot be left out.
@@ -306,7 +311,7 @@ func TestParseRejectsMalformedJSON(t *testing.T) {
 
 func TestLookups(t *testing.T) {
 	c := MustLoad()
-	if p, ok := c.Package("all_data"); !ok || p.Monthly != 80000 {
+	if p, ok := c.Package("all_data"); !ok || p.Monthly != 79900 {
 		t.Errorf("package lookup %+v %v", p, ok)
 	}
 	if _, ok := c.Package("nope"); ok {

@@ -79,7 +79,7 @@
         <section class="api-section api-configurator" id="api-configure">
             <h2>{{if .Change}}Change your plan{{else}}Your plan{{end}}</h2>
             <fieldset class="api-fieldset" id="api-stores">
-                <legend>Stores <span class="api-legend-note" data-when="explicit"{{if not .DefaultExplicit}} hidden{{end}}>{{if .ImpliedStores}}{{range $i, $s := .ImpliedStores}}{{if $i}}, {{end}}{{$s.Name}}{{end}} always included, {{end}}your first store is on us, each additional is {{usd .ExtraStoreMonthly}}/month</span><span class="api-legend-note" data-when="preset"{{if .DefaultExplicit}} hidden{{end}}>Lit stores are included in the package</span></legend>
+                <legend>Stores <span class="api-legend-note" data-when="explicit"{{if not .DefaultExplicit}} hidden{{end}}>{{if .ImpliedStores}}{{range $i, $s := .ImpliedStores}}{{if $i}}, {{end}}{{$s.Name}}{{end}} always included, {{end}}your first store is on us, {{if .ExtraStoreFirst}}the next is {{usd .ExtraStoreFirst}}/month and each after it {{usd .ExtraStoreMonthly}}/month{{else}}each additional is {{usd .ExtraStoreMonthly}}/month{{end}}</span><span class="api-legend-note" data-when="preset"{{if .DefaultExplicit}} hidden{{end}}>Lit stores are included in the package</span></legend>
                 {{if or .ImpliedStores .Stores .PaidStores}}
                 {{/* Singles: the implied family locked on, then the selectable ones lit by the default package. */}}
                 <div class="api-store-row" id="api-stores-singles">
@@ -114,7 +114,7 @@
             </fieldset>
 
             <fieldset class="api-fieldset"{{if le (len .Games) 1}} hidden{{end}}>
-                <legend>Games <span class="api-legend-note">{{if eq .Products.IncludedGames 1}}one included{{else}}{{.Products.IncludedGames}} included{{end}}, {{usd .ExtraGameMonthly}}/month for each additional</span></legend>
+                <legend>Games <span class="api-legend-note">{{if eq .Products.IncludedGames 1}}one included{{else}}{{.Products.IncludedGames}} included{{end}}, {{if .ExtraGameFirst}}the next is {{usd .ExtraGameFirst}}/month and each after it {{usd .ExtraGameMonthly}}/month{{else}}{{usd .ExtraGameMonthly}}/month for each additional{{end}}</span></legend>
                 <div class="api-choices">
                     {{range .Games}}
                     <label class="api-choice"><input type="checkbox" name="games" value="{{.Key}}"{{if .Checked}} checked{{end}}> {{.Name}}</label>
