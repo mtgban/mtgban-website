@@ -417,6 +417,8 @@ func bestOffers(offers map[string]float64, blMode bool, percMargin float64) []st
 type UploadVars struct {
 	// All the scrapers in singles/sealed mode
 	AllScraperKeys []string
+	// The custom buylist stores' rules, spelled, by shorthand
+	CustomTips map[string]string
 	// All the singles scrapers
 	ScraperKeys []string
 	IndexKeys   []string
@@ -826,6 +828,7 @@ func fillUploadKeys(pageVars *UploadVars, blMode bool, selected uploadStores, id
 		pageVars.IndexKeys = append(pageVars.IndexKeys, key)
 	}
 	pageVars.ScraperKeys = prices.enabledStores
+	pageVars.CustomTips = prices.customTips
 	if len(ids.sealedProductIDs) > 0 {
 		pageVars.SealedIndexKeys = indexes.sealedKeys
 		pageVars.SealedScraperKeys = prices.enabledSealedStores
@@ -2096,6 +2099,7 @@ type uploadPrices struct {
 	credits             map[string]float64
 	enabledStores       []string
 	enabledSealedStores []string
+	customTips          map[string]string
 }
 
 // fetchUploadPrices looks up the upload's singles and sealed products in the
@@ -2108,6 +2112,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 	// Search — fetch card and sealed prices separately then merge
 	var results map[string]map[string]*BanPrice
 	var credits map[string]float64
+	var customTips map[string]string
 
 	if blMode {
 		// Only fetch singles prices when the upload actually has singles. A nil
@@ -2135,29 +2140,37 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 		// on search and arbit
 		rate := customBuylistSetting(getUploadSetting(r, "customrate", "UploadCustomRate"))
 		if st.canUploadCustom && customBuylist && rate != 0 {
+			custom := customBuylistRule{
+				rate:         rate,
+				minPrice:     customBuylistSetting(getUploadSetting(r, "customminprice", "UploadCustomMinPrice")),
+				seller:       getUploadSetting(r, "customseller", "UploadCustomBuyer"),
+				sealedSeller: getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer"),
+				fallback:     customFallback,
+			}
 			rule := EntryRule{SkipSets: customBuylistSkipSets, ReleasedBy: time.Now().Add(-customBuylistMinAge)}
-			rule.MinPrice = customBuylistSetting(getUploadSetting(r, "customminprice", "UploadCustomMinPrice"))
-			rule.Rate = rate
+			rule.MinPrice = custom.minPrice
+			rule.Rate = custom.rate
+			customTips = map[string]string{}
 
-			customSeller := getUploadSetting(r, "customseller", "UploadCustomBuyer")
-			if customSeller != "" {
-				ref, _ := p.sellerInventory(customSeller)
-				fallback := customBuylistFallback(p, customFallback)
-				isIndex := slices.Contains(UploadIndexComparePriceList, customSeller)
+			if custom.seller != "" {
+				ref, _ := p.sellerInventory(custom.seller)
+				fallback := customBuylistFallback(p, custom.fallback)
+				isIndex := slices.Contains(UploadIndexComparePriceList, custom.seller)
 				for _, cardID := range ids.cardIDs {
 					entries := customBuylistReference(ref[cardID], fallback[cardID], isIndex)
 					processEntry(b, p, results, entries, "", cardID, customStore, false, ids.shouldCheckForConditions, false, rule)
 				}
 				enabledStores = append(enabledStores, customStore)
+				customTips[customStore] = custom.tip(p, false)
 			}
 
-			customSealedSeller := getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer")
-			if customSealedSeller != "" && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-				ref, _ := p.sellerInventory(customSealedSeller)
+			if custom.sealedSeller != "" && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
+				ref, _ := p.sellerInventory(custom.sealedSeller)
 				for _, productID := range ids.sealedProductIDs {
 					processEntry(b, p, results, ref[productID], "", productID, customSealedStore, false, false, false, rule)
 				}
 				enabledSealedStores = append(enabledSealedStores, customSealedStore)
+				customTips[customSealedStore] = custom.tip(p, true)
 			}
 		}
 
@@ -2192,6 +2205,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 		credits:             credits,
 		enabledStores:       enabledStores,
 		enabledSealedStores: enabledSealedStores,
+		customTips:          customTips,
 	}
 }
 

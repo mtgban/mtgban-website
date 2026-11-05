@@ -1,9 +1,13 @@
 package main
 
 import (
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -87,6 +91,14 @@ func TestCustomBuylistSkipsSets(t *testing.T) {
 	}
 	if found[cardID] == nil || found[sealedID] == nil {
 		t.Errorf("search priced %v, want the plain card %s and the sealed product %s", found, cardID, sealedID)
+	}
+	if tip := found[cardID]["NM"][0].RuleTip; tip != "50% of CK" {
+		t.Errorf("the card's tip is %q", tip)
+	}
+	for _, entries := range found[sealedID] {
+		if tip := entries[0].RuleTip; tip != "50% of CKSealed" {
+			t.Errorf("the sealed product's tip is %q", tip)
+		}
 	}
 }
 
@@ -333,6 +345,109 @@ func TestCustomBuylistFallbackFollowsTheToggle(t *testing.T) {
 			}
 			if got != tt.wantSP {
 				t.Errorf("arbit pays %v at SP, want %v", got, tt.wantSP)
+			}
+		})
+	}
+}
+
+// The tooltip spells the rule the offers were priced by, on one line, with
+// only what the rule actually applies.
+func TestCustomBuylistRuleTip(t *testing.T) {
+	inv := mtgban.InventoryRecord{}
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "REF", Name: "Ref Store"}),
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "REFSealed", Name: "Ref Sealed", SealedMode: true}),
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "TCGLow", Name: "TCG Low", MetadataOnly: true}),
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market", MetadataOnly: true}),
+	}, []mtgban.Vendor{})
+
+	for _, tt := range []struct {
+		name   string
+		rule   customBuylistRule
+		sealed bool
+		want   string
+	}{
+		{
+			name: "the rate alone",
+			rule: customBuylistRule{rate: 0.8, seller: "REF"},
+			want: "80% of REF",
+		},
+		{
+			name: "a fractional rate, and a minimum",
+			rule: customBuylistRule{rate: 0.07, minPrice: 7, seller: "REF"},
+			want: "7% of REF if ≥ $7.00",
+		},
+		{
+			name: "every setting",
+			rule: customBuylistRule{rate: 0.825, minPrice: 7, seller: "REF", fallback: "TCGLow"},
+			want: "82.5% of REF (or TCG Low) if ≥ $7.00",
+		},
+		{
+			name: "an index reference with another index behind it",
+			rule: customBuylistRule{rate: 0.5, seller: "TCGLow", fallback: "TCGMarket"},
+			want: "50% of TCG Low (or TCG Market)",
+		},
+		{
+			name: "an index is no fallback for itself",
+			rule: customBuylistRule{rate: 0.5, seller: "TCGLow", fallback: "TCGLow"},
+			want: "50% of TCG Low",
+		},
+		{
+			name: "a fallback that is no index is not applied",
+			rule: customBuylistRule{rate: 0.5, seller: "TCGLow", fallback: "REF"},
+			want: "50% of TCG Low",
+		},
+		{
+			name:   "sealed has its own reference and no fallback",
+			rule:   customBuylistRule{rate: 0.5, minPrice: 20, seller: "REF", sealedSeller: "REFSealed", fallback: "TCGLow"},
+			sealed: true,
+			want:   "50% of REFSealed if ≥ $20.00",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.rule.tip(currentPrices(), tt.sealed); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// Search shows the rule on the custom buylist's row, in its tooltip on
+// desktop and in the row's details on the phone.
+func TestSearchSpellsTheCustomBuylistRule(t *testing.T) {
+	cards := closeVendors(t)
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Search") })
+	}
+	co, err := backend().GetUUID(cards[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := mtgban.InventoryRecord{}
+	ref.Add(co.UUID, &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 1})
+	withPrices(t, []mtgban.Seller{mtgban.NewSellerFromInventory(ref, sessionInfo("ZZA"))}, currentPrices().vendors)
+
+	const rule = "50% of ZZA if ≥ $2.00"
+	for _, tt := range []struct {
+		name, mobile, want string
+	}{
+		{"desktop", "", `title="` + rule + `">Custom Buylist`},
+		{"phone", "true", `<div class="m-detail-note">` + rule + `</div>`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(co.Name), nil)
+			for name, value := range map[string]string{
+				"UploadCustomOpts": "enabled", "UploadCustomRate": "0.5",
+				"UploadCustomBuyer": "ZZA", "UploadCustomMinPrice": "2",
+				"MobileView": tt.mobile,
+			} {
+				req.AddCookie(&http.Cookie{Name: name, Value: value})
+			}
+			rec := httptest.NewRecorder()
+			testSite.Search(rec, req)
+			if page := rec.Body.String(); !strings.Contains(page, tt.want) {
+				t.Errorf("no %q on the %d byte page", tt.want, len(page))
 			}
 		})
 	}

@@ -76,6 +76,9 @@ type SearchEntry struct {
 	Listings      string
 	ListingsTitle string
 
+	// RuleTip spells the rule behind a custom buylist row.
+	RuleTip string
+
 	// PriceUnit says what the number in this row's price slot is worth: an
 	// offer to rank and show as currency (the zero value), a store's count
 	// of copies wanted (the scraper declares it), or a synthetic row's
@@ -2317,10 +2320,42 @@ func customBuylistSetting(s string) float64 {
 	return v
 }
 
+// tip spells the rule on one line for a tooltip, for a card or, when sealed,
+// a sealed product, which has no fallback: 80% of CK (or TCG Low) if ≥ $7.00.
+func (rule customBuylistRule) tip(p *prices, sealed bool) string {
+	reference := rule.seller
+	if sealed {
+		reference = rule.sealedSeller
+	}
+	tip := fmt.Sprintf("%.4g%% of %s", rule.rate*100, customBuylistTipName(p, reference))
+	if !sealed && rule.fallback != reference && customBuylistFallback(p, rule.fallback) != nil {
+		tip += " (or " + customBuylistTipName(p, rule.fallback) + ")"
+	}
+	if rule.minPrice > 0 {
+		tip += fmt.Sprintf(" if ≥ $%.2f", rule.minPrice)
+	}
+	return tip
+}
+
+// customBuylistTipName is how the tip names a reference: a store by its
+// shorthand, an index by its name.
+func customBuylistTipName(p *prices, shorthand string) string {
+	if !slices.Contains(UploadIndexComparePriceList, shorthand) {
+		return shorthand
+	}
+	return cmp.Or(p.scraperName(shorthand), shorthand)
+}
+
 // Append a virtual buylist to search results, priced off the reference
 // seller inventories according to the custom buylist rule settings
 func searchCustomBuylist(b *matcher.Backend, p *prices, r *http.Request, cardIDs []string, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
-	for _, offer := range customBuylistOffers(b, p, r, cardIDs) {
+	offers := customBuylistOffers(b, p, r, cardIDs)
+	if len(offers) == 0 {
+		return
+	}
+	rule := readCustomBuylistRule(r)
+	tips := map[bool]string{false: rule.tip(p, false), true: rule.tip(p, true)}
+	for _, offer := range offers {
 		if foundVendors[offer.cardID] == nil {
 			foundVendors[offer.cardID] = map[mtgban.Condition][]SearchEntry{}
 		}
@@ -2328,6 +2363,7 @@ func searchCustomBuylist(b *matcher.Backend, p *prices, r *http.Request, cardIDs
 			ScraperName: "Custom Buylist",
 			Shorthand:   "CUSTOM",
 			Price:       offer.price,
+			RuleTip:     tips[offer.sealed],
 		})
 	}
 }
@@ -2337,6 +2373,7 @@ type customOffer struct {
 	cardID    string
 	condition mtgban.Condition
 	price     float64
+	sealed    bool
 }
 
 // customBuylistOffers prices cardIDs off the reference seller inventories
@@ -2389,7 +2426,7 @@ func customBuylistOffers(b *matcher.Backend, p *prices, r *http.Request, cardIDs
 			if !isIndex {
 				condition = entry.Conditions
 			}
-			offers = append(offers, customOffer{cardID: cardID, condition: condition, price: entry.Price * rate})
+			offers = append(offers, customOffer{cardID: cardID, condition: condition, price: entry.Price * rate, sealed: co.Sealed})
 		}
 	}
 	return offers
