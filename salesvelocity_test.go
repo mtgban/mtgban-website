@@ -295,6 +295,42 @@ func TestLoadSalesVelocityNoSalesYet(t *testing.T) {
 	}
 }
 
+// TestLoadSalesVelocityClearsAPastProblem reports a run that had nothing to
+// load, so a failed read's problem clears once the newspaper answers again.
+func TestLoadSalesVelocityClearsAPastProblem(t *testing.T) {
+	newest := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
+	dayRows := func() *fakeRows {
+		return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{newest}}}
+	}
+	var answer func(string) (*fakeRows, error)
+	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) { return answer(query) }}
+	s := withFakeNewspaper(t, f)
+	setTestSalesVelocity(t, nil)
+	setTestJobs(t)
+
+	for _, next := range []struct {
+		name   string
+		answer func(string) (*fakeRows, error)
+	}{
+		{"the day already loaded", func(string) (*fakeRows, error) { return dayRows(), nil }},
+		{"no sales", func(string) (*fakeRows, error) { return &fakeRows{cols: []string{"sale_date"}}, nil }},
+	} {
+		answer = func(string) (*fakeRows, error) { return nil, errors.New("connection reset") }
+		s.loadSalesVelocity()
+		failed := jobRow(t, jobSalesVelocity)
+		if !strings.HasPrefix(failed.Problem, "cannot read the newspaper") {
+			t.Fatalf("%s: a failed read reported %q", next.name, failed.Problem)
+		}
+
+		answer = next.answer
+		s.loadSalesVelocity()
+		row := jobRow(t, jobSalesVelocity)
+		if row.Problem != "" || row.Result == "" {
+			t.Errorf("%s: the next run left result %q, problem %q; want a result and no problem", next.name, row.Result, row.Problem)
+		}
+	}
+}
+
 // TestRefreshNewspaperLoadsSalesVelocity checks for a new sale day when the
 // pages refresh, and the sales job shares their schedule on the dashboard.
 func TestRefreshNewspaperLoadsSalesVelocity(t *testing.T) {
