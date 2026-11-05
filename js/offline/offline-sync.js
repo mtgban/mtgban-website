@@ -118,8 +118,11 @@ async function runSync(msg) {
         var storesKey = stores.slice().sort().join(',');
         fullResync = fullResync || storesKey !== await self.OfflineDB.getMeta('storesKey');
 
+        // A new key cannot decrypt what is stored, so none of it counts as here.
         var have = {};
-        (await self.OfflineDB.listSetVersions()).forEach(function(row) { have[row.code] = row.version; });
+        if (!newKey) {
+            (await self.OfflineDB.listSetVersions()).forEach(function(row) { have[row.code] = row.version; });
+        }
 
         var changed = Object.keys(manifest.sets || {}).filter(function(code) {
             if (editions.length > 0 && editions.indexOf(code) < 0) return false;
@@ -136,6 +139,7 @@ async function runSync(msg) {
                 var code = changed[i];
                 try {
                     state.bytes += await syncSet(code, manifest.sets[code], stores, key);
+                    have[code] = manifest.sets[code];
                     state.done++;
                 } catch (e) {
                     // Lapsed access fails every set alike; anything else costs
@@ -159,6 +163,12 @@ async function runSync(msg) {
         // Two lanes: modest parallelism without hammering the server.
         await Promise.all([pump(), pump()]);
         if (forbiddenErr) throw forbiddenErr;
+
+        // The banner's warning. A failed refresh of a stored set is not one of
+        // these: its cards are still there, at their old prices.
+        await self.OfflineDB.setMeta('missingSets', Object.keys(manifest.sets || {}).filter(function(code) {
+            return (editions.length === 0 || editions.indexOf(code) >= 0) && !(code in have);
+        }).length);
 
         if (!cancelled) {
             // Edition-filtered runs must not record storesKey as fully resynced.

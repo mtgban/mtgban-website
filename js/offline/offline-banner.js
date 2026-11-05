@@ -1,6 +1,6 @@
 /*
- * Offline shell banner: live data age, stale warning, lapsed-auth notice,
- * and a back-online affordance driven by /healthz polling.
+ * Offline shell banner: live data age, stale and missing-sets warnings,
+ * lapsed-auth notice, and a back-online affordance driven by /healthz polling.
  */
 (function () {
     'use strict';
@@ -46,12 +46,38 @@
         return metaGet('lastSync');
     }
 
+    // Sets a first sync running in this tab has yet to download.
+    var left = 0;
+    // What the last read of the database found, once there has been one.
+    var read = false;
+    var lastSync = null;
+    var missing = 0;
+
+    function paintAge() {
+        var now = Date.now();
+        ageEl.textContent = OfflineAge.bannerText(lastSync, now, left, missing);
+        root.classList.toggle('offline-banner-stale', OfflineAge.isStale(lastSync, now) || missing > 0);
+    }
+
     function renderAge() {
-        getLastSync().then(function (lastSync) {
-            var now = Date.now();
-            ageEl.textContent = OfflineAge.refreshText(lastSync, now);
-            root.classList.toggle('offline-banner-stale', OfflineAge.isStale(lastSync, now));
+        Promise.all([getLastSync(), metaGet('missingSets')]).then(function (res) {
+            read = true;
+            lastSync = res[0];
+            missing = res[1] || 0;
+            paintAge();
         });
+    }
+
+    function onSyncMessage(e) {
+        var m = e.detail || {};
+        if (m.type === 'progress' && m.stage === 'prices') {
+            left = m.total - m.done;
+            // Only the count changed, and a first sync sends one per set
+            if (read && !lastSync) paintAge();
+        } else if (m.type === 'done' || m.type === 'error') {
+            left = 0;
+            renderAge();
+        }
     }
 
     function renderAuth() {
@@ -104,6 +130,8 @@
         renderAuth();
     }, AGE_TICK_MS);
     setInterval(poll, POLL_MS);
+    document.addEventListener('offline:sync-message', onSyncMessage);
+    document.addEventListener('offline:synced', renderAge);
     window.addEventListener('online', poll);
     window.addEventListener('offline', function () { backEl.hidden = true; if (settingsEl) settingsEl.style.display = 'none'; });
 

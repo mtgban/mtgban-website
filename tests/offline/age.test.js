@@ -36,3 +36,18 @@ test('staleness is strictly over three days, unknown counts as stale', () => {
     expect(OfflineAge.isStale(null, NOW)).toBe(true);
     expect(OfflineAge.isStale('junk', NOW)).toBe(true);
 });
+
+test('bannerText warns about sets still downloading on a first sync', () => {
+    expect(OfflineAge.bannerText(null, NOW, 829, 0)).toBe('Prices are still downloading (829 sets left). Some cards might be missing.');
+    expect(OfflineAge.bannerText(null, NOW, 1, 0)).toBe('Prices are still downloading (1 set left). Some cards might be missing.');
+    expect(OfflineAge.bannerText(null, NOW, 0, 0)).toBe(OfflineAge.refreshText(null, NOW));
+});
+
+test('bannerText warns about sets a sync left out', () => {
+    const refreshed = OfflineAge.refreshText(ago(5 * MIN), NOW);
+    expect(OfflineAge.bannerText(ago(5 * MIN), NOW, 0, 0)).toBe(refreshed);
+    expect(OfflineAge.bannerText(ago(5 * MIN), NOW, 0, 3)).toBe(refreshed + '\nThere are 3 sets that need to resync, a few results will be unavailable.');
+    expect(OfflineAge.bannerText(ago(5 * MIN), NOW, 0, 1)).toBe(refreshed + '\nThere is 1 set that needs to resync, a few results will be unavailable.');
+    // A refresh of sets already here is not a first sync
+    expect(OfflineAge.bannerText(ago(5 * MIN), NOW, 40, 0)).toBe(refreshed);
+});
