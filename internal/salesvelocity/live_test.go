@@ -72,6 +72,10 @@ func TestSalesVelocityLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	dayTook := time.Since(start)
+	err = db.QueryRowContext(ctx, GlobalDayQuery, Window).Scan(&newest)
+	if err != nil {
+		t.Fatal(err)
+	}
 	day := lastCompleteSaleDay(newest)
 	t.Logf("the window ends on %s", day.Format(time.DateOnly))
 

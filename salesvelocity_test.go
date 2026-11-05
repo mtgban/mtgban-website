@@ -178,7 +178,7 @@ func TestLoadSalesVelocityReadsInOneSnapshot(t *testing.T) {
 	newest := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
 		switch query {
-		case salesvelocity.DayQuery:
+		case salesvelocity.DayQuery, salesvelocity.GlobalDayQuery:
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{newest}}}, nil
 		case salesvelocity.WindowQuery:
 			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}}, nil
@@ -193,11 +193,11 @@ func TestLoadSalesVelocityReadsInOneSnapshot(t *testing.T) {
 		{sql: salesvelocity.WindowQuery, args: []driver.Value{"2026-09-13", "2026-10-12", "Magic: The Gathering"}, inTx: true},
 		{sql: salesvelocity.LastQuery, args: []driver.Value{"2025-10-13", "2026-10-12", "Magic: The Gathering"}, inTx: true},
 	}
-	if len(queries) != len(want)+1 {
-		t.Fatalf("got %d queries, want the day and %d more", len(queries), len(want))
+	if len(queries) != len(want)+2 {
+		t.Fatalf("got %d queries, want the two days and %d more", len(queries), len(want))
 	}
 	for i, w := range want {
-		q := queries[i+1]
+		q := queries[i+2]
 		if q.sql != w.sql || !slices.Equal(q.args, w.args) || q.inTx != w.inTx {
 			t.Errorf("query %d: got args %v in a transaction %v, want %v, %v", i, q.args, q.inTx, w.args, w.inTx)
 		}
@@ -230,12 +230,12 @@ func withFakeNewspaper(t *testing.T, f *fakeNewspaper) *site {
 }
 
 // TestLoadSalesVelocityReadsOneGame reads the newest sale day for the site's
-// own game, then the sales to the day before it, the last complete one, for the
-// same game only.
+// own game and for every game, then the sales to the day before it, the last
+// complete one, for the site's game only.
 func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 	day := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
-		if query == salesvelocity.DayQuery {
+		if query == salesvelocity.DayQuery || query == salesvelocity.GlobalDayQuery {
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{day}}}, nil
 		}
 		return &fakeRows{cols: []string{"p", "v", "l"}}, nil
@@ -246,13 +246,16 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 
 	s.loadSalesVelocity()
 	queries := f.seen()
-	if len(queries) != 3 {
-		t.Fatalf("got %d queries, want 3", len(queries))
+	if len(queries) != 4 {
+		t.Fatalf("got %d queries, want 4", len(queries))
 	}
 	if queries[0].sql != salesvelocity.DayQuery || !slices.Equal(queries[0].args, []driver.Value{gameMap[matcher.GameLorcana], int64(salesvelocity.Window)}) {
 		t.Errorf("first query: got %q %v, want the day query scoped to %q", queries[0].sql, queries[0].args, gameMap[matcher.GameLorcana])
 	}
-	for _, q := range queries[1:] {
+	if queries[1].sql != salesvelocity.GlobalDayQuery || !slices.Equal(queries[1].args, []driver.Value{int64(salesvelocity.Window)}) {
+		t.Errorf("second query: got %q %v, want the day query across every game", queries[1].sql, queries[1].args)
+	}
+	for _, q := range queries[2:] {
 		if len(q.args) != 3 || q.args[1] != "2026-10-11" || q.args[2] != gameMap[matcher.GameLorcana] {
 			t.Errorf("got args %v, want the day and %q", q.args, gameMap[matcher.GameLorcana])
 		}
@@ -267,8 +270,57 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 		t.Errorf("a load matching no card: reported %q, want a failure on the day before %s", problem, day.Format(time.DateOnly))
 	}
 	s.loadSalesVelocity()
-	if n := len(f.seen()); n != 4 {
-		t.Errorf("the failed day retried at once: got %d queries, want only one more day query", n)
+	if n := len(f.seen()); n != 6 {
+		t.Errorf("the failed day retried at once: got %d queries, want only the two day queries more", n)
+	}
+}
+
+// TestLoadSalesVelocityEndsOnEveryGamesCompleteDay ends a game's window on the
+// day before the newest sale of any game, not of its own: the newspaper writes
+// a day for every game at once, so a game that sold nothing on it is complete.
+func TestLoadSalesVelocityEndsOnEveryGamesCompleteDay(t *testing.T) {
+	skipWithoutDatastore(t)
+	cardID, productID := counterspellProduct(t, backend())
+	gameNewest := time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)
+	globalNewest := gameNewest.AddDate(0, 0, 1)
+	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
+		switch query {
+		case salesvelocity.DayQuery:
+			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{gameNewest}}}, nil
+		case salesvelocity.GlobalDayQuery:
+			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{globalNewest}}}, nil
+		case salesvelocity.WindowQuery:
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}, vals: [][]driver.Value{
+				{productID, "Normal", int64(3), int64(2), int64(1)},
+			}}, nil
+		}
+		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{productID, "Normal", gameNewest}}}, nil
+	}}
+	s := withFakeNewspaper(t, f)
+	s.ds.Store(testSite.datastore())
+
+	s.loadSalesVelocity()
+	snap := salesVelocityStore.Snapshot()
+	if snap == nil || !snap.Day.Equal(gameNewest) {
+		t.Fatalf("snapshot: got %+v, want one for %s, the day before every game's newest", snap, gameNewest.Format(time.DateOnly))
+	}
+	_, found := salesVelocityStore.For(cardID)
+	if !found {
+		t.Errorf("%s: no sales filed", cardID)
+	}
+	want := map[string][]driver.Value{
+		salesvelocity.WindowQuery: {"2026-10-05", "2026-11-03", "Magic: The Gathering"},
+		salesvelocity.LastQuery:   {"2025-11-04", "2026-11-03", "Magic: The Gathering"},
+	}
+	for _, q := range f.seen() {
+		w, bounded := want[q.sql]
+		if bounded && !slices.Equal(q.args, w) {
+			t.Errorf("got args %v, want %v", q.args, w)
+		}
+		delete(want, q.sql)
+	}
+	if len(want) != 0 {
+		t.Errorf("never ran %d of the window and lookback", len(want))
 	}
 }
 
@@ -428,7 +480,7 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 	lastSale := day.AddDate(0, 0, -1)
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
 		switch query {
-		case salesvelocity.DayQuery:
+		case salesvelocity.DayQuery, salesvelocity.GlobalDayQuery:
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{day}}}, nil
 		case salesvelocity.WindowQuery:
 			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}, vals: [][]driver.Value{
@@ -441,8 +493,8 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 	s.ds.Store(testSite.datastore())
 
 	s.loadSalesVelocity()
-	if n := len(f.seen()); n != 3 {
-		t.Fatalf("got %d queries, want the day, the window and the lookback", n)
+	if n := len(f.seen()); n != 4 {
+		t.Fatalf("got %d queries, want the two days, the window and the lookback", n)
 	}
 	got, found := salesVelocityStore.For(cardID)
 	want := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: lastSale}
@@ -455,8 +507,8 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 
 	s.loadSalesVelocity()
 	queries := f.seen()
-	if len(queries) != 4 || queries[3].sql != salesvelocity.DayQuery || len(queries[3].args) != 2 {
-		t.Errorf("second run on the same day: got %d queries, want only the day query, scoped to the game, after the first 3", len(queries))
+	if len(queries) != 6 || queries[4].sql != salesvelocity.DayQuery || queries[5].sql != salesvelocity.GlobalDayQuery {
+		t.Errorf("second run on the same day: got %d queries, want only the two day queries after the first 4", len(queries))
 	}
 }
 
