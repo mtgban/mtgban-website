@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -735,6 +736,33 @@ func TestHistoryAPISetPages(t *testing.T) {
 	rec, _ = historyGet(t, s, "/api/v2/history/sealed/nope.json", "history", "365", nil)
 	if rec.Code != 404 {
 		t.Errorf("unknown sealed set: %d", rec.Code)
+	}
+}
+
+// A NaN or infinite archive price is left out, in JSON and CSV, and the
+// card's other points still answer.
+func TestHistoryAPINotFinite(t *testing.T) {
+	s := historySite(t)
+	historyFixture(t, map[int64]map[string]timeseries.ProviderPrices{
+		100: {"2026-10-05": {1: 8.49, 3: math.NaN()}, "2026-10-06": {1: math.Inf(1), 3: 4.99}},
+	}, nil)
+	rec, out := historyGet(t, s, "/api/v2/history/h-1.json", "history", "365", nil)
+	if rec.Code != 200 {
+		t.Fatalf("JSON: %d %s", rec.Code, rec.Body.String())
+	}
+	ck, tcg := out.Retail["scry-1"]["nonfoil"]["CK"], out.Retail["scry-1"]["nonfoil"]["TCGLow"]
+	if ck == nil || !slices.Equal(ck.Dates, []string{"2026-10-05"}) || !slices.Equal(ck.Prices, []float64{8.49}) {
+		t.Errorf("CK %+v", ck)
+	}
+	if tcg == nil || !slices.Equal(tcg.Dates, []string{"2026-10-06"}) || !slices.Equal(tcg.Prices, []float64{4.99}) {
+		t.Errorf("TCGLow %+v", tcg)
+	}
+	csvRec := historyServe(t, s, "/api/v2/history/h-1.csv", historyFields("history", "365"), nil)
+	want := "id,finish,store,section,date,price\n" +
+		"scry-1,nonfoil,CK,retail,2026-10-05,8.49\n" +
+		"scry-1,nonfoil,TCGLow,retail,2026-10-06,4.99\n"
+	if csvRec.Code != 200 || csvRec.Body.String() != want {
+		t.Errorf("CSV: %d\n%s\nwant\n%s", csvRec.Code, csvRec.Body.String(), want)
 	}
 }
 
