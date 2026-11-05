@@ -1235,22 +1235,30 @@ func TestNewspaperSalesJobRunsOnOneSite(t *testing.T) {
 	}
 }
 
-// TestVelocityRateOnInfoPages shows the rate and its tooltip on arbitrage, whatever
-// the reader's tier, on the card selling fast enough alone.
+// TestVelocityRateOnInfoPages shows the rate and its tooltip on arbitrage and Global,
+// whatever the reader's tier, on the card selling fast enough alone.
 func TestVelocityRateOnInfoPages(t *testing.T) {
 	cards := closeVendors(t)
-	if LogPages["Arbitrage"] == nil {
-		LogPages["Arbitrage"] = log.New(io.Discard, "", 0)
-		t.Cleanup(func() { delete(LogPages, "Arbitrage") })
+	for _, name := range []string{"Arbitrage", "Global"} {
+		if LogPages[name] == nil {
+			LogPages[name] = log.New(io.Discard, "", 0)
+			t.Cleanup(func() { delete(LogPages, name) })
+		}
 	}
+	withConfigCopy(t)
+	Config().Stores.GlobalAllowList = []string{"ZZG"}
+	Config().Stores.GlobalProbeList = []string{"ZZA"}
 	stock := mtgban.InventoryRecord{}
+	probe := mtgban.InventoryRecord{}
 	ref := mtgban.InventoryRecord{}
 	for _, card := range cards {
 		stock[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 1, Quantity: 2, URL: "u"}}
+		probe[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 10, Quantity: 2, URL: "u"}}
 		ref[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 100}}
 	}
 	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(stock, sessionInfo("ZZS")),
+		mtgban.NewSellerFromInventory(probe, sessionInfo("ZZG")),
 		mtgban.NewSellerFromInventory(ref, sessionInfo("ZZA")),
 	}, currentPrices().vendors)
 	co, err := backend().GetUUID(cards[0])
@@ -1274,13 +1282,20 @@ func TestVelocityRateOnInfoPages(t *testing.T) {
 			testSite.Arbit(rec, req)
 			return rec.Body.String()
 		},
+		"global": func(cookie *http.Cookie) string {
+			req := httptest.NewRequest(http.MethodGet, "/global?source=ZZG&f=1&legit=0", nil)
+			req.AddCookie(cookie)
+			rec := httptest.NewRecorder()
+			testSite.Global(rec, req)
+			return rec.Body.String()
+		},
 	}
 
 	signingEnabled(t, true)
 	reader := func(news string) *http.Cookie {
 		fields := url.Values{
 			"UserEmail": {"reader@example.com"}, "UserTier": {"Test"},
-			"ArbitEnabled": {"ALL"},
+			"ArbitEnabled": {"ALL"}, "AnyEnabled": {"true"},
 		}
 		if news != "" {
 			fields.Set("NewsEnabled", news)
