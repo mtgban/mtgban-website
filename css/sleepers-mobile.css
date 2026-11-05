@@ -121,17 +121,6 @@
     margin: 0 0 0.15em;
 }
 
-.m-sleep-beta {
-    font-size: 0.6rem;
-    font-weight: 700;
-    padding: 0.1em 0.35em;
-    border-radius: 3px;
-    background: var(--dodgerblue-fill);
-    color: white;
-    text-transform: uppercase;
-    vertical-align: middle;
-}
-
 .m-sleep-gap-desc {
     font-size: 0.75rem;
     color: var(--greytext);
