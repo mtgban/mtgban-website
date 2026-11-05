@@ -378,6 +378,10 @@ func TestArbitMinProfitAsShown(t *testing.T) {
 			t.Errorf("%v is held at %s, want the %.2f the table prints", p, got, p)
 		}
 	}
+	got := fmt.Sprintf("%.2f", asShown(-0.004))
+	if got != "0.00" {
+		t.Errorf("-0.004 is shown as %s, want 0.00", got)
+	}
 }
 
 // TestArbitMinDiffAndSpreadAsShown holds the difference and spread bounds

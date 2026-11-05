@@ -434,10 +434,10 @@ func (f arbitRowFilter) keep(e mtgban.ArbitEntry, noQuantity bool) bool {
 const shownStep = 0.01
 
 // asShown is a value rounded as the table prints it, through the same
-// formatter, which rounds a half to even.
+// formatter, which rounds a half to even, and a minus zero as zero.
 func asShown(x float64) float64 {
 	v, _ := strconv.ParseFloat(strconv.FormatFloat(x, 'f', 2, 64), 64)
-	return v
+	return v + 0
 }
 
 // unbounded is the state with the reader's limits dropped, picks and
