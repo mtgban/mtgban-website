@@ -14,9 +14,11 @@ with `sales_count`, the copies sold, and `num_orders`, the orders they
 came in. A row exists only for a day with a sale. There is no game
 column: TCGplayer's product ids are global.
 
-The newspaper keeps at most five orders per product a day. On a day with
-five orders, both the orders and the copies are floors: the card may have
-sold more. The row and its details say so.
+The newspaper pulls TCGplayer's `latestsales` for each product with a
+signed-in cookie. Signed out, TCGplayer returns only the newest five sales, and
+rows before 2026-10-13 were pulled that way, so they hold at most five orders
+a day. A window ending before 2026-11-11 reaches back past that date and reads
+low on the busiest cards.
 
 ## The metric
 
@@ -25,7 +27,6 @@ Per card uuid, a printing in one finish:
 - copies and orders summed over the 30 days ending on the newest
   `sale_date` in the table, not today, since the scrape lags a day;
 - the days in that window with a sale;
-- capped, when any day in the window has five orders;
 - the last sale over the 365 days ending on the same day.
 
 The rate is the copies over 30, to one decimal.
@@ -39,11 +40,7 @@ The rate is the copies over 30, to one decimal.
 | A rate | copies in the window | `2.3/day`, or `<0.1/day` under a tenth | copies, orders, days with a sale, last sale |
 
 `velocityText` (salesvelocity.go) writes both. The details open with
-`Sold on TCGplayer, last 30 days`. A capped rate reads `>=2.3/day`, and
-its details mark the copies and orders `(at least)` and end with `the
-newspaper keeps five orders a day, so these are floors`. A capped rate
-under a tenth would still print `<0.1/day`: the small-rate form takes
-priority over the floor mark.
+`Sold on TCGplayer, last 30 days`.
 
 The row is a `<details>` on both layouts, showing the rate and opening on a
 click or tap to the details, so a phone reads what a desktop reads. A phone
@@ -69,8 +66,8 @@ upsell lines.
 ## Searching by it
 
 `v>1` or `velocity>1` finds the cards selling more than once a day, and `<`
-those selling less, by the same copies over 30 the row shows; a capped card
-compares at its floor. A card with no data matches neither, and `-v>1` keeps
+those selling less, by the same copies over 30 the row shows. A card with no
+data matches neither, and `-v>1` keeps
 it. Each printing is judged on its own finish.
 
 The filter parses locked, and a locked one matches nothing, negated or not,
@@ -130,19 +127,15 @@ and build in Go:
 | last sale over 365 days | 23612 | 163867 |
 | match and build (cards) | 705 | 157385 |
 
-Entries are the cards with a sale in the year, capped share is of those,
-and zero counts the cards with no sale in the window. Unmatched pairs
+Entries are the cards with a sale in the year, and zero counts the cards with no sale in the window. Unmatched pairs
 count the product and printing pairs no card matches. The last column
 derives this game's pairs again from `tcgplayerproductinfomodel`, apart
 from the queries, and counts those unmatched; matching the column before
 it shows the semi-join kept to the game.
 
-| entries | capped | capped share | zero | unmatched pairs | this game's pairs unmatched |
-|---:|---:|---:|---:|---:|---:|
-| 157385 | 22937 | 14.6% | 17020 | 6477 | 6477 of 163867 |
-
-A card counts as capped if any day in its window was, so the capped
-share of cards runs well above the share of capped days.
+| entries | zero | unmatched pairs | this game's pairs unmatched |
+|---:|---:|---:|---:|
+| 157385 | 17020 | 6477 | 6477 of 163867 |
 
 ## Watching the pull
 

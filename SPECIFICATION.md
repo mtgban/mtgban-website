@@ -651,8 +651,7 @@ override; phone UA detection via `mileusna/useragent`).
 - **Sales velocity** (`salesvelocity.go`, `docs/search-sales-velocity.md`):
   a collapsible row atop each result's Buyers with TCGplayer's copies sold
   a day over the last 30 days, from the newspaper's `tcgplayersalesdata`:
-  `>=` where the newspaper's five-orders-a-day cap made it a floor, `0/day`
-  for a card that sold in the year but not the window, nothing for one with
+  `0/day` for a card that sold in the year but not the window, nothing for one with
   no sale in the year. Shown only to the Newspaper tiers (`newspaperTier`,
   news.go, through `SearchVars.CanVelocity`); other readers get an upsell
   line in its place unless `noUpsell` is set. Never in the oEmbed preview.
