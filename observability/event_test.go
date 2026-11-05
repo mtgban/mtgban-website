@@ -9,6 +9,7 @@ func TestNormalizePath(t *testing.T) {
 		{"/newspaper", "spike_score", "newspaper/spike_score"},
 		{"/newspaper", "bogus", "newspaper/other"},
 		{"/sleepers", "hotlist", "sleepers/hotlist"},
+		{"/sleepers", "velocity", "sleepers/velocity"},
 		{"/sleepers", "", "sleepers/index"},
 		{"/search", "options", "search"},
 		{"/arbit", "", "arbit"},

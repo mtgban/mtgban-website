@@ -868,6 +868,7 @@ func SleepersTargetsJSON() template.JS {
 		{Value: "mismatch", Label: "Market Mismatch"},
 		{Value: "gap", Label: "Ocean Gap"},
 		{Value: "hotlist", Label: "Highest Buylist Growth"},
+		{Value: "velocity", Label: "Sales Velocity"},
 	}
 	data, _ := json.Marshal(out)
 	return template.JS(data)

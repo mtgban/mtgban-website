@@ -258,7 +258,7 @@ func TestSleepersVelocityGatedByTier(t *testing.T) {
 
 	setSalesVelocityStore(t, &salesvelocity.Store{})
 	index = page("/sleepers", reader("1day"))
-	if strings.Contains(index, "Sales Velocity") {
+	if strings.Contains(index, "<h3>Sales Velocity</h3>") {
 		t.Error("the card shows with no sales loaded")
 	}
 }
