@@ -491,6 +491,9 @@ func (pair sleeperPair) cardIDs(b *matcher.Backend) []string {
 type sleeperHits struct {
 	once    sync.Once
 	cardIDs []string
+
+	// Under the cache's mutex: whether cardIDs is set
+	done bool
 }
 
 // sleeperCache holds one prices snapshot's pairs' hits, against the backend
@@ -503,8 +506,8 @@ type sleeperCache struct {
 	pairs   map[sleeperPair]*sleeperHits
 }
 
-// sleeperTiersFor is next's cache: the pairs of prev's that next still
-// publishes, nil before the first publish.
+// sleeperTiersFor is next's cache: the finished pairs of prev's that next
+// still publishes. prev is nil before the first publish.
 func sleeperTiersFor(prev, next *prices) *sleeperCache {
 	c := &sleeperCache{pairs: map[sleeperPair]*sleeperHits{}}
 	if prev == nil {
@@ -515,7 +518,7 @@ func sleeperTiersFor(prev, next *prices) *sleeperCache {
 	c.backend = prev.sleepers.backend
 	for _, pair := range sleeperPairs(next, nil, nil) {
 		entry, found := prev.sleepers.pairs[pair]
-		if found {
+		if found && entry.done {
 			c.pairs[pair] = entry
 		}
 	}
@@ -546,9 +549,8 @@ func (c *sleeperCache) hits(b *matcher.Backend, pairs []sleeperPair) [][]string 
 	for i, entry := range held {
 		entry.once.Do(func() {
 			// A pair that panicked is not held empty: the next request asks again
-			finished := false
 			defer func() {
-				if finished {
+				if entry.done {
 					return
 				}
 				c.mu.Lock()
@@ -557,8 +559,10 @@ func (c *sleeperCache) hits(b *matcher.Backend, pairs []sleeperPair) [][]string 
 				}
 				c.mu.Unlock()
 			}()
-			entry.cardIDs = pairs[i].cardIDs(b)
-			finished = true
+			cardIDs := pairs[i].cardIDs(b)
+			c.mu.Lock()
+			entry.cardIDs, entry.done = cardIDs, true
+			c.mu.Unlock()
 		})
 		out[i] = entry.cardIDs
 	}
