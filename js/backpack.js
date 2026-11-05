@@ -225,12 +225,14 @@
         return true;
     }
 
-    // addTab opens a new, empty backpack under the lowest number free.
+    // addTab opens a new, empty backpack numbered past every one shown or
+    // deleted, so a deleted backpack's tombstone keeps its number to itself.
     function addTab() {
         var list = tabs();
         if (list.length >= TABS) return false;
-        var p = 1;
-        while (list.some(function (t) { return t.pack === p; })) p++;
+        var p = list.concat(storedTabs()).reduce(function (n, t) {
+            return t ? Math.max(n, ListStorage.backpackPack(t)) : n;
+        }, 0) + 1;
         list.push({ pack: p, name: "Backpack " + p });
         saveTabs(list);
         setActive(p);
