@@ -114,6 +114,10 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	page := r.FormValue("page")
+	// With no sales loaded the velocity page has nothing to rank.
+	if page == "velocity" && !pageVars.HasVelocity {
+		page = ""
+	}
 	switch page {
 	default:
 		pageVars.Subtitle = "Index"

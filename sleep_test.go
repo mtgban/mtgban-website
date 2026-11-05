@@ -213,7 +213,7 @@ func TestVelocityTiers(t *testing.T) {
 }
 
 // TestSleepersVelocityNeedsSales links the page from the index once sales are
-// loaded, and not before.
+// loaded, and not before, when the page itself serves the index.
 func TestSleepersVelocityNeedsSales(t *testing.T) {
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
@@ -223,19 +223,23 @@ func TestSleepersVelocityNeedsSales(t *testing.T) {
 		t.Cleanup(func() { delete(LogPages, "Sleepers") })
 	}
 	withSigMode(t, true, false)
-	index := func() string {
+	get := func(target string) string {
 		rec := httptest.NewRecorder()
-		testSite.Sleepers(rec, httptest.NewRequest(http.MethodGet, "/sleepers", nil))
+		testSite.Sleepers(rec, httptest.NewRequest(http.MethodGet, target, nil))
 		return rec.Body.String()
 	}
 	const link = `href="?page=velocity"`
 
 	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{"a-card": {Copies: 3}})
-	if !strings.Contains(index(), link) {
+	if !strings.Contains(get("/sleepers"), link) {
 		t.Error("no link on the index with sales loaded")
 	}
 	setSalesVelocityStore(t, &salesvelocity.Store{})
-	if strings.Contains(index(), link) {
+	if strings.Contains(get("/sleepers"), link) {
 		t.Error("the link shows with no sales loaded")
+	}
+	page := get("/sleepers?page=velocity")
+	if strings.Contains(page, "Errors have been made") || !strings.Contains(page, "Sleepers - Index</title>") {
+		t.Error("the velocity page with no sales loaded does not serve the index")
 	}
 }
