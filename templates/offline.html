@@ -118,7 +118,7 @@
         if (!exec) { el.textContent = ''; return; }
         var n = exec.results.length;
         var shown = Math.min(n, PAGE_SIZE);
-        el.textContent = n ? n + ' result' + (n > 1 ? 's' : '') + ' found' + (n > shown ? ' (' + shown + ' shown)' : '') : '';
+        el.textContent = n + ' result' + (n === 1 ? '' : 's') + ' found' + (n > shown ? ' (' + shown + ' shown)' : '');
     }
 
     function paintPills() {
