@@ -301,8 +301,8 @@ add-on to the price plans:
   `APImode` and `UserEmail` (`apisig.APIFields`); a key without it gets 30
   days. The site's `SearchChartLoopback`, which its own charts read, is
   unrelated and means nothing to the history endpoint.
-  The package is `history` in `apiproductlist/products.json`, 365 days;
-  its price is a placeholder until the maintainers set it.
+  The package is `history` in `apiproductlist/products.json`, 365 days,
+  at $300 a month.
 - the sources are the archive's, not a store list, so the package has no
   `store_scope`. Every history plan reads every source; plans differ by
   lookback (decided).
@@ -409,5 +409,7 @@ response changes only when a snapshot runs:
 4. Deploy every game host, then the gateway, then set
    `api_gateway.history_on_sale` on the hosts and update the wiki.
 
-A host with no stores loaded refuses history too, with the price API's
-503, since the two share the API middleware (`enforceAPISigning`).
+History serves before a host's stores load: the price API's 503 for
+that is its own handler's, not the middleware's (`enforceAPISigning`).
+Until they load, `id=tcg` leaves out a card whose TCGplayer id comes
+only from the store dumps.
