@@ -27,28 +27,43 @@ function makeEl(attrs = {}) {
         toggleAttribute: (name, on) => { if (on) attrs[name] = ''; else delete attrs[name]; },
         querySelector: () => null,
         querySelectorAll: () => [],
+        blur: () => { attrs.blurred = true; },
     };
 }
 
 // Runs the page's real scripts against stand-ins for the document, the database
 // and the query. Each query answers with the rows queries[q] names.
-function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queries = {}, broken = false, gates = {}, states = [] } = {}) {
+function loadPage(file, { search = '', ids = [], pills = [], navLinks = [], cookies = {}, queries = {}, broken = false, gates = {}, states = [], stored = { offline_live_search: 'false' } } = {}) {
     const els = Object.fromEntries(ids.map((id) => [id, makeEl()]));
     const docListeners = {};
     const winListeners = {};
     const location = { search, pathname: '/offline' };
-    const hold = { draw: null, fail: false, views: [] };
-    const log = { namesRead: [], pushed: [], parsed: [], executed: [], rendered: [], sorted: [], mounted: null, errors: [], art: [] };
+    const hold = { draw: null, fail: false, views: [], full: [] };
+    const log = { namesRead: [], pushed: [], replaced: [], parsed: [], drafts: [], executed: [], rendered: [], sorted: [], mounted: null, errors: [], art: [], scrolls: [], dictReads: 0 };
+    const timers = new Map();
+    let nextTimer = 0;
 
     const document = {
         getElementById: (id) => els[id] || null,
-        querySelectorAll: (sel) => (sel === '.search-sort-pill' ? pills : []),
+        querySelectorAll: (sel) => (sel === '.search-sort-pill' ? pills : sel === '.offline-mode-btn' ? navLinks : []),
         addEventListener: (type, fn) => { docListeners[type] = fn; },
     };
-    const window = { addEventListener: (type, fn) => { winListeners[type] = fn; } };
+    const window = {
+        addEventListener: (type, fn) => { winListeners[type] = fn; },
+        scrollTo: (x, y) => log.scrolls.push(['to', y]),
+        scrollBy: (x, y) => log.scrolls.push(['by', y]),
+    };
+    const localStorage = {
+        getItem: (key) => (key in stored ? stored[key] : null),
+        setItem: (key, value) => { stored[key] = value; },
+    };
     const history = {
         pushState: (_state, _title, url) => {
             log.pushed.push(url);
+            location.search = url.startsWith('?') ? url : '';
+        },
+        replaceState: (_state, _title, url) => {
+            log.replaced.push(url);
             location.search = url.startsWith('?') ? url : '';
         },
     };
@@ -67,9 +82,14 @@ function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queri
         getAllRows: async () => [],
     };
     const dicts = { sets: { NEO: {} }, stores: {}, finishes: [], rarities: [] };
-    const OfflineUtil = { normName: (s) => s, loadCatalogDicts: async () => dicts, loadSetPayload: async () => null };
+    const OfflineUtil = { normName: (s) => s, loadCatalogDicts: async () => { log.dictReads++; return dicts; }, loadSetPayload: async () => null };
     const OfflineQuery = {
-        parse: (q) => { log.parsed.push(q); return { q }; },
+        parse: (q, _finishes, _rarities, _sets, options) => {
+            log.parsed.push(q);
+            log.drafts.push(options.draft);
+            return { q };
+        },
+        answerable: (parsed) => parsed.q.length >= 3,
         execute: async (parsed, env, view) => {
             log.executed.push(parsed);
             log.env = env;
@@ -80,6 +100,7 @@ function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queri
         },
         showPage: async (out, _env, view) => {
             hold.views.push(view.allPrices ? view.allPrices() : false);
+            hold.full.push(view);
             if (view.order) view.order(out.results);
             out.page = out.results.slice(0, view.size);
             if (hold.draw) await hold.draw;
@@ -91,11 +112,16 @@ function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queri
     const render = (el, page, ctx) => { log.rendered.push({ page, ctx }); el.innerHTML = 'drawn ' + page.results.length; };
     const self = {};
     const consoleStub = { error: (...args) => log.errors.push(args) };
-    const names = ['self', 'document', 'window', 'location', 'history', 'console', 'getCookie', 'setCardArtSource',
+    const setTimeout = (fn) => { timers.set(++nextTimer, fn); return nextTimer; };
+    const clearTimeout = (id) => { timers.delete(id); };
+    const getComputedStyle = () => ({ top: '77px' });
+    const names = ['self', 'document', 'window', 'location', 'history', 'console', 'getCookie', 'setCardArtSource', 'localStorage',
+        'setTimeout', 'clearTimeout', 'getComputedStyle',
         'OfflineDB', 'OfflineUtil', 'OfflineQuery', 'OfflineSearch', 'OfflineRender', 'OfflineRenderMobile'];
     const args = [self, document, window, location, history, consoleStub, (name) => cookies[name] || '',
-        (el, url) => log.art.push(url), OfflineDB, OfflineUtil, OfflineQuery, OfflineSearch, { render }, { render }];
-    for (const src of [read('offline-page.js'), read(file)]) new Function(...names, src)(...args);
+        (el, url) => log.art.push(url), localStorage, setTimeout, clearTimeout, getComputedStyle,
+        OfflineDB, OfflineUtil, OfflineQuery, OfflineSearch, { render }, { render }];
+    for (const src of [read('offline-live.js'), read('offline-page.js'), read(file)]) new Function(...names, src)(...args);
 
     return {
         els,
@@ -106,6 +132,15 @@ function loadPage(file, { search = '', ids = [], pills = [], cookies = {}, queri
         settle: () => new Promise((resolve) => setImmediate(resolve)),
         load: () => docListeners.DOMContentLoaded(),
         pop: () => winListeners.popstate(),
+        // Stands in for the box having sat still long enough.
+        pause: async () => {
+            const waiting = [...timers.values()];
+            timers.clear();
+            waiting.forEach((fn) => fn());
+            await new Promise((resolve) => setImmediate(resolve));
+        },
+        pausePending: () => timers.size > 0,
+        type: (value) => log.mounted.onType(value),
     };
 }
 
@@ -433,4 +468,334 @@ test('mobile mode pills drop the query when the box empties', async () => {
     page.log.mounted.onSubmit('');
     expect(page.els['offline-pill-singles'].href).toBe('/offline');
     expect(page.els['offline-pill-sealed'].href).toBe('/offline?sealed=1');
+});
+
+// Results as you type.
+const LIVE = { stored: { offline_live_search: 'true' } };
+const rows = (n) => Array.from({ length: n }, (_, i) => ({ uuid: 'r' + i }));
+
+for (const [file, ids, box, results] of [
+    ['offline-page-desktop.js', DESKTOP, 'nav-searchbox', 'offline-results'],
+    ['offline-page-mobile.js', MOBILE, 'navsearchbox', 'm-offline-results'],
+]) {
+    const liveStart = (opts) => started(file, { ids, ...LIVE, ...opts });
+
+    test(file + ' draws a first screen per keystroke and the page on the pause', async () => {
+        const page = await liveStart({ queries: { sol: rows(150) } });
+        page.type('sol');
+        await page.settle();
+        expect(page.els[results].innerHTML).toBe('drawn 10');
+        expect(page.log.drafts.at(-1)).toBe(true);
+        await page.pause();
+        expect(page.els[results].innerHTML).toBe('drawn 100');
+        expect(page.log.drafts.at(-1)).toBe(false);
+    });
+
+    test(file + ' adds one history entry per stretch of typing', async () => {
+        const page = await liveStart({ queries: { sol: rows(1), 'sol ring': rows(1) } });
+        page.type('sol');
+        page.type('sol r');
+        expect(page.log.pushed).toEqual(['?q=sol']);
+        expect(page.log.replaced).toEqual([]);
+        page.type('sol ring ');
+        await page.pause();
+        expect(page.log.pushed).toEqual(['?q=sol']);
+        expect(page.log.replaced).toEqual(['?q=sol%20ring']);
+        page.type('sol ring f');
+        expect(page.log.pushed).toEqual(['?q=sol', '?q=sol%20ring%20f']);
+    });
+
+    test(file + ' keeps the answer up until a new one is ready, and keeps zero for the pause', async () => {
+        let open;
+        const gate = new Promise((resolve) => { open = resolve; });
+        const page = await liveStart({ queries: { sol: rows(3) }, gates: { 'sol x': gate } });
+        page.type('sol');
+        await page.settle();
+        page.type('sol x');
+        await page.settle();
+        expect(page.els[results].innerHTML).toBe('drawn 3');
+        open();
+        await page.settle();
+        expect(page.els[results].innerHTML).toBe('drawn 3');
+        await page.pause();
+        expect(page.els[results].innerHTML).toBe('drawn 0');
+    });
+
+    test(file + ' skips what is not worth asking, and drops the search it replaced', async () => {
+        let open;
+        const gate = new Promise((resolve) => { open = resolve; });
+        const page = await liveStart({ queries: { sol: rows(3) }, gates: { sol: gate } });
+        page.type('sol');
+        page.type('so');
+        expect(page.log.executed.map((p) => p.q)).toEqual(['sol']);
+        open();
+        await page.settle();
+        expect(page.els[results].innerHTML).toBe('');
+        expect(page.pausePending()).toBe(true);
+    });
+
+    test(file + ' a pause on too little leaves the page alone, and Enter still asks', async () => {
+        const page = await liveStart({ queries: { sol: rows(3) } });
+        page.type('sol');
+        await page.pause();
+        page.type('so');
+        await page.pause();
+        expect(page.els[results].innerHTML).toBe('drawn 3');
+        expect(page.log.executed.map((p) => p.q)).toEqual(['sol', 'sol']);
+        expect(page.log.replaced.at(-1)).toBe('?q=so');
+        page.log.mounted.onSubmit('so');
+        await page.settle();
+        expect(page.log.executed.at(-1).q).toBe('so');
+        expect(page.els[results].innerHTML).toBe('drawn 0');
+    });
+
+    test(file + ' tells a replaced search to stop opening sets', async () => {
+        let open;
+        const gate = new Promise((resolve) => { open = resolve; });
+        const page = await liveStart({ queries: { sol: rows(3) }, gates: { sol: gate } });
+        const replaced = page.hold.full.length;
+        page.type('sol');
+        page.type('sol r');
+        await page.settle();
+        open();
+        await page.settle();
+        const views = page.hold.full.slice(replaced);
+        expect(views.map((view) => view.stale())).toEqual([false, true]);
+    });
+
+    test(file + ' puts the best match first only once settled', async () => {
+        const page = await liveStart({ queries: { sol: rows(1) } });
+        page.type('sol');
+        await page.settle();
+        expect(page.hold.full.at(-1).bestMatch).toBe(false);
+        await page.pause();
+        expect(page.hold.full.at(-1).bestMatch).toBe(true);
+    });
+
+    test(file + ' settles on Enter without another history entry, and once', async () => {
+        const page = await liveStart({ queries: { sol: rows(150) } });
+        page.type('sol');
+        page.log.mounted.onSubmit('sol');
+        await page.settle();
+        expect(page.pausePending()).toBe(false);
+        expect(page.els[results].innerHTML).toBe('drawn 100');
+        expect(page.log.pushed).toEqual(['?q=sol']);
+        const asked = page.log.executed.length;
+        page.log.mounted.onSubmit('sol');
+        await page.settle();
+        expect(page.log.executed.length).toBe(asked);
+        expect(page.log.pushed).toEqual(['?q=sol']);
+    });
+
+    test(file + ' Back ends the typing and reads the query as finished', async () => {
+        const page = await liveStart({ search: '?q=bolt', queries: { bolt: rows(150) } });
+        page.type('bolt f');
+        page.location.search = '?q=bolt';
+        page.pop();
+        await page.settle();
+        expect(page.pausePending()).toBe(false);
+        expect(page.log.drafts.at(-1)).toBe(false);
+        expect(page.els[box].value).toBe('bolt');
+        expect(page.els[results].innerHTML).toBe('drawn 100');
+        page.type('bolt g');
+        expect(page.log.pushed).toEqual(['?q=bolt%20f', '?q=bolt%20g']);
+    });
+
+    test(file + ' emptying the box clears the page at once', async () => {
+        const page = await liveStart({ queries: { sol: rows(3) } });
+        page.type('sol');
+        await page.settle();
+        page.type('');
+        await page.settle();
+        expect(page.els[results].innerHTML).toBe('');
+        expect(page.pausePending()).toBe(false);
+        expect(page.log.replaced.at(-1)).toBe('/offline');
+    });
+
+    test(file + ' scrolls back up only when the answer changes', async () => {
+        const page = await liveStart({ queries: { sol: rows(3), 'sol ': rows(3), 'sol r': rows(2) } });
+        page.type('sol');
+        await page.settle();
+        expect(page.log.scrolls).toEqual([]);
+        page.type('sol ');
+        await page.settle();
+        expect(page.log.scrolls).toEqual([]);
+        page.type('sol r');
+        await page.settle();
+        expect(page.log.scrolls).toEqual([['to', 0]]);
+    });
+
+    test(file + ' with the setting off leaves the order and the scroll alone', async () => {
+        const page = await started(file, { ids, queries: { sol: rows(3), bolt: rows(2) } });
+        expect(page.log.mounted.live()).toBe(false);
+        page.log.mounted.onSubmit('sol');
+        await page.settle();
+        page.log.mounted.onSubmit('bolt');
+        await page.settle();
+        expect(page.hold.full.at(-1).bestMatch).toBe(false);
+        expect(page.log.scrolls).toEqual([]);
+        expect(page.log.pushed).toEqual(['?q=sol', '?q=bolt']);
+    });
+
+    test(file + ' reads the setting on each event', async () => {
+        const stored = { offline_live_search: 'false' };
+        const page = await started(file, { ids, stored });
+        expect(page.log.mounted.live()).toBe(false);
+        stored.offline_live_search = 'true';
+        expect(page.log.mounted.live()).toBe(true);
+    });
+}
+
+test('each page has its own default with nothing stored', async () => {
+    const desktop = await started('offline-page-desktop.js', { ids: DESKTOP, stored: {} });
+    const mobile = await started('offline-page-mobile.js', { ids: MOBILE, stored: {} });
+    expect(desktop.log.mounted.live()).toBe(true);
+    expect(mobile.log.mounted.live()).toBe(false);
+});
+
+test('desktop holds a price sort and the image until the pause', async () => {
+    const page = await started('offline-page-desktop.js', {
+        ids: DESKTOP, ...LIVE, cookies: { SearchDefaultSort: 'retail' }, queries: { sol: rows(3) },
+    });
+    page.type('sol');
+    await page.settle();
+    expect(page.hold.views.at(-1)).toBe(false);
+    expect(page.log.sorted.at(-1)).toMatchObject({ mode: 'chrono', reverse: false });
+    await page.pause();
+    expect(page.hold.views.at(-1)).toBe(true);
+    expect(page.log.sorted.at(-1)).toMatchObject({ mode: 'retail' });
+});
+
+test('desktop leaves the image alone while typing, and follows at the pause', async () => {
+    const page = loadPage('offline-page-desktop.js', { ids: DESKTOP, ...LIVE, queries: { sol: rows(3) } });
+    const header = makeEl({ 'data-image-url': '/api/offline/images/a.webp' });
+    page.els['offline-results'].querySelector = () => header;
+    page.load();
+    await page.settle();
+    page.type('sol');
+    await page.settle();
+    expect(page.log.art).toEqual([]);
+    await page.pause();
+    expect(page.log.art).toEqual(['/api/offline/images/a.webp']);
+});
+
+test('desktop counts the page a settled answer will show while typing', async () => {
+    const page = await started('offline-page-desktop.js', { ids: DESKTOP, ...LIVE, queries: { sol: rows(150), lig: rows(4) } });
+    page.type('sol');
+    await page.settle();
+    expect(page.els['offline-count'].textContent).toBe('150 results found (100 shown)');
+    page.type('lig');
+    await page.settle();
+    expect(page.els['offline-count'].textContent).toBe('4 results found');
+});
+
+test('a sort pill settles what is being typed', async () => {
+    const pill = makeEl({ 'data-sort': 'alpha' });
+    const page = await started('offline-page-desktop.js', { ids: DESKTOP, ...LIVE, pills: [pill], queries: { sol: rows(150) } });
+    page.type('sol');
+    await page.settle();
+    pill.fire('click');
+    await page.settle();
+    expect(page.pausePending()).toBe(false);
+    expect(page.els['offline-results'].innerHTML).toBe('drawn 100');
+    expect(page.log.sorted.at(-1)).toMatchObject({ mode: 'alpha' });
+    expect(page.log.replaced).toEqual(['?q=sol']);
+});
+
+function headersFor(page, n) {
+    const headers = Array.from({ length: n }, (_, i) => {
+        const header = makeEl({ 'data-image-url': '/api/offline/images/' + i + '.webp' });
+        header.nextElementSibling = { getBoundingClientRect: () => ({ bottom: 500 + i }) };
+        return header;
+    });
+    const el = page.els['offline-results'];
+    el.querySelectorAll = () => headers;
+    el.querySelector = () => headers[0];
+    return headers;
+}
+
+test('arrow keys walk the results, with the image following', async () => {
+    const page = loadPage('offline-page-desktop.js', { ids: DESKTOP, ...LIVE, search: '?q=sol', queries: { sol: rows(3) } });
+    const headers = headersFor(page, 3);
+    page.load();
+    await page.settle();
+    page.log.mounted.onArrow(-1);
+    await page.settle();
+    expect(page.log.scrolls).toEqual([]);
+
+    page.log.mounted.onArrow(1);
+    await page.settle();
+    expect(headers[1].classList.names.has('offline-cursor')).toBe(true);
+    expect(page.log.art.at(-1)).toBe('/api/offline/images/1.webp');
+    expect(page.log.scrolls.at(-1)).toEqual(['by', 500 - 77]);
+
+    page.log.mounted.onArrow(1);
+    await page.settle();
+    page.log.mounted.onArrow(1);
+    await page.settle();
+    expect(headers[2].classList.names.has('offline-cursor')).toBe(true);
+    expect(headers[1].classList.names.has('offline-cursor')).toBe(false);
+
+    page.log.mounted.onArrow(-1);
+    await page.settle();
+    page.log.mounted.onArrow(-1);
+    await page.settle();
+    expect(headers[0].classList.names.has('offline-cursor')).toBe(true);
+    expect(page.log.scrolls.at(-1)).toEqual(['to', 0]);
+});
+
+test('an arrow key settles what is being typed, then moves', async () => {
+    const page = loadPage('offline-page-desktop.js', { ids: DESKTOP, ...LIVE, queries: { sol: rows(150) } });
+    const headers = headersFor(page, 2);
+    page.load();
+    await page.settle();
+    page.type('sol');
+    page.log.mounted.onArrow(1);
+    await page.settle();
+    expect(page.pausePending()).toBe(false);
+    expect(page.els['offline-results'].innerHTML).toBe('drawn 100');
+    expect(headers[1].classList.names.has('offline-cursor')).toBe(true);
+});
+
+test('Enter closes the keyboard on a phone, and only with the setting on', async () => {
+    const live = await started('offline-page-mobile.js', { ids: MOBILE, ...LIVE, queries: { sol: rows(1) } });
+    live.type('sol');
+    live.log.mounted.onSubmit('sol');
+    expect(live.els.navsearchbox.attrs.blurred).toBe(true);
+
+    const off = await started('offline-page-mobile.js', { ids: MOBILE });
+    off.log.mounted.onSubmit('sol');
+    expect(off.els.navsearchbox.attrs.blurred).toBeUndefined();
+
+    const desktop = await started('offline-page-desktop.js', { ids: DESKTOP, ...LIVE, queries: { sol: rows(1) } });
+    desktop.type('sol');
+    desktop.log.mounted.onSubmit('sol');
+    expect(desktop.els['nav-searchbox'].attrs.blurred).toBeUndefined();
+});
+
+test('the navbar links on desktop keep the query as it is typed', async () => {
+    const search = { href: 'http://x.test/offline?q=old', setAttribute(_n, value) { this.href = 'http://x.test' + value; } };
+    const sealed = { href: 'http://x.test/offline?sealed=1&q=old', setAttribute(_n, value) { this.href = 'http://x.test' + value; } };
+    const page = await started('offline-page-desktop.js', { ids: DESKTOP, ...LIVE, navLinks: [search, sealed], queries: { 'sol r': rows(1) } });
+    page.type('sol r');
+    expect(new URL(search.href).searchParams.get('q')).toBe('sol r');
+    expect(new URL(sealed.href).searchParams.get('q')).toBe('sol r');
+    expect(new URL(sealed.href).searchParams.get('sealed')).toBe('1');
+    page.type('');
+    expect(new URL(search.href).search).toBe('');
+});
+
+test('the sets and stores are read again once a sync has finished', async () => {
+    const states = [{ catalogVersion: 'c1', stored: [], lastSync: 'one' }];
+    const page = await started('offline-page-mobile.js', { ids: MOBILE, ...LIVE, queries: { sol: rows(1) }, states });
+    expect(page.log.dictReads).toBe(1);
+    page.type('sol');
+    await page.settle();
+    const env = page.log.env;
+    states.push({ catalogVersion: 'c1', stored: [], lastSync: 'one' });
+    await env.searchState();
+    expect(page.log.dictReads).toBe(1);
+    states.push({ catalogVersion: 'c1', stored: [], lastSync: 'two' });
+    await env.searchState();
+    expect(page.log.dictReads).toBe(2);
 });

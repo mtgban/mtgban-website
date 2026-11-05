@@ -451,10 +451,14 @@
         if (!toggle || !usage) return;
 
         var controls = document.getElementById('settings-offline-controls');
+        var liveRow = document.getElementById('settings-offline-live-row');
+        var liveToggle = document.getElementById('settings-offline-live');
 
         function paint() {
             toggle.checked = enabled();
             if (controls) controls.hidden = !enabled();
+            if (liveRow) liveRow.hidden = !enabled();
+            if (liveToggle) liveToggle.checked = OfflineLive.on('desktop');
             if (!enabled()) { paintUsage(); return; }
             refreshStatus().then(paintUsage);
         }
@@ -482,6 +486,11 @@
                 paint();
             });
         });
+        if (liveToggle) {
+            liveToggle.addEventListener('change', function () {
+                OfflineLive.set(liveToggle.checked);
+            });
+        }
         var resyncBtn = document.getElementById('offline-resync-btn');
         if (resyncBtn) {
             resyncBtn.addEventListener('click', function () {

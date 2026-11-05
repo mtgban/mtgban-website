@@ -202,7 +202,16 @@
             if (items[active]) items[active].classList.add('autocomplete-active');
         }
 
+        function live() {
+            return !!opts.live && opts.live();
+        }
+
         input.addEventListener('input', function () {
+            if (live()) {
+                close();
+                opts.onType(input.value);
+                return;
+            }
             var id = ++reqId;
             suggest(input.value, opts.deps, function () { return id !== reqId; }).then(function (r) {
                 if (id !== reqId) return;
@@ -212,8 +221,13 @@
         });
 
         input.addEventListener('keydown', function (e) {
-            if (e.key === 'ArrowDown') { e.preventDefault(); highlight(active + 1); return; }
-            if (e.key === 'ArrowUp') { e.preventDefault(); highlight(active - 1); return; }
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                var step = e.key === 'ArrowDown' ? 1 : -1;
+                e.preventDefault();
+                if (live()) opts.onArrow(step);
+                else highlight(active + step);
+                return;
+            }
             if (e.key === 'Escape') { close(); return; }
             if (e.key === 'Enter') {
                 e.preventDefault();

@@ -735,7 +735,7 @@
 
     // priceRows opens the sets the rows need, and reports whether it could: a set
     // that won't open changes what the search should have found.
-    async function priceRows(rows, env) {
+    async function priceRows(rows, env, stale) {
         var bySet = {};
         rows.forEach(function (row) {
             if (!row.retail) (bySet[row.card.set] = bySet[row.card.set] || []).push(row);
@@ -743,6 +743,7 @@
         var complete = true;
         var codes = Object.keys(bySet);
         for (var k = 0; k < codes.length; k++) {
+            if (stale && stale()) break;
             var pl;
             try {
                 pl = await cachedPayload(codes[k], env);
@@ -766,7 +767,8 @@
         dropStalePayloads(state.lastSync);
         var stored = new Set(state.stored);
         unreadableSets.forEach(function (code) { stored.delete(code); });
-        var out = {results: [], page: [], truncated: false, unsupported: parsed.unsupported};
+        var out = {results: [], page: [], truncated: false, unsupported: parsed.unsupported,
+            needle: env.normName(parsed.names.join(' '))};
 
         out.results = toRows(await findCards(parsed, env, stored, out), stored);
 
@@ -790,14 +792,35 @@
         return out;
     }
 
+    // bestMatchFirst moves the names closest to what was typed to the top: the
+    // whole name, its start, the start of a word, then the rest. Each group keeps
+    // the order it had.
+    function bestMatchFirst(results, needle, env) {
+        if (!needle) return;
+        var tiers = new Map();
+        function tier(name) {
+            if (tiers.has(name)) return tiers.get(name);
+            var key = env.normName(name);
+            var rank = 3;
+            if (key === needle) rank = 0;
+            else if (key.indexOf(needle) === 0) rank = 1;
+            else if (key.indexOf(' ' + needle) !== -1) rank = 2;
+            tiers.set(name, rank);
+            return rank;
+        }
+        results.sort(function (a, b) { return tier(a.card.n) - tier(b.card.n); });
+    }
+
     // showPage orders an answer and prices what view asks: size rows, or every
     // row if allPrices says a sort needs them. False means a set wouldn't open,
-    // and the query has to be asked again.
+    // and the query has to be asked again. view.stale ends the pricing early for
+    // an answer nobody is waiting for any more, leaving rows unpriced.
     async function showPage(out, env, view) {
-        if (view.allPrices && view.allPrices() && !(await priceRows(out.results, env))) return false;
+        if (view.allPrices && view.allPrices() && !(await priceRows(out.results, env, view.stale))) return false;
         if (view.order) view.order(out.results);
+        if (view.bestMatch) bestMatchFirst(out.results, out.needle, env);
         out.page = view.size === undefined ? out.results : out.results.slice(0, view.size);
-        return priceRows(out.page, env);
+        return priceRows(out.page, env, view.stale);
     }
 
     // answerable says a query is worth asking while it is typed: a name needs the

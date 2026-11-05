@@ -16,6 +16,13 @@
             <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
             <span>Enable offline mode</span>
         </label>
+        <div id="settings-offline-live-row" hidden>
+            <label class="settings-toggle" title="Results update with each letter. Off, Enter runs the search and names are suggested.">
+                <input type="checkbox" id="settings-offline-live">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Show results as you type</span>
+            </label>
+        </div>
         <div id="offlineSyncStatus" class="offline-sync-status" aria-live="polite"></div>
         {{/* Only does anything with offline mode on */}}
         <div id="settings-offline-controls" hidden>

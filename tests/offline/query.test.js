@@ -1274,3 +1274,42 @@ test.each([
     }
 });
 
+
+function namedRows(names) {
+    return names.map((n, i) => ({ uuid: 'u' + i, card: { n, set: 'S' + i }, retail: null, buylist: null }));
+}
+
+test('the best match comes first, each group keeping its order', async () => {
+    const env = { normName: (s) => s.toLowerCase(), loadSetPayload: async () => ({ retail: {}, buylist: {} }) };
+    const out = {
+        needle: 'sol',
+        results: namedRows(['Parasol Bird', 'Solemn Simulacrum', 'Blinding Sol', 'Sol', 'Soldier', 'Absolute Sol']),
+    };
+    await Q.showPage(out, env, { size: 6, bestMatch: true });
+    expect(out.results.map((r) => r.card.n)).toEqual(
+        ['Sol', 'Solemn Simulacrum', 'Soldier', 'Blinding Sol', 'Absolute Sol', 'Parasol Bird']);
+});
+
+test('without a name to match, the order stays', async () => {
+    const env = { normName: (s) => s.toLowerCase(), loadSetPayload: async () => ({ retail: {}, buylist: {} }) };
+    const out = { needle: '', results: namedRows(['B', 'A']) };
+    await Q.showPage(out, env, { size: 2, bestMatch: true });
+    expect(out.results.map((r) => r.card.n)).toEqual(['B', 'A']);
+});
+
+test('a search nobody is waiting for stops opening sets', async () => {
+    Q.resetCaches();
+    const opened = [];
+    let stale = false;
+    const env = {
+        normName: (s) => s,
+        loadSetPayload: async (code) => {
+            opened.push(code);
+            stale = true;
+            return { retail: {}, buylist: {} };
+        },
+    };
+    const out = { needle: '', results: namedRows(['A', 'B', 'C']) };
+    expect(await Q.showPage(out, env, { size: 3, stale: () => stale })).toBe(true);
+    expect(opened).toEqual(['S0']);
+});
