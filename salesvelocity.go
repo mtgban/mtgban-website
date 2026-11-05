@@ -27,9 +27,7 @@ const (
 // salesVelocity is one card's sales over the window and its last sale.
 type salesVelocity struct {
 	Copies, Orders, Days int32
-	// A day in the window hit the newspaper's five-order cap.
-	Capped   bool
-	LastSale time.Time
+	LastSale             time.Time
 }
 
 // perDay is the copies sold a day over window days.
@@ -60,11 +58,10 @@ var salesVelocityFailed atomic.Pointer[salesVelocityFailure]
 // The newest day this game has a sale; the scrape lags today by a day.
 const salesVelocityDayQuery = `SELECT max(sale_date) FROM tcgplayersalesdata WHERE product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $1)`
 
-// Copies, orders and sale days per product and printing of one game; five orders is the cap.
+// Copies, orders and sale days per product and printing of one game.
 const salesVelocityQuery = `
 	SELECT product_id, variant,
-	       coalesce(sum(sales_count), 0), coalesce(sum(num_orders), 0), count(*),
-	       coalesce(bool_or(num_orders >= 5), false)
+	       coalesce(sum(sales_count), 0), coalesce(sum(num_orders), 0), count(*)
 	  FROM tcgplayersalesdata
 	 WHERE sale_date BETWEEN $1::date AND $2::date
 	   AND product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $3)
@@ -83,7 +80,6 @@ type salesRow struct {
 	ProductID            int64
 	Variant              string
 	Copies, Orders, Days int32
-	Capped               bool
 }
 
 // lastRow is one row of salesVelocityLastQuery.
@@ -172,7 +168,7 @@ func readSalesRows(ctx context.Context, q salesQuerier, game string, day time.Ti
 	var all []salesRow
 	for rows.Next() {
 		var row salesRow
-		err := rows.Scan(&row.ProductID, &row.Variant, &row.Copies, &row.Orders, &row.Days, &row.Capped)
+		err := rows.Scan(&row.ProductID, &row.Variant, &row.Copies, &row.Orders, &row.Days)
 		if err != nil {
 			return nil, err
 		}
@@ -289,7 +285,6 @@ func buildSalesVelocity(rows []salesRow, last []lastRow, match func(productID in
 		v.Orders += row.Orders
 		// The larger count, not the sum: the rows can't say which days overlap.
 		v.Days = max(v.Days, row.Days)
-		v.Capped = v.Capped || row.Capped
 	}
 	return cards, unmatched
 }
@@ -309,14 +304,8 @@ func salesVelocityFor(cardID string) (salesVelocity, bool) {
 
 // salesVelocityReport is a load's line on the admin dashboard.
 func salesVelocityReport(snap *salesVelocitySnapshot, unmatched int) string {
-	capped := 0
-	for _, v := range snap.Cards {
-		if v.Capped {
-			capped++
-		}
-	}
-	return fmt.Sprintf("%d cards over the %d days to %s, %d capped, %d not matched",
-		len(snap.Cards), snap.Window, snap.Day.Format(time.DateOnly), capped, unmatched)
+	return fmt.Sprintf("%d cards over the %d days to %s, %d not matched",
+		len(snap.Cards), snap.Window, snap.Day.Format(time.DateOnly), unmatched)
 }
 
 // velocityText is a card's rate and its details (tip_html format) over window days.
@@ -332,28 +321,18 @@ func velocityText(v salesVelocity, window int) (rate, detail string) {
 
 	perDay := v.perDay(window)
 	rate = strconv.FormatFloat(perDay, 'f', 1, 64) + "/day"
-	switch {
-	case perDay < 0.1:
+	if perDay < 0.1 {
 		rate = "<0.1/day"
-	case v.Capped:
-		rate = ">=" + rate
 	}
 
-	floor := ""
-	if v.Capped {
-		floor = " (at least)"
-	}
 	lines := []string{
 		head,
-		"|copies|" + strconv.Itoa(int(v.Copies)) + floor,
-		"|orders|" + strconv.Itoa(int(v.Orders)) + floor,
+		"|copies|" + strconv.Itoa(int(v.Copies)),
+		"|orders|" + strconv.Itoa(int(v.Orders)),
 		"|days with a sale|" + strconv.Itoa(int(v.Days)),
 	}
 	if !v.LastSale.IsZero() {
 		lines = append(lines, "|last sale|"+v.LastSale.Format(time.DateOnly))
-	}
-	if v.Capped {
-		lines = append(lines, "the newspaper keeps five orders a day, so these are floors")
 	}
 	return rate, strings.Join(lines, "\n")
 }

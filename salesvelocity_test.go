@@ -42,7 +42,7 @@ func TestBuildSalesVelocity(t *testing.T) {
 	day := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
 	rows := []salesRow{
 		{ProductID: 1, Variant: "Normal", Copies: 69, Orders: 31, Days: 18},
-		{ProductID: 2, Variant: "Foil", Copies: 12, Orders: 9, Days: 4, Capped: true},
+		{ProductID: 2, Variant: "Foil", Copies: 12, Orders: 9, Days: 4},
 		// Two products filed under one card: copies and orders add up.
 		{ProductID: 3, Variant: "Normal", Copies: 2, Orders: 2, Days: 2},
 		{ProductID: 4, Variant: "Normal", Copies: 3, Orders: 1, Days: 1},
@@ -66,7 +66,7 @@ func TestBuildSalesVelocity(t *testing.T) {
 		{ProductID: 9, Variant: "Foil", Last: day(3, 1)},
 	}
 	ids := map[salesPair]string{
-		{1, "Normal"}: "steady", {2, "Foil"}: "capped",
+		{1, "Normal"}: "steady", {2, "Foil"}: "foil",
 		{3, "Normal"}: "merged", {4, "Normal"}: "merged",
 		{6, "Normal"}: "zero", {7, "Normal"}: "busy", {8, "Normal"}: "busy",
 	}
@@ -82,7 +82,7 @@ func TestBuildSalesVelocity(t *testing.T) {
 	}
 	want := map[string]salesVelocity{
 		"steady": {Copies: 69, Orders: 31, Days: 18, LastSale: day(10, 11)},
-		"capped": {Copies: 12, Orders: 9, Days: 4, Capped: true, LastSale: day(10, 12)},
+		"foil":   {Copies: 12, Orders: 9, Days: 4, LastSale: day(10, 12)},
 		"merged": {Copies: 5, Orders: 3, Days: 2, LastSale: day(10, 12)},
 		"busy":   {Copies: 80, Orders: 80, Days: 20, LastSale: day(10, 12)},
 		"zero":   {LastSale: day(8, 2)},
@@ -157,11 +157,11 @@ func TestSalesVelocityFor(t *testing.T) {
 func TestSalesVelocityReport(t *testing.T) {
 	snap := &salesVelocitySnapshot{
 		Day:    time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC),
-		Cards:  map[string]*salesVelocity{"a": {Copies: 3}, "b": {Copies: 9, Capped: true}, "c": {}},
+		Cards:  map[string]*salesVelocity{"a": {Copies: 3}, "b": {Copies: 9}, "c": {}},
 		Window: salesVelocityWindow,
 	}
 	got := salesVelocityReport(snap, 7)
-	want := "3 cards over the 30 days to 2026-10-12, 1 capped, 7 not matched"
+	want := "3 cards over the 30 days to 2026-10-12, 7 not matched"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -301,8 +301,8 @@ func TestReadSalesVelocity(t *testing.T) {
 	lastSale := time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC)
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
 		if query == salesVelocityQuery {
-			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "x"}, vals: [][]driver.Value{
-				{int64(1), "Normal", int64(69), int64(31), int64(18), true},
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}, vals: [][]driver.Value{
+				{int64(1), "Normal", int64(69), int64(31), int64(18)},
 			}}, nil
 		}
 		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{int64(6), "Foil", lastSale}}}, nil
@@ -314,7 +314,7 @@ func TestReadSalesVelocity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(rows, []salesRow{{ProductID: 1, Variant: "Normal", Copies: 69, Orders: 31, Days: 18, Capped: true}}) {
+	if !slices.Equal(rows, []salesRow{{ProductID: 1, Variant: "Normal", Copies: 69, Orders: 31, Days: 18}}) {
 		t.Errorf("rows: got %+v", rows)
 	}
 	if len(last) != 1 || last[0].ProductID != 6 || last[0].Variant != "Foil" || !last[0].Last.Equal(lastSale) {
@@ -344,7 +344,7 @@ func TestReadSalesVelocity(t *testing.T) {
 }
 
 // TestSalesVelocitySQL keeps both queries bounded on both ends by the
-// arguments and to one game's products, and the window's cap at five orders.
+// arguments and to one game's products.
 func TestSalesVelocitySQL(t *testing.T) {
 	for name, query := range map[string]string{"window": salesVelocityQuery, "lookback": salesVelocityLastQuery} {
 		for _, part := range []string{
@@ -355,9 +355,6 @@ func TestSalesVelocitySQL(t *testing.T) {
 				t.Errorf("%s: missing %q", name, part)
 			}
 		}
-	}
-	if !strings.Contains(salesVelocityQuery, "bool_or(num_orders >= 5)") {
-		t.Error("window: missing the five-order cap")
 	}
 }
 
@@ -509,8 +506,8 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 		case salesVelocityDayQuery:
 			return &fakeRows{cols: []string{"max"}, vals: [][]driver.Value{{day}}}, nil
 		case salesVelocityQuery:
-			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "x"}, vals: [][]driver.Value{
-				{productID, "Normal", int64(69), int64(31), int64(18), false},
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}, vals: [][]driver.Value{
+				{productID, "Normal", int64(69), int64(31), int64(18)},
 			}}, nil
 		}
 		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{productID, "Normal", lastSale}}}, nil
@@ -538,8 +535,8 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 	}
 }
 
-// TestVelocityText words each state: a rate to one decimal, under a tenth,
-// a capped floor, and zero with the last sale.
+// TestVelocityText words each state: a rate to one decimal, under a tenth, and
+// zero with the last sale.
 func TestVelocityText(t *testing.T) {
 	last := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
 	const head = "**Sold on TCGplayer, last 30 days**\n"
@@ -559,9 +556,6 @@ func TestVelocityText(t *testing.T) {
 			head + "|copies|3\n|orders|3\n|days with a sale|3\n|last sale|2026-10-11"},
 		{"under a tenth", salesVelocity{Copies: 2, Orders: 2, Days: 1, LastSale: last}, 30, "<0.1/day",
 			head + "|copies|2\n|orders|2\n|days with a sale|1\n|last sale|2026-10-11"},
-		{"capped", salesVelocity{Copies: 69, Orders: 31, Days: 18, Capped: true, LastSale: last}, 30, ">=2.3/day",
-			head + "|copies|69 (at least)\n|orders|31 (at least)\n|days with a sale|18\n|last sale|2026-10-11\n" +
-				"the newspaper keeps five orders a day, so these are floors"},
 		{"zero", salesVelocity{LastSale: time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)}, 30, "0/day",
 			head + "no sale in the window; last sold 2026-09-02"},
 		{"another window", salesVelocity{Copies: 7, Orders: 7, Days: 5, LastSale: last}, 7, "1.0/day",

@@ -117,11 +117,8 @@ func TestSalesVelocityLive(t *testing.T) {
 		}
 	}
 
-	capped, zero := 0, 0
+	zero := 0
 	for _, v := range cards {
-		if v.Capped {
-			capped++
-		}
 		if v.Copies == 0 {
 			zero++
 		}
@@ -132,7 +129,6 @@ func TestSalesVelocityLive(t *testing.T) {
 	fmt.Printf("| %d-day window | %d | %d |\n", salesVelocityWindow, rowsTook.Milliseconds(), len(rows))
 	fmt.Printf("| last sale over %d days | %d | %d |\n", salesVelocityLookback, lastTook.Milliseconds(), len(last))
 	fmt.Printf("| match and build (cards) | %d | %d |\n\n", buildTook.Milliseconds(), len(cards))
-	fmt.Print("| entries | capped | capped share | zero | unmatched pairs | this game's pairs unmatched |\n|---:|---:|---:|---:|---:|---:|\n")
-	fmt.Printf("| %d | %d | %.1f%% | %d | %d | %d of %d |\n",
-		len(cards), capped, 100*float64(capped)/float64(len(cards)), zero, unmatched, gameUnmatched, gamePairs)
+	fmt.Print("| entries | zero | unmatched pairs | this game's pairs unmatched |\n|---:|---:|---:|---:|\n")
+	fmt.Printf("| %d | %d | %d | %d of %d |\n", len(cards), zero, unmatched, gameUnmatched, gamePairs)
 }
