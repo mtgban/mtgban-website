@@ -993,6 +993,22 @@ span.emoji {
 }
 .bl-ck-sell { color: var(--asuccess); }
 .bl-ck-wait { color: var(--awarning); }
+/* The signal's line, shared with the rate a card sells at */
+.bl-ck-line {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+.bl-velocity {
+    font-size: var(--text-2xs);
+    color: var(--greytext);
+    text-align: left;
+    white-space: nowrap;
+    cursor: help;
+}
+.bl-ck + .bl-velocity::before {
+    content: "\00b7\00a0";
+}
 /* The details column's one tooltip, CK's verdict, stock, P90 and odds */
 .bl-info[title] { cursor: help; }
 

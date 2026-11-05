@@ -63,6 +63,15 @@ row's place, linking to Patreon, on the cards that have data and so would
 show a row. The `noUpsell` search setting hides it, as it does the other
 upsell lines.
 
+## On the other pages
+
+Arbitrage and Reverse show the rate as a line of text in the INFO column, beside
+Card Kingdom's signal where it shows, with the row's details as its tooltip. A rate
+that prints as `0.1/day` or less is left out, being noise on these tables. The rows
+already carry the text from `uuid2card`, so the line costs only its own HTML. These
+pages check no tier: every tier with them also has the Newspaper. They have no phone
+layout of their own, so a phone gets the same line.
+
 ## On the Sleepers page
 
 `?page=velocity` ranks cards by the same copies over 30: the S tier starts at about

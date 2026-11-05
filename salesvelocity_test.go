@@ -1234,3 +1234,99 @@ func TestNewspaperSalesJobRunsOnOneSite(t *testing.T) {
 		}
 	}
 }
+
+// TestVelocityRateOnInfoPages shows the rate and its tooltip on arbitrage, whatever
+// the reader's tier, on the card selling fast enough alone.
+func TestVelocityRateOnInfoPages(t *testing.T) {
+	cards := closeVendors(t)
+	if LogPages["Arbitrage"] == nil {
+		LogPages["Arbitrage"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Arbitrage") })
+	}
+	stock := mtgban.InventoryRecord{}
+	ref := mtgban.InventoryRecord{}
+	for _, card := range cards {
+		stock[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 1, Quantity: 2, URL: "u"}}
+		ref[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 100}}
+	}
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(stock, sessionInfo("ZZS")),
+		mtgban.NewSellerFromInventory(ref, sessionInfo("ZZA")),
+	}, currentPrices().vendors)
+	co, err := backend().GetUUID(cards[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	slow, err := backend().GetUUID(cards[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{
+		co.UUID:   {Copies: 69, Orders: 31, Days: 18},
+		slow.UUID: {Copies: 3, Orders: 3, Days: 3},
+	})
+
+	pages := map[string]func(cookie *http.Cookie) string{
+		"arbitrage": func(cookie *http.Cookie) string {
+			req := httptest.NewRequest(http.MethodGet, "/arbit?source=ZZS", nil)
+			req.AddCookie(cookie)
+			rec := httptest.NewRecorder()
+			testSite.Arbit(rec, req)
+			return rec.Body.String()
+		},
+	}
+
+	signingEnabled(t, true)
+	reader := func(news string) *http.Cookie {
+		fields := url.Values{
+			"UserEmail": {"reader@example.com"}, "UserTier": {"Test"},
+			"ArbitEnabled": {"ALL"},
+		}
+		if news != "" {
+			fields.Set("NewsEnabled", news)
+		}
+		return &http.Cookie{Name: "BAN_SIG", Value: signedAs(t, fields, time.Now().Add(time.Hour))}
+	}
+	const shown = `class="bl-velocity"`
+	for name, page := range pages {
+		got := page(reader("1day"))
+		if strings.Count(got, shown) == 0 {
+			t.Errorf("%s: a newspaper tier sees no rate in the %d byte page", name, len(got))
+			continue
+		}
+		if !strings.Contains(got, `>2.3/day</span>`) || !strings.Contains(got, `data-tip="**Sold on TCGplayer, last 30 days**`) {
+			t.Errorf("%s: the rate lacks its tooltip or text", name)
+		}
+		if strings.Contains(got, `>0.1/day</span>`) {
+			t.Errorf("%s: a rate of 0.1/day shows", name)
+		}
+		if !strings.Contains(page(reader("")), shown) {
+			t.Errorf("%s: the rate is hidden without the Newspaper", name)
+		}
+		if !strings.Contains(got, "INFO</th>") {
+			t.Errorf("%s: no INFO column", name)
+		}
+	}
+}
+
+// TestVelocityRateSitsBesideCKSignal keeps INFO to one line for the signal and the
+// rate, with the rate's own tooltip, and the signal's line alone for a slow card.
+func TestVelocityRateSitsBesideCKSignal(t *testing.T) {
+	render := func(notable bool) string {
+		vars := reversePageVars()
+		for id, card := range vars.Metadata {
+			card.CKSignal = "sell"
+			card.Velocity, card.VelocityDetail, card.VelocityNotable = "2.3/day", "**Sold**\n|copies|69", notable
+			vars.Metadata[id] = card
+		}
+		return renderArbit(t, vars)
+	}
+	const signal = `<span class="bl-ck bl-ck-sell">Sell now</span>`
+	got := render(true)
+	if !strings.Contains(got, `<span class="bl-ck-line">`+signal+`<span class="bl-velocity" title="`) || !strings.Contains(got, `>2.3/day</span></span>`) {
+		t.Error("the rate is not beside the signal")
+	}
+	if !strings.Contains(render(false), `<span class="bl-ck-line">`+signal+`</span>`) {
+		t.Error("a slow card's signal shares its line")
+	}
+}
