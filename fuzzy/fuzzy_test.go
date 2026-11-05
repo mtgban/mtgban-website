@@ -43,6 +43,30 @@ func TestDistance(t *testing.T) {
 	}
 }
 
+// One scan's rows give each pair the distance a fresh call does, however
+// the lengths before it ran.
+func TestDistanceReusesRows(t *testing.T) {
+	pairs := [][2]string{
+		{"lightnig bolt", "lightning bolt"},
+		{"swapm", "swamp"},
+		{"kitten", "sitting"},
+		{"ca", "abc"},
+		{"counterspel", "counterspell"},
+		{"", "abc"},
+		{"abcd", "badc"},
+	}
+	var r rows
+	for _, limit := range []int{1, 2, 999} {
+		for _, pair := range pairs {
+			got := r.distance(pair[0], pair[1], limit)
+			want := Distance(pair[0], pair[1], limit)
+			if got != want {
+				t.Errorf("distance(%q, %q, %d) = %d after other pairs, want %d", pair[0], pair[1], limit, got, want)
+			}
+		}
+	}
+}
+
 func TestClosest(t *testing.T) {
 	candidates := []string{"Lightning Bolt", "Lightning Helix", "Counterspell", "Island", "Snap", "Swab", "Swamp", "Swarm"}
 	cases := []struct {

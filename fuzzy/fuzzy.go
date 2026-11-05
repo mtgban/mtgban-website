@@ -14,14 +14,28 @@ import (
 // limit+1 as soon as the distance is guaranteed to exceed limit.
 // Comparison is byte-wise, which is enough for typo detection.
 func Distance(a, b string, limit int) int {
+	var r rows
+	return r.distance(a, b, limit)
+}
+
+// rows holds the three rows distance fills, kept across the calls of one
+// scan, which allocates only for a name longer than any before it.
+type rows struct {
+	buf []int
+}
+
+// distance is Distance, filling the rows r holds.
+func (r *rows) distance(a, b string, limit int) int {
 	la, lb := len(a), len(b)
 	if la-lb > limit || lb-la > limit {
 		return limit + 1
 	}
 
-	prev2 := make([]int, lb+1)
-	prev := make([]int, lb+1)
-	curr := make([]int, lb+1)
+	n := lb + 1
+	if len(r.buf) < 3*n {
+		r.buf = make([]int, 3*n)
+	}
+	prev2, prev, curr := r.buf[:n], r.buf[n:2*n], r.buf[2*n:3*n]
 	for j := 0; j <= lb; j++ {
 		prev[j] = j
 	}
@@ -75,12 +89,13 @@ func Closest(query string, candidates []string) []string {
 		dist int
 	}
 	var near []ranked
+	var r rows
 	for _, candidate := range candidates {
 		lower := strings.ToLower(candidate)
 		if lower == query {
 			return nil
 		}
-		dist := Distance(query, lower, limit)
+		dist := r.distance(query, lower, limit)
 		if dist <= limit {
 			near = append(near, ranked{candidate, dist})
 		}
