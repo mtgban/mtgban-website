@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -98,6 +100,7 @@ type AdminVars struct {
 	OverrideCandidates []OverrideCard
 
 	Tables          [][][]string
+	GrantsStamp     string
 	Jobs            []jobs.Row
 	DatastoreReload dsreload.State
 	LastNews        time.Time
@@ -918,6 +921,9 @@ func adminGrantSave(r *http.Request, pageVars *PageVars) {
 	if was == "" && strings.TrimSpace(r.PostFormValue("grantEmail")) == "" {
 		return
 	}
+	if grantsMoved(r, pageVars) {
+		return
+	}
 
 	grants := PatreonGrants()
 	idx := -1
@@ -1005,7 +1011,7 @@ func adminGrantRevoke(r *http.Request, pageVars *PageVars) {
 	// Persists like the quick-add above, so the row disappears from the
 	// table rendered below and stays gone after a restart.
 	revokeEmail := strings.ToLower(strings.TrimSpace(r.PostFormValue("revokeEmail")))
-	if revokeEmail != "" {
+	if revokeEmail != "" && !grantsMoved(r, pageVars) {
 		grants := PatreonGrants()
 		idx := slices.IndexFunc(grants, func(person PatreonGrant) bool {
 			return strings.EqualFold(person.Email, revokeEmail)
@@ -1027,12 +1033,34 @@ func adminGrantRevoke(r *http.Request, pageVars *PageVars) {
 	}
 }
 
+// grantsStamp is a short digest of a grants list, which the People forms
+// post back to name the list their table was drawn from.
+func grantsStamp(grants []PatreonGrant) string {
+	raw, _ := json.Marshal(grants)
+	sum := sha1.Sum(raw)
+	return hex.EncodeToString(sum[:8])
+}
+
+// grantsMoved reports whether a People form was posted from a table drawn
+// from another grants list than the current one, and warns when it was. A
+// form with no stamp passes, as one drawn before the stamp existed.
+func grantsMoved(r *http.Request, pageVars *PageVars) bool {
+	stamp := r.PostFormValue("grantsStamp")
+	if stamp == "" || stamp == grantsStamp(PatreonGrants()) {
+		return false
+	}
+	pageVars.WarningMessage = access.ErrGrantsChanged.Error()
+	return true
+}
+
 // adminPeopleTables appends the Patreon grants and the API users tables to the
 // page, after the grant forms have changed them.
 func adminPeopleTables(pageVars *PageVars) {
 	// -- People: Patreon Grants --
+	grants := PatreonGrants()
+	pageVars.GrantsStamp = grantsStamp(grants)
 	var userTable [][]string
-	for i, person := range PatreonGrants() {
+	for i, person := range grants {
 		overrides := ""
 		if len(person.Overrides) > 0 {
 			if raw, err := json.Marshal(person.Overrides); err == nil {
