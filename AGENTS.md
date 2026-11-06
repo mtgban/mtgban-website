@@ -274,7 +274,9 @@ commit to this repo can complete on its own.
    `Config()` returns the live one from `liveConfig`, read-only; a load, an
    editor save or a new API key builds a new value and publishes it whole
    (`finishConfig`, `generateAPIKey`). Never write into `Config()` outside
-   tests.
+   tests. The sales velocity snapshot follows the rule too: a search reads
+   `salesVelocityStore.Snapshot()` once into `SearchConfig.Sales` and the
+   filters, sort and row take it from there.
 
 2. **Authorisation lives in the signed cookie.** Permissions live entirely
    in the signed `BAN_SIG` cookie / `?sig=` (an HMAC-signed query string),
@@ -362,3 +364,17 @@ stale the moment an item lands.
   `csvWithout` has a table test of its own (`chart_test.go`). The rest
   (`firstCSV`, `slug`, ...) are pure functions that could be tested the
   same way.
+- **CodeQL alerts on lines that moved:** the request-forgery alert on
+  `loadCollection`'s TCGplayer fetch (upload.go) and the path-injection one
+  on `ServeFile` (routes.go) are dismissed false positives (the host and
+  path checks sit right above each request). CodeQL fingerprints a line by
+  its text and what follows, so editing near one reopens it as a new alert
+  and the PR's CodeQL check fails. The fix is dismissing the new alert
+  with the old one's reason, not a code change.
+- **Comparing benchmarks:** `TestMain` picks a random card per run, so the
+  `Search*` micro-benchmarks only compare across runs with that card
+  pinned. `BenchmarkSearchPage` loads every dump of the game through a
+  B2 key pair in `B2_KEY_ID`/`B2_APP_KEY`; run it with no `GOMEMLIMIT`
+  (under 3 GiB the collector never stops, and timings double and scatter).
+  Build each tree's test binary and run it from its own checkout, since
+  templates are read from the working directory.

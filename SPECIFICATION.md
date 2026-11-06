@@ -1042,8 +1042,13 @@ infrastructure editors are read-only when the config names no path for
 them, and the infrastructure one shows the file alone, without the keys
 the deployment's own config sets. Key overrides are backed
 by a per-store UUID-remap builder reached from a "Fix" link on search
-results (`search.go`/`search.html`). A People tab adds/removes Patreon
-grants in place.
+results (`search.go`/`search.html`). The checkpoints and key overrides
+editors are offered, and their saves taken, only with the config on B2.
+A People tab adds/removes Patreon grants in place; a save is refused when
+the shared grants file has moved on from the loaded list (`SaveGrants`
+re-reads it) or the form came from a table drawn from an older list (the
+forms post a stamp of it), and the table then shows the grants as they
+are.
 
 Whatever saves or changes state — the editors (datasets and infrastructure
 among them), the grant forms, `removestore`, `refresh`, `reload` and every
