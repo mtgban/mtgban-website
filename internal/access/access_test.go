@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -188,6 +189,87 @@ func TestSaveGrantsWritesThePath(t *testing.T) {
 	}
 	if len(onDisk) != 2 || onDisk[1].Email != "b@example.com" {
 		t.Errorf("file holds %v, want the saved pair", onDisk)
+	}
+}
+
+// readGrants reads the grants file the way a test checks what a save left.
+func readGrants(t *testing.T, path string) []Grant {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var grants []Grant
+	err = json.Unmarshal(data, &grants)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return grants
+}
+
+// Two clients share one grants file: B, still holding the list from before
+// A's save, is refused rather than overwriting it, and catches up to the file.
+func TestSaveGrantsRefusesAStaleList(t *testing.T) {
+	dir := t.TempDir()
+	tablePath := filepath.Join(dir, "acl.json")
+	writeJSON(t, tablePath, Table{"Root": {"Search": {}}})
+	grantsPath := filepath.Join(dir, "grants.json")
+	writeJSON(t, grantsPath, []Grant{{Email: "a@example.com", Tier: "Mods"}})
+	sources := Sources{TablePath: tablePath, GrantsPath: grantsPath}
+
+	a, b := New(fileHooks()), New(fileHooks())
+	for _, c := range []*Client{a, b} {
+		err := c.Load(context.Background(), sources)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	added := append([]Grant{}, a.Grants()...)
+	added = append(added, Grant{Email: "b@example.com", Tier: "Mods"})
+	err := a.SaveGrants(context.Background(), added)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = b.SaveGrants(context.Background(), nil)
+	if !errors.Is(err, ErrGrantsChanged) {
+		t.Fatalf("stale save returned %v, want ErrGrantsChanged", err)
+	}
+	onDisk := readGrants(t, grantsPath)
+	if len(onDisk) != 2 || len(GrantsChanged(added, onDisk)) > 0 {
+		t.Errorf("file holds %v, want A's save %v", onDisk, added)
+	}
+	if len(b.Grants()) != 2 || len(GrantsChanged(b.Grants(), onDisk)) > 0 {
+		t.Errorf("B publishes %v, want the file's %v", b.Grants(), onDisk)
+	}
+}
+
+// A save that cannot read the file returns that error and writes nothing.
+func TestSaveGrantsReportsAMissingFile(t *testing.T) {
+	dir := t.TempDir()
+	tablePath := filepath.Join(dir, "acl.json")
+	writeJSON(t, tablePath, Table{"Root": {"Search": {}}})
+	grantsPath := filepath.Join(dir, "grants.json")
+	writeJSON(t, grantsPath, []Grant{{Email: "a@example.com"}})
+
+	c := New(fileHooks())
+	err := c.Load(context.Background(), Sources{TablePath: tablePath, GrantsPath: grantsPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.Remove(grantsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = c.SaveGrants(context.Background(), nil)
+	if err == nil || errors.Is(err, ErrGrantsChanged) {
+		t.Errorf("save over a missing file returned %v, want the read error", err)
+	}
+	_, err = os.Stat(grantsPath)
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("save over a missing file wrote it: %v", err)
 	}
 }
 

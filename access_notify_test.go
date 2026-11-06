@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -356,5 +357,21 @@ func TestSaveGrantsPokesTheGrantee(t *testing.T) {
 	err = saveGrants(context.Background(), PatreonGrants()[1:])
 	if err != nil || !pokes.Poked(a, time.Now(), pokeWindow()) || pokes.Len() != 2 {
 		t.Errorf("save with a revoked: err %v, poked %v; want a and b", err, pokes.Len())
+	}
+}
+
+// A save refused because the file moved on publishes the file's list, so it
+// pokes whoever the peer's edit changed: the peer's NOTIFY then finds nothing.
+func TestSaveGrantsRefusedPokesThePeersGrantee(t *testing.T) {
+	renewalConfig(t, renewalBlock, "client-id")
+	pokes := freshPokes(t)
+	files := loadAccessFiles(t, `{"Legacy":{"Search":{}}}`, `[`+grantFor("a@example.com", "Legacy")+`]`)
+	stale := PatreonGrants()
+	files.set("grants", `[`+grantFor("a@example.com", "Legacy")+`,`+grantFor("b@example.com", "Legacy")+`]`)
+
+	err := saveGrants(context.Background(), append(stale[:1:1], PatreonGrant{Email: "c@example.com", Tier: "Legacy"}))
+	b := userstate.HashEmail("b@example.com")
+	if !errors.Is(err, access.ErrGrantsChanged) || pokes.Len() != 1 || !pokes.Poked(b, time.Now(), pokeWindow()) {
+		t.Errorf("err %v, poked %v; want the save refused and only b poked", err, pokes.Len())
 	}
 }

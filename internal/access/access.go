@@ -233,14 +233,24 @@ func (c *Client) loadGrants(ctx context.Context, sources Sources) ([]Grant, erro
 	return grants, nil
 }
 
+// ErrGrantsChanged is SaveGrants refusing a save made from a stale list.
+var ErrGrantsChanged = errors.New("another save changed the grants first; the table now shows them as they are, redo the edit")
+
 // SaveGrants persists a new grant list to wherever the list was read from,
-// and publishes it on success.
+// and publishes it on success. The file is shared by every deployment, so a
+// save is refused with ErrGrantsChanged when the file no longer holds what
+// this client loaded, and the client publishes the file's list instead.
 func (c *Client) SaveGrants(ctx context.Context, grants []Grant) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.sources.GrantsPath == "" {
-		return errors.New("grants: no path configured")
+	current, err := c.loadGrants(ctx, c.sources)
+	if err != nil {
+		return err
+	}
+	if len(GrantsChanged(c.Grants(), current)) > 0 {
+		c.setGrants(current)
+		return ErrGrantsChanged
 	}
 	if err := c.writeJSONPath(ctx, c.sources.GrantsPath, grants); err != nil {
 		return fmt.Errorf("grants %s: %w", c.sources.GrantsPath, err)
