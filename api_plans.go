@@ -28,7 +28,7 @@ type APIPlansVars struct {
 	// Cards is the packages in podium order; TopCard is the one on the podium step.
 	Cards   []apiproductlist.Package
 	TopCard string
-	// HistoryCards are the history packages, shown after the podium once on sale.
+	// HistoryCards are the history packages, shown after the podium once the flag is set.
 	HistoryCards []apiproductlist.Package
 	// Default is the package checked on arrival: the top card, so the fullest
 	// package is what the page opens on.
@@ -65,10 +65,10 @@ type APIPlansVars struct {
 	WantedStores []string
 	// PaidStores are keys a change request names that this site no longer offers.
 	PaidStores []string
-	// ModeAddons are the add-ons that grant a mode, listed once on sale.
+	// ModeAddons are the add-ons that grant a mode, listed once the flag is set.
 	ModeAddons []apiproductlist.Addon
-	// NewspaperOnSale names the newspaper among a package's bullets when its modes grant it.
-	NewspaperOnSale bool
+	// ShowNewspaperAddon names the newspaper among a package's bullets when its modes grant it.
+	ShowNewspaperAddon bool
 
 	// TrialDays must match the gateway's trial_days config.
 	TrialDays int
@@ -172,12 +172,12 @@ func apiPlansVars(p *prices, r *http.Request, sig string) *APIPlansVars {
 		Change:     change,
 		Email:      GetParamFromSig(sig, "UserEmail"),
 		TrialDays:  15,
-		// The gateway grants the newspaper only once it is on sale.
-		NewspaperOnSale: Config().APIGateway.NewspaperOnSale,
+		// The gateway grants the newspaper only once the add-on is shown.
+		ShowNewspaperAddon: Config().APIGateway.ShowNewspaperAddon,
 	}
 	var history []apiproductlist.Package
 	v.Cards, v.TopCard, history = podiumOrder(apiProducts.Packages)
-	if Config().APIGateway.HistoryOnSale {
+	if Config().APIGateway.ShowHistoryPackage {
 		v.HistoryCards = history
 	}
 	v.ImpliedStores, v.Stores, v.SealedStores = storeFamilies(p)
@@ -192,7 +192,7 @@ func apiPlansVars(p *prices, r *http.Request, sig string) *APIPlansVars {
 		}
 	}
 	// A change link names the package the reader is on, so the form opens on it.
-	if p, ok := apiProducts.Package(r.FormValue("package")); ok && (!p.IsHistory() || Config().APIGateway.HistoryOnSale) {
+	if p, ok := apiProducts.Package(r.FormValue("package")); ok && (!p.IsHistory() || Config().APIGateway.ShowHistoryPackage) {
 		v.Default = p
 	}
 	v.DefaultPackage = v.Default.Key
@@ -206,7 +206,7 @@ func apiPlansVars(p *prices, r *http.Request, sig string) *APIPlansVars {
 		v.ExtraStoreMonthly, v.ExtraStoreFirst = a.Monthly, a.FirstMonthly
 	}
 	for _, a := range apiProducts.Addons {
-		if modeAddonOnSale(a) {
+		if modeAddonShown(a) {
 			v.ModeAddons = append(v.ModeAddons, a)
 		}
 	}
@@ -221,9 +221,9 @@ func apiPlansVars(p *prices, r *http.Request, sig string) *APIPlansVars {
 	return v
 }
 
-// modeAddonOnSale reports whether a mode add-on is sold here: the newspaper, once its flag is set.
-func modeAddonOnSale(a apiproductlist.Addon) bool {
-	return a.GrantsMode == apiproductlist.ModeNewspaper && Config().APIGateway.NewspaperOnSale
+// modeAddonShown reports whether a mode add-on is listed here: the newspaper, once its flag is set.
+func modeAddonShown(a apiproductlist.Addon) bool {
+	return a.GrantsMode == apiproductlist.ModeNewspaper && Config().APIGateway.ShowNewspaperAddon
 }
 
 // familyKeys maps each lowercased configured shorthand to its family key, the config key up to its first underscore.
@@ -484,14 +484,14 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 		StoreKeys     []string            `json:"storeKeys,omitempty"`
 	}{Addons: map[string]int64{}, AddonApplies: map[string][]string{}, IncludedGames: v.Products.IncludedGames, StoreKeys: v.WantedStores}
 	for _, p := range v.Products.Packages {
-		// Off sale, history stays out of the page source as well as off the page.
-		if p.IsHistory() && !Config().APIGateway.HistoryOnSale {
+		// Hidden, history stays out of the page source as well as off the page.
+		if p.IsHistory() && !Config().APIGateway.ShowHistoryPackage {
 			continue
 		}
 		out.Packages = append(out.Packages, pkg{p.Key, p.Name, p.Monthly, p.StoreScope == apiproductlist.StoreScopeExplicit, p.IncludedStores, p.StoreScope, slices.Contains(p.Modes, "sealed")})
 	}
 	for _, a := range v.Products.Addons {
-		// Off sale, a mode add-on stays out of the page source too.
+		// Hidden, a mode add-on stays out of the page source too.
 		if a.GrantsMode != "" && !slices.ContainsFunc(v.ModeAddons, func(m apiproductlist.Addon) bool { return m.Key == a.Key }) {
 			continue
 		}

@@ -265,7 +265,7 @@ refuses a `grants_mode` outside `Modes`. Its price is $200 a month on
 The plans page shows a checkbox for it inside the À la carte and Base
 Access cards, adding its monthly to the total and submitting
 `addons=newspaper` to the gateway's checkout, only where the config sets
-`api_gateway.newspaper_on_sale`: the gateway cannot sell it until it
+`api_gateway.show_newspaper_addon`: the gateway cannot sell it until it
 re-pins this module and seeds Stripe. Off, the add-on is left out of the
 page and of the configurator's data.
 
@@ -299,7 +299,7 @@ a request made with an API key (step 3 of Rollout).
 ## Rollout
 
 1. Site: the endpoint, the shared filter, the rarity field, the add-on
-   in the catalog, the plans checkbox behind `newspaper_on_sale`, the
+   in the catalog, the plans checkbox behind `show_newspaper_addon`, the
    OpenAPI and guide entries, and this doc. (built)
 2. Deploy every game's site: the gateway's verifier needs nothing new,
    but the route must exist before the gateway forwards to it.
@@ -312,4 +312,4 @@ a request made with an API key (step 3 of Rollout).
    this module in the gateway's `go.mod` and seed Stripe from the
    catalog.
 4. With the price set at $200 a month, set
-   `api_gateway.newspaper_on_sale` on the sites.
+   `api_gateway.show_newspaper_addon` on the sites.

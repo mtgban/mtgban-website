@@ -69,10 +69,10 @@ type APIGatewayConfig struct {
 	URL string `json:"url"`
 	// Games are the gateway's configured games, what the configurator offers
 	Games []matcher.Game `json:"games"`
-	// NewspaperOnSale shows the newspaper add-on on the plans page; off until the gateway sells it
-	NewspaperOnSale bool `json:"newspaper_on_sale"`
-	// HistoryOnSale shows the history package on the plans page; off until the gateway sells it
-	HistoryOnSale bool `json:"history_on_sale"`
+	// ShowNewspaperAddon shows the newspaper add-on on the plans page; off until the gateway sells it
+	ShowNewspaperAddon bool `json:"show_newspaper_addon"`
+	// ShowHistoryPackage shows the history package on the plans page; off until the gateway sells it
+	ShowHistoryPackage bool `json:"show_history_package"`
 }
 
 // DiscordConfig contains the bot connection, community links, channel IDs,

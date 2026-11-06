@@ -4,7 +4,7 @@
     <link rel="stylesheet" type="text/css" href="/css/api-plans.css?hash={{.Hash}}">
 {{end}}
 
-{{/* api-card-body is the podium and history cards' shared inner markup: .Package, and .Newspaper when on sale. */}}
+{{/* api-card-body is the podium and history cards' shared inner markup: .Package, and .Newspaper when the add-on is shown. */}}
 {{define "api-card-body" -}}
 {{with .Package -}}
 <div class="api-tier-icon">{{plan_icon .Icon}}</div>
@@ -45,7 +45,7 @@
                 {{range .Cards}}
                 <div class="card api-card{{if eq .Key $.API.TopCard}} api-card-top{{end}}">
                     <input type="radio" name="package" id="api-package-{{.Key}}" value="{{.Key}}"{{if eq .Key $.API.DefaultPackage}} checked{{end}}>
-                    {{template "api-card-body" (dict "Package" . "Newspaper" $.API.NewspaperOnSale)}}
+                    {{template "api-card-body" (dict "Package" . "Newspaper" $.API.ShowNewspaperAddon)}}
                     <p class="api-cta-note">Billed monthly, cancel any time</p>
                     {{$key := .Key}}{{range $.API.ModeAddons}}{{if slice_has .AppliesTo $key}}
                     <label class="api-choice api-card-addon"><input type="checkbox" name="addons" value="{{.Key}}" data-package="{{$key}}"> Add {{.Name}}, {{usd .Monthly}}/month</label>
@@ -68,7 +68,7 @@
                 {{range .HistoryCards}}
                 <div class="card api-card">
                     <input type="radio" name="package" id="api-package-{{.Key}}" value="{{.Key}}"{{if eq .Key $.API.DefaultPackage}} checked{{end}}>
-                    {{template "api-card-body" (dict "Package" . "Newspaper" $.API.NewspaperOnSale)}}
+                    {{template "api-card-body" (dict "Package" . "Newspaper" $.API.ShowNewspaperAddon)}}
                     <p class="api-cta-note">Billed monthly, cancel any time</p>
                 </div>
                 {{end}}

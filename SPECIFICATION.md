@@ -944,7 +944,7 @@ least 60 s; 60 s while the cache predates the last scheduled run; 300 s
 once stale) with an `ETag` over the body, compared weakly for a 304,
 and `Last-Modified` from the refresh. The mode is sold as the
 `newspaper` add-on in `apiproductlist` (`grants_mode`), which the plans
-page shows only with `api_gateway.newspaper_on_sale`. It is $200 a month, a
+page shows only with `api_gateway.show_newspaper_addon`. It is $200 a month, a
 checkbox on the À la carte and Base Access cards and included in All
 Access. The page reads a `stores.json` of its own, which carries `base` per
 family (true when Base Access covers at least one of its singles scrapers)
@@ -983,7 +983,7 @@ archive write (00:00 and 12:00, and 21:00 off Magic), a minute for the
 half hour after each, and `no-store` while this process writes; errors
 are JSON with real statuses. The mode is `history`, a package of its own
 in `apiproductlist` with `lookback_days` and no store scope, which the
-plans page shows only with `api_gateway.history_on_sale`.
+plans page shows only with `api_gateway.show_history_package`.
 `docs/api-v2-history.md` has the design and the read-cost tables.
 
 ### 5.8 Discord bot (`discord.go`, `embed.go`, `internal/embed/`)
