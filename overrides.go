@@ -67,8 +67,12 @@ func loadKeyOverrides() error {
 
 // saveKeyOverrides writes the overrides to the config bucket and publishes them
 // for subsequent loads. It does not itself re-apply them to already-loaded
-// scrapers; callers reload the affected shorthands for that.
+// scrapers; callers reload the affected shorthands for that. With the config
+// read from a local file it refuses, as there is no editor to save from.
 func saveKeyOverrides(overrides KeyOverrides) error {
+	if configBucketName() == "" {
+		return errors.New("key overrides are edited only with the config on B2")
+	}
 	return keyOverridesStore.Save(context.Background(), overrides)
 }
 
@@ -175,8 +179,12 @@ func overrideFixCandidates(b *matcher.Backend, wrongUUID string) (wrong *Overrid
 }
 
 // currentKeyOverridesJSON returns the loaded overrides as pretty JSON, for the
-// admin editor. An empty/unloaded set renders as "{}".
+// admin editor. An empty/unloaded set renders as "{}". With the config read
+// from a local file it returns "", which tells the page to offer no editor.
 func currentKeyOverridesJSON() (string, error) {
+	if configBucketName() == "" {
+		return "", nil
+	}
 	return keyOverridesStore.JSON()
 }
 
