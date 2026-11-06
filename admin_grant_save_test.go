@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/mtgban/mtgban-website/internal/access"
 )
 
 // A People row saves in place: a POST naming the row by updateEmail rewrites
@@ -79,5 +81,45 @@ func TestAdminGrantSaveEditsTheRow(t *testing.T) {
 	grants = PatreonGrants()
 	if pv.WarningMessage != "" || len(grants) != 4 || grants[3].Email != "c@example.com" {
 		t.Errorf("quick-add: warning %q, grants %+v; want c appended", pv.WarningMessage, grants)
+	}
+}
+
+// A People form posts the stamp of the list its table was drawn from: a
+// stamp of a list that has since changed is refused and saves nothing, the
+// current one saves, and a form with no stamp still saves.
+func TestAdminGrantRevokeRefusesAMovedTable(t *testing.T) {
+	freshPokes(t)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	savedLog := LogPages["Admin"]
+	t.Cleanup(func() { LogPages["Admin"] = savedLog })
+	LogPages["Admin"] = log.New(io.Discard, "", 0)
+	loadAccessFiles(t, `{"Legacy":{"Search":{}}}`,
+		`[`+grantFor("a@example.com", "Legacy")+`,`+grantFor("b@example.com", "Legacy")+`]`)
+
+	old := grantsStamp(PatreonGrants())
+	var pv PageVars
+	adminGrantSave(postForm("/admin", url.Values{"grantEmail": {"c@example.com"}, "grantTier": {"Legacy"}, "grantsStamp": {old}}), &pv)
+	if pv.WarningMessage != "" || len(PatreonGrants()) != 3 {
+		t.Fatalf("quick-add with the current stamp: warning %q, %d grants; want c added", pv.WarningMessage, len(PatreonGrants()))
+	}
+
+	pv = PageVars{}
+	adminGrantRevoke(postForm("/admin", url.Values{"revokeEmail": {"a@example.com"}, "grantsStamp": {old}}), &pv)
+	if !strings.Contains(pv.WarningMessage, access.ErrGrantsChanged.Error()) || len(PatreonGrants()) != 3 {
+		t.Errorf("revoke from a moved table: warning %q, %d grants; want it refused", pv.WarningMessage, len(PatreonGrants()))
+	}
+
+	pv = PageVars{}
+	adminGrantRevoke(postForm("/admin", url.Values{"revokeEmail": {"a@example.com"}, "grantsStamp": {grantsStamp(PatreonGrants())}}), &pv)
+	if pv.WarningMessage != "" || len(PatreonGrants()) != 2 {
+		t.Errorf("revoke with the current stamp: warning %q, %d grants; want a removed", pv.WarningMessage, len(PatreonGrants()))
+	}
+
+	pv = PageVars{}
+	adminGrantRevoke(postForm("/admin", url.Values{"revokeEmail": {"b@example.com"}}), &pv)
+	if pv.WarningMessage != "" || len(PatreonGrants()) != 1 {
+		t.Errorf("revoke with no stamp: warning %q, %d grants; want b removed", pv.WarningMessage, len(PatreonGrants()))
 	}
 }
