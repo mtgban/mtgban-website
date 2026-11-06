@@ -1049,14 +1049,18 @@
         sortBar.append(sortSel, sortDirBtn);
     }
 
-    // icon puts the lucide icon named in button b, painted once lucide has
-    // loaded.
+    // The panel's lucide icons, drawn here because it opens on the pages that
+    // skip the lucide bundle too.
+    var ICONS = {
+        "search": '<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
+        "undo-2": '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/>',
+        "trash-2": '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+        "arrow-up-narrow-wide": '<path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="M11 12h4"/><path d="M11 16h7"/><path d="M11 20h10"/>',
+        "arrow-down-wide-narrow": '<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/>'
+    };
+
     function icon(b, name) {
-        while (b.children.length) b.children[0].remove();
-        var i = text("i");
-        i.setAttribute("data-lucide", name);
-        b.appendChild(i);
-        if (typeof window.paintIcons === "function") window.paintIcons(b);
+        b.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[name] + "</svg>";
     }
 
     function setSortNote(s) {
