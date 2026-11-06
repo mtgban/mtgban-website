@@ -18,6 +18,7 @@
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/navbar.css?hash={{.Hash}}">
     {{block "extra-css" .}}{{end}}
+    {{if not .NoBackpack}}<link rel="stylesheet" type="text/css" href="/css/backpack.css?hash={{.Hash}}">{{end}}
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css">
 
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
@@ -33,6 +34,12 @@
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
     <!-- Before content: search's modal decorates links with sameSiteURL as it loads. -->
     <script type="text/javascript" src="/js/utils.js?hash={{.Hash}}"></script>
+    {{if not .NoBackpack}}
+    <script>window.BAN_BACKPACK = {canUpload: {{if .CanUpload}}true{{else}}false{{end}}};</script>
+    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}" defer></script>
+    {{end}}
 
     {{block "extra-meta" .}}{{end}}
 
@@ -115,6 +122,7 @@ window.__BAN_PALETTE_TARGETS = {
 <script type="text/javascript" src="/js/offline/offline-images-ui.js?hash={{.Hash}}" defer></script>
 <script>window.BAN_SETTINGS = { tab: "{{.SettingsTab}}" };</script>
 <script>window.BAN_BACKPACK_MAX = {{.BackpackMax}}; window.BAN_BACKPACK_TABS = {{.BackpackTabs}};</script>
+{{if not .NoBackpack}}<script type="text/javascript" src="/js/backpack.js?hash={{.Hash}}" defer></script>{{end}}
 <script type="text/javascript" src="/js/store-factors.js?hash={{.Hash}}" defer></script>
 <!-- The modal's own scripts and sheets come with its first open, through the loader. -->
 <script type="text/javascript" src="/js/settings-loader.js?hash={{.Hash}}" defer></script>

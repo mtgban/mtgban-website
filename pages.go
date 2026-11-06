@@ -344,9 +344,12 @@ type PageVars struct {
 
 	// BackpackMax is how many cards each of the reader's backpacks holds,
 	// and BackpackTabs how many backpacks they may keep, for js/backpack.js
-	// and js/user-state.js on every page that syncs them.
+	// and js/user-state.js. CanUpload says the navbar offers Upload, so the
+	// backpack may send to it. NoBackpack leaves the backpack off the page.
 	BackpackMax  int
 	BackpackTabs int
+	CanUpload    bool
+	NoBackpack   bool
 
 	// HasVelocity says sales are loaded, so there is something to sort or rank by.
 	HasVelocity bool
@@ -480,6 +483,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 
 		BackpackMax:  backpackMaxFromValues(sigParams),
 		BackpackTabs: backpackTabsFromValues(sigParams),
+		CanUpload:    navOffers(s, sigParams, "Upload"),
 
 		ScriptSignedIn:    cookie != "",
 		ScriptOfflineMode: cookieParams.Get("SearchOfflineMode") == "true",

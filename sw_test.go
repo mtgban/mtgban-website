@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -19,13 +20,15 @@ func TestServiceWorkerPrecachesShellAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	assetRE := regexp.MustCompile(`(?:src|href)="(/(?:js|css)/[^"?]+)`)
+	// base.html leaves these out of the shell, under NoBackpack.
+	notInShell := []string{"/js/list-storage.js", "/js/user-state.js", "/js/confirm-dialog.js", "/js/backpack.js", "/css/backpack.css"}
 	for _, tmpl := range []string{"templates/base.html", "templates/partials/navbar.html"} {
 		body, err := os.ReadFile(tmpl)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, m := range assetRE.FindAllStringSubmatch(string(body), -1) {
-			if !strings.Contains(string(sw), "'"+m[1]+"?hash=") {
+			if !slices.Contains(notInShell, m[1]) && !strings.Contains(string(sw), "'"+m[1]+"?hash=") {
 				t.Errorf("%s: %s is missing from the service worker precache list", tmpl, m[1])
 			}
 		}

@@ -75,6 +75,8 @@ function renderedBase(base, page) {
             depth++;
             const name = /"([^"]+)"/.exec(m[0]);
             if (!skip && m[1] === 'block' && name && defined.has(name[1])) skip = depth;
+            // OfflinePage sets NoBackpack, so these tags never reach the shell.
+            if (!skip && m[0].includes('not .NoBackpack')) skip = depth;
         } else {
             if (skip === depth) skip = 0;
             depth--;

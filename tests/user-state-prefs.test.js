@@ -9,13 +9,14 @@ test('upload presets ride the synced preferences', () => {
     expect(m[1]).toContain("'mtgban_upload_presets'");
 });
 
-test('upload.html loads list-storage.js before user-state.js', () => {
-    const html = readFileSync(new URL('../templates/upload.html', import.meta.url), 'utf8');
-    const listStorageIdx = html.indexOf('/js/list-storage.js');
-    const userStateIdx = html.indexOf('/js/user-state.js');
-    expect(listStorageIdx).toBeGreaterThan(-1);
-    expect(userStateIdx).toBeGreaterThan(-1);
-    expect(listStorageIdx).toBeLessThan(userStateIdx);
+test('every base loads list-storage.js before user-state.js', () => {
+    for (const f of ['base.html', 'mobile/base-mobile.html', 'home.html']) {
+        const html = readFileSync(new URL('../templates/' + f, import.meta.url), 'utf8');
+        const listStorageIdx = html.indexOf('/js/list-storage.js');
+        const userStateIdx = html.indexOf('/js/user-state.js');
+        expect(listStorageIdx).toBeGreaterThan(-1);
+        expect(userStateIdx).toBeGreaterThan(listStorageIdx);
+    }
 });
 
 // Runs user-state.js signed in, with a server holding prefs, and returns what
@@ -82,14 +83,6 @@ test('a preset deleted on one device stays deleted, and the newer save wins', as
 test('the saved arbitrage filters ride the synced preferences', () => {
     const m = source.match(/var PREF_KEYS = \[([\s\S]*?)\];/);
     expect(m[1]).toContain("'mtgban_arbit_filters'");
-});
-
-test('arbit.html loads list-storage.js before user-state.js', () => {
-    const html = readFileSync(new URL('../templates/arbit.html', import.meta.url), 'utf8');
-    const listStorageIdx = html.indexOf('/js/list-storage.js');
-    const userStateIdx = html.indexOf('/js/user-state.js');
-    expect(listStorageIdx).toBeGreaterThan(-1);
-    expect(userStateIdx).toBeGreaterThan(listStorageIdx);
 });
 
 test('hydrate hands the synced arbitrage filters to the page', async () => {

@@ -264,7 +264,6 @@ body.light-theme .navbar-v2[data-tier="modern"] {
 @media (max-width: 900px) {
     .nav2-utility { margin-left: 0; }
 }
-.nav2-icon-btn.nav2-backpack[hidden] { display: none; }
 .nav2-icon-btn {
     display: inline-flex; align-items: center; justify-content: center;
     width: 36px; height: 36px;
@@ -428,7 +427,6 @@ body.light-theme .navbar-v2[data-tier="modern"] {
 /* The bar's icons the reader dragged down here, squared off like the
    theme toggle beside them; their titles name them. */
 .tools-quick-dock { display: contents; }
-.tools-quick-dock .nav2-backpack-wrap { display: flex; }
 .tools-quick-dock .nav2-icon-btn {
     box-sizing: border-box;
     background: var(--surface-2);

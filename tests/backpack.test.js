@@ -49,7 +49,7 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     const sm = session || (pending ? { mtgban_backpack_pending_clear: JSON.stringify(pending) } : {});
     const sessionStorage = { getItem: (k) => (k in sm ? sm[k] : null), setItem: (k, v) => { sm[k] = String(v); }, removeItem: (k) => { delete sm[k]; } };
     const body = el('body'); if (mobile) body.classes.add('mobile');
-    const nav = el('button'); nav.setAttribute('id', 'nav-backpack'); nav.hidden = true;
+    const nav = el('button'); nav.setAttribute('id', 'nav-backpack');
     const navCount = el('span'); navCount.setAttribute('id', 'nav-backpack-count'); navCount.hidden = true; nav.appendChild(navCount);
     body.appendChild(nav);
     if (navMenu) { const menu = el('div'); menu.setAttribute('id', 'nav-backpack-menu'); menu.hidden = true; body.appendChild(menu); }
@@ -139,7 +139,6 @@ describe('adding', () => {
         expect(p.rows[0].children[0].textContent).toBe('1');
         expect(p.rows[0].children[0].hidden).toBe(false);
         expect(p.rows[0].getAttribute('title')).toBe('Add another copy');
-        expect(p.nav.hidden).toBe(false);
         expect(p.navCount.textContent).toBe('1');
         expect(p.navCount.hidden).toBe(false);
         expect(p.nav.getAttribute('aria-label')).toBe('Backpack, 1 copy');
@@ -1136,7 +1135,6 @@ describe('the panel', () => {
         ids['backpack-clear'].click();
         expect(confirms).toEqual(['Empty the backpack?']);
         expect(p.stored().every((e) => e.del)).toBe(true);
-        expect(p.nav.hidden).toBe(false);
         expect(p.navCount.hidden).toBe(true);
     });
 
