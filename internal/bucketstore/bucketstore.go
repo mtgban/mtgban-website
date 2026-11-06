@@ -8,11 +8,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"sync/atomic"
 
+	"github.com/Backblaze/blazer/b2"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -26,9 +29,12 @@ type Store[T any] struct {
 	Bucket func(ctx context.Context) (simplecloud.ReadWriter, string, error)
 
 	ptr atomic.Pointer[T]
-	// read is set once a document was read or written, after which a
-	// document that cannot be opened is a failure rather than "none yet".
-	read atomic.Bool
+	// loaded is set while the snapshot reflects the bucket: a document was
+	// read or saved, or the bucket confirmed there is none.
+	loaded atomic.Bool
+	// held is set once a document was read or saved, after which a missing
+	// or unreadable one is a failure rather than "none yet".
+	held atomic.Bool
 }
 
 // Get returns the current snapshot, or the zero T when nothing was loaded.
@@ -47,11 +53,16 @@ func (s *Store[T]) Set(value T) {
 	s.ptr.Store(&value)
 }
 
-// Load reads the document from the bucket and publishes it. A document that
-// cannot be opened publishes the zero T instead of failing, since every
-// document here is optional until first saved; once one was read or saved,
-// that is an error and the loaded snapshot stays, since the bucket cannot
-// tell a missing document from one it failed to serve.
+// Loaded reports whether the snapshot reflects the bucket: a document was
+// read or saved, or the bucket confirmed there is none.
+func (s *Store[T]) Loaded() bool {
+	return s.loaded.Load()
+}
+
+// Load reads the document from the bucket and publishes it. Until one was
+// read or saved, a document that cannot be opened publishes the zero T, and
+// one the bucket reports missing marks the store loaded. Once one was read
+// or saved, any failure returns the error and the snapshot stays.
 func (s *Store[T]) Load(ctx context.Context) error {
 	bucket, path, err := s.Bucket(ctx)
 	if err != nil {
@@ -59,12 +70,10 @@ func (s *Store[T]) Load(ctx context.Context) error {
 	}
 	reader, err := simplecloud.InitReader(ctx, bucket, path)
 	if err != nil {
-		if s.read.Load() {
+		if s.held.Load() {
 			return err
 		}
-		log.Printf("bucketstore: %s unavailable, starting empty: %v", path, err)
-		var zero T
-		s.ptr.Store(&zero)
+		s.startEmpty(path, err)
 		return nil
 	}
 	defer reader.Close()
@@ -73,12 +82,37 @@ func (s *Store[T]) Load(ctx context.Context) error {
 	// does not name it.
 	var value T
 	err = json.NewDecoder(reader).Decode(&value)
+	if err != nil && !s.held.Load() && missing(err) {
+		s.startEmpty(path, err)
+		return nil
+	}
 	if err != nil {
+		if !s.held.Load() {
+			s.loaded.Store(false)
+		}
 		return fmt.Errorf("bucketstore: %s: %w", path, err)
 	}
 	s.ptr.Store(&value)
-	s.read.Store(true)
+	s.loaded.Store(true)
+	s.held.Store(true)
 	return nil
+}
+
+// startEmpty publishes the zero T, loaded only when err says the bucket has
+// no document.
+func (s *Store[T]) startEmpty(path string, err error) {
+	log.Printf("bucketstore: %s unavailable, starting empty: %v", path, err)
+	var zero T
+	s.ptr.Store(&zero)
+	s.loaded.Store(missing(err))
+}
+
+// isB2NotExist reports a B2 not-found, a variable so tests can swap it.
+var isB2NotExist = b2.IsNotExist
+
+// missing reports whether err says the document does not exist.
+func missing(err error) bool {
+	return errors.Is(err, fs.ErrNotExist) || isB2NotExist(err)
 }
 
 // Save writes value to the bucket and, on success, publishes it as the new
@@ -108,7 +142,8 @@ func (s *Store[T]) Save(ctx context.Context, value T) error {
 	}
 
 	s.ptr.Store(&value)
-	s.read.Store(true)
+	s.loaded.Store(true)
+	s.held.Store(true)
 	return nil
 }
 

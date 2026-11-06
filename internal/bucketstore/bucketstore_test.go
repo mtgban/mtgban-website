@@ -75,14 +75,34 @@ func (b *lazyBucket) NewReader(context.Context, string) (io.ReadCloser, error) {
 	return io.NopCloser(iotest.ErrReader(b.err)), nil
 }
 
-func TestStoreLoadNamesDocumentOnReadFailure(t *testing.T) {
-	const path = "b2://mtgban-config/lorcana/checkpoints.json"
-	refused := errors.New("b2_download_file_by_name: 404: no such file")
-	s := &Store[testDoc]{
+// errB2NotFound stands in for blazer's not-found, whose type is unexported.
+var errB2NotFound = errors.New("b2_download_file_by_name: 404: no such file")
+
+// lazyStore reads path from a lazyBucket failing with err, and has
+// isB2NotExist report errB2NotFound alone.
+func lazyStore(t *testing.T, path string, err error) *Store[testDoc] {
+	saved := isB2NotExist
+	isB2NotExist = func(e error) bool { return e == errB2NotFound }
+	t.Cleanup(func() { isB2NotExist = saved })
+	return &Store[testDoc]{
 		Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-			return &lazyBucket{err: refused}, path, nil
+			return &lazyBucket{err: err}, path, nil
 		},
 	}
+}
+
+func TestStoreLoadMissingOnFirstRead(t *testing.T) {
+	s := lazyStore(t, "b2://mtgban-config/lorcana/checkpoints.json", errB2NotFound)
+	err := s.Load(context.Background())
+	if err != nil || !s.Loaded() {
+		t.Errorf("Load of a document B2 reports missing = %v, Loaded %v; want nil, true", err, s.Loaded())
+	}
+}
+
+func TestStoreLoadNamesDocumentOnReadFailure(t *testing.T) {
+	const path = "b2://mtgban-config/lorcana/checkpoints.json"
+	refused := errors.New("b2_download_file_by_name: 503: service unavailable")
+	s := lazyStore(t, path, refused)
 
 	err := s.Load(context.Background())
 	if !errors.Is(err, refused) {
@@ -90,6 +110,26 @@ func TestStoreLoadNamesDocumentOnReadFailure(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), path) {
 		t.Errorf("Load = %q, want it to name %s", err, path)
+	}
+	if s.Loaded() {
+		t.Error("a document that failed to read should leave the store not loaded")
+	}
+}
+
+func TestStoreLazyReloadFailureKeepsDocument(t *testing.T) {
+	ctx := context.Background()
+	s := fileStore(t, "doc.json")
+	err := s.Save(ctx, testDoc{Events: []string{"a"}})
+	if err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	s.Bucket = lazyStore(t, "doc.json", errB2NotFound).Bucket
+	err = s.Load(ctx)
+	if err == nil {
+		t.Error("reload of a document B2 reports missing should fail")
+	}
+	if got := s.Get(); len(got.Events) != 1 || !s.Loaded() {
+		t.Errorf("after a failed reload Get = %v, Loaded %v; want the saved document, true", got, s.Loaded())
 	}
 }
 
