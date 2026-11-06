@@ -104,16 +104,19 @@ func saveCheckpoints(ctx context.Context, events []CheckpointEvent) error {
 	if Config().CheckpointsPath == "" {
 		return errors.New("checkpoints_path not configured")
 	}
+	if configBucketName() == "" {
+		return errors.New("checkpoints are edited only with the config on B2")
+	}
 	return checkpointsStore.Save(ctx, checkpointsFile{Events: events})
 }
 
 // currentCheckpointsJSON returns the in-memory document serialized as JSON,
 // for display in the admin editor. An empty store still produces a valid
-// `{"events": []}` document. Magic and a game with no checkpoints_path have no
-// document to show: an empty string is what tells the page to offer no editor
-// at all.
+// `{"events": []}` document. Magic, a game with no checkpoints_path and a
+// config read from a local file have no document to edit: an empty string is
+// what tells the page to offer no editor at all.
 func currentCheckpointsJSON() (string, error) {
-	if Config().Game == DefaultGame || Config().CheckpointsPath == "" {
+	if Config().Game == DefaultGame || Config().CheckpointsPath == "" || configBucketName() == "" {
 		return "", nil
 	}
 	return checkpointsStore.JSON()

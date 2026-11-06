@@ -90,11 +90,56 @@ func TestCheckpointsNoPathReadsNothing(t *testing.T) {
 	}
 }
 
+// The checkpoints and key overrides editors exist only with the config on
+// B2: read from a local file, both show no text and both saves are refused.
+func TestAdminEditorsOnlyWithConfigOnB2(t *testing.T) {
+	withConfigCopy(t)
+	Config().Game = "lorcana"
+	dir := t.TempDir()
+	Config().CheckpointsPath = filepath.Join(dir, "checkpoints.json")
+	savedCheckpoints, savedOverrides := checkpointsStore.Get(), keyOverridesStore.Get()
+	t.Cleanup(func() {
+		checkpointsStore.Set(savedCheckpoints)
+		keyOverridesStore.Set(savedOverrides)
+	})
+	checkpointsStore.Set(checkpointsFile{Events: []CheckpointEvent{{ID: "launch"}}})
+	keyOverridesStore.Set(KeyOverrides{"CK": {overrideKindRetail: {"wrong": "right"}}})
+
+	Config().sourcePath = filepath.Join(dir, "config.json")
+	cpText, err := currentCheckpointsJSON()
+	if err != nil || cpText != "" {
+		t.Errorf("checkpoints text with a local config = %q, %v; want none", cpText, err)
+	}
+	koText, err := currentKeyOverridesJSON()
+	if err != nil || koText != "" {
+		t.Errorf("key overrides text with a local config = %q, %v; want none", koText, err)
+	}
+	err = saveCheckpoints(context.Background(), []CheckpointEvent{{ID: "launch"}})
+	if err == nil {
+		t.Error("checkpoints save with a local config succeeded")
+	}
+	err = saveKeyOverrides(KeyOverrides{})
+	if err == nil {
+		t.Error("key overrides save with a local config succeeded")
+	}
+
+	Config().sourcePath = "b2://mtgban-config/lorcana/config.json"
+	cpText, err = currentCheckpointsJSON()
+	if err != nil || !strings.Contains(cpText, "launch") {
+		t.Errorf("checkpoints text with the config on B2 = %q, %v", cpText, err)
+	}
+	koText, err = currentKeyOverridesJSON()
+	if err != nil || !strings.Contains(koText, "wrong") {
+		t.Errorf("key overrides text with the config on B2 = %q, %v", koText, err)
+	}
+}
+
 // A save is what the next reload reads, from where checkpoints_path says.
 func TestCheckpointsSavedThenReloaded(t *testing.T) {
 	withConfigCopy(t)
 	Config().Game = "lorcana"
 	Config().CheckpointsPath = filepath.Join(t.TempDir(), "checkpoints.json")
+	Config().sourcePath = "b2://mtgban-config/lorcana/config.json"
 	savedDoc := checkpointsStore.Get()
 	t.Cleanup(func() { checkpointsStore.Set(savedDoc) })
 
