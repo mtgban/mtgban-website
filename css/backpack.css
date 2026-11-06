@@ -21,7 +21,6 @@
 /* The switcher under the navbar button, on hover or keyboard focus, while
    there are backpacks to pick from. */
 .nav2-backpack-wrap { position: relative; display: flex; }
-.nav2-backpack-wrap:has(> .nav2-backpack[hidden]) { display: none; }
 
 .nav2-backpack-menu {
     position: absolute;

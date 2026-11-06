@@ -483,7 +483,8 @@
         Promise.race([sync ? window.UserStateSync.flush() : null, wait]).then(go, go);
     }
 
-    // Upload checks its own grant; a page without BAN_BACKPACK sends as before.
+    // The base template says whether the navbar offers Upload, and Upload
+    // checks its own grant too.
     function canUpload() { return !(window.BAN_BACKPACK && window.BAN_BACKPACK.canUpload === false); }
     // onUpload says whether this is Upload, the one page naming what it priced.
     function onUpload() { return !!window.BAN_BACKPACK && "priced" in window.BAN_BACKPACK; }
@@ -548,7 +549,6 @@
     function markNav() {
         var btn = document.getElementById("nav-backpack");
         if (!btn) return;
-        btn.hidden = false;
         var c = count();
         var span = document.getElementById("nav-backpack-count");
         if (span) { span.textContent = String(c.copies); span.hidden = c.copies === 0; }

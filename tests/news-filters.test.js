@@ -148,10 +148,9 @@ test('the saved choices ride the synced preferences', () => {
     expect(m[1]).toContain("'mtgban_news_filters'");
 });
 
-test('both newspaper templates load user-state.js and give the form its id', () => {
+test('both newspaper templates load news-filters.js and give the form its id', () => {
     for (const f of ['news.html', 'mobile/news.html']) {
         const html = readFileSync(new URL('../templates/' + f, import.meta.url), 'utf8');
-        expect(html).toContain('/js/user-state.js');
         expect(html).toContain('/js/news-filters.js');
         expect(html).toContain('<form id="newsFilters"');
         // form.submit() skips the submit event that saves the choices, so

@@ -21,5 +21,8 @@ func (s *site) OfflinePage(w http.ResponseWriter, r *http.Request) {
 	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "Offline", sig)
 	pageVars.SettingsTab = "offline"
+	// The service worker precaches this page without cookies, so a backpack
+	// edited on it would not sync and could be overwritten once back online.
+	pageVars.NoBackpack = true
 	render(w, "offline.html", pageVars)
 }

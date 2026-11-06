@@ -10,6 +10,7 @@
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/mobile.css?hash={{.Hash}}">
     {{block "extra-css" .}}{{end}}
+    {{if not .NoBackpack}}<link rel="stylesheet" type="text/css" href="/css/backpack.css?hash={{.Hash}}">{{end}}
 
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
@@ -19,6 +20,12 @@
     <meta name="theme-color" content="#ff0000">
 
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+    {{if not .NoBackpack}}
+    <script>window.BAN_BACKPACK = {canUpload: {{if .CanUpload}}true{{else}}false{{end}}};</script>
+    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}" defer></script>
+    {{end}}
 
     {{block "extra-meta" .}}{{end}}
 
@@ -75,5 +82,6 @@
 <script type="text/javascript" src="/js/store-factors.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/tooltips.js?hash={{.Hash}}" defer></script>
 <script>window.BAN_BACKPACK_MAX = {{.BackpackMax}}; window.BAN_BACKPACK_TABS = {{.BackpackTabs}};</script>
+{{if not .NoBackpack}}<script type="text/javascript" src="/js/backpack.js?hash={{.Hash}}" defer></script>{{end}}
 </body>
 </html>

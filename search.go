@@ -586,8 +586,6 @@ type SearchVars struct {
 	// CanAlerts says the reader's ACL grants the Alerts page and an
 	// allowance, so result rows may offer the alert link.
 	CanAlerts bool
-	// CanUpload says the navbar offers Upload, so the backpack may send to it.
-	CanUpload bool
 	// CanVelocity shows the sales velocity row to the newspaper tiers.
 	CanVelocity bool
 	// VelocityNotice says a velocity filter needs a higher tier, for the phone's
@@ -618,7 +616,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CanAlerts, pageVars.CanFixSearch = searchReader(s, r)
 	pageVars.CanVelocity = newspaperTier(sig)
 	pageVars.AlertChannelList = alertChannelList(parseSig(sig))
-	pageVars.CanUpload = navOffers(s, parseSig(sig), "Upload")
 
 	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(r, sig)
 
