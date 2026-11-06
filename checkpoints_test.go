@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/mtgban-website/internal/bucketstore"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -97,9 +98,13 @@ func TestCheckpointsSavedThenReloaded(t *testing.T) {
 	Config().CheckpointsPath = filepath.Join(t.TempDir(), "checkpoints.json")
 	savedDoc := checkpointsStore.Get()
 	t.Cleanup(func() { checkpointsStore.Set(savedDoc) })
+	err := reloadCheckpoints()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	event := CheckpointEvent{ID: "launch", Type: "format", Date: "2026-10-01", Title: "Launch"}
-	err := saveCheckpoints(context.Background(), []CheckpointEvent{event})
+	err = saveCheckpoints(context.Background(), []CheckpointEvent{event})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,5 +116,40 @@ func TestCheckpointsSavedThenReloaded(t *testing.T) {
 	events := checkpointsStore.Get().Events
 	if len(events) != 1 || events[0].ID != "launch" {
 		t.Errorf("reloaded %+v from %s, want the saved event", events, Config().CheckpointsPath)
+	}
+}
+
+// Neither editor saves over a document its store never read from the bucket.
+func TestCheckpointAndOverrideSavesRefusedUntilRead(t *testing.T) {
+	withConfigCopy(t)
+	Config().Game = "lorcana"
+	Config().CheckpointsPath = filepath.Join(t.TempDir(), "checkpoints.json")
+	koPath := filepath.Join(t.TempDir(), keyOverridesFile)
+	savedCP, savedKO := checkpointsStore, keyOverridesStore
+	t.Cleanup(func() { checkpointsStore, keyOverridesStore = savedCP, savedKO })
+	checkpointsStore = &bucketstore.Store[checkpointsFile]{Bucket: savedCP.Bucket}
+	keyOverridesStore = &bucketstore.Store[KeyOverrides]{
+		Bucket: func(context.Context) (simplecloud.ReadWriter, string, error) {
+			return &simplecloud.FileBucket{}, koPath, nil
+		},
+	}
+	events := []CheckpointEvent{{ID: "launch"}}
+
+	err := saveCheckpoints(context.Background(), events)
+	if !errors.Is(err, errCheckpointsUnread) {
+		t.Errorf("checkpoints save before a read = %v, want %v", err, errCheckpointsUnread)
+	}
+	err = saveKeyOverrides(KeyOverrides{})
+	if !errors.Is(err, errKeyOverridesUnread) {
+		t.Errorf("key overrides save before a read = %v, want %v", err, errKeyOverridesUnread)
+	}
+
+	err = errors.Join(reloadCheckpoints(), loadKeyOverrides())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = errors.Join(saveCheckpoints(context.Background(), events), saveKeyOverrides(KeyOverrides{}))
+	if err != nil {
+		t.Errorf("save after a read: %v", err)
 	}
 }

@@ -94,15 +94,21 @@ func reloadCheckpoints() error {
 	return nil
 }
 
+// errCheckpointsUnread refuses a save over a document the editor never saw.
+var errCheckpointsUnread = errors.New("checkpoints were never read from the bucket; run Reload Checkpoints before saving")
+
 // saveCheckpoints pushes events to the bucket and, on success, atomically
 // swaps the in-memory cache. Magic derives its markers instead, and has
-// nothing here to write.
+// nothing here to write; nor does a store the bucket was never read for.
 func saveCheckpoints(ctx context.Context, events []CheckpointEvent) error {
 	if Config().Game == DefaultGame {
 		return errors.New("checkpoints for Magic come from the published ban list and cannot be edited")
 	}
 	if Config().CheckpointsPath == "" {
 		return errors.New("checkpoints_path not configured")
+	}
+	if !checkpointsStore.Loaded() {
+		return errCheckpointsUnread
 	}
 	return checkpointsStore.Save(ctx, checkpointsFile{Events: events})
 }

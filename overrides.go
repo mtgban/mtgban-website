@@ -37,7 +37,7 @@ type KeyOverrides map[string]map[string]map[string]string
 // keyOverridesStore holds the overrides document, stored in the config bucket
 // as a sibling of the main config file. A missing or unreadable file is not
 // fatal: overrides are simply treated as empty, mirroring how a missing main
-// config falls back to safe defaults.
+// config falls back to safe defaults, but an unreadable one is not saved over.
 var keyOverridesStore = &bucketstore.Store[KeyOverrides]{
 	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
 		return ConfigBucket, configSibling(keyOverridesFile), nil
@@ -65,10 +65,17 @@ func loadKeyOverrides() error {
 	return keyOverridesStore.Load(context.Background())
 }
 
+// errKeyOverridesUnread refuses a save over a document the editor never saw.
+var errKeyOverridesUnread = errors.New("key overrides were never read from the bucket; restart before saving")
+
 // saveKeyOverrides writes the overrides to the config bucket and publishes them
-// for subsequent loads. It does not itself re-apply them to already-loaded
-// scrapers; callers reload the affected shorthands for that.
+// for subsequent loads, refusing while the bucket was never read for them. It
+// does not itself re-apply them to already-loaded scrapers; callers reload the
+// affected shorthands for that.
 func saveKeyOverrides(overrides KeyOverrides) error {
+	if !keyOverridesStore.Loaded() {
+		return errKeyOverridesUnread
+	}
 	return keyOverridesStore.Save(context.Background(), overrides)
 }
 
