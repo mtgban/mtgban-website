@@ -33,7 +33,7 @@ func TestUploadSealedCSV(t *testing.T) {
 
 	rows := [][]string{
 		{"9e295ba4-a378-5259-8ba9-5a67ead6d17f", "Champions of Kamigawa Fat Pack", "Champions of Kamigawa", "sealed", "", "product", "NM", "368.58", "4", "url", "", "", "116082", "750831"},
-		{"48ff4766-9d88-5426-800a-1613c990011b", "Mystery Booster Booster Box (Convention Edition)", "Mystery Booster", "sealed", "", "product", "NM", "15.36", "150", "url", "", "", "101685", "659571"},
+		{"25997430-5fe6-50fb-8d56-a7feac5369a3", "Mystery Booster Booster Box (Retail Edition)", "Mystery Booster", "sealed", "", "product", "NM", "15.36", "150", "url", "", "", "101685", "659571"},
 		{"96772e6d-0aba-5362-ab10-d5f3f6d23634", "Urzas Saga Tournament Pack", "Urza's Saga", "sealed", "", "product", "NM", "645.01", "70", "url", "", "", "23679", "159742"},
 	}
 
