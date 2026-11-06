@@ -403,6 +403,11 @@ func saveDatasets(ctx context.Context, value []DatasetConfig) error {
 func saveGrants(ctx context.Context, grants []PatreonGrant) error {
 	before := PatreonGrants()
 	err := Access.SaveGrants(ctx, grants)
+	if errors.Is(err, access.ErrGrantsChanged) {
+		// The refusal published the file's list, so the peer's NOTIFY will
+		// find nothing changed: this is the reload that sees its edit
+		pokeGrantees(before, PatreonGrants())
+	}
 	if err != nil {
 		return err
 	}
