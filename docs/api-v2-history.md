@@ -314,7 +314,7 @@ billing allows one plan per account, so holding a price plan and a history
 plan at once waits on the gateway (Rollout, step 3).
 
 The plans page shows the package only where the config sets
-`api_gateway.history_on_sale`, off until the gateway can check it out.
+`api_gateway.show_history_package`, off until the gateway can check it out.
 
 ## Rate limit (advice)
 
@@ -408,7 +408,7 @@ response changes only when a snapshot runs:
      gzips; the site compares `If-None-Match` weakly, so a weakened tag
      still matches as long as the gateway forwards the header.
 4. Deploy every game host, then the gateway, then set
-   `api_gateway.history_on_sale` on the hosts and update the wiki.
+   `api_gateway.show_history_package` on the hosts and update the wiki.
 
 History serves before a host's stores load: the price API's 503 for
 that is its own handler's, not the middleware's (`enforceAPISigning`).

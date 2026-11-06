@@ -25,7 +25,7 @@ func apiPlansPageAt(t *testing.T, sig, target string) string {
 	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config().APIGateway
 	t.Cleanup(func() { DevMode, SigCheck, Config().APIGateway = savedDev, savedSig, savedCfg })
 	DevMode, SigCheck = true, false
-	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []matcher.Game{"magic", "pokemon"}, NewspaperOnSale: savedCfg.NewspaperOnSale, HistoryOnSale: savedCfg.HistoryOnSale}
+	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []matcher.Game{"magic", "pokemon"}, ShowNewspaperAddon: savedCfg.ShowNewspaperAddon, ShowHistoryPackage: savedCfg.ShowHistoryPackage}
 
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	req.Host = "mtgban.com"
@@ -41,36 +41,36 @@ func apiPlansPageAt(t *testing.T, sig, target string) string {
 	return rec.Body.String()
 }
 
-// withHistoryOnSale puts the history package on sale for one test.
-func withHistoryOnSale(t *testing.T) {
+// withHistoryPackageShown shows the history package for one test.
+func withHistoryPackageShown(t *testing.T) {
 	t.Helper()
 	saved := Config()
 	config := *saved
-	config.APIGateway.HistoryOnSale = true
+	config.APIGateway.ShowHistoryPackage = true
 	liveConfig.Store(&config)
 	t.Cleanup(func() { liveConfig.Store(saved) })
 }
 
-// Until the gateway sells history, the page keeps it off: no section, no card.
-func TestAPIPlansHidesHistoryUntilOnSale(t *testing.T) {
+// With the flag off, the page keeps history off: no section, no card.
+func TestAPIPlansHidesHistoryBehindTheFlag(t *testing.T) {
 	body := apiPlansPage(t, "")
 	if strings.Contains(body, `id="api-package-history"`) || strings.Contains(body, "api-history") {
-		t.Error("history shown with history_on_sale off")
+		t.Error("history shown with show_history_package off")
 	}
 	if got := strings.Count(body, `class="card api-card`); got != 3 {
 		t.Errorf("want three package cards, got %d", got)
 	}
 	if strings.Contains(body, `"key":"history"`) {
-		t.Error("history package in the configurator data with history_on_sale off")
+		t.Error("history package in the configurator data with show_history_package off")
 	}
-	withHistoryOnSale(t)
+	withHistoryPackageShown(t)
 	if body := apiPlansPage(t, ""); !strings.Contains(body, `"key":"history"`) {
-		t.Error("history package missing from the configurator data with history_on_sale on")
+		t.Error("history package missing from the configurator data with show_history_package on")
 	}
 }
 
 func TestAPIPlansRendersCatalog(t *testing.T) {
-	withHistoryOnSale(t)
+	withHistoryPackageShown(t)
 	body := apiPlansPage(t, "")
 	for _, want := range []string{
 		"À la carte", "$199", "Base Access", "$499", "All Access", "$799", "$150",
@@ -124,21 +124,21 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 	}
 }
 
-// A change link naming history is ignored while the package is off sale,
+// A change link naming history is ignored while the package is hidden,
 // so a crafted query can't pick a package the page does not render.
-func TestAPIPlansChangeLinkIgnoresHistoryOffSale(t *testing.T) {
+func TestAPIPlansChangeLinkIgnoresHiddenHistory(t *testing.T) {
 	body := apiPlansPageAt(t, "", "/api-plans?package=history")
 	if !strings.Contains(body, `name="package" id="api-package-all_data" value="all_data" checked`) {
-		t.Error("the top card should stay checked when history is off sale")
+		t.Error("the top card should stay checked when history is hidden")
 	}
 	if !strings.Contains(body, `id="api-total-package">All Access</span>`) {
 		t.Error("the total should still name the top card")
 	}
 
-	withHistoryOnSale(t)
+	withHistoryPackageShown(t)
 	body = apiPlansPageAt(t, "", "/api-plans?package=history")
 	if !strings.Contains(body, `name="package" id="api-package-history" value="history" checked`) {
-		t.Error("the history card should check once history is on sale")
+		t.Error("the history card should check once history is shown")
 	}
 }
 
@@ -563,7 +563,7 @@ func TestAPIPlansPresetPackageSubmitsNoStores(t *testing.T) {
 
 // A package with no store scope, the history one, lights no store chip.
 func TestAPIPlansHistoryScopeLightsNoStore(t *testing.T) {
-	withHistoryOnSale(t)
+	withHistoryPackageShown(t)
 	stubScrapers(t, magicStub)
 	body := apiPlansPageAt(t, "", "/api-plans?package=history")
 	parts := strings.Split(body, `name="stores"`)
@@ -750,15 +750,15 @@ func TestAPIStoresIsGetOnly(t *testing.T) {
 // The newspaper add-on reaches the page and its data only once the flag is set.
 func TestAPIPlansNewspaperAddonBehindTheFlag(t *testing.T) {
 	withConfigCopy(t)
-	Config().APIGateway.NewspaperOnSale = false
+	Config().APIGateway.ShowNewspaperAddon = false
 	off := apiPlansPage(t, "")
 	for _, absent := range []string{`name="addons"`, "api-card-addon", "Newspaper reports", `"mode_addons"`, `"newspaper":`, `"addon_applies"`} {
 		if strings.Contains(off, absent) {
-			t.Errorf("off sale, the page carries %s", absent)
+			t.Errorf("hidden, the page carries %s", absent)
 		}
 	}
 
-	Config().APIGateway.NewspaperOnSale = true
+	Config().APIGateway.ShowNewspaperAddon = true
 	on := apiPlansPage(t, "")
 	for _, present := range []string{
 		`"mode_addons":["newspaper"]`,
@@ -767,7 +767,7 @@ func TestAPIPlansNewspaperAddonBehindTheFlag(t *testing.T) {
 		`Add Newspaper reports, $200/month`,
 	} {
 		if !strings.Contains(on, present) {
-			t.Errorf("on sale, the page lacks %s", present)
+			t.Errorf("shown, the page lacks %s", present)
 		}
 	}
 	if strings.Contains(on, `id="api-mode-addons"`) {
