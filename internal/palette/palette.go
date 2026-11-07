@@ -863,7 +863,6 @@ func newspaperSourceSuffix(option string) string {
 // SleepersTargetsJSON returns the static sleepers page views.
 func SleepersTargetsJSON() template.JS {
 	out := []NavTarget{
-		{Value: "bulk", Label: "Bulk Me Up"},
 		{Value: "reprint", Label: "Long Time No Reprint"},
 		{Value: "mismatch", Label: "Market Mismatch"},
 		{Value: "gap", Label: "Ocean Gap"},

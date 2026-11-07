@@ -729,9 +729,9 @@ and `MaxUploadFileSize` 5 MB (`5 << 20` bytes).
   8 sort orders (`arbitLess()`: available, sell price, buy price,
   profitability, diff, spread, edition, alpha).
 - **Sleepers** scores cards by how often they appear as opportunities across
-  all seller×vendor pairs (`getTiers()`), plus variants: bulk repricing
-  (`getBulks()`), long-unreprinted (`getReprints()` — the 2-year/$3 floors
-  are not in sleep.go: they live in product.go's `getReprintsGlobal()`
+  all seller×vendor pairs (`getTiers()`), plus variants: long-unreprinted
+  (`getReprints()` — the 2-year/$3 floors are not in sleep.go: they live in
+  product.go's `getReprintsGlobal()`
   (`YearsBeforeReprint`/`MinimumReprintPrice`), which builds the snapshot
   `getReprints()` reads via `GetReprints()`, see §5.5), CK hotlist growth
   (`getHotlist()`), market-gap (`getGap()`), copies sold a day

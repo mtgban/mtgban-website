@@ -129,11 +129,6 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "options":
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
 		return
-	case "bulk":
-		pageVars.Subtitle = "Bulk me up"
-
-		tiers = getBulks(b, p, skipEditions)
-
 	case "reprint":
 		pageVars.Subtitle = "Long time no reprint"
 
@@ -196,94 +191,6 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("Sleepers render took", time.Since(start))
 	}
-}
-
-func getBulks(b *matcher.Backend, p *prices, skipEditions []string) map[string]int {
-	inv, err := p.sellerInventory("TCGLow")
-	if err != nil {
-		return nil
-	}
-	bl, err := p.vendorBuylist("CK")
-	if err != nil {
-		return nil
-	}
-
-	tiers := map[string]int{}
-
-	for _, code := range b.GetAllSets() {
-		set, err := b.GetSet(code)
-		if err != nil || slices.Contains(skipEditions, set.Code) {
-			continue
-		}
-
-		switch set.Code {
-		case "OPCA", "PLST", "MB2", "30A":
-			continue
-		}
-
-		// Skip anything older than 5 years
-		releaseDate, err := time.Parse("2006-01-02", set.ReleaseDate)
-		if err != nil {
-			continue
-		}
-		if time.Since(releaseDate).Hours()/24/365 > 5 {
-			continue
-		}
-
-		count := 0
-		cardPrices := map[string]float64{}
-		var totalPrices float64
-		for _, card := range set.Cards {
-			uuid := b.ConvertID(matcher.IDSpaceScryfall, card.Identifiers["scryfallId"])
-			co, err := b.GetUUID(uuid)
-			if err != nil {
-				continue
-			}
-			if co.Foil || co.Etched || co.IsPromo ||
-				co.HasPromoType(magic.PromoTypeBoosterfun) ||
-				co.HasPromoType(magic.PromoTypePromoPack) {
-				continue
-			}
-
-			// Only consider common and uncommon cards
-			entries, found := inv[uuid]
-			if !found {
-				continue
-			}
-			if card.Rarity == "common" || card.Rarity == "uncommon" {
-				count++
-				price := entries[0].Price
-				totalPrices += price
-				cardPrices[uuid] = price
-			}
-		}
-		if count == 0 {
-			continue
-		}
-
-		averagePrice := totalPrices / float64(count)
-
-		for uuid, price := range cardPrices {
-			if price < averagePrice {
-				continue
-			}
-
-			// Assign a value considering how big of a gap the minimum price has
-			tiers[uuid] = int(price-averagePrice) + 1
-
-			// Assign additional value if buylist has non-bulk worth
-			var blPrice float64
-			blEntries, found := bl[uuid]
-			if found {
-				blPrice = blEntries[0].BuyPrice
-			}
-			if blPrice > SleepersMinPrice {
-				tiers[uuid]++
-			}
-		}
-	}
-
-	return tiers
 }
 
 func getHotlist(b *matcher.Backend, p *prices, skipEditions []string) map[string]int {
