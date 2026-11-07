@@ -27,7 +27,7 @@ window.__BAN_GUIDE = {
             keywords: ['palette', 'modes', 'shortcuts', 'overview', 'pages', 'help', 'saved', 'recent', 'sealed', 'upload', 'tiles'],
             content: {
                 table: [
-                    { value: '>',  short: 'Pages - navigate to a page or a specific sub-view (Newspaper Archive, Sleepers Bulk, Arbitrage sorted by spread, etc.)' },
+                    { value: '>',  short: 'Pages - navigate to a page or a specific sub-view (Newspaper Archive, Sleepers Hotlist, Arbitrage sorted by spread, etc.)' },
                     { value: '?',  short: 'Help & syntax - look up a syntax prefix; Enter copies the snippet, Shift+Enter opens the guide section' },
                     { value: '*',  short: 'Saved - browse and run your saved searches; Shift+Enter restores chips for editing' },
                     { value: '<',  short: 'Recent - recall your recent searches' },
@@ -1040,12 +1040,11 @@ window.__BAN_GUIDE = {
             requiresNav: 'Sleepers',
             title: 'Sleepers',
             icon: 'moon',
-            summary: 'Find cards the market hasn\'t caught up on - bulk gems, no-reprint plays, mismatches, and seller gaps.',
+            summary: 'Find cards the market hasn\'t caught up on - no-reprint plays, mismatches, and seller gaps.',
             snippets: [],
-            keywords: ['sleepers', 'bulk', 'reprint', 'mismatch', 'gap', 'hotlist', 'velocity', 'analysis', 'tier', 'rank', 'S', 'F', 'undervalued', 'opportunity', 'arbitrage', 'ocean gap', 'custom comparison', 'seller', 'reference', 'target', 'TCGLow', 'MKMLow', 'MKMTrend', 'Manapool'],
+            keywords: ['sleepers', 'reprint', 'mismatch', 'gap', 'hotlist', 'velocity', 'analysis', 'tier', 'rank', 'S', 'F', 'undervalued', 'opportunity', 'arbitrage', 'ocean gap', 'custom comparison', 'seller', 'reference', 'target', 'TCGLow', 'MKMLow', 'MKMTrend', 'Manapool'],
             content: {
                 table: [
-                    { value: 'Bulk Me Up',              short: 'Cards deviating from their set\'s 5-year average' },
                     { value: 'Long Time No Reprint',    short: 'No reprint in 2+ years (excludes bulk / RL / non-tournament)' },
                     { value: 'Market Mismatch',         short: 'Buylist > market, or priced below TCG Low' },
                     { value: 'Hotlist',                 short: 'Most buylist growth over past 3 months' },
@@ -1055,7 +1054,7 @@ window.__BAN_GUIDE = {
                     { value: 'Custom comparison',       short: 'Pick any reference seller and target seller (tier-gated)' }
                 ],
                 examples: [
-                    { query: '>sleepers + Tab + "Bulk Me Up"', desc: 'Jump straight to Bulk analysis', palette: true },
+                    { query: '>sleepers + Tab + "Long Time No Reprint"', desc: 'Jump straight to the no-reprint list', palette: true },
                     { query: 'on:hotlist sort:buylist', desc: 'Cards on the buylist hot list, sorted by value' }
                 ]
             }

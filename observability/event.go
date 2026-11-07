@@ -31,8 +31,8 @@ var pageSubviews = map[string]map[string]bool{
 		"syp": true, "options": true,
 	},
 	"sleepers": {
-		"bulk": true, "reprint": true, "mismatch": true,
-		"gap": true, "hotlist": true, "velocity": true, "options": true,
+		"reprint": true, "mismatch": true, "gap": true,
+		"hotlist": true, "velocity": true, "options": true,
 	},
 }
 
