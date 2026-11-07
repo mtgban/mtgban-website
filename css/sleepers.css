@@ -109,6 +109,21 @@
     color: var(--headingtext);
 }
 
+.sleepers-tool-beta {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(191,127,255,0.15);
+    color: #c48bff;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.light-theme .sleepers-tool-beta { color: #7a3fc4; }
+
 .sleepers-tool p {
     font-size: var(--text-md);
     color: var(--activetext);
