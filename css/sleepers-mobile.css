@@ -93,6 +93,23 @@
     font-size: 0.85rem;
 }
 
+.m-sleep-tool-beta {
+    display: inline-block;
+    padding: 0 0.35em;
+    border-radius: 4px;
+    background: rgba(191, 127, 255, 0.15);
+    color: #c48bff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.light-theme .m-sleep-tool-beta {
+    color: #7a3fc4;
+}
+
 .m-sleep-tool-desc {
     font-size: 0.7rem;
     color: var(--greytext);
