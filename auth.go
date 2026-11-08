@@ -859,10 +859,25 @@ func recoverPanic(r *http.Request, w http.ResponseWriter) {
 	errPanic := recover()
 	if errPanic != nil {
 		reportPanic(errPanic, "source request: "+r.URL.String())
+		writeInternalError(w, r)
+	}
+}
 
+// writeInternalError answers a browser with errors/500.html, and anything
+// else, an API client or a page's script, with the bare status text.
+func writeInternalError(w http.ResponseWriter, r *http.Request) {
+	var page []byte
+	if strings.Contains(r.Header.Get("Accept"), "text/html") {
+		page, _ = os.ReadFile("errors/500.html")
+	}
+	if page == nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusInternalServerError)
+	w.Write(page)
 }
 
 // applyACL sets each enabled page and its option values from table into v,
