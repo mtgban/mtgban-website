@@ -32,6 +32,7 @@ PORT_GREEN=${PORT_GREEN:-8082}
 UNIT=${UNIT:-mtgban}                     # systemd template: ${UNIT}@<port>
 UPSTREAM_NAME=${UPSTREAM_NAME:-mtgban}   # the nginx server block proxy_passes to this
 UPSTREAM_CONF=${UPSTREAM_CONF:-/etc/nginx/conf.d/mtgban_upstream.conf}   # chown'd to the deploy user, see README
+ERRORS_DIR=${ERRORS_DIR:-/var/www/mtgban/errors}   # nginx's own error pages, chown'd to the deploy user, see README
 
 # The per-port checkouts sit beside this control repo, so the deploy user's
 # home is read off this script's own location rather than assumed.
@@ -140,6 +141,14 @@ if [ "$ready" -ne 1 ]; then
     exit 1
 fi
 echo "==> new instance ready"
+
+# 4a. Publish the error pages nginx serves from disk, so they show while no
+#     instance answers. A host without the directory keeps deploying.
+if [ -w "$ERRORS_DIR" ]; then
+    install -m 644 "$NEW_CO"/errors/*.html "$ERRORS_DIR"/
+else
+    echo "!! $ERRORS_DIR is missing or not writable, error pages not updated (see deploy/README.md)"
+fi
 
 # 5. Flip nginx to the new port (graceful reload — no dropped connections).
 echo "==> flipping nginx to :$NEW"

@@ -188,20 +188,29 @@ location / {
 }
 
 # Take bodies up to the app's own cap (MaxUploadBodySize, upload.go), not
-# nginx's 1m default, and answer anything larger with the site's page.
+# nginx's 1m default.
 client_max_body_size 10m;
+
+# The site's pages for errors nginx raises itself, served from disk so they
+# show while no instance answers.
 error_page 413 /errors/413.html;
-location = /errors/413.html {
+error_page 502 504 /errors/502.html;
+location ^~ /errors/ {
     internal;
-    proxy_pass http://mtgban;
-    # The refused body was never read: send none, and no length promising one.
-    proxy_pass_request_body off;
-    proxy_set_header Content-Length "";
-    proxy_set_header Host $host;
+    root /var/www/mtgban;
 }
 ```
 
 Then `sudo nginx -t && sudo systemctl reload nginx`.
+
+`deploy.sh` copies `errors/` into `/var/www/mtgban/errors` on every deploy.
+`bootstrap.sh` creates that directory; on a host set up before it did, create
+it once and fill it from the control repo:
+
+```bash
+sudo install -d -o koda -g koda -m 755 /var/www/mtgban/errors
+install -m 644 /home/koda/src/mtgban-website/errors/*.html /var/www/mtgban/errors/
+```
 
 ### 5. Passwordless sudo for the deploy commands
 
