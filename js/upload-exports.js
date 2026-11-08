@@ -91,6 +91,7 @@ function runUnpack() {
     document.getElementById("res_unpack").value = "true";
     var form = document.getElementById("upload_form");
     form.target = '';
+    if (window.showUploadProcessing) showUploadProcessing();
     form.submit();
 }
 
@@ -111,6 +112,7 @@ function switchUploadMode() {
     mode.value = mode.value === "true" ? "false" : "true";
     var form = document.getElementById("upload_form");
     form.target = '';
+    if (window.showUploadProcessing) showUploadProcessing();
     form.submit();
 }
 
@@ -150,6 +152,7 @@ window.reprocessUploadResults = function() {
     });
     // Flag this as a reload so the page keeps the current view
     try { sessionStorage.setItem('uploadReload', '1'); } catch (e) {}
+    if (window.showUploadProcessing) showUploadProcessing();
     document.getElementById("upload_form").submit();
 };
 

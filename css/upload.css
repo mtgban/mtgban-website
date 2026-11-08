@@ -1769,6 +1769,39 @@ tr.opt-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
     margin-top: 16px;
 }
 
+/* -- Processing overlay, up from a post until the results page replaces it -- */
+.upload-processing {
+    box-sizing: border-box;
+    width: 340px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 28px 24px;
+    text-align: center;
+    outline: none;
+}
+.upload-processing-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--surface-4);
+    border-top-color: var(--ainfo);
+    border-radius: 50%;
+    animation: upload-processing-spin 0.8s linear infinite;
+}
+.upload-processing-note {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+    line-height: 1.4;
+}
+@keyframes upload-processing-spin {
+    to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .upload-processing-spinner { animation-duration: 2.4s; }
+}
+
 /* A folded store keeps its header and hides the column labels and cards */
 .opt-store.folded tbody,
 .opt-store.folded thead tr + tr { display: none; }
