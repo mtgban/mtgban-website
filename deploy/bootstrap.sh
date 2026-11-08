@@ -272,6 +272,7 @@ Remaining MANUAL steps:
 
   2. Point nginx at the upstream — in this host's server block set:
        proxy_pass http://${UPSTREAM_NAME};
+     plus the body cap and 413 page from deploy/README.md section 4,
      then:  sudo nginx -t && sudo systemctl reload nginx
 
   3. Retire any old single-instance unit if present:

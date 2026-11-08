@@ -81,6 +81,8 @@ func (s *site) registerRoutes() {
 	http.HandleFunc("/openapi/", ServeFile)
 	http.HandleFunc("/favicon.ico", ServeFile)
 	http.HandleFunc("/robots.txt", ServeFile)
+	// The pages nginx answers with for errors it raises itself (deploy/README.md)
+	http.HandleFunc("/errors/", ServeFile)
 	// Dedicated handler: the service worker must revalidate on every deploy
 	http.HandleFunc("/sw.js", ServeServiceWorker)
 

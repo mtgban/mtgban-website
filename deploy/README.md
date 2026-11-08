@@ -186,6 +186,19 @@ location / {
     proxy_set_header X-Real-IP         $remote_addr;
     proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
 }
+
+# Take bodies up to the app's own cap (MaxUploadBodySize, upload.go), not
+# nginx's 1m default, and answer anything larger with the site's page.
+client_max_body_size 10m;
+error_page 413 /errors/413.html;
+location = /errors/413.html {
+    internal;
+    proxy_pass http://mtgban;
+    # The refused body was never read: send none, and no length promising one.
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Host $host;
+}
 ```
 
 Then `sudo nginx -t && sudo systemctl reload nginx`.
