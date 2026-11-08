@@ -27,6 +27,7 @@ BOOT_PORT=${PORTS[0]}                            # the instance enabled at boot
 UNIT=${UNIT:-mtgban}                             # systemd template: ${UNIT}@<port>
 UPSTREAM_NAME=${UPSTREAM_NAME:-mtgban}           # what the server block proxy_passes to
 UPSTREAM_CONF=${UPSTREAM_CONF:-/etc/nginx/conf.d/mtgban_upstream.conf}
+ERRORS_DIR=${ERRORS_DIR:-/var/www/mtgban/errors}
 SUDOERS_FILE=${SUDOERS_FILE:-/etc/sudoers.d/mtgban-deploy}
 UNIT_FILE=${UNIT_FILE:-/etc/systemd/system/${UNIT}@.service}
 ENV_FILE=${ENV_FILE:-/etc/mtgban.env}
@@ -229,6 +230,11 @@ EOF
 sudo "$SYSTEMCTL" daemon-reload
 sudo "$SYSTEMCTL" enable --now "${SELF_CYCLE_UNIT}.timer"
 
+# 5b. The error pages nginx serves from disk; deploy.sh refreshes them.
+echo "==> error pages -> $ERRORS_DIR"
+sudo install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 755 "$ERRORS_DIR"
+install -m 644 "$REPO_DIR"/errors/*.html "$ERRORS_DIR"/
+
 # 6. Build both checkouts.
 for port in "${PORTS[@]}"; do
     echo "==> [$port] building"
@@ -272,7 +278,7 @@ Remaining MANUAL steps:
 
   2. Point nginx at the upstream — in this host's server block set:
        proxy_pass http://${UPSTREAM_NAME};
-     plus the body cap and 413 page from deploy/README.md section 4,
+     plus the body cap and error pages from deploy/README.md section 4,
      then:  sudo nginx -t && sudo systemctl reload nginx
 
   3. Retire any old single-instance unit if present:

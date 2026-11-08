@@ -6,7 +6,6 @@
     <meta name="robots" content="noindex">
     <meta name="theme-color" content="#ff0000">
     <title>Upload too large - BAN</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=optional">
     <style>
         :root {
@@ -50,14 +49,11 @@
             padding: 32px 28px;
         }
         .brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
+            display: inline-block;
             margin-bottom: 24px;
             color: inherit;
             text-decoration: none;
         }
-        .brand img { width: 44px; height: 44px; }
         .brand span {
             font-size: 26px;
             font-weight: 800;
@@ -73,9 +69,9 @@
         }
         h1 { font-size: 22px; margin: 4px 0 12px; letter-spacing: -0.02em; }
         p { margin: 0 0 12px; color: var(--text-dim); }
-        ul { margin: 0 0 24px; padding-left: 20px; color: var(--text-dim); }
+        ul { margin: 0 0 12px; padding-left: 20px; color: var(--text-dim); }
         li { margin-bottom: 4px; }
-        .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
         .actions a {
             padding: 8px 16px;
             border: 1px solid var(--border);
@@ -100,7 +96,6 @@
 <body>
 <main>
     <a class="brand" href="/">
-        <img src="/img/logo/ban-stroop.png" alt="">
         <span>MTG<span class="ban">BAN</span></span>
     </a>
     <div class="code">Error 413</div>
@@ -112,7 +107,7 @@
         <li>Paste the list as text, or link a Google Sheet.</li>
     </ul>
     <div class="actions">
-        <a href="/upload">Back to Upload</a>
+        <a href="/" onclick="if (history.length > 1) { history.back(); return false; }">Go back</a>
         <a href="/">Home</a>
     </div>
 </main>
