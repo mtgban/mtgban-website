@@ -723,6 +723,36 @@ func TestMagicIDAltCopy(t *testing.T) {
 	t.Error("no card carries mtgjson's isAlternative")
 }
 
+// TestMagicAliasesAreUnique pins that no two printings share an alias, which
+// variants_mtg_uk holds unique: the second one to be priced would be refused
+// as respelled on every snapshot. A two-sided token sheet's id starts with one
+// face's uuid, so it is the case to watch.
+func TestMagicAliasesAreUnique(t *testing.T) {
+	skipWithoutDatastore(t)
+	t.Parallel()
+	b := backend()
+	seen := map[timeseries.MagicVariant]string{}
+	pairs := 0
+	for id, co := range b.UUIDs {
+		if magicID(co) == "" {
+			continue
+		}
+		if co.Identifiers["derivedTokenPair"] == "true" {
+			pairs++
+		}
+		alias := magicAlias(co)
+		alias.Language = *timeseries.NormalizeLanguage(&alias.Language)
+		if other, found := seen[alias]; found {
+			t.Errorf("%s and %s share the alias %+v", other, id, alias)
+			continue
+		}
+		seen[alias] = id
+	}
+	if pairs == 0 {
+		t.Error("no two-sided token sheet in the datastore")
+	}
+}
+
 func TestMagicIDOnlyForMagicShapedIDs(t *testing.T) {
 	if got := magicID(&matcher.CardObject{Card: matcher.Card{UUID: "492703"}}); got != "" {
 		t.Errorf("magicID(non-Magic) = %q", got)

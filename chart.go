@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
@@ -561,14 +562,33 @@ func snapshotDate(ts time.Time, now time.Time) string {
 // magicAlias is the lookup alias a Magic card's variant row carries. The uuid
 // column holds mtgjson's 36 characters, so is_alt is what tells the
 // Alternate Fourth Edition copy ("<uuid>_alt") from the printing it copies.
+//
+// A two-sided token sheet the matcher derives from two tokens has no uuid of
+// its own, and its id starts with one face's, so it takes tokenPairUUID
+// rather than that face's alias.
 func magicAlias(co *matcher.CardObject) timeseries.MagicVariant {
+	mtgjsonUUID := timeseries.NormalizeUUID(co.UUID)
+	if co.Identifiers["derivedTokenPair"] == "true" {
+		mtgjsonUUID = tokenPairUUID(co.Identifiers["tokenPairPartA"], co.Identifiers["tokenPairPartB"], mtgjsonUUID)
+	}
 	return timeseries.MagicVariant{
-		MtgjsonUUID: timeseries.NormalizeUUID(co.UUID),
+		MtgjsonUUID: mtgjsonUUID,
 		IsFoil:      co.Foil,
 		IsEtched:    co.Etched,
 		IsAlt:       strings.Contains(co.UUID, "_alt"),
 		Language:    co.Language,
 	}
+}
+
+// tokenPairUUID is the uuid a two-sided token sheet is filed under: the
+// name-based (version 5) uuid of face b in face a's namespace, which no
+// mtgjson printing holds. A face that is not a uuid leaves fallback.
+func tokenPairUUID(a, b, fallback string) string {
+	namespace, err := uuid.Parse(a)
+	if err != nil || b == "" {
+		return fallback
+	}
+	return uuid.NewSHA1(namespace, []byte(b)).String()
 }
 
 // magicID is the id a Magic card's prices are filed under, "" for another game's.
