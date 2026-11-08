@@ -725,7 +725,13 @@ and `MaxUploadFileSize` 5 MB (`5 << 20` bytes).
   `mtgban_arbit_presets`, synced and merged preset by preset like upload's)
   are listed per page group in a Preset select; a preset matches the page
   when the two queries agree once each drops the keys the page ignores and
-  those at its defaults (`arbitMode.presetNorms`).
+  those at its defaults (`arbitMode.presetNorms`). The pin beside the
+  select makes the preset a store shows the one it opens on, per page
+  (arbit, reverse, global), without changing the saved filters; the store
+  picker and a link with no `f=1` follow the pin, and a store picked from
+  a pinned one opens on the saved filters (localStorage
+  `mtgban_arbit_pins`, synced and merged store by store by when each was
+  set).
   8 sort orders (`arbitLess()`: available, sell price, buy price,
   profitability, diff, spread, edition, alpha).
 - **Sleepers** scores cards by how often they appear as opportunities across

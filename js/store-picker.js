@@ -17,6 +17,10 @@ document.addEventListener('click', function (event) {
     if (!wrapper) {
         return;
     }
+    // A control of its own in the pill, as the preset's pin, keeps its click
+    if (target.closest('button')) {
+        return;
+    }
 
     var select = wrapper.querySelector('.arb-store-select');
     // Clicks on the select itself already open it natively; calling showPicker()

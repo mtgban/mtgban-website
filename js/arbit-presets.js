@@ -1,7 +1,8 @@
 // The arbitrage pages' filter presets: the filter bar saved under a name and
 // picked from the Preset select. Kept in localStorage, which user-state.js
 // syncs to the reader's other devices; one list for Arbit and Reverse, one
-// for Global, as for the saved filters. arbit.html sets window.BAN_ARBIT.
+// for Global, as for the saved filters. A store can have a preset pinned,
+// which it opens on. arbit.html sets window.BAN_ARBIT.
 (function () {
     var cfg = window.BAN_ARBIT || {};
 
@@ -15,6 +16,11 @@
     var SEL_KEY = 'mtgban_arbit_selected_preset';
 
     var group = cfg.cookie === 'GlobalFilters' ? 'global' : 'arbit';
+    // Pins are per page, as a store buys on reverse what it sells on arbit
+    var mode = cfg.mode || group;
+    // What each store opens on, {"<mode>:<source>": {id, t}}, which
+    // user-state.js merges entry by entry.
+    var PINS_KEY = 'mtgban_arbit_pins';
 
     // The built-in preset: the page's own defaults. It is never stored, so
     // nothing can overwrite, rename or delete it, and its name is reserved.
@@ -104,6 +110,46 @@
         },
     };
 
+    function readPins() {
+        try {
+            var o = JSON.parse(localStorage.getItem(PINS_KEY) || '{}');
+            return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function writePin(key, entry) {
+        var all = readPins();
+        all[key] = entry;
+        try {
+            localStorage.setItem(PINS_KEY, JSON.stringify(all));
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    var pins = {
+        // get is the preset source opens on, null where none is pinned or
+        // the pinned one was deleted.
+        get: function (source) {
+            var e = readPins()[mode + ':' + source];
+            if (!e || typeof e.id !== 'string') return null;
+            if (e.id === DEFAULT.id) return DEFAULT;
+            var hit = null;
+            store.list().forEach(function (p) { if (p.id === e.id) hit = p; });
+            return hit;
+        },
+        set: function (source, id) { return writePin(mode + ':' + source, { id: id, t: now() }); },
+        // any is whether a store on this page has a preset pinned.
+        any: function () {
+            return Object.keys(readPins()).some(function (k) {
+                return k.indexOf(mode + ':') === 0 && !!pins.get(k.slice(mode.length + 1));
+            });
+        },
+    };
+
     // normalize is a query as this page applies it: without the marker,
     // sort and save time, the keys the page does not apply, and every key at
     // the page's default, in key order. Two queries filtering this page the
@@ -181,10 +227,36 @@
         return new URLSearchParams(params).toString();
     }
 
-    // presetURL is the page with a preset's filters and the page's own sort.
-    function presetURL(p) {
+    // presetURL is the page, or source on it, with a preset's filters and
+    // the page's own sort.
+    function presetURL(p, source) {
         var sort = cfg.sort ? '&sort=' + encodeURIComponent(cfg.sort) : '';
-        return '?source=' + encodeURIComponent(cfg.source || '') + '&' + p.q + sort;
+        return '?source=' + encodeURIComponent(source || cfg.source || '') + '&' + p.q + sort;
+    }
+
+    // storeURL is where the store picker's link goes: the store's pinned
+    // preset, else the reader's saved filters where this store's pin would
+    // otherwise ride along, else the link as it is.
+    function storeURL(link) {
+        var at = link.indexOf('?');
+        var source = at < 0 ? '' : new URLSearchParams(link.slice(at + 1)).get('source');
+        if (!source) return link;
+        var p = pins.get(source);
+        if (p) return link.slice(0, at) + presetURL(p, source);
+        return pins.get(cfg.source) ? link.slice(0, at) + '?source=' + encodeURIComponent(source) : link;
+    }
+
+    // openPinned sends a store reached without filters of its own, as from
+    // the navbar, to its pinned preset, and says whether it did.
+    function openPinned() {
+        if (!cfg.cookie || !cfg.source) return false;
+        if (new URLSearchParams(window.location.search || '').has('f')) return false;
+        var p = pins.get(cfg.source);
+        if (!p || normalize(p.q) === normalize(cfg.query)) return false;
+        var url = sameSiteURL(presetURL(p));
+        if (!url) return false;
+        window.location.replace(url);
+        return true;
     }
 
     // apply opens the page on a preset, saving it as the reader's filters
@@ -212,6 +284,9 @@
         var toggle = el('arbPresetSaveToggle'), saveRow = el('arbPresetSaveRow');
         var nameInput = el('arbPresetName'), saveBtn = el('arbPresetSave'), cancelBtn = el('arbPresetCancel');
         var renameBtn = el('arbPresetRename'), deleteBtn = el('arbPresetDelete');
+        var pinBtn = el('arbPresetPin');
+        // The preset the page shows, which the pin button pins
+        var pinnable = null;
         var form = el('arbFilters');
         box.hidden = false;
         if (controls) controls.hidden = false;
@@ -226,6 +301,12 @@
                 if (id) sessionStorage.setItem(SEL_KEY, id);
                 else sessionStorage.removeItem(SEL_KEY);
             } catch (e) { /* ignore */ }
+        }
+        // Once stores are pinned, a store was opened on its own pin, not the
+        // preset picked on the store before
+        if (pins.any()) {
+            var own = pins.get(cfg.source);
+            setSelected(own && own !== DEFAULT ? own.id : null);
         }
 
         // A preset saves the bar as it stands: the page's own state, or the
@@ -245,10 +326,15 @@
             if (match) setSelected(match.id);
             var selected = null;
             presets.forEach(function (p) { if (p.id === selectedId) selected = p; });
-            var rows = [['', 'Presets'], [DEFAULT.id, DEFAULT.name]];
-            presets.forEach(function (p) {
-                rows.push([p.id, p.name + (selected && p.id === selected.id && !match ? ' (modified)' : '')]);
-            });
+            var pinned = pins.get(cfg.source);
+            function label(p) {
+                var tags = [];
+                if (pinned && p.id === pinned.id) tags.push('pinned');
+                if (selected && p.id === selected.id && !match) tags.push('modified');
+                return p.name + (tags.length ? ' (' + tags.join(', ') + ')' : '');
+            }
+            var rows = [['', 'Presets'], [DEFAULT.id, label(DEFAULT)]];
+            presets.forEach(function (p) { rows.push([p.id, label(p)]); });
             var atDefault = !match && normalize(cfg.query) === '';
             var want = selected ? selected.id : atDefault ? DEFAULT.id : '';
             // Rebuilding closes an open dropdown, so skip it when nothing would change.
@@ -266,6 +352,16 @@
                     if (r[0] === want) o.selected = true;
                     select.appendChild(o);
                 });
+            }
+            if (pinBtn) {
+                pinnable = match || (atDefault ? DEFAULT : null);
+                var isPinned = !!(pinnable && pinned && pinnable.id === pinned.id);
+                pinBtn.setAttribute('aria-disabled', !pinnable || isPinned ? 'true' : 'false');
+                pinBtn.classList.toggle('arb-preset-pinned', isPinned);
+                var tip = isPinned ? pinnable.name + ' is pinned to this store' :
+                    pinnable ? 'Pin ' + pinnable.name + ' to this store' : 'Pick a preset to pin';
+                // tooltips.js holds the title aside while it shows it
+                if (tip !== (pinBtn.getAttribute('title') || pinBtn.getAttribute('data-ban-title'))) pinBtn.setAttribute('title', tip);
             }
             if (renameBtn) renameBtn.disabled = !selected;
             if (deleteBtn) deleteBtn.disabled = !selected;
@@ -287,16 +383,17 @@
         }
 
         select.addEventListener('change', function () {
-            if (select.value === DEFAULT.id) {
-                setSelected(null);
-                apply(DEFAULT);
-                return;
-            }
-            var hit = null;
+            var hit = select.value === DEFAULT.id ? DEFAULT : null;
             store.list().forEach(function (p) { if (p.id === select.value) hit = p; });
             if (!hit) { setSelected(null); render(); return; }
-            setSelected(hit.id);
+            setSelected(hit === DEFAULT ? null : hit.id);
             apply(hit);
+        });
+
+        if (pinBtn) pinBtn.addEventListener('click', function () {
+            if (pinBtn.getAttribute('aria-disabled') === 'true' || !pinnable) return;
+            if (!pins.set(cfg.source, pinnable.id)) say('Could not pin: browser storage is unavailable');
+            render();
         });
 
         if (toggle) toggle.addEventListener('click', function () {
@@ -415,8 +512,8 @@
     }
 
     window.ArbitPresets = {
-        store: store, normalize: normalize, findMatch: findMatch, decideSave: decideSave, formState: formState,
-        presetURL: presetURL, apply: apply, mount: mount, refresh: refresh,
+        store: store, pins: pins, normalize: normalize, findMatch: findMatch, decideSave: decideSave, formState: formState,
+        presetURL: presetURL, storeURL: storeURL, apply: apply, mount: mount, refresh: refresh,
     };
-    mount(document);
+    if (!openPinned()) mount(document);
 })();
