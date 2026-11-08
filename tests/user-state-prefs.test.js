@@ -102,12 +102,12 @@ test('hydrate hands the synced arbitrage filters to the page', async () => {
 
 // Runs reconcile on a device with unsynced arbitrage filters, and returns
 // the copy it pushes over the server's.
-async function reconcileArbit(local, server) {
-    const m = { mtgban_userstate_dirty: '1', mtgban_arbit_filters: JSON.stringify(local) };
+async function reconcileArbit(local, server, key = 'mtgban_arbit_filters') {
+    const m = { mtgban_userstate_dirty: '1', [key]: JSON.stringify(local) };
     const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const session = { getItem: () => null, setItem() {}, removeItem() {} };
     const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
-    const state = { version: 3, favorites: [], recents: [], preferences: { mtgban_arbit_filters: JSON.stringify(server) } };
+    const state = { version: 3, favorites: [], recents: [], preferences: { [key]: JSON.stringify(server) } };
     const puts = [];
     const fetch = (url, opts) => {
         if (opts && opts.method === 'PUT') puts.push(JSON.parse(opts.body));
@@ -117,7 +117,7 @@ async function reconcileArbit(local, server) {
         { addEventListener() {} }, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [], capBackpack: (list) => list });
     for (let i = 0; i < 20; i++) await Promise.resolve();
     expect(puts.length).toBe(1);
-    return JSON.parse(puts[0].preferences.mtgban_arbit_filters);
+    return JSON.parse(puts[0].preferences[key]);
 }
 
 test('each page group keeps the filters applied last, on whichever device', async () => {
@@ -134,9 +134,18 @@ test('a page group only one device saved survives the merge', async () => {
     expect(pushed).toEqual({ arbit: { q: 'f=1&minsell=2', t: 5 }, global: { q: 'f=1&minsell=7', t: 3 } });
 });
 
-test('the arbitrage presets ride the synced preferences', () => {
+test('the arbitrage presets and pins ride the synced preferences', () => {
     const m = source.match(/var PREF_KEYS = \[([\s\S]*?)\];/);
     expect(m[1]).toContain("'mtgban_arbit_presets'");
+    expect(m[1]).toContain("'mtgban_arbit_pins'");
+});
+
+test('the pins merge store by store, the one set later winning', async () => {
+    const pushed = await reconcileArbit(
+        { 'arbit:CK': { id: 'p_a', t: 5 }, 'arbit:SCG': { id: 'p_b', t: 1 } },
+        { 'arbit:SCG': { id: 'p_c', t: 4 }, 'reverse:CK': { id: 'default', t: 2 } },
+        'mtgban_arbit_pins');
+    expect(pushed).toEqual({ 'arbit:CK': { id: 'p_a', t: 5 }, 'arbit:SCG': { id: 'p_c', t: 4 }, 'reverse:CK': { id: 'default', t: 2 } });
 });
 
 // Runs reconcile on a device with unsynced arbitrage presets, and returns

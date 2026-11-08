@@ -23,13 +23,13 @@ const ARBIT = {
 // sameSiteURL (utils.js) as it answers for this site's own query URLs
 const sameSite = (v) => (v.charAt(0) === '?' ? v : '');
 
-function load(cfg, { local = fakeStorage(), session = fakeStorage(), elements = {}, filters = null, sameSiteURL = sameSite, userState } = {}) {
+function load(cfg, { local = fakeStorage(), session = fakeStorage(), elements = {}, filters = null, sameSiteURL = sameSite, userState, search = '' } = {}) {
     const saves = [];
     const listeners = {};
     const window = {
         addEventListener: (ev, fn) => { listeners[ev] = fn; },
         BAN_ARBIT: Object.assign({}, ARBIT, cfg),
-        location: { href: '' },
+        location: { href: '', search, replace: (u) => { window.location.replaced = u; } },
         ArbitFilters: filters || { save: (q) => saves.push(q), formQuery: (f) => f.query },
         prompt: null,
         confirm: null,
@@ -164,6 +164,17 @@ test('a limit the floor holds up saves as the value carried beside it, unless on
     expect(P.formState(empty)).toBe('f=1&mindiff=-50&minspread=300');
 });
 
+// The pin button, its attributes and classes kept as set
+function fakePin(addEventListener) {
+    const attrs = {}, classes = new Set();
+    return {
+        attrs, addEventListener,
+        getAttribute: (k) => (k in attrs ? attrs[k] : null),
+        setAttribute: (k, v) => { attrs[k] = String(v); },
+        classList: { toggle: (c, on) => { if (on) classes.add(c); else classes.delete(c); }, contains: (c) => classes.has(c) },
+    };
+}
+
 // The preset row's elements, as arbit.html has them
 function fakePage(formQuery, dom = fakeFormDOM()) {
     const listeners = {};
@@ -189,6 +200,7 @@ function fakePage(formQuery, dom = fakeFormDOM()) {
         arbPresetCancel: button('cancel'),
         arbPresetRename: button('rename'),
         arbPresetDelete: button('delete'),
+        arbPresetPin: fakePin(on('pin')),
         arbFilters: form,
     };
     return { elements, options, listeners, form };
@@ -350,4 +362,110 @@ test('a name longer than 40 characters is saved and renamed cut to 40', () => {
     expect(r.preset.name).toBe('x'.repeat(40));
     P.store.rename(r.preset.id, 'y'.repeat(50));
     expect(P.store.list()[0].name).toBe('y'.repeat(40));
+});
+
+const pinsOf = (local) => JSON.parse(local.getItem('mtgban_arbit_pins') || '{}');
+const pinState = (pin) => [pin.attrs['aria-disabled'], pin.classList.contains('arb-preset-pinned'), pin.attrs.title];
+
+test('the pin pins the preset the store shows, then reads pinned and does nothing more', () => {
+    const local = fakeStorage();
+    load({}, { local }).P.store.save({ name: 'Two', q: 'f=1&minsell=2' });
+    const page = fakePage('f=1&minsell=2');
+    load({ query: 'f=1&minsell=2' }, { local, elements: page.elements, search: '?f=1' });
+    const pin = page.elements.arbPresetPin;
+    expect(pinState(pin)).toEqual(['false', false, 'Pin Two to this store']);
+    page.listeners['pin:click']();
+    expect(pinsOf(local)['arbit:CK'].id).toBe(page.options[2].value);
+    expect(page.options.map((o) => o.textContent)).toEqual(['Presets', 'Default', 'Two (pinned)']);
+    expect(pinState(pin)).toEqual(['true', true, 'Two is pinned to this store']);
+    const t = pinsOf(local)['arbit:CK'].t;
+    page.listeners['pin:click']();
+    expect(pinsOf(local)['arbit:CK'].t).toBe(t);
+});
+
+test('the pin is off where the page shows no preset, and pins Default at the defaults', () => {
+    const local = fakeStorage();
+    const changed = fakePage('f=1&minsell=3');
+    load({ query: 'f=1&minsell=3' }, { local, elements: changed.elements });
+    expect(pinState(changed.elements.arbPresetPin)).toEqual(['true', false, 'Pick a preset to pin']);
+    changed.listeners['pin:click']();
+    expect(pinsOf(local)).toEqual({});
+
+    const page = fakePage('f=1');
+    load({}, { local, elements: page.elements });
+    page.listeners['pin:click']();
+    expect(pinsOf(local)['arbit:CK'].id).toBe('default');
+    expect(page.options.map((o) => o.textContent)).toEqual(['Presets', 'Default (pinned)']);
+});
+
+test('choosing a preset on a pinned store applies it, and the select reads pinned and modified', () => {
+    const local = fakeStorage();
+    const two = load({}, { local }).P.store.save({ name: 'Two', q: 'f=1&minsell=2' }).preset;
+    local.setItem('mtgban_arbit_pins', JSON.stringify({ 'arbit:CK': { id: two.id, t: 1 } }));
+    const page = fakePage('f=1');
+    const { window, saves } = load({}, { local, elements: page.elements, search: '?f=1' });
+    page.elements.arbPresetSelect.value = two.id;
+    page.listeners['select:change']();
+    expect(window.location.href).toBe('?source=CK&f=1&minsell=2');
+    expect(saves).toEqual(['f=1&minsell=2']);
+
+    const changed = fakePage('f=1&minsell=3');
+    load({ query: 'f=1&minsell=3' }, { local, elements: changed.elements, search: '?f=1' });
+    expect(changed.options.map((o) => o.textContent)).toEqual(['Presets', 'Default', 'Two (pinned, modified)']);
+    expect(pinState(changed.elements.arbPresetPin)[0]).toBe('true');
+});
+
+test('the store picker opens a store on its pin, and on the saved filters from a pinned store', () => {
+    const local = fakeStorage();
+    const { P } = load({ sort: 'profit' }, { local });
+    const four = P.store.save({ name: 'Four', q: 'f=1&minsell=4' }).preset;
+    const link = '/arbit?f=1&minsell=9&source=SCG';
+    expect(P.storeURL(link)).toBe(link);
+    local.setItem('mtgban_arbit_pins', JSON.stringify({ 'arbit:SCG': { id: four.id, t: 1 } }));
+    expect(P.storeURL(link)).toBe('/arbit?source=SCG&f=1&minsell=4&sort=profit');
+    // From an unpinned store, another unpinned store keeps the page's filters
+    expect(P.storeURL('/arbit?f=1&minsell=9&source=TCG')).toBe('/arbit?f=1&minsell=9&source=TCG');
+    // From a pinned store, they stay with it
+    const fromSCG = load({ source: 'SCG', sort: 'profit' }, { local }).P;
+    expect(fromSCG.storeURL('/arbit?f=1&minsell=4&source=TCG')).toBe('/arbit?source=TCG');
+    // Pins are per page: reverse has none for SCG
+    const reverse = load({ mode: 'reverse' }, { local }).P;
+    expect(reverse.storeURL('/reverse?f=1&source=SCG')).toBe('/reverse?f=1&source=SCG');
+    // A deleted preset unpins its stores
+    P.store.remove(four.id);
+    expect(P.storeURL(link)).toBe(link);
+});
+
+test('a pinned store reached without filters of its own opens on its pin', () => {
+    const local = fakeStorage();
+    const four = load({}, { local }).P.store.save({ name: 'Four', q: 'f=1&minsell=4' }).preset;
+    local.setItem('mtgban_arbit_pins', JSON.stringify({ 'arbit:CK': { id: four.id, t: 1 } }));
+    expect(load({ query: 'f=1&minsell=2' }, { local, search: '?source=CK' }).window.location.replaced).toBe('?source=CK&f=1&minsell=4');
+    // A link's own filters, or the pin already showing, stay put
+    expect(load({ query: 'f=1&minsell=2' }, { local, search: '?source=CK&f=1&minsell=2' }).window.location.replaced).toBeUndefined();
+    expect(load({ query: 'f=1&minsell=4' }, { local, search: '?source=CK' }).window.location.replaced).toBeUndefined();
+    // Another store, unpinned, opens on the saved filters as before
+    expect(load({ source: 'SCG', query: 'f=1&minsell=2' }, { local, search: '?source=SCG' }).window.location.replaced).toBeUndefined();
+});
+
+test('once stores are pinned, a store shows its own pin, not the preset picked on the store before', () => {
+    const local = fakeStorage();
+    const four = load({}, { local }).P.store.save({ name: 'Four', q: 'f=1&minsell=4' }).preset;
+    const session = fakeStorage({ mtgban_arbit_selected_preset: four.id });
+    // With no pins, the preset picked last reads modified, as before
+    const before = fakePage('f=1&minspread=40');
+    load({ source: 'SCG', query: 'f=1&minspread=40' }, { local, session, elements: before.elements });
+    expect(before.options.map((o) => o.textContent)).toEqual(['Presets', 'Default', 'Four (modified)']);
+    local.setItem('mtgban_arbit_pins', JSON.stringify({ 'arbit:CK': { id: four.id, t: 1 } }));
+    const other = fakePage('f=1&minspread=40');
+    load({ source: 'SCG', query: 'f=1&minspread=40' }, { local, session, elements: other.elements });
+    expect(other.options.map((o) => o.textContent)).toEqual(['Presets', 'Default', 'Four']);
+    expect(other.elements.arbPresetSelect.value).toBe('');
+});
+
+test('arbit.html sends the store picker through the pins and gives the page its mode', () => {
+    const html = readFileSync(new URL('../templates/arbit.html', import.meta.url), 'utf8');
+    expect(html).toContain('window.ArbitPresets.storeURL(value)');
+    expect(html).toMatch(/<button type="button" class="arb-preset-pin" id="arbPresetPin"[^>]*><i data-lucide="pin"><\/i><\/button>/);
+    expect(html).toContain('window.BAN_ARBIT = {source: {{$.ScraperShort}}, mode: {{if .GlobalMode}}');
 });

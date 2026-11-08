@@ -145,6 +145,23 @@
     user-select: none;
 }
 
+/* The preset's pin, lit once the preset shown is the store's pin */
+.arb-preset-pin {
+    padding: 2px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.arb-preset-pin:hover { background: var(--accent-muted); color: var(--ainfo); }
+.arb-preset-pin svg, .arb-preset-pin i[data-lucide] { width: 16px; height: 16px; }
+.arb-preset-pin[aria-disabled="true"] { cursor: default; background: transparent; color: var(--text-dim); opacity: 0.45; }
+.arb-preset-pin.arb-preset-pinned { color: var(--ainfo); opacity: 1; }
+
 .arb-change-btn {
     padding: 6px 12px;
     border-radius: var(--radius-sm);

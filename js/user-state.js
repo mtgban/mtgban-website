@@ -22,6 +22,7 @@
     var ARBIT_KEY = 'mtgban_arbit_filters';
     var NEWS_KEY = 'mtgban_news_filters';
     var ARBIT_PRESETS_KEY = 'mtgban_arbit_presets';
+    var ARBIT_PINS_KEY = 'mtgban_arbit_pins';
     var TABS_KEY = 'mtgban_backpack_tabs';
     // Keys bundled into the preferences object.
     var PREF_KEYS = [
@@ -30,7 +31,7 @@
         'chartReleasesLongRange', 'chartCheckpointTypes',
         'offline_mode', 'offline_stores', 'offline_editions', 'offline_img_editions',
         'mtgban_search_layout', 'mtgban_popular_collapsed', 'mtgban_store_factors',
-        'mtgban_upload_presets', 'mtgban_arbit_filters', 'mtgban_arbit_presets',
+        'mtgban_upload_presets', 'mtgban_arbit_filters', 'mtgban_arbit_presets', 'mtgban_arbit_pins',
         'mtgban_backpack_tabs', 'mtgban_backpack_sort', 'mtgban_news_filters'
     ];
 
@@ -232,7 +233,7 @@
                 // The saved filters merge in, should one have been applied
                 // signed out: on a synced device the server's are as new
                 var mine = {};
-                [ARBIT_KEY, NEWS_KEY].forEach(function(k) {
+                [ARBIT_KEY, NEWS_KEY, ARBIT_PINS_KEY].forEach(function(k) {
                     if (readLocal(k, null) != null) mine[k] = readLocal(k, null);
                 });
                 var prefs = mergePrefs(mine, state.preferences);
@@ -568,7 +569,8 @@
     // Preferences: last-write-wins per key (local wins on first merge), but
     // the upload and arbitrage presets, lists of their own, merge preset by
     // preset, the saved arbitrage filters page group by page group, the
-    // newspaper's report by report, and the backpack tabs tab by tab. A
+    // newspaper's report by report, the arbitrage pins store by store, and
+    // the backpack tabs tab by tab. A
     // list on one side only goes through its merge too, to be repaired.
     function mergePrefs(localPrefs, serverPrefs) {
         localPrefs = localPrefs || {};
@@ -580,6 +582,7 @@
         if (ARBIT_PRESETS_KEY in out) out[ARBIT_PRESETS_KEY] = mergeArbitPresets(localPrefs[ARBIT_PRESETS_KEY], serverPrefs[ARBIT_PRESETS_KEY]);
         if (ARBIT_KEY in out) out[ARBIT_KEY] = mergeSavedStates(localPrefs[ARBIT_KEY], serverPrefs[ARBIT_KEY]);
         if (NEWS_KEY in out) out[NEWS_KEY] = mergeSavedStates(localPrefs[NEWS_KEY], serverPrefs[NEWS_KEY]);
+        if (ARBIT_PINS_KEY in out) out[ARBIT_PINS_KEY] = mergeSavedStates(localPrefs[ARBIT_PINS_KEY], serverPrefs[ARBIT_PINS_KEY]);
         if (TABS_KEY in out) out[TABS_KEY] = mergeBackpackTabs(localPrefs[TABS_KEY], serverPrefs[TABS_KEY]);
         return out;
     }
@@ -619,10 +622,10 @@
     }
 
     // Merge two copies of saved filters, one state per arbitrage page group
-    // (arbit, global) or newspaper report: the one applied later (t, by
-    // later) wins, ties keep the local copy, and a winner ahead of the
-    // server's clock comes back to it, which a sync then sends on so the
-    // server stops holding it.
+    // (arbit, global), newspaper report or arbitrage pin: the one applied
+    // later (t, by later) wins, ties keep the local copy, and a winner
+    // ahead of the server's clock comes back to it, which a sync then sends
+    // on so the server stops holding it.
     function mergeSavedStates(local, server) {
         function parse(s) {
             try { var o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }
