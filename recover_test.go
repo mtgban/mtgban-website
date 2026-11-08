@@ -432,3 +432,33 @@ func TestAccessReloadRecovers(t *testing.T) {
 		t.Errorf("source = %q, want the reload", source)
 	}
 }
+
+// A browser whose page panics gets the site's error page; an API client or
+// a page's script gets the bare status text it can show or parse.
+func TestRecoverPanicAnswersBrowsersWithThePage(t *testing.T) {
+	serverWebhook(t)
+
+	for _, tc := range []struct {
+		accept string
+		want   string
+	}{
+		{"text/html,application/xhtml+xml,*/*;q=0.8", "<title>Something went wrong - BAN</title>"},
+		{"application/json", "Internal Server Error\n"},
+		{"", "Internal Server Error\n"},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/search", nil)
+		req.Header.Set("Accept", tc.accept)
+		rec := httptest.NewRecorder()
+		func() {
+			defer recoverPanic(req, rec)
+			panic("the page broke")
+		}()
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("Accept %q: status %d, want 500", tc.accept, rec.Code)
+		}
+		if !strings.Contains(rec.Body.String(), tc.want) {
+			t.Errorf("Accept %q: body %.80q, want it to hold %q", tc.accept, rec.Body.String(), tc.want)
+		}
+	}
+}
