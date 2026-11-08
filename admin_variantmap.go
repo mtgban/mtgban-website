@@ -17,18 +17,12 @@ type variantMapRow struct {
 	MtgbanID string
 }
 
-// variantMapRows lists every card and sealed product, sorted by matcher id,
-// and counts the ids the backend could not resolve.
-func variantMapRows(b *matcher.Backend) ([]variantMapRow, int) {
-	ids := slices.Concat(b.GetUUIDs(), b.GetSealedUUIDs())
-	rows := make([]variantMapRow, 0, len(ids))
-	skipped := 0
-	for _, id := range ids {
-		co, err := b.GetUUID(id)
-		if err != nil {
-			skipped++
-			continue
-		}
+// variantMapRows lists every id the backend holds, sorted by matcher id:
+// b.UUIDs rather than GetUUIDs, which leaves out the two-sided token sheets
+// a snapshot prices.
+func variantMapRows(b *matcher.Backend) []variantMapRow {
+	rows := make([]variantMapRow, 0, len(b.UUIDs))
+	for _, co := range b.UUIDs {
 		alias := magicAlias(co)
 		alias.MtgjsonUUID = timeseries.NormalizeUUID(alias.MtgjsonUUID)
 		alias.Language = *timeseries.NormalizeLanguage(&alias.Language)
@@ -37,7 +31,7 @@ func variantMapRows(b *matcher.Backend) ([]variantMapRow, int) {
 	slices.SortFunc(rows, func(a, b variantMapRow) int {
 		return strings.Compare(a.MtgbanID, b.MtgbanID)
 	})
-	return rows, skipped
+	return rows
 }
 
 func tf(v bool) string {
@@ -67,11 +61,7 @@ func writeVariantMap(w io.Writer, rows []variantMapRow) error {
 func serveVariantMap(w http.ResponseWriter, b *matcher.Backend) {
 	w.Header().Set("Content-Type", "text/tab-separated-values")
 	w.Header().Set("Content-Disposition", "attachment; filename=variant_map.tsv")
-	rows, skipped := variantMapRows(b)
-	if skipped > 0 {
-		LogPages["Admin"].Println("variant map: skipped", skipped, "ids the backend could not resolve")
-	}
-	if err := writeVariantMap(w, rows); err != nil {
+	if err := writeVariantMap(w, variantMapRows(b)); err != nil {
 		LogPages["Admin"].Println("variant map: write error:", err)
 	}
 }

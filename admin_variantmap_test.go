@@ -13,7 +13,7 @@ func TestVariantMapRowsNameTheCopyAndItsOriginal(t *testing.T) {
 	if err != nil {
 		t.Skip("matcher data not loaded")
 	}
-	rows, _ := variantMapRows(backend())
+	rows := variantMapRows(backend())
 	byID := map[string]variantMapRow{}
 	for _, r := range rows {
 		byID[r.MtgbanID] = r
