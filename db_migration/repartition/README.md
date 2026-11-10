@@ -54,6 +54,9 @@ Without the grant those scripts, run as the archive role, fail with
 writer's first write of a new category, whose partition takes the
 tablespace of `prices`.
 
+The second volume is temporary: once `prices_old` is dropped, step 16
+moves the table back onto the main volume and step 17 retires the volume.
+
 Re-read `df -h /mnt/postgres_database`, and the second volume's mount, the
 day the copy starts.
 
@@ -101,13 +104,14 @@ Steps 8 to 10 run inside the hold, a window in which nothing writes
   a command line.
 
 The hold is a schedule, not a switch: nothing is stopped. It is the window
-from 02:00 to 10:00 UTC, which holds none of them, begun once the 00:00
-stash and its sealed analysis show idle on the admin dashboard of every
-deployment. Inside it, press no admin button and run no ingest by hand.
-The buylist aggregates, the CK signals, the screener and the charts only
-read, and run as usual. The times assume each server's clock is UTC:
-confirm it before the day. Steps 8 to 10 take minutes; begin them by 03:00
-so the window has hours to spare.
+from 02:00 to 10:00 UTC, which holds none of the cron starts, but the
+00:00 stash on Magic writes until about 05:00 and its sealed analysis
+after, so the hold begins once the admin dashboard of every deployment
+shows them idle, not at 02:00. Inside it, press no admin button and run
+no ingest by hand. The buylist aggregates, the CK signals, the screener
+and the charts only read, and run as usual. The times assume each
+server's clock is UTC: confirm it before the day. Steps 8 to 10 take
+minutes; begin them by 03:00 so the window has hours to spare.
 
 ## The order
 
@@ -133,6 +137,8 @@ about 34 times as many.
 | 13 | `VALIDATE CONSTRAINT prices_provider_fk` | off-peak, during the soak | | `convalidated` true |
 | 14 | a volume snapshot, by the user | after the week's soak | | that it completed |
 | 15 | `09_drop_old.sql` | after the snapshot, outside every writer's window | 2 s | then the cold-read measurement |
+| 16 | `10_move_tablespace.sql -v from=fast`, in batches | after step 15, outside the stash hours, `df` read first | 19 s, the whole table (60 relations) | the report: `left_on_from` 0, `prices` and both parent indexes on `pg_default`, both valid, no stray, no other database |
+| 17 | `DROP TABLESPACE fast`, the unmount and the volume, by the user | after step 16's clean report and a fresh snapshot, as "Retiring the volume" says | | `pg_tablespace` without `fast`; the volume gone from the droplet |
 
 Steps 6 and 8 have no dry run: nothing reads `prices_v2` yet, so an apply
 changes nothing anyone sees. Step 6 does the days since the census, so
@@ -434,39 +440,161 @@ readers of both up to those 5 s while it waits.
 - After the drop: the volume snapshot taken before it. On the
   second-volume route that is both volumes' snapshots, taken together as
   the disk section says, and restored together.
+- During step 16, before step 17: run `10_move_tablespace.sql` in reverse
+  (`-v from=pg_default -v to=fast`), or restore both volumes' snapshots
+  from before step 15 together. After step 17: the snapshot of
+  "Retiring the volume" step 2.
 
-## Moving off a temporary tablespace
+## 10_move_tablespace.sql
 
-If `02_create.sql` and `04_indexes.sql` put `prices_v2` on the tablespace
-of a temporary volume, move it back once `prices_old` is dropped and the
-main volume has the room, one relation at a time, off-peak. Per
-partition, its table and its two indexes:
+Moves every relation of `prices` off a tablespace: the parent, its
+partitions and the indexes of each, so the tablespace's volume can be
+deleted. Run it from this directory on the direct port; nothing moves
+unless `apply=1`:
 
-```sql
-SET lock_timeout = '5s';
-ALTER TABLE prices_seq_01 SET TABLESPACE pg_default;
-ALTER INDEX prices_seq_01_uk SET TABLESPACE pg_default;
-ALTER INDEX prices_seq_01_provider_date SET TABLESPACE pg_default;
+```sh
+psql -v from=fast -f 10_move_tablespace.sql                          # list the plan
+psql -v from=fast -v apply=1 -f 10_move_tablespace.sql               # move it all
+psql -v from=fast -v apply=1 -v limit=6 -f 10_move_tablespace.sql    # the parent and 6 partitions
+psql -v from=fast -v to=other -v apply=1 -f 10_move_tablespace.sql   # to another tablespace
 ```
 
-Each statement holds an ACCESS EXCLUSIVE lock on that partition for as
-long as its copy takes, so the chart reads and the writes of the id range
-it holds are blocked for the move's length. The `lock_timeout` only keeps a
-statement from queuing behind a long reader. If the volume must go and that
-wait cannot be afforded, pg_repack moves a table to another tablespace
-without holding the lock for the copy. Then the parent and its two
-indexes, which move no rows, only where new partitions and their indexes
-go:
+`to` defaults to `pg_default`, and `apply` takes only 0 or 1. Before it
+lists anything, it raises:
 
-```sql
-ALTER TABLE prices SET TABLESPACE pg_default;
-ALTER INDEX prices_uk SET TABLESPACE pg_default;
-ALTER INDEX prices_provider_date SET TABLESPACE pg_default;
-```
+- when `from` is missing or names no tablespace;
+- when `to` names no tablespace, equals `from`, or is not the database's
+  default tablespace and the role lacks `CREATE` on it;
+- when `limit` is not a whole number of at most 9 digits;
+- when `prices` is not partitioned by `ban_id`: the move is for the
+  layout after the swap;
+- when `prices_old` still exists: run `09_drop_old.sql` first, since the
+  main volume needs its room;
+- when a parent index, `prices_uk` or `prices_provider_date`, is missing
+  or not valid.
 
-`SELECT relname FROM pg_class WHERE reltablespace = (SELECT oid FROM
-pg_tablespace WHERE spcname = 'fast')` lists what is left; when it is
-empty, drop the tablespace and delete the volume.
+The plan takes the parent first, with its two indexes: they move no rows,
+but they decide where a new partition goes, so a category that appears
+mid-move lands on `to`. Then the partitions, smallest first by the bytes
+each still has on `from`, each as its table, then its unique index, then
+the other. The dry run lists every relation with its unit and
+size, then the relations, the total, the partitions and how many this run
+takes, then the strays. `limit` is the number of partitions a run moves,
+0 (the default) for all. It numbers only the partitions still wholly or
+partly on `from`, so a partly moved one counts as one and a rerun with the
+same `limit` takes the next ones; the parent never counts.
+
+The plan and `left_on_from` read each relation's effective tablespace (a
+stored `reltablespace` of 0 is the database's default), so the script
+works in either direction: a rehearsal can move onto a tablespace with
+`-v from=pg_default -v to=fast` and back with `-v from=fast`. The strays
+query compares the stored `reltablespace`, so with `from=pg_default` it
+lists nothing, and with `from=fast` it is exact.
+
+It runs outside a transaction block: every ALTER commits alone, and
+Postgres keeps a relation's old files until the commit and removes the new
+ones on a failure, so a stop or a failure leaves nothing half-moved, keeps
+what moved, and a rerun lists what is left. A run that fails, on a lock
+timeout for example, stops under `ON_ERROR_STOP` and prints no end report:
+rerun without `apply` to see the state, with `apply` to continue. Never
+run it with psql's `-1` (`--single-transaction`): every ALTER would share
+one transaction, hold every lock until the end and lose the keep-what-moved
+property. A `\set AUTOCOMMIT off` in a `.psqlrc` would do the same, which
+is why the script sets it on.
+
+`SET TABLESPACE` holds ACCESS EXCLUSIVE on that one relation for the whole
+copy: seconds for a small partition, minutes for a big one. While it does,
+that partition's chart reads and writes wait, so does every read across
+partitions (the buylist aggregate, the movers), and so does a stash
+running then. The 5 s `lock_timeout` bounds only the wait to acquire the
+lock, not how long it is held: behind a long reader the statement gives
+up after 5 s rather than queuing, holding every later reader up to those
+5 s while it waits, and the run stops; rerun once the reader is done. Each
+statement is also capped at 30 min by `statement_timeout`; a copy
+cancelled there rolls back like any other failure, and the rerun takes it
+again.
+
+Run it inside `tmux` or `screen` on the droplet, or any session that
+survives a dropped connection, so a drop leaves psql running to its end.
+Otherwise, if the ssh session drops mid-copy, its backend can go on to
+finish and commit the statement it was running: before the rerun, look in
+`pg_stat_activity` for an `ALTER ... SET TABLESPACE` still running and
+wait for it, or the rerun's ALTER on that relation times out and stops.
+
+Each copied block is also written to WAL, on the main volume. Checkpoints
+recycle it and `max_wal_size`, a soft limit, keeps what is held between
+them near that size, as long as the slot and archiving checks of the disk
+section still hold.
+
+Before each session, read `df -h /mnt/postgres_database`: it must have
+room for the dry run's total plus a margin of about one `seq` partition
+with its two indexes (the plan's largest unit, about 13 GB). The total is
+all the main volume needs, since the old files stay on `fast`; the margin
+covers the WAL's turnover and the days' growth while the sessions run.
+
+Run it in two or three sessions with `limit`: after the 00:00 stash and
+its analysis show idle on the admin dashboards (about 05:30 UTC) until
+before the 12:00 stash, or after the 12:00 stash, which also writes until
+about 17:00, and its analysis show idle (about 17:30 UTC) until before
+the 21:00 UTC ingest.
+
+It ends with a report, every field read after each session:
+
+- `left_on_from`: the relations of `prices` still on `from` and their
+  size; 0 when the move is done.
+- `prices`, `prices_uk` and `prices_provider_date` with their tablespace
+  (`pg_default` for a stored 0): all three on `to`.
+- `parent_index` with `indisvalid`: true for both.
+- `stray`: relations on `from` that are not of `prices`, which keep the
+  tablespace from being dropped; it must be empty, or each is moved or
+  dropped before step 17.
+- `databases_using_from`: the databases with a directory under `from`.
+
+`databases_using_from` lists the current database even after everything
+has moved, because Postgres leaves the database's empty directory under
+the tablespace until `DROP TABLESPACE`. The proof of a finished move is
+`left_on_from` 0 and an empty stray list, not this field. A database other
+than the current one listed there is the real warning: it may hold
+something on `fast`, which `DROP TABLESPACE` would refuse over, or only an
+empty directory, which the drop removes; look in that database before
+step 17. When `from` is `pg_default` it lists every database, which
+only a rehearsal's direction meets.
+
+Then read the table: open a chart for a card in a moved partition, and
+once the move is done run `06_gate.sql -v table=prices -v ban=<fresh id>`
+once, as the cold-read measurement below asks.
+
+## Retiring the volume
+
+The root steps, in order, after step 16:
+
+1. `10_move_tablespace.sql -v from=fast`, dry, reports clean:
+   `left_on_from` 0, no stray, no database but the archive's.
+2. A snapshot of the `postgres-database` volume, after a `CHECKPOINT`
+   with the writers idle, as the disk section describes. From here on it
+   is the restore point.
+3. As `postgres` over ssh, `DROP TABLESPACE fast;`; it refuses while any
+   database has an object there: the stray list shows one in the archive,
+   and any database but the archive's in the last field is one to look in.
+4. `umount /mnt/card_prices_fast` and remove its `/etc/fstab` line before
+   the detach: a volume still in fstab without `nofail` can stop the next
+   boot.
+5. `umount` may answer "target is busy": Postgres 18's I/O workers still
+   hold the moved relations' deleted files open, and `fuser -vm
+   /mnt/card_prices_fast` names them as `postgres: ... io worker N`. Do
+   not kill them: the postmaster restarts the cluster as a crash. Use
+   `umount -l`, remove the fstab line, then restart Postgres at a quiet
+   moment before the detach: `systemctl restart postgresql@18-main`
+   takes seconds and the sites reconnect by themselves. `fuser -vm
+   <device>` printing nothing is the go for the detach.
+6. Detach the volume in DigitalOcean, then delete it.
+7. Then the snapshots from before the move, as the user decides, only
+   once step 2's exists and each pair together, both halves: step 14's
+   two, one of each volume, and step 7's two,
+   `postgres-database-preswap-20261104` and
+   `card-prices-fast-preswap-20261104`, and any older pair likewise. A
+   main-volume snapshot restored without its fast half holds a `prices`
+   whose files are on a volume that no longer exists.
 
 ## The cold-read measurement after the drop
 
