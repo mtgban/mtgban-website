@@ -152,7 +152,7 @@ func TestUploadCustomBuylistIgnoresABadSetting(t *testing.T) {
 }
 
 // On upload a row's grade the reference lacks is priced off the fallback at
-// the rule's rate when the request turns it on; without it the row keeps the
+// the rule's rate when the request names one; without it the row keeps the
 // reference's flat price. The form speaks for a re-post, the cookies otherwise.
 func TestUploadCustomBuylistFallback(t *testing.T) {
 	cards := closeVendors(t)
@@ -187,8 +187,8 @@ func TestUploadCustomBuylistFallback(t *testing.T) {
 	}
 
 	base := url.Values{"custombuylist": {"true"}, "customseller": {"ZZA"}, "customrate": {"0.5"}}
-	if got := offer(base, map[string]string{"UploadCustomFallback": "TCGLow"}); got != "5.00" {
-		t.Errorf("fallback off: SP offer is $%s, want the flat $5.00", got)
+	if got := offer(base, map[string]string{"UploadCustomSinglesFallback": "TCGLow"}); got != "5.00" {
+		t.Errorf("no fallback on the form: SP offer is $%s, want the flat $5.00", got)
 	}
 	on := url.Values{"customfallback": {"TCGLow"}}
 	for k, v := range base {
@@ -198,11 +198,18 @@ func TestUploadCustomBuylistFallback(t *testing.T) {
 		t.Errorf("fallback on: SP offer is $%s, want $2.00", got)
 	}
 	got := offer(url.Values{}, map[string]string{
-		"UploadCustomOpts": "enabled,fallback,", "UploadCustomBuyer": "ZZA",
-		"UploadCustomRate": "0.5", "UploadCustomFallback": "TCGLow",
+		"UploadCustomOpts": "enabled,", "UploadCustomBuyer": "ZZA",
+		"UploadCustomRate": "0.5", "UploadCustomSinglesFallback": "TCGLow",
 	})
 	if got != "2.00" {
 		t.Errorf("fallback on by cookie: SP offer is $%s, want $2.00", got)
+	}
+	got = offer(url.Values{}, map[string]string{
+		"UploadCustomOpts": "enabled,", "UploadCustomBuyer": "ZZA", "UploadCustomRate": "0.5",
+		"UploadCustomFallback": "TCGLow",
+	})
+	if got != "5.00" {
+		t.Errorf("the old toggle's cookie alone: SP offer is $%s, want the flat $5.00", got)
 	}
 }
 

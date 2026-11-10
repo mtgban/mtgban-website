@@ -636,7 +636,9 @@ body.settings-open {
     user-select: none;
     justify-content: start;
 }
-.settings-field-row > span {
+.settings-field-row > span,
+.settings-field-row > label,
+.settings-field-beside > span {
     font-size: var(--text-md);
     color: var(--normal);
     opacity: 0.78;
@@ -644,6 +646,28 @@ body.settings-open {
 .settings-field-row > select {
     width: 14em;
     min-width: 0;
+}
+/* A second field on the row, beside the first */
+.settings-field-row:has(> .settings-field-beside) {
+    grid-template-columns: 12em auto auto;
+}
+.settings-field-beside {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    cursor: pointer;
+}
+.settings-field-beside > select {
+    width: 10em;
+    min-width: 0;
+}
+/* No room beside on a phone: the second field takes a row of its own */
+@media (max-width: 720px) {
+    .settings-field-row:has(> .settings-field-beside) {
+        grid-template-columns: 12em auto;
+        row-gap: 0.6em;
+    }
+    .settings-field-beside { display: contents; }
 }
 .settings-field-row > .settings-inline-num {
     margin: 0;

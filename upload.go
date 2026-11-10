@@ -2130,23 +2130,24 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 		// Build the custom buylist if requested
 		customBuylist, _ := strconv.ParseBool(r.FormValue("custombuylist"))
 		customFallback := r.FormValue("customfallback")
+		customSealedFallback := r.FormValue("customsealedfallback")
 		if !r.Form.Has("custombuylist") {
 			customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
 			customBuylist = slices.Contains(customOpts, "enabled")
-			if slices.Contains(customOpts, "fallback") {
-				customFallback = readCookie(r, "UploadCustomFallback")
-			}
+			customFallback = readCookie(r, "UploadCustomSinglesFallback")
+			customSealedFallback = readCookie(r, "UploadCustomSealedFallback")
 		}
 		// A rate that is not a positive number means no custom buylist, as
 		// on search and arbit
 		rate := customBuylistSetting(getUploadSetting(r, "customrate", "UploadCustomRate"))
 		if st.canUploadCustom && customBuylist && rate != 0 {
 			custom := customBuylistRule{
-				rate:         rate,
-				minPrice:     customBuylistSetting(getUploadSetting(r, "customminprice", "UploadCustomMinPrice")),
-				seller:       getUploadSetting(r, "customseller", "UploadCustomBuyer"),
-				sealedSeller: getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer"),
-				fallback:     customFallback,
+				rate:           rate,
+				minPrice:       customBuylistSetting(getUploadSetting(r, "customminprice", "UploadCustomMinPrice")),
+				seller:         getUploadSetting(r, "customseller", "UploadCustomBuyer"),
+				sealedSeller:   getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer"),
+				fallback:       customFallback,
+				sealedFallback: customSealedFallback,
 			}
 			rule := EntryRule{SkipSets: customBuylistSkipSets, ReleasedBy: time.Now().Add(-customBuylistMinAge)}
 			rule.MinPrice = custom.minPrice
@@ -2167,8 +2168,10 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 
 			if custom.sealedSeller != "" && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
 				ref, _ := p.sellerInventory(custom.sealedSeller)
+				fallback := customBuylistSealedFallback(p, custom.sealedFallback)
 				for _, productID := range ids.sealedProductIDs {
-					processEntry(b, p, results, ref[productID], "", productID, customSealedStore, false, false, false, rule)
+					entries := customBuylistReference(ref[productID], fallback[productID], true)
+					processEntry(b, p, results, entries, "", productID, customSealedStore, false, false, false, rule)
 				}
 				enabledSealedStores = append(enabledSealedStores, customSealedStore)
 				customTips[customSealedStore] = custom.tip(p, true)

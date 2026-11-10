@@ -279,9 +279,9 @@ func TestCustomBuylistReference(t *testing.T) {
 	}
 }
 
-// The toggle turns the fallback on for search and arbit, and a fallback that
-// is no price index, a store the reader may not see among them, prices nothing.
-func TestCustomBuylistFallbackFollowsTheToggle(t *testing.T) {
+// Naming a fallback turns it on for search and arbit, and a fallback that is
+// no price index, a store the reader may not see among them, prices nothing.
+func TestCustomBuylistFallbackFollowsTheSetting(t *testing.T) {
 	cardID := firstPlainCard(t)
 	sealedID := backend().GetSealedUUIDs()[0]
 	withPrices(t, []mtgban.Seller{
@@ -299,19 +299,20 @@ func TestCustomBuylistFallbackFollowsTheToggle(t *testing.T) {
 	}, []mtgban.Vendor{})
 
 	for _, tt := range []struct {
-		name, opts, fallback string
-		wantSP               float64
+		name, fallback string
+		wantSP         float64
 	}{
-		{"off", "enabled", "TCGLow", 0},
-		{"on", "enabled,fallback", "TCGLow", 2},
-		{"on, not an index", "enabled,fallback", "HIDDENSTORE", 0},
-		{"on, unset", "enabled,fallback", "", 0},
+		{"none", "", 0},
+		{"an index", "TCGLow", 2},
+		{"not an index", "HIDDENSTORE", 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "/search", nil)
 			for name, value := range map[string]string{
-				"UploadCustomOpts": tt.opts, "UploadCustomRate": "0.5", "UploadCustomBuyer": "REF",
-				"UploadCustomSealedBuyer": "REF", "UploadCustomFallback": tt.fallback,
+				"UploadCustomOpts": "enabled", "UploadCustomRate": "0.5", "UploadCustomBuyer": "REF",
+				"UploadCustomSealedBuyer": "REF", "UploadCustomSinglesFallback": tt.fallback,
+				// What the old toggle's select saved, on or off, is not read
+				"UploadCustomFallback": "TCGLow",
 			} {
 				r.AddCookie(&http.Cookie{Name: name, Value: value})
 			}
@@ -350,6 +351,69 @@ func TestCustomBuylistFallbackFollowsTheToggle(t *testing.T) {
 	}
 }
 
+// A product the sealed reference does not price takes the sealed fallback's
+// price on search and arbit, and one it does price keeps it. A fallback that
+// sells no sealed prices nothing.
+func TestCustomBuylistSealedFallback(t *testing.T) {
+	sealedIDs := backend().GetSealedUUIDs()
+	if len(sealedIDs) < 2 {
+		t.Skip("needs two sealed products")
+	}
+	listed, missing := sealedIDs[0], sealedIDs[1]
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			listed: {{Conditions: "NM", Price: 10, Quantity: 1}},
+		}, mtgban.ScraperInfo{Shorthand: "REFSealed", SealedMode: true}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			listed:  {{Conditions: "NM", Price: 4, Quantity: 1}},
+			missing: {{Conditions: "NM", Price: 6, Quantity: 1}},
+		}, mtgban.ScraperInfo{Shorthand: "ALTSealed", SealedMode: true}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			missing: {{Conditions: "NM", Price: 8, Quantity: 1}},
+		}, mtgban.ScraperInfo{Shorthand: "SINGLES"}),
+	}, []mtgban.Vendor{})
+
+	for _, tt := range []struct {
+		name, fallback string
+		wantMissing    float64
+	}{
+		{"none", "", 0},
+		{"a sealed seller", "ALTSealed", 3},
+		{"not a sealed seller", "SINGLES", 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/search", nil)
+			for name, value := range map[string]string{
+				"UploadCustomOpts": "enabled", "UploadCustomRate": "0.5",
+				"UploadCustomSealedBuyer": "REFSealed", "UploadCustomSealedFallback": tt.fallback,
+			} {
+				r.AddCookie(&http.Cookie{Name: name, Value: value})
+			}
+
+			prices := map[string]float64{}
+			for _, offer := range customBuylistOffers(backend(), currentPrices(), r, []string{listed, missing}) {
+				prices[offer.cardID] = offer.price
+			}
+			if prices[listed] != 5 || prices[missing] != tt.wantMissing {
+				t.Errorf("search pays %v and %v, want 5 and %v", prices[listed], prices[missing], tt.wantMissing)
+			}
+
+			source := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+				listed:  {{Conditions: "NM", Price: 10, Quantity: 1}},
+				missing: {{Conditions: "NM", Price: 10, Quantity: 1}},
+			}, mtgban.ScraperInfo{Shorthand: "SRC", SealedMode: true})
+			buylist := newCustomBuylistVendor(backend(), currentPrices(), readCustomBuylistRule(r), source).Buylist()
+			var got float64
+			if len(buylist[missing]) > 0 {
+				got = buylist[missing][0].BuyPrice
+			}
+			if len(buylist[listed]) != 1 || buylist[listed][0].BuyPrice != 5 || got != tt.wantMissing {
+				t.Errorf("arbit pays %v and %v, want 5 and %v", buylist[listed], got, tt.wantMissing)
+			}
+		})
+	}
+}
+
 // The tooltip spells the rule the offers were priced by, on one line, with
 // only what the rule actually applies.
 func TestCustomBuylistRuleTip(t *testing.T) {
@@ -357,6 +421,7 @@ func TestCustomBuylistRuleTip(t *testing.T) {
 	withPrices(t, []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "REF", Name: "Ref Store"}),
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "REFSealed", Name: "Ref Sealed", SealedMode: true}),
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "ALTSealed", Name: "Alt Sealed", SealedMode: true}),
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "TCGLow", Name: "TCG Low", MetadataOnly: true}),
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market", MetadataOnly: true}),
 	}, []mtgban.Vendor{})
@@ -398,10 +463,16 @@ func TestCustomBuylistRuleTip(t *testing.T) {
 			want: "50% of TCG Low",
 		},
 		{
-			name:   "sealed has its own reference and no fallback",
-			rule:   customBuylistRule{rate: 0.5, minPrice: 20, seller: "REF", sealedSeller: "REFSealed", fallback: "TCGLow"},
+			name:   "sealed has its own reference and fallback",
+			rule:   customBuylistRule{rate: 0.5, minPrice: 20, seller: "REF", sealedSeller: "REFSealed", fallback: "TCGLow", sealedFallback: "ALTSealed"},
 			sealed: true,
-			want:   "50% of REFSealed if ≥ $20.00",
+			want:   "50% of REFSealed (or ALTSealed) if ≥ $20.00",
+		},
+		{
+			name:   "a sealed fallback that sells no sealed is not applied",
+			rule:   customBuylistRule{rate: 0.5, seller: "REF", sealedSeller: "REFSealed", fallback: "TCGLow", sealedFallback: "REF"},
+			sealed: true,
+			want:   "50% of REFSealed",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

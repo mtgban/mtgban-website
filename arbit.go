@@ -620,11 +620,10 @@ func (v *customBuylistVendor) Buylist() mtgban.BuylistRecord { return v.buylist 
 func newCustomBuylistVendor(b *matcher.Backend, p *prices, rule customBuylistRule, seller mtgban.Seller) *customBuylistVendor {
 	sealed := seller.Info().SealedMode
 	refName, shorthand := rule.seller, customStore
-	var fallback mtgban.InventoryRecord
+	fallback := customBuylistFallback(p, rule.fallback)
 	if sealed {
 		refName, shorthand = rule.sealedSeller, customSealedStore
-	} else {
-		fallback = customBuylistFallback(p, rule.fallback)
+		fallback = customBuylistSealedFallback(p, rule.sealedFallback)
 	}
 	ref, err := p.sellerInventory(refName)
 	if err != nil {
@@ -641,7 +640,7 @@ func newCustomBuylistVendor(b *matcher.Backend, p *prices, rule customBuylistRul
 		if err != nil || customBuylistSkips(b, co, releasedBy) {
 			continue
 		}
-		entries := customBuylistEntries(customBuylistReference(ref[cardID], fallback[cardID], isIndex), rule, isIndex)
+		entries := customBuylistEntries(customBuylistReference(ref[cardID], fallback[cardID], isIndex || sealed), rule, isIndex)
 		if len(entries) > 0 {
 			buylist[cardID] = entries
 		}
