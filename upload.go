@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"maps"
-	"math"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -62,8 +61,6 @@ const (
 	// maxPackedRows caps the rows a page posts back packed into one field,
 	// above what unpacking a full Pro upload legitimately expands to.
 	maxPackedRows = 4 * MaxUploadTotalEntries
-
-	ProfitabilityConstant = 2
 )
 
 // Bounds on what one uploaded workbook may unpack to. excelize's own default
@@ -1098,7 +1095,7 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 			qty = adjustQty(entry.Quantity+row.qty, 1, st.maxQty) - entry.Quantity
 			added = price * float64(qty)
 			entry.Quantity += qty
-			entry.Profitability = profitability(entry.Price, entry.BestPrice, entry.Spread, entry.Quantity)
+			entry.Profitability = mtgban.Profitability(entry.BestPrice, entry.Price, entry.Quantity, 0)
 		} else {
 			// Break down by store
 			if opened {
@@ -1115,7 +1112,7 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 				BestPrice:       price,
 				Quantity:        row.qty,
 				VisualPrice:     comparePrice * st.visualPerc / 100.0,
-				Profitability:   profitability(comparePrice, price, factor, row.qty),
+				Profitability:   mtgban.Profitability(price, comparePrice, row.qty, 0),
 			})
 		}
 
@@ -1138,19 +1135,6 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 			}
 		}
 	}
-}
-
-// profitability ranks an optimizer row by how far the store's offer is from
-// the comparison price, weighed by the spread and, gently, by the quantity.
-func profitability(comparePrice, price, spread float64, qty int) float64 {
-	if comparePrice == 0 || spread <= 0 {
-		return 0
-	}
-	p := ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log10(1+spread)
-	if qty > 1 {
-		p *= math.Pow(float64(qty), 0.25)
-	}
-	return p
 }
 
 // tallyOffers files the row's price at every store, in credit when the price
@@ -2383,9 +2367,13 @@ func sortResults(b *matcher.Backend, reprintParents map[string]string, uploadedD
 				if optimizedResults[store][i].Spread < 0 || optimizedResults[store][j].Spread < 0 {
 					return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
 				}
-				// Profitability is computed over the factor to the base price,
-				// not the traditional spread, so the comparison is reversed.
-				return optimizedResults[store][i].Profitability < optimizedResults[store][j].Profitability
+				// Profitability is how far the offer falls short of the base
+				// price, so the comparison is reversed. An offer at or over
+				// the base scores zero: those lead, the highest factor first.
+				if optimizedResults[store][i].Profitability != optimizedResults[store][j].Profitability {
+					return optimizedResults[store][i].Profitability < optimizedResults[store][j].Profitability
+				}
+				return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
 			})
 		}
 	}

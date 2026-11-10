@@ -223,11 +223,9 @@ func getHotlist(b *matcher.Backend, p *prices, skipEditions []string) map[string
 		difference := currentPrice - oldPrice
 		spread := 100 * (currentPrice - oldPrice) / oldPrice
 
-		// Modeled after the "profitability" formula, coupling spread and difference.
-		// NOTE: this still uses natural log (math.Log), whereas the canonical PI
-		// formula in go-mtgban and upload.go now uses log10. Left as ln deliberately:
-		// these integer tier buckets are calibrated against this scale, so switching
-		// to log10 would shift every tier. Revisit if/when the tiers are recalibrated.
+		// Couples spread and difference on a scale of its own, not
+		// mtgban.Profitability's: the integer tier buckets are calibrated
+		// against this one.
 		tiers[cardID] = int(100 * difference / (currentPrice + 10) * math.Log(1+spread))
 	}
 

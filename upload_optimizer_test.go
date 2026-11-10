@@ -399,3 +399,22 @@ func TestOptimizerRowsCarryTheCondition(t *testing.T) {
 		}
 	}
 }
+
+// TestSortByProfitabilityLeadsWithOffersOverTheBase orders offers at or over
+// the base price, which all score zero, by their factor ahead of the rest.
+func TestSortByProfitabilityLeadsWithOffersOverTheBase(t *testing.T) {
+	results := map[string][]OptimizedUploadEntry{"store": {
+		{CardID: "short", Spread: 50, Profitability: 2},
+		{CardID: "at", Spread: 100},
+		{CardID: "over", Spread: 140},
+	}}
+	sortResults(nil, nil, nil, results, "profitability")
+	var got []string
+	for _, e := range results["store"] {
+		got = append(got, e.CardID)
+	}
+	want := []string{"over", "at", "short"}
+	if !slices.Equal(got, want) {
+		t.Errorf("sorted as %v, want %v", got, want)
+	}
+}

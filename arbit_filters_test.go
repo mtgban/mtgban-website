@@ -38,26 +38,22 @@ func TestArbitDefaultsMatchToday(t *testing.T) {
 		mode                 arbitMode
 		minSpread, maxSpread float64
 		minDiff              float64
-		profConst            float64
 		minSell, minBuy      float64
 		priceFilter, edits   bool
 	}{
-		{"arbit", arbitMode{}, 10, 0, 0, ProfConst, 0, 0, false, false},
-		{"reverse", arbitMode{Reverse: true}, 10, 0, 0, ProfConst, 0, 0, false, false},
-		{"sealed arbit", arbitMode{Sealed: true}, -30, 0, math.Inf(-1), ProfConst, 0, 0, false, false},
-		{"sealed reverse", arbitMode{Reverse: true, Sealed: true}, -30, 0, math.Inf(-1), ProfConst, 0, 0, false, false},
-		{"global", arbitMode{Global: true}, 200, 1000 + shownStep, 5, ProfConst, 1, 1, true, true},
-		{"global with AnySpread", arbitMode{Global: true, AnySpread: true}, 50, 1000 + shownStep, 5, ProfConst, 1, 1, true, true},
-		{"global sealed", arbitMode{Global: true, Sealed: true}, 10, 0, 1, ProfConst, 0, 0, true, false},
+		{"arbit", arbitMode{}, 10, 0, 0, 0, 0, false, false},
+		{"reverse", arbitMode{Reverse: true}, 10, 0, 0, 0, 0, false, false},
+		{"sealed arbit", arbitMode{Sealed: true}, -30, 0, math.Inf(-1), 0, 0, false, false},
+		{"sealed reverse", arbitMode{Reverse: true, Sealed: true}, -30, 0, math.Inf(-1), 0, 0, false, false},
+		{"global", arbitMode{Global: true}, 200, 1000 + shownStep, 5, 1, 1, true, true},
+		{"global with AnySpread", arbitMode{Global: true, AnySpread: true}, 50, 1000 + shownStep, 5, 1, 1, true, true},
+		{"global sealed", arbitMode{Global: true, Sealed: true}, 10, 0, 1, 0, 0, true, false},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
 			opts, rows := arbitState{}.apply(backend(), currentPrices(), tt.mode)
 			if rows.limits.MinSpread != tt.minSpread || opts.MaxSpread != tt.maxSpread || rows.limits.MinDiff != tt.minDiff {
 				t.Errorf("spread %v..%v diff %v, want %v..%v diff %v",
 					rows.limits.MinSpread, opts.MaxSpread, rows.limits.MinDiff, tt.minSpread, tt.maxSpread, tt.minDiff)
-			}
-			if opts.ProfitabilityConstant != tt.profConst {
-				t.Errorf("profitability constant %v, want %v", opts.ProfitabilityConstant, tt.profConst)
 			}
 			if rows.limits.MinSell != tt.minSell || rows.limits.MinBuy != tt.minBuy {
 				t.Errorf("price floors %v/%v, want %v/%v", rows.limits.MinSell, rows.limits.MinBuy, tt.minSell, tt.minBuy)
@@ -69,7 +65,7 @@ func TestArbitDefaultsMatchToday(t *testing.T) {
 				t.Errorf("ratio %v and editions %v, want global's: %v", opts.MaxPriceRatio, opts.Editions, tt.edits)
 			}
 			if opts.Conditions != nil || opts.Rarities != nil || opts.CustomCardFilter != nil ||
-				opts.MinProfitability != 0 || opts.MinPrice != 0 || opts.MinBuyPrice != 0 || opts.MinQuantity != 0 {
+				opts.MinProfitability != 0 || opts.ProfitabilityConstant != 0 || opts.MinPrice != 0 || opts.MinBuyPrice != 0 || opts.MinQuantity != 0 {
 				t.Errorf("a filter is set by default: %+v", opts)
 			}
 			if rows.limits.MaxSell != math.Inf(1) || rows.limits.MaxBuy != math.Inf(1) || rows.limits.MinQty != 0 {
@@ -340,7 +336,7 @@ func TestArbitRowFilter(t *testing.T) {
 }
 
 // TestArbitMinProfitAsShown holds the profit minimum to the value the table
-// prints: a trade scoring 0.18994 shows as 0.19, so a minimum of 0.19 keeps
+// prints: a trade scoring 0.18988 shows as 0.19, so a minimum of 0.19 keeps
 // it, run through the engine and the row filter as the page runs it.
 func TestArbitMinProfitAsShown(t *testing.T) {
 	b := &matcher.Backend{UUIDs: map[string]*matcher.CardObject{
@@ -350,7 +346,7 @@ func TestArbitMinProfitAsShown(t *testing.T) {
 		"card": {{Conditions: "NM", BuyPrice: 0.98, Quantity: 5}},
 	}, mtgban.ScraperInfo{Name: "vendor"})
 	seller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
-		"card": {{Conditions: "NM", Price: 0.3305, Quantity: 3}},
+		"card": {{Conditions: "NM", Price: 0.8492, Quantity: 3}},
 	}, mtgban.ScraperInfo{Name: "seller"})
 	for _, tt := range []struct {
 		query string
@@ -372,7 +368,7 @@ func TestArbitMinProfitAsShown(t *testing.T) {
 			}
 		}
 	}
-	for _, p := range []float64{0.125, 0.135, 0.18994} {
+	for _, p := range []float64{0.125, 0.135, 0.18988} {
 		got := fmt.Sprintf("%.2f", asShown(p))
 		if got != fmt.Sprintf("%.2f", p) {
 			t.Errorf("%v is held at %s, want the %.2f the table prints", p, got, p)

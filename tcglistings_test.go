@@ -441,7 +441,7 @@ func TestRankDirectAsOneCopyUndoesArbit(t *testing.T) {
 		seller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
 			"card": {{Conditions: "NM", Price: 10, Quantity: qty}},
 		}, mtgban.ScraperInfo{Name: "seller"})
-		arbit := mtgban.Arbit(b, &mtgban.ArbitOpts{ProfitabilityConstant: ProfConst}, vendor, seller)
+		arbit := mtgban.Arbit(b, nil, vendor, seller)
 		if len(arbit) != 1 {
 			t.Fatalf("%d copies: Arbit returned %d entries, want 1", qty, len(arbit))
 		}
