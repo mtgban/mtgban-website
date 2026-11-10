@@ -121,15 +121,10 @@
                 <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
                 <span>Enable the custom buylist</span>
             </label>
-            <label class="settings-toggle" title="A condition the reference seller has no price for pays the buy rate on the fallback price, or on a better condition's price if lower">
-                <input type="checkbox" data-misc="fallback">
-                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
-                <span>Fill missing conditions</span>
-            </label>
         </div>
         <div class="settings-upload-fields">
-            <label class="settings-field-row">
-                <span>Reference seller (singles)</span>
+            <div class="settings-field-row">
+                <label for="opt-customseller">Reference seller (singles)</label>
                 <select id="opt-customseller" data-cookie="UploadCustomBuyer">
                     <optgroup label="Index">
                         {{range $.UploadAltKeys}}{{$name := index $.StoreNames .}}{{if $name}}
@@ -142,23 +137,33 @@
                         {{end}}{{end}}
                     </optgroup>
                 </select>
-            </label>
-            <label class="settings-field-row">
-                <span>Fallback price (singles)</span>
-                <select id="opt-customfallback" data-cookie="UploadCustomFallback">
-                    {{range $.UploadAltKeys}}{{$name := index $.StoreNames .}}{{if $name}}
-                    <option value="{{.}}" {{if eq . "TCGLow"}}selected{{end}}>{{$name}}</option>
-                    {{end}}{{end}}
-                </select>
-            </label>
-            <label class="settings-field-row">
-                <span>Reference seller (sealed)</span>
+                <label class="settings-field-beside" title="A condition the reference seller has no price for pays the buy rate on the fallback price, or on a better condition's price if lower">
+                    <span>Fallback</span>
+                    <select id="opt-customfallback" data-cookie="UploadCustomSinglesFallback">
+                        <option value="">None</option>
+                        {{range $.UploadAltKeys}}{{$name := index $.StoreNames .}}{{if $name}}
+                        <option value="{{.}}">{{$name}}</option>
+                        {{end}}{{end}}
+                    </select>
+                </label>
+            </div>
+            <div class="settings-field-row">
+                <label for="opt-customsealedseller">Reference seller (sealed)</label>
                 <select id="opt-customsealedseller" data-cookie="UploadCustomSealedBuyer">
                     {{range $.UploadSealedSellerKeys}}{{$name := index $.StoreNames .}}{{if $name}}
                     <option value="{{.}}" {{if eq . "TCGSealed"}}selected{{end}}>{{$name}}</option>
                     {{end}}{{end}}
                 </select>
-            </label>
+                <label class="settings-field-beside" title="A product the reference seller has no price for pays the buy rate on the fallback seller's price">
+                    <span>Fallback</span>
+                    <select id="opt-customsealedfallback" data-cookie="UploadCustomSealedFallback">
+                        <option value="">None</option>
+                        {{range $.UploadSealedSellerKeys}}{{$name := index $.StoreNames .}}{{if $name}}
+                        <option value="{{.}}">{{$name}}</option>
+                        {{end}}{{end}}
+                    </select>
+                </label>
+            </div>
             <label class="settings-field-row">
                 <span>Minimum price ($)</span>
                 <input type="text" id="opt-customminprice" value="7" class="settings-inline-num">

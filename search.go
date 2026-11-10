@@ -2249,11 +2249,12 @@ func customBuylistSkips(b *matcher.Backend, co *matcher.CardObject, releasedBy t
 // customBuylistRule is the reader's custom buylist as the upload settings
 // save it: the reference sellers' prices at a rate, from a minimum price.
 // With a fallback set, a price index fills in the grades the singles
-// reference does not price.
+// reference does not price, and another sealed seller the products the
+// sealed reference does not.
 type customBuylistRule struct {
-	rate, minPrice       float64
-	seller, sealedSeller string
-	fallback             string
+	rate, minPrice           float64
+	seller, sealedSeller     string
+	fallback, sealedFallback string
 }
 
 // readCustomBuylistRule reads the reader's custom buylist rule, the zero
@@ -2269,16 +2270,14 @@ func readCustomBuylistRule(r *http.Request) customBuylistRule {
 		return customBuylistRule{}
 	}
 
-	rule := customBuylistRule{
-		rate:         rate,
-		minPrice:     customBuylistSetting(readCookie(r, "UploadCustomMinPrice")),
-		seller:       readCookie(r, "UploadCustomBuyer"),
-		sealedSeller: readCookie(r, "UploadCustomSealedBuyer"),
+	return customBuylistRule{
+		rate:           rate,
+		minPrice:       customBuylistSetting(readCookie(r, "UploadCustomMinPrice")),
+		seller:         readCookie(r, "UploadCustomBuyer"),
+		sealedSeller:   readCookie(r, "UploadCustomSealedBuyer"),
+		fallback:       readCookie(r, "UploadCustomSinglesFallback"),
+		sealedFallback: readCookie(r, "UploadCustomSealedFallback"),
 	}
-	if slices.Contains(customOpts, "fallback") {
-		rule.fallback = readCookie(r, "UploadCustomFallback")
-	}
-	return rule
 }
 
 // customBuylistFallback is the inventory of the fallback a rule names, nil
@@ -2291,11 +2290,21 @@ func customBuylistFallback(p *prices, name string) mtgban.InventoryRecord {
 	return inventory
 }
 
+// customBuylistSealedFallback is the inventory of the sealed fallback a rule
+// names, nil when it names no sealed seller.
+func customBuylistSealedFallback(p *prices, name string) mtgban.InventoryRecord {
+	seller, found := p.index.sellerFold[strings.ToLower(name)]
+	if !found || !seller.Info().SealedMode {
+		return nil
+	}
+	return seller.Inventory()
+}
+
 // customBuylistReference is what the rule prices one card off: the
 // reference's listings, best grade first, plus a price at every grade the
 // reference does not price: the lowest of the fallback's and those listed at
-// better grades. An index reference has one price whatever the grade, so the
-// fallback only stands in for a missing one.
+// better grades. An index reference, like a sealed one, has one price
+// whatever the grade, so the fallback only stands in for a missing one.
 func customBuylistReference(entries, fallback []mtgban.InventoryEntry, isIndex bool) []mtgban.InventoryEntry {
 	priced := func(e mtgban.InventoryEntry) bool { return !unpriced(e.Price) }
 	first := slices.IndexFunc(fallback, priced)
@@ -2348,15 +2357,17 @@ func customBuylistSetting(s string) float64 {
 }
 
 // tip spells the rule on one line for a tooltip, for a card or, when sealed,
-// a sealed product, which has no fallback: 80% of CK (or TCG Low) if ≥ $7.00.
+// a sealed product: 80% of CK (or TCG Low) if ≥ $7.00.
 func (rule customBuylistRule) tip(p *prices, sealed bool) string {
-	reference := rule.seller
+	reference, fallback := rule.seller, rule.fallback
+	applies := customBuylistFallback(p, fallback) != nil
 	if sealed {
-		reference = rule.sealedSeller
+		reference, fallback = rule.sealedSeller, rule.sealedFallback
+		applies = customBuylistSealedFallback(p, fallback) != nil
 	}
 	tip := fmt.Sprintf("%.4g%% of %s", rule.rate*100, customBuylistTipName(p, reference))
-	if !sealed && rule.fallback != reference && customBuylistFallback(p, rule.fallback) != nil {
-		tip += " (or " + customBuylistTipName(p, rule.fallback) + ")"
+	if applies && fallback != reference {
+		tip += " (or " + customBuylistTipName(p, fallback) + ")"
 	}
 	if rule.minPrice > 0 {
 		tip += fmt.Sprintf(" if ≥ $%.2f", rule.minPrice)
@@ -2418,6 +2429,7 @@ func customBuylistOffers(b *matcher.Backend, p *prices, r *http.Request, cardIDs
 	singles, _ := p.sellerInventory(rule.seller)
 	sealed, _ := p.sellerInventory(rule.sealedSeller)
 	fallback := customBuylistFallback(p, rule.fallback)
+	sealedFallback := customBuylistSealedFallback(p, rule.sealedFallback)
 
 	isIndex := slices.Contains(UploadIndexComparePriceList, rule.seller)
 
@@ -2432,7 +2444,7 @@ func customBuylistOffers(b *matcher.Backend, p *prices, r *http.Request, cardIDs
 
 		var entries []mtgban.InventoryEntry
 		if co.Sealed {
-			entries = sealed[cardID]
+			entries = customBuylistReference(sealed[cardID], sealedFallback[cardID], true)
 		} else {
 			entries = customBuylistReference(singles[cardID], fallback[cardID], isIndex)
 		}

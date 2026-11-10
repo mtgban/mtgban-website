@@ -277,21 +277,26 @@ test('apply writes the settings cookies, sets mode and tab, ticks stores and rep
     expect(cookies.enabledVendors).toBe('CK');
 });
 
-test('the custom buylist fallback travels with a preset only when it is on', () => {
-    const on = { UploadCustomOpts: 'enabled,fallback,', UploadCustomFallback: 'MKMLow' };
+test('the custom buylist fallback travels with a preset only when one is set', () => {
+    const on = { UploadCustomOpts: 'enabled,', UploadCustomSinglesFallback: 'MKMLow', UploadCustomSealedFallback: 'CKSealed' };
     const { P } = loadPresets();
-    expect(P.fromState({ mode: 'true', tab: 'singles' }, n => on[n] ?? null).customfallback).toBe('MKMLow');
-    const off = { UploadCustomOpts: 'enabled,', UploadCustomFallback: 'MKMLow' };
-    expect(P.fromState({ mode: 'true', tab: 'singles' }, n => off[n] ?? null).customfallback).toBeUndefined();
+    const saved = P.fromState({ mode: 'true', tab: 'singles' }, n => on[n] ?? null);
+    expect(saved.customfallback).toBe('MKMLow');
+    expect(saved.customsealedfallback).toBe('CKSealed');
+    const off = { UploadCustomOpts: 'enabled,', UploadCustomSinglesFallback: '' };
+    const none = P.fromState({ mode: 'true', tab: 'singles' }, n => off[n] ?? null);
+    expect(none.customfallback).toBeUndefined();
+    expect(none.customsealedfallback).toBeUndefined();
 
     const doc = fakeDoc({ mode: 'true', tab: 'singles' });
     const win = { reloadSelect() {}, selectTab() {} };
     const applied = loadPresets({ win });
-    applied.P.apply({ id: 'p', name: 'n', opts: applied.P.canonical({ mode: 'true', tab: 'singles', custombuylist: 'true', customfallback: 'MKMLow', stores: [] }) }, doc);
-    expect(applied.cookies.UploadCustomOpts).toBe('enabled,fallback,');
-    expect(applied.cookies.UploadCustomFallback).toBe('MKMLow');
+    applied.P.apply({ id: 'p', name: 'n', opts: applied.P.canonical({ mode: 'true', tab: 'singles', custombuylist: 'true', customfallback: 'MKMLow', customsealedfallback: 'CKSealed', stores: [] }) }, doc);
+    expect(applied.cookies.UploadCustomSinglesFallback).toBe('MKMLow');
+    expect(applied.cookies.UploadCustomSealedFallback).toBe('CKSealed');
     applied.P.apply({ id: 'q', name: 'n', opts: applied.P.canonical({ mode: 'true', tab: 'singles', custombuylist: 'true', stores: [] }) }, doc);
-    expect(applied.cookies.UploadCustomOpts).toBe('enabled,');
+    expect(applied.cookies.UploadCustomSinglesFallback).toBe('');
+    expect(applied.cookies.UploadCustomSealedFallback).toBe('');
 });
 
 test('apply with every flag off writes a cookie that does not read as unset', () => {
