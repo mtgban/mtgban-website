@@ -489,7 +489,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		CanUpload:    navOffers(s, sigParams, "Upload"),
 
 		ScriptSignedIn:    cookie != "",
-		ScriptOfflineMode: cookieParams.Get("SearchOfflineMode") == "true",
+		ScriptOfflineMode: cookieParams.Get("SearchOfflineMode") == "true" || (DevMode && !SigCheck),
 	}
 
 	if Config().Game != DefaultGame {
