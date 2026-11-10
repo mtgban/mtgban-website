@@ -1070,7 +1070,7 @@
                                     {{end}}
                                     {{if .Profitability}}
                                         ({{printf "%.2f" .Profitability}})
-                                        {{if and $.CanFilterByPrice (gt .Profitability 4.0)}}&#10071;{{end}}
+                                        {{if and $.CanFilterByPrice (gt .Profitability 15.0)}}&#10071;{{end}}
                                     {{end}}
                                 </td>
                                 <td class="c">{{if $.IsBuylist}}{{with $row.Sends}}<button type="button" class="opt-send-btn" popovertarget="opt-send-{{$scraperKey}}-{{$n}}" title="Load this card at a buylist" aria-label="Load this card at a buylist"><svg aria-hidden="true"><use href="#opt-send-icon"/></svg></button><div class="opt-send-menu" id="opt-send-{{$scraperKey}}-{{$n}}" popover><div class="opt-send-title">Load this card at</div>{{range .}}<a href="{{.Link}}" target="_blank" rel="noopener" data-store="{{.Store}}" data-buylist="true" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">{{.Store}}<span>$ {{printf "%.2f" .Price}}</span></a>{{end}}</div>{{end}}{{end}}<input type="checkbox" checked autocomplete="off" class="opt-row-check" onchange="window.toggleOptRow && toggleOptRow(this)"></td>

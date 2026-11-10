@@ -681,11 +681,9 @@ Row resolution still goes through `Match` on the parser's backend
 `getSellerPrices()`/`getVendorPrices()` machinery as the API. The
 **optimizer** picks the best store per card (highest buylist / lowest
 retail within a percentage margin), with spread/absolute-value floors and a
-profitability score
-`((compare - price) / (price + 2)) * log10(1+factor) * sqrt(qty)`
-— **the exponent on quantity is a square root, not
-`qty^0.25`**, and the log is base 10 (`math.Log10`), not a bare `log`; the
-`+2` is the named constant `ProfitabilityConstant`. Output: sub-tabbed
+profitability score from go-mtgban's `mtgban.Profitability`, the one
+arbitrage uses, called with the store's offer as the price paid and the
+comparison price as the price sold at, and no constant. Output: sub-tabbed
 tables (singles/sealed/not-found, via `docparse.PartitionEntries()`), CSV
 export, CardConduit estimate hand-off, sharable result URLs. Limits are now
 named constants (upload.go): `MaxUploadEntries` 350,

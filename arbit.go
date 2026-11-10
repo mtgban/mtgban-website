@@ -31,8 +31,6 @@ const (
 	MinSpreadNegative = -30
 	MinDiffNegative   = -100
 
-	ProfConst = 10
-
 	DefaultSortingOption = "profitability"
 
 	// For sealed simulations

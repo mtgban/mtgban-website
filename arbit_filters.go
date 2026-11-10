@@ -466,9 +466,8 @@ func previewSample(entries []mtgban.ArbitEntry, limits arbitRowFilter, noQuantit
 func (st arbitState) apply(b *matcher.Backend, p *prices, m arbitMode) (*mtgban.ArbitOpts, arbitRowFilter) {
 	l := st.limits(m)
 	opts := &mtgban.ArbitOpts{
-		MinSpread:             l.MinSpread - shownStep,
-		MinDiff:               l.MinDiff - shownStep,
-		ProfitabilityConstant: ProfConst,
+		MinSpread: l.MinSpread - shownStep,
+		MinDiff:   l.MinDiff - shownStep,
 	}
 	switch {
 	case m.Global && !m.Sealed:
