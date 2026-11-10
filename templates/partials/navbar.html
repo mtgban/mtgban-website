@@ -110,6 +110,11 @@
         <a class="nav2-icon-btn" href="/guide" title="Guide" data-util="guide" draggable="true">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         </a>
+        {{/* Hidden until the inline script below finds offline mode on, so
+             the bar is laid out with it before the first paint. */}}
+        <button type="button" class="nav2-icon-btn ban-offline-toggle" id="nav-offline-toggle" title="Switch to offline mode" aria-pressed="false"{{if .OfflineShell}} data-shell="true"{{end}} hidden>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/></svg>
+        </button>
         <a class="nav2-icon-btn ban-settings-btn" id="nav-settings-btn" href="?settings=1" title="Settings (Ctrl+,)" data-util="settings" draggable="true" onclick="if(window.openSettings){event.preventDefault();window.openSettings();return false;}return false;">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </a>
@@ -186,6 +191,19 @@
  * load — this script only handles initial restoration.
  */
 (function() {
+    // Show the offline toggle to a reader who has offline mode on. The cached
+    // offline shell is rendered without credentials, so it takes the flag
+    // the last ordinary page left behind; offline-mode.js wires the button.
+    try {
+        var offBtn = document.getElementById('nav-offline-toggle');
+        var offOK = offBtn && (document.documentElement.dataset.offlineMode === 'true' ||
+            (offBtn.dataset.shell === 'true' && localStorage.getItem('offline_available') === 'true'));
+        if (offOK && localStorage.getItem('offline_mode') === 'true') {
+            offBtn.hidden = false;
+            offBtn.classList.toggle('is-active', localStorage.getItem('offline_prefer') === 'true');
+        }
+    } catch (e) {}
+
     // On /offline the navbar is a Singles/Sealed mode switch: mark it and hide the
     // online section nav inline before first paint, then skip layout restoration.
     // Hiding inline (not only via CSS) keeps it hidden even if a stale cached

@@ -350,6 +350,9 @@ type PageVars struct {
 	BackpackTabs int
 	CanUpload    bool
 	NoBackpack   bool
+	// OfflineShell marks the offline search shell, which the service worker
+	// also serves at other URLs when a navigation fails.
+	OfflineShell bool
 
 	// HasVelocity says sales are loaded, so there is something to sort or rank by.
 	HasVelocity bool

@@ -70,6 +70,53 @@ test('an ordinary page remembers the flag it was rendered with, the shell does n
     expect(localStorage.getItem('offline_available')).toBe('false');
 });
 
+// --- Navbar toggle ---
+
+// The navbar's own button, as the template renders it: hidden, unwired.
+function navToggle() {
+    const listeners = [];
+    const classes = new Set();
+    return {
+        listeners,
+        hidden: true,
+        dataset: {},
+        classList: { toggle: (c, on) => { if (on) classes.add(c); else classes.delete(c); } },
+        setAttribute: () => {},
+        addEventListener: (type) => { listeners.push(type); },
+    };
+}
+
+// Loads the module on a page carrying the button; loading runs initNavToggle.
+function loadWithToggle(offlineMode, stored) {
+    const btn = navToggle();
+    const localStorage = memoryStorage(stored);
+    const win = { addEventListener: () => {} };
+    const OfflineMode = loadOfflineMode(offlineMode, win, { localStorage }, {
+        getElementById: (id) => (id === 'nav-offline-toggle' ? btn : null),
+    });
+    return { btn, localStorage, OfflineMode };
+}
+
+test('the navbar toggle shows only to an entitled reader with offline mode on', () => {
+    expect(loadWithToggle('true', { offline_mode: 'true' }).btn.hidden).toBe(false);
+    expect(loadWithToggle('true', {}).btn.hidden).toBe(true);
+    expect(loadWithToggle('false', { offline_mode: 'true' }).btn.hidden).toBe(true);
+});
+
+test('the navbar toggle hides when offline mode goes off and is wired once', () => {
+    const { btn, localStorage, OfflineMode } = loadWithToggle('true', { offline_mode: 'true' });
+    expect(btn.listeners).toEqual(['click']);
+
+    localStorage.removeItem('offline_mode');
+    OfflineMode.initNavToggle();
+    expect(btn.hidden).toBe(true);
+
+    localStorage.setItem('offline_mode', 'true');
+    OfflineMode.initNavToggle();
+    expect(btn.hidden).toBe(false);
+    expect(btn.listeners).toEqual(['click']);
+});
+
 // --- Storage line sync-status text ---
 
 test('syncStatusText reports last sync date when present', () => {

@@ -24,5 +24,6 @@ func (s *site) OfflinePage(w http.ResponseWriter, r *http.Request) {
 	// The service worker precaches this page without cookies, so a backpack
 	// edited on it would not sync and could be overwritten once back online.
 	pageVars.NoBackpack = true
+	pageVars.OfflineShell = true
 	render(w, "offline.html", pageVars)
 }
