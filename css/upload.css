@@ -1402,10 +1402,14 @@
 .opt-send-menu a span { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--asuccess); }
 /* The Card header's tie-breaker menu (upload-sort.js), a popover the
    sticky headers cannot clip */
-.sort-ties-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-left: 4px; padding: 0; vertical-align: middle; background: none; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--text-dim); cursor: pointer; }
+.sort-ties-btn { float: right; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-left: 4px; padding: 0; vertical-align: middle; background: none; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--text-dim); cursor: pointer; }
 .sort-ties-btn svg { width: 14px; height: 14px; }
 .sort-ties-btn:hover, .sort-ties-btn:focus-visible { color: var(--text-primary); border-color: var(--border-moderate); }
 .sort-ties-btn.on { color: var(--ainfo); }
+/* The toolbar's, which sorts every optimizer store, shows on that tab only */
+.res-sort-btn { padding: 8px 12px; }
+.res-sort-btn.on { color: var(--ainfo); }
+body:not(:has(#panel-optimizer.active)) .res-sort-btn { display: none; }
 .sort-ties-menu { position: fixed; inset: auto; margin: 0; padding: 4px; width: 240px; max-width: calc(100vw - 16px); background: var(--surface-1); color: var(--normal); border: 1px solid var(--border-moderate); border-radius: var(--radius-sm); box-shadow: 0 6px 20px rgba(0,0,0,0.18); font-size: var(--text-sm); }
 .sort-ties-row { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: var(--radius-sm); }
 .sort-ties-row:hover { background: var(--row-hover); }

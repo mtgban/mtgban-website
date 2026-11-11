@@ -338,7 +338,7 @@ test('a saved chain sorts the page on load, lights its buttons, and writes nothi
     expect(hashes(t)).toEqual(['b', 'a']);
     expect(btn.classList.has('on')).toBe(true);
     expect(btn.getAttribute('title')).toBe(null);
-    expect(btn.title).toBe('Ties broken by Condition \u25B2');
+    expect(btn.title).toBe('Sorted by Condition \u25B2');
     expect(store.writes).toBe(0);
 });
 
@@ -351,4 +351,51 @@ test('the menu lists the keys some row has, the chain first in its order', () =>
     const keys = [...menu.innerHTML.matchAll(/data-key="(\w+)"/g)].map((m) => m[1]);
     expect(keys).toEqual(['color', 'name']);
     expect(menu.innerHTML).toContain('data-act="up" title="Earlier" disabled');
+});
+
+test("an optimizer store's own button sorts that store alone, for this page only", () => {
+    const a = table([element({})], [keyed('x', { name: 'zap' }), keyed('y', { name: 'opt' })], [], 'opt-table');
+    const b = table([element({})], [keyed('x', { name: 'zap' }), keyed('y', { name: 'opt' })], [], 'opt-table');
+    const store = storage();
+    const { uresMenuAct, chains } = load(page([a, b]), store);
+    uresMenuAct('opt', 'name', 'toggle', a);
+    expect(hashes(a)).toEqual(['y', 'x']);
+    expect(hashes(b)).toEqual(['x', 'y']);
+    expect(chains().opt).toEqual([]);
+    expect(store.writes).toBe(0);
+});
+
+test("the stores' button sorts every store, replaces their own orders, and is saved", () => {
+    const a = table([element({})], [keyed('x', { name: 'zap', color: '1.00' }), keyed('y', { name: 'opt', color: '1.04' })], [], 'opt-table');
+    const b = table([element({})], [keyed('x', { name: 'zap', color: '1.00' }), keyed('y', { name: 'opt', color: '1.04' })], [], 'opt-table');
+    const store = storage();
+    const { uresMenuAct } = load(page([a, b]), store);
+    uresMenuAct('opt', 'name', 'toggle', a);
+    uresMenuAct('opt', 'color', 'toggle');
+    expect(hashes(a)).toEqual(['x', 'y']);
+    expect(hashes(b)).toEqual(['x', 'y']);
+    expect(JSON.parse(store.map.mtgban_upload_sort).opt).toBe('color:a');
+    // A store's own order now starts from the stores' one
+    uresMenuAct('opt', 'color', 'dir', b);
+    expect(hashes(b)).toEqual(['y', 'x']);
+    expect(hashes(a)).toEqual(['x', 'y']);
+});
+
+test("a store's own order is made when it is edited, not when it is shown", () => {
+    const a = table([element({})], [keyed('x', { name: 'zap' }), keyed('y', { name: 'opt' })], [], 'opt-table');
+    const { uresMenuAct, uresRenderMenu, chains } = load(page([a]));
+    uresRenderMenu({}, 'opt', a);
+    // The stores' order changes under it, with no reset of the stores' own
+    chains().opt.push({ key: 'name', descending: false });
+    uresMenuAct('opt', 'name', 'none', a);
+    expect(hashes(a)).toEqual(['y', 'x']);
+});
+
+test("the toolbar's button says it sorts every store", () => {
+    const btn = button('opt');
+    const store = storage({ mtgban_upload_sort: JSON.stringify({ results: '', opt: 'color:d' }) });
+    const doc = page([], [btn]);
+    load(doc, store);
+    doc.listeners.DOMContentLoaded.forEach((fn) => fn());
+    expect(btn.title).toBe('Stores sorted by Color \u25BC');
 });

@@ -455,7 +455,7 @@
 <table class="ures-table">
     <thead>
         <tr>
-            <th style="width:380px;">Card <button type="button" class="sort-ties-btn" data-sort-area="results" title="Break ties by card properties" aria-label="Break ties by card properties">{{template "upload-icon" "arrow-down-wide-narrow"}}</button></th>
+            <th style="width:380px;">Card <button type="button" class="sort-ties-btn" data-sort-area="results" title="Sort by card properties" aria-label="Sort by card properties">{{template "upload-icon" "arrow-down-wide-narrow"}}</button></th>
             <th class="r" data-sort-method="number" data-sort-descending>Your Price</th>
             <th class="c" data-sort-method="number">Cond</th>
             <th class="c" data-sort-method="number" data-sort-descending>Qty</th>
@@ -694,6 +694,11 @@
                 {{if .Optimized}}<button class="res-tab" onclick="window.showResTab && showResTab('optimizer',this)">Optimizer</button>{{end}}
             </div>
             <div class="res-btn-sep"></div>
+            {{if .Optimized}}
+                <button type="button" class="upload-btn upload-btn-secondary res-mode-btn res-sort-btn" data-sort-area="opt" title="Sort every store by card properties" aria-label="Sort every store by card properties">
+                    {{template "upload-icon" "arrow-down-wide-narrow"}}
+                </button>
+            {{end}}
             {{if .CanBuylist}}
                 {{/* The same list, priced the other way round. The rows are read
                      off the page and posted back the way the exports are, so
@@ -1042,7 +1047,7 @@
                     </div>
                     </td></tr>
                         <tr>
-                            <th role="columnheader">Card <button type="button" class="sort-ties-btn" data-sort-area="opt" title="Break ties by card properties" aria-label="Break ties by card properties">{{template "upload-icon" "arrow-down-wide-narrow"}}</button></th>
+                            <th role="columnheader">Card <button type="button" class="sort-ties-btn" data-sort-area="opt" title="Sort by card properties" aria-label="Sort by card properties">{{template "upload-icon" "arrow-down-wide-narrow"}}</button></th>
                             <th role="columnheader">Set</th>
                             <th data-sort-method="none">INFO</th>
                             <th class="c" role="columnheader" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Offer</th>

@@ -135,11 +135,35 @@ function uresArea(table) {
     return table.classList.contains('opt-table') ? 'opt' : 'results';
 }
 
+// An optimizer store's own order, picked from its own Card header for this
+// page; a store without one follows the stores' order (uresChains.opt).
+var uresStoreChains = new WeakMap();
+
+// The order a menu shows: the area's, or with table an optimizer store's
+// own, else the stores'. To edit a store's, own begins it as a copy.
+function uresChainOf(area, table, own) {
+    if (!table) return uresChains[area];
+    if (!own) return uresStoreChains.get(table) || uresChains.opt;
+    own = uresStoreChains.get(table);
+    if (!own) {
+        own = uresChains.opt.map(function(c) { return {key: c.key, descending: c.descending}; });
+        uresStoreChains.set(table, own);
+    }
+    return own;
+}
+
+// The store a button sorts alone: an optimizer store's Card header button,
+// not the toolbar's, which sorts them all.
+function uresButtonTable(btn) {
+    return btn.getAttribute('data-sort-area') === 'opt' && btn.closest ? btn.closest('table') : null;
+}
+
 // The steps that break the column's ties: the sorting setting's tie groups
 // when no column leads, then the area's chain.
 function uresTies(table, led) {
     var ties = led ? [{attr: 'data-k-lead', numeric: true}] : [];
-    uresChains[uresArea(table)].forEach(function(c) {
+    var own = uresArea(table) === 'opt' && uresStoreChains.get(table);
+    (own || uresChains[uresArea(table)]).forEach(function(c) {
         ties.push({attr: 'data-k-' + c.key, numeric: !!uresTieKey(c.key).numeric, descending: c.descending});
     });
     return ties;
@@ -177,16 +201,16 @@ function uresAreaTables(area) {
     });
 }
 
-// The tie-breakers any row in the area has a value for, as the menu lists
-// them: the chain's in its order, then the rest.
-function uresMenuKeys(area) {
-    var tables = uresAreaTables(area);
+// The tie-breakers any row in the area (or table) has a value for, as the
+// menu lists them: the chain's in its order, then the rest.
+function uresMenuKeys(area, table) {
+    var tables = table ? [table] : uresAreaTables(area);
     var shown = uresTieKeys.filter(function(def) {
         return tables.some(function(table) {
             return table.querySelector('tbody tr[data-k-' + def.key + ']:not([data-k-' + def.key + '=""])');
         });
     });
-    var chain = uresChains[area];
+    var chain = uresChainOf(area, table);
     return chain.map(function(c) { return uresTieKey(c.key); }).filter(function(def) {
         return shown.indexOf(def) >= 0;
     }).concat(shown.filter(function(def) {
@@ -194,18 +218,19 @@ function uresMenuKeys(area) {
     }));
 }
 
-function uresDescribe(area) {
-    var chain = uresChains[area];
-    if (!chain.length) return 'Break ties by card properties';
-    return 'Ties broken by ' + chain.map(function(c) {
+function uresDescribe(area, table) {
+    var chain = uresChainOf(area, table);
+    var all = area === 'opt' && !table;
+    if (!chain.length) return all ? 'Sort every store by card properties' : 'Sort by card properties';
+    return (all ? 'Stores sorted by ' : 'Sorted by ') + chain.map(function(c) {
         return uresTieKey(c.key).label + (c.descending ? ' ▼' : ' ▲');
     }).join(', ');
 }
 
-function uresRenderMenu(menu, area) {
-    var chain = uresChains[area];
+function uresRenderMenu(menu, area, table) {
+    var chain = uresChainOf(area, table);
     var html = '';
-    uresMenuKeys(area).forEach(function(def) {
+    uresMenuKeys(area, table).forEach(function(def) {
         var at = -1;
         chain.forEach(function(c, i) { if (c.key === def.key) at = i; });
         var on = at >= 0;
@@ -222,26 +247,34 @@ function uresRenderMenu(menu, area) {
     menu.innerHTML = html;
 }
 
-// The area's buttons say its chain in their tooltip, and light up while
+// The area's buttons say their order in their tooltip, and light up while
 // it has one.
 function uresShowChain(area) {
-    document.querySelectorAll('.sort-ties-btn[data-sort-area="' + area + '"]').forEach(function(btn) {
-        btn.title = uresDescribe(area);
-        btn.classList.toggle('on', uresChains[area].length > 0);
+    document.querySelectorAll('[data-sort-area="' + area + '"]').forEach(function(btn) {
+        var table = uresButtonTable(btn);
+        btn.title = uresDescribe(area, table);
+        btn.classList.toggle('on', uresChainOf(area, table).length > 0);
     });
 }
 
-// After a change to an area's chain: keep it, show it, and sort the area's
-// tables by it.
-function uresChainChanged(area) {
+// After a change to an order: a store's own sorts that store; the area's is
+// kept, replaces every store's own, and sorts the area's tables.
+function uresChainChanged(area, table) {
+    if (table) {
+        uresShowChain(area);
+        uresResort(table);
+        return;
+    }
+    if (area === 'opt') uresStoreChains = new WeakMap();
     uresSaveChains();
     uresShowChain(area);
     uresAreaTables(area).forEach(uresResort);
 }
 
-// What a pick in the menu does to the area's chain.
-function uresMenuAct(area, key, act) {
-    var chain = uresChains[area];
+// What a pick in the menu does to the area's order, or with table to an
+// optimizer store's own.
+function uresMenuAct(area, key, act, table) {
+    var chain = uresChainOf(area, table, true);
     var at = -1;
     chain.forEach(function(c, i) { if (c.key === key) at = i; });
     if (act === 'clear') {
@@ -256,7 +289,7 @@ function uresMenuAct(area, key, act) {
     } else if (act === 'down' && at >= 0 && at < chain.length - 1) {
         chain.splice(at + 1, 0, chain.splice(at, 1)[0]);
     }
-    uresChainChanged(area);
+    uresChainChanged(area, table);
 }
 
 // The area's menu, made on first use: one popover the area's buttons share,
@@ -275,8 +308,9 @@ function uresMenu(area) {
         var row = el.closest('[data-key]');
         var key = row ? row.getAttribute('data-key') : '';
         var act = el.getAttribute('data-act');
-        uresMenuAct(area, key, act);
-        uresRenderMenu(menu, area);
+        var table = uresButtonTable(uresMenuButton);
+        uresMenuAct(area, key, act, table);
+        uresRenderMenu(menu, area, table);
         // The menu is drawn anew: keep the keyboard on the same control
         var again = menu.querySelector(key ? '[data-key="' + key + '"] [data-act="' + act + '"]' : '[data-act="clear"]');
         if (again && !again.disabled) again.focus();
@@ -302,7 +336,7 @@ function uresPlaceMenu(menu) {
 document.addEventListener('beforetoggle', function(e) {
     var menu = e.target;
     if (!menu.classList || !menu.classList.contains('sort-ties-menu') || e.newState !== 'open' || !uresMenuButton) return;
-    uresRenderMenu(menu, uresMenuButton.getAttribute('data-sort-area'));
+    uresRenderMenu(menu, uresMenuButton.getAttribute('data-sort-area'), uresButtonTable(uresMenuButton));
     uresPlaceMenu(menu);
 }, true);
 
@@ -328,7 +362,7 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
     uresLoadChains();
     ['results', 'opt'].forEach(function(area) {
-        var buttons = document.querySelectorAll('.sort-ties-btn[data-sort-area="' + area + '"]');
+        var buttons = document.querySelectorAll('[data-sort-area="' + area + '"]');
         if (!buttons.length) return;
         var menu = uresMenu(area);
         buttons.forEach(function(btn) {
