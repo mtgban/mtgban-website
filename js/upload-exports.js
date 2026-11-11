@@ -152,8 +152,10 @@ window.reprocessUploadResults = function() {
     });
     // Flag this as a reload so the page keeps the current view
     try { sessionStorage.setItem('uploadReload', '1'); } catch (e) {}
+    var form = document.getElementById("upload_form");
+    form.target = '';
     if (window.showUploadProcessing) showUploadProcessing();
-    document.getElementById("upload_form").submit();
+    form.submit();
 };
 
 document.addEventListener('DOMContentLoaded', function() {

@@ -52,7 +52,7 @@ function resultsPage() {
     };
     const api = new Function('window', 'document', 'with (window) {' + exportsSrc + '}\nreturn { runExport, runUnpack, switchUploadMode };')(window, document);
     window.runExport = api.runExport;
-    return { window, api, opened };
+    return { window, api, opened, form: els.upload_form };
 }
 
 test('Reload, Unpack and the mode switch open the overlay', () => {
@@ -65,6 +65,14 @@ test('Reload, Unpack and the mode switch open the overlay', () => {
         run(page);
         expect(page.opened.length).toBe(1);
     }
+});
+
+test('Reload after a new-tab export comes back in this tab', () => {
+    const page = resultsPage();
+    page.api.runExport('estimate', 'singles', true);
+    page.window.reprocessUploadResults();
+    expect(page.opened.length).toBe(1);
+    expect(page.form.target).toBe('');
 });
 
 test('the results page exports leave it closed', () => {
