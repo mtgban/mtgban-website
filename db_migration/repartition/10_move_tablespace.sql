@@ -125,6 +125,16 @@ JOIN pg_index i ON i.indrelid = t.tbl
 JOIN pg_class c ON c.oid = i.indexrelid
 CROSS JOIN (SELECT dattablespace FROM pg_database WHERE datname = current_database()) d;
 
+-- The TOAST table and TOAST index of each relation of prices, which move with it.
+CREATE TEMP VIEW move_toast AS
+SELECT c.reltoastrelid AS oid
+FROM pg_class c
+WHERE c.oid IN (SELECT oid FROM move_family) AND c.reltoastrelid <> 0
+UNION ALL
+SELECT i.indexrelid
+FROM pg_index i JOIN pg_class c ON c.reltoastrelid = i.indrelid
+WHERE c.oid IN (SELECT oid FROM move_family);
+
 -- Unit 0 is the parent and its indexes; partitions follow by bytes still on from.
 -- pg_table_size counts every fork (main, fsm, vm, TOAST), for an index as for a table.
 CREATE TEMP TABLE move_plan AS
@@ -152,12 +162,13 @@ SELECT count(*) AS relations, pg_size_pretty(coalesce(sum(bytes), 0)) AS total,
        CASE WHEN current_setting('move.limit')::int = 0 THEN count(DISTINCT unit) FILTER (WHERE unit > 0)
             ELSE least(current_setting('move.limit')::int, count(DISTINCT unit) FILTER (WHERE unit > 0)) END AS this_run
 FROM move_plan;
--- Strays: relations placed on from that are not of prices, which keep it from being dropped.
+-- Strays: relations placed on from that are not of prices or its TOAST, which keep it from being dropped.
 -- It compares the stored reltablespace on purpose (0 on the default): empty for from=pg_default, exact for fast.
 SELECT c.relname AS stray, c.relkind
 FROM pg_class c
 WHERE c.reltablespace = (SELECT oid FROM pg_tablespace WHERE spcname = current_setting('move.from'))
   AND c.oid NOT IN (SELECT oid FROM move_family)
+  AND c.oid NOT IN (SELECT oid FROM move_toast)
 ORDER BY c.relname;
 
 \if :apply_on
@@ -188,6 +199,7 @@ SELECT c.relname AS stray, c.relkind
 FROM pg_class c
 WHERE c.reltablespace = (SELECT oid FROM pg_tablespace WHERE spcname = current_setting('move.from'))
   AND c.oid NOT IN (SELECT oid FROM move_family)
+  AND c.oid NOT IN (SELECT oid FROM move_toast)
 ORDER BY c.relname;
 -- Lists this database too while its empty directory remains under from, until DROP TABLESPACE.
 SELECT d.datname AS databases_using_from

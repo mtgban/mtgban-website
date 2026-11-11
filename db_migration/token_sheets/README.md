@@ -10,7 +10,9 @@ out of the table: the snapshot refuses it as respelled.
 `prices.sql` moves each such row to the alias the map gives its
 `mtgban_id`. It keeps its `ban_id`, its prices and its id, so nothing reads
 it differently. It moves only a row whose map uuid differs from the stored
-one; a finish or language the matcher now spells otherwise is left as it is.
+one, and takes the map's finish and language with it; a row whose uuid
+already matches keeps its own, even where the matcher now spells them
+otherwise.
 
 ## Running it
 
