@@ -17,6 +17,7 @@ import (
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/matcher/magic"
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
 
 type Sleeper struct {
@@ -108,7 +109,8 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
 	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)
 
-	pageVars.HasVelocity = salesVelocityStore.Snapshot() != nil
+	sales := salesVelocityStore.Snapshot()
+	pageVars.HasVelocity = sales != nil
 
 	var tiers map[string]int
 
@@ -149,7 +151,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "velocity":
 		pageVars.Subtitle = "Sales Velocity"
 
-		tiers = getVelocity(b, skipEditions)
+		tiers = getVelocity(b, sales, skipEditions)
 	}
 
 	sleepers, err := sleepersLayout(b, p, tiers)
@@ -237,10 +239,9 @@ func getHotlist(b *matcher.Backend, p *prices, skipEditions []string) map[string
 // getVelocity it makes the tiers start at about 25, 13, 6, 3 and 1 a day.
 const velocityTierCap = 50
 
-// getVelocity scores the cards by copies sold a day, on a log scale since a few
-// sell hundreds of times what most do.
-func getVelocity(b *matcher.Backend, skipEditions []string) map[string]int {
-	snap := salesVelocityStore.Snapshot()
+// getVelocity scores the cards by copies sold a day in snap, on a log scale
+// since a few sell hundreds of times what most do.
+func getVelocity(b *matcher.Backend, snap *salesvelocity.Snapshot, skipEditions []string) map[string]int {
 	if snap == nil {
 		return nil
 	}
