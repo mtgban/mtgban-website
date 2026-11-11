@@ -1,6 +1,7 @@
-// Sorts a results table by the column whose header was clicked. The rows
-// move on the page itself: the exports read them back off the page in the
-// order they stand (upload-exports.js), so a CSV follows the order shown.
+// Sorts a results or optimizer table by the column whose header was clicked.
+// The rows move on the page itself: the exports read them back off the page
+// in the order they stand (upload-exports.js), so a CSV follows the order
+// shown.
 
 // What a cell sorts by: its data-sort, else its text. A cell with nothing
 // to sort by goes last whichever way the column is sorted.
@@ -33,32 +34,36 @@ function uresSortedRows(rows, col, numeric, descending) {
 }
 
 // Sorts the header's table by its column. The first click goes the way the
-// header asks (data-sort-descending), each one after turns it round. Only
-// the entry rows move; the totals row keeps the end of the table.
+// header asks (data-sort-descending, bare or "true"), each one after turns
+// it round. A row marked data-sort-method="none", the totals, keeps the end
+// of the table.
 function uresSortBy(th) {
     var table = th.closest('table');
     var tbody = table.tBodies[0];
     if (!tbody) return;
     var numeric = th.getAttribute('data-sort-method') === 'number';
     var was = th.getAttribute('aria-sort');
-    var descending = was ? was === 'ascending' : th.hasAttribute('data-sort-descending');
+    var first = th.getAttribute('data-sort-descending');
+    var descending = was ? was === 'ascending' : first !== null && first !== 'false';
 
     var entries = [], rest = [];
     Array.prototype.forEach.call(tbody.rows, function(row) {
-        (row.hasAttribute('data-hash') ? entries : rest).push(row);
+        (row.getAttribute('data-sort-method') === 'none' ? rest : entries).push(row);
     });
     uresSortedRows(entries, th.cellIndex, numeric, descending).concat(rest).forEach(function(row) {
         tbody.appendChild(row);
     });
 
-    Array.prototype.forEach.call(table.tHead.rows[0].cells, function(cell) {
+    // The header's own row: an optimizer table heads it with its store
+    Array.prototype.forEach.call(th.parentNode.cells, function(cell) {
         cell.removeAttribute('aria-sort');
     });
     th.setAttribute('aria-sort', descending ? 'descending' : 'ascending');
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.ures-table thead th').forEach(function(th) {
+    document.querySelectorAll('.ures-table thead th, .opt-table thead th').forEach(function(th) {
+        if (th.getAttribute('data-sort-method') === 'none') return;
         th.setAttribute('tabindex', '0');
         th.addEventListener('click', function() { uresSortBy(th); });
         th.addEventListener('keydown', function(e) {

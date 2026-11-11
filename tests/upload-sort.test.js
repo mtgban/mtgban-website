@@ -2,6 +2,7 @@ import { test, expect } from 'bun:test';
 import { readFileSync } from 'fs';
 
 const source = readFileSync(new URL('../js/upload-sort.js', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../templates/upload.html', import.meta.url), 'utf8');
 
 // An element with the attributes the sorter reads and writes.
 function element(attrs) {
@@ -21,15 +22,21 @@ function cell(text, sort) {
     return Object.assign(element(attrs), { textContent: text });
 }
 
-// An entry row carries a hash; the totals row does not.
+// An entry row carries a hash; the totals row stays put instead.
 function row(cells, hash) {
-    const attrs = hash === undefined ? {} : { 'data-hash': hash };
+    const attrs = hash === undefined ? { 'data-sort-method': 'none' } : { 'data-hash': hash };
     return Object.assign(element(attrs), { cells });
 }
 
-// A results table: its headers, its rows, and a tbody whose appendChild
-// moves a row to the end the way a real one does.
-function table(headers, rows) {
+// An optimizer row, which carries its place in the store's lists instead.
+function optRow(cells, idx) {
+    return Object.assign(element({ 'data-load-idx': String(idx) }), { cells });
+}
+
+// A table: its header row, under the rows above it in the head (an
+// optimizer table's store header), its rows, and a tbody whose
+// appendChild moves a row to the end the way a real one does.
+function table(headers, rows, above = []) {
     const tbody = {
         rows: rows.slice(),
         appendChild(r) {
@@ -37,18 +44,22 @@ function table(headers, rows) {
             this.rows.push(r);
         },
     };
-    const t = { tBodies: [tbody], tHead: { rows: [{ cells: headers }] } };
-    headers.forEach((th, i) => { th.cellIndex = i; th.closest = () => t; });
+    const headRow = { cells: headers };
+    const t = { tBodies: [tbody], tHead: { rows: above.concat([headRow]) } };
+    headers.forEach((th, i) => { th.cellIndex = i; th.closest = () => t; th.parentNode = headRow; });
     return t;
 }
 
-function load() {
-    const document = { addEventListener: () => {} };
+function load(document = { addEventListener: () => {} }) {
     return new Function('document', source + '\nreturn {uresSortBy};')(document);
 }
 
 function hashes(t) {
     return t.tBodies[0].rows.map((r) => (r.hasAttribute('data-hash') ? r.getAttribute('data-hash') : 'totals'));
+}
+
+function idxs(t) {
+    return t.tBodies[0].rows.map((r) => r.getAttribute('data-load-idx'));
 }
 
 test('a price column sorts highest first, missing prices last, the totals row at the end', () => {
@@ -113,4 +124,64 @@ test('ties keep the order they had, and only the clicked header shows a directio
     expect(hashes(t)).toEqual(['b', 'c', 'a']);
     expect(card.hasAttribute('aria-sort')).toBe(false);
     expect(cond.getAttribute('aria-sort')).toBe('ascending');
+});
+
+test('optimizer rows move, though they carry no hash', () => {
+    const { uresSortBy } = load();
+    const offer = element({ 'data-sort-method': 'number', 'data-sort-descending': 'true' });
+    const t = table([element({}), offer], [
+        optRow([cell('a'), cell('$ 1.00')], 0),
+        optRow([cell('b'), cell('$ 5.00')], 1),
+        optRow([cell('c'), cell('$ 3.00')], 2),
+    ]);
+    uresSortBy(offer);
+    expect(idxs(t)).toEqual(['1', '2', '0']);
+});
+
+test('data-sort-descending="false" sorts ascending first, "true" descending', () => {
+    const { uresSortBy } = load();
+    const retail = element({ 'data-sort-method': 'number', 'data-sort-descending': 'false' });
+    const t = table([retail], [optRow([cell('5')], 0), optRow([cell('1')], 1), optRow([cell('3')], 2)]);
+    uresSortBy(retail);
+    expect(idxs(t)).toEqual(['1', '2', '0']);
+    expect(retail.getAttribute('aria-sort')).toBe('ascending');
+
+    const buylist = element({ 'data-sort-method': 'number', 'data-sort-descending': 'true' });
+    const u = table([buylist], [optRow([cell('5')], 0), optRow([cell('1')], 1), optRow([cell('3')], 2)]);
+    uresSortBy(buylist);
+    expect(idxs(u)).toEqual(['0', '2', '1']);
+    expect(buylist.getAttribute('aria-sort')).toBe('descending');
+});
+
+test('the direction is cleared on the header row, below the store header', () => {
+    const { uresSortBy } = load();
+    const store = element({ 'aria-sort': 'ascending' });
+    const card = element({});
+    const set = element({});
+    table([card, set], [optRow([cell('b'), cell('x')], 0), optRow([cell('a'), cell('y')], 1)],
+        [{ cells: [store] }]);
+    uresSortBy(card);
+    uresSortBy(set);
+    expect(card.hasAttribute('aria-sort')).toBe(false);
+    expect(set.getAttribute('aria-sort')).toBe('ascending');
+    expect(store.getAttribute('aria-sort')).toBe('ascending');
+});
+
+test('headers marked data-sort-method="none" are not made sortable', () => {
+    const listeners = {};
+    const ths = [element({}), element({ 'data-sort-method': 'none' }), element({ 'data-sort-method': 'number' })];
+    ths.forEach((th) => { th.events = []; th.addEventListener = (type) => th.events.push(type); });
+    let asked = '';
+    load({
+        addEventListener: (type, fn) => { listeners[type] = fn; },
+        querySelectorAll: (sel) => { asked = sel; return ths; },
+    });
+    listeners.DOMContentLoaded();
+    expect(asked).toBe('.ures-table thead th, .opt-table thead th');
+    expect(ths.map((th) => th.events.join(','))).toEqual(['click,keydown', '', 'click,keydown']);
+    expect(ths.map((th) => th.getAttribute('tabindex'))).toEqual(['0', null, '0']);
+});
+
+test('the results totals row is marked to stay at the end', () => {
+    expect(html).toContain('<tr class="ures-totals-row" data-sort-method="none">');
 });

@@ -46,7 +46,7 @@ test('the store header is the first row of the optimizer thead', () => {
     expect(table).toBeGreaterThan(-1);
     const thead = html.indexOf('<thead>', table);
     const header = html.indexOf('<div class="opt-store-header">', table);
-    const labels = html.indexOf('<th>Card</th>', table);
+    const labels = html.indexOf('<th role="columnheader">Card</th>', table);
     const tbody = html.indexOf('<tbody>', table);
     expect(thead).toBeGreaterThan(table);
     expect(header).toBeGreaterThan(thead);
