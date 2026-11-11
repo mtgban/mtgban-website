@@ -353,7 +353,8 @@ html:has(.settings-modal.open) { overflow: hidden; }
     flex: 1;
     min-width: 0;
     white-space: nowrap;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 /* Only hide the toggle's own checkbox, not the inline number inputs

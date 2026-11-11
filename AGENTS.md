@@ -361,8 +361,9 @@ stale the moment an item lands.
   test can reach.
 - `main.css` gives every span `line-height: 1`, a box shorter than its
   glyphs, so a span (or a child of one) ending in an ellipsis clips with
-  `overflow-x: clip` and `min-width: 0`, not `overflow: hidden`, which cuts
-  its descenders off.
+  `overflow: hidden; overflow: clip visible;` and
+  `min-width: 0`, not `overflow: hidden` alone, which cuts its descenders
+  off. The `hidden` is for Safari before 16, which has no `clip`.
 - The API gateway (`mtgban/api-gatewahy`) imports seven packages from this
   module: `apisig`, `apihandoff`, `apiproductlist`, `observability`,
   `ratelimit`, `timeseries` and `mailer`. A change to any of them is a change to the

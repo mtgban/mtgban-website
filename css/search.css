@@ -1560,7 +1560,8 @@ html.admin-fix-mode .raw-record { display: inline-block; }
     font-weight: 500;
     flex: 1;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -2775,7 +2776,8 @@ body.modal-embed .cp-overlay {
 .landing-item-name {
     font-weight: 600;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -2796,7 +2798,8 @@ body.modal-embed .cp-overlay {
 
 .landing-item-price-label {
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -2816,7 +2819,8 @@ body.modal-embed .cp-overlay {
 .landing-item-query {
     font-size: 0.95em;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
     white-space: nowrap;
     display: block;

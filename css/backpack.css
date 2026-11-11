@@ -82,7 +82,7 @@ html:has(.backpack-panel.open) .nav2-backpack-menu { display: none; }
 }
 .nav2-backpack-pick:hover { background: var(--surface-3, var(--navbackground)); color: var(--normal); }
 .nav2-backpack-pick.active { color: var(--normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--dodgerblue); }
-.nav2-backpack-pick-name { flex: 1; min-width: 0; overflow-x: clip; text-overflow: ellipsis; white-space: nowrap; }
+.nav2-backpack-pick-name { flex: 1; min-width: 0; overflow: hidden; overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
 .nav2-backpack-pick-count { opacity: 0.7; font-variant-numeric: tabular-nums; }
 
 .pack-btn { position: relative; }
@@ -233,7 +233,7 @@ html:has(.backpack-panel.open) { overflow: hidden; }
     user-select: none;
 }
 
-.backpack-tab-name { min-width: 0; overflow-x: clip; text-overflow: ellipsis; white-space: nowrap; }
+.backpack-tab-name { min-width: 0; overflow: hidden; overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
 
 .backpack-tab-count { opacity: 0.7; }
 

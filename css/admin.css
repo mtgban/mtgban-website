@@ -603,7 +603,8 @@ td.admin-stale-date { color: var(--adanger); font-weight: 600; }
     font-size: var(--text-sm);
     color: var(--text-dim);
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
     white-space: nowrap;
 }

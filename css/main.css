@@ -931,7 +931,8 @@ pre {
 }
 
 /* A line box this short cuts off descenders under overflow: hidden, so a
-   span ending in an ellipsis clips only sideways: overflow-x: clip. */
+   span ending in an ellipsis clips only sideways: overflow: clip visible,
+   after an overflow: hidden that Safari before 16 keeps, having no clip. */
 span {
     line-height: 1;
 }

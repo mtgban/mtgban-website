@@ -428,7 +428,8 @@
 .alert-modal .alert-stores input[type="checkbox"] { flex-shrink: 0; align-self: center; margin: 0; }
 .alert-store-name {
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
     white-space: nowrap;
 }

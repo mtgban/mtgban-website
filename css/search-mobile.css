@@ -264,7 +264,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     font-size: 1rem;
     white-space: nowrap;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 
@@ -273,7 +274,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     color: var(--greytext);
     white-space: nowrap;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 
@@ -282,7 +284,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     color: var(--greytext);
     white-space: nowrap;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 /* A promo type inside the variant text links to the search that finds every
@@ -298,7 +301,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     color: var(--greytext);
     white-space: nowrap;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 
@@ -642,7 +646,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     flex: 1;
     min-width: 0;
     white-space: nowrap;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
     font-size: 0.9rem;
 }
@@ -1218,7 +1223,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     flex: 1;
     min-width: 0;
     white-space: nowrap;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 
@@ -1623,7 +1629,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     font-weight: 600;
     font-size: 0.9rem;
     white-space: nowrap;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
     flex: 1;
     min-width: 0;
