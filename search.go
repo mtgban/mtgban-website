@@ -280,14 +280,27 @@ func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchC
 		return nil, nil
 	}
 	b := ds.backend
-	alts := suggest.Build(suggest.Params{
+	params := suggest.Params{
 		RawQuery:       rawQuery,
 		CleanQuery:     quoteIfFilter(config.CleanQuery),
 		SearchMode:     config.SearchMode,
 		AppliedFilters: config.AppliedFilters,
 		Sealed:         sealed,
 		Backend:        b,
-	})
+	}
+	for _, field := range re.FindAllString(rawQuery, -1) {
+		if setFilterNamesNothing(b, field) {
+			params.UnknownSets = append(params.UnknownSets, field)
+		}
+	}
+	alts := suggest.Build(params)
+
+	// A set filter naming no set sits in the name's words, so no name is
+	// close until it is read as a set.
+	sets := suggest.Sets(params)
+	if len(sets) != 0 {
+		return sets, alts
+	}
 
 	names := suggest.Closest(b, config.CleanQuery, sealed)
 	corrected := len(names) != 0

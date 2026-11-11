@@ -52,6 +52,9 @@ type Params struct {
 	AppliedFilters []string
 	// Sealed is true when the search ran against sealed products.
 	Sealed bool
+	// UnknownSets lists the set filters in RawQuery that name no set,
+	// which the parser read as words of the name.
+	UnknownSets []string
 }
 
 // collapseSpaces trims and squeezes runs of whitespace into single spaces.

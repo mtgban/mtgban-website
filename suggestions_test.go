@@ -195,3 +195,55 @@ func TestDidYouMeanKeepsAStore(t *testing.T) {
 		}
 	}
 }
+
+// A set filter naming no set is read as the nearest set the query's name
+// is printed in, by code or by name.
+func TestDidYouMeanNearestSet(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+
+	tests := []struct{ query, want string }{
+		{"urza's mine s:atw", "urza's mine s:atq"},
+		{"urza's mine e:atw f:nonfoil", "urza's mine e:atq f:nonfoil"},
+		{`urza's mine s:"antiquites"`, "urza's mine s:atq"},
+		{"urza's mine s:atw,5ef", "urza's mine s:atq,5ed"},
+		{"urza's mine s:atw,zzq", ""},
+		{"urza's mine s:zzq", ""},
+		{"urza's mine s:m10", ""},
+		{"lightning bolt s:atw", "lightning bolt s:ath"},
+		{"black lotus s:atw", ""},
+	}
+	for _, tt := range tests {
+		config := parseSearchPage(ds, currentPrices(), tt.query, false, false, nil, nil, nil)
+		got, _ := searchSuggestions(ds, currentPrices(), tt.query, config, nil, nil, false)
+		if nearest(got) != tt.want {
+			t.Errorf("%q: did-you-mean %q, want %q", tt.query, got, tt.want)
+		}
+	}
+
+	query := "s:atw"
+	config := parseSearchPage(ds, currentPrices(), query, false, false, nil, nil, nil)
+	got, _ := searchSuggestions(ds, currentPrices(), query, config, nil, nil, false)
+	if !slices.Contains(got, "s:atq") || !slices.Contains(got, "s:ath") {
+		t.Errorf("%q: did-you-mean %q, want s:atq and s:ath among them", query, got)
+	}
+}
+
+// A sealed search offers only sets with sealed product: OTJ has some, OTP
+// none, and both sit one edit from the typo.
+func TestDidYouMeanNearestSetSealed(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+
+	query := "s:otx"
+	config := parseSearchPage(ds, currentPrices(), query, true, false, nil, nil, nil)
+	got, _ := searchSuggestions(ds, currentPrices(), query, config, nil, nil, true)
+	if !slices.Contains(got, "s:otj") || slices.Contains(got, "s:otp") {
+		t.Errorf("sealed %q: did-you-mean %q, want s:otj and no s:otp", query, got)
+	}
+	config = parseSearchPage(ds, currentPrices(), query, false, false, nil, nil, nil)
+	got, _ = searchSuggestions(ds, currentPrices(), query, config, nil, nil, false)
+	if !slices.Contains(got, "s:otp") {
+		t.Errorf("%q: did-you-mean %q, want s:otp among them", query, got)
+	}
+}
