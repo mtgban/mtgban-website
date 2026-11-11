@@ -112,6 +112,110 @@ func TestCommaQuotedListsTokenize(t *testing.T) {
 	}
 }
 
+// A comma inside a quoted value is part of the value, and only one outside
+// the quotes separates two of them.
+func TestSplitQuotedList(t *testing.T) {
+	for _, tt := range []struct {
+		in   string
+		want []string
+	}{
+		{`a,b`, []string{`a`, `b`}},
+		{`"A B"`, []string{`"A B"`}},
+		{`"A, B"`, []string{`"A, B"`}},
+		{`"A, B","C"`, []string{`"A, B"`, `"C"`}},
+		{`"A","B, C",d`, []string{`"A"`, `"B, C"`, `d`}},
+		{`"A, B`, []string{`"A, B`}},
+		{``, []string{``}},
+	} {
+		got := splitQuotedList(tt.in)
+		if !slices.Equal(got, tt.want) {
+			t.Errorf("splitQuotedList(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+// A product named with a comma is one product, alone or in a list. Split at
+// its comma, the first half named no product and fell back to every product
+// containing it: "Warhammer 40" answered with a Secret Lair drop's decklist.
+func TestContentsProductNameWithComma(t *testing.T) {
+	skipWithoutDatastore(t)
+	b := backend()
+
+	other, _ := twoDisjointSealedProducts(t)
+	tested := 0
+	for _, code := range b.GetAllSets() {
+		set, err := b.GetSet(code)
+		if err != nil {
+			continue
+		}
+		for _, product := range set.SealedProduct {
+			if !strings.Contains(product.Name, ",") {
+				continue
+			}
+			tested++
+
+			got := fixupContents(b, `"`+product.Name+`"`)
+			if !slices.Equal(got, []string{product.UUID}) {
+				t.Errorf("%q resolved to %d products %v, want its own %s", product.Name, len(got), got, product.UUID)
+			}
+			if other != nil {
+				got = fixupContents(b, `"`+product.Name+`","`+other.Name+`"`)
+				if !slices.Equal(got, []string{product.UUID, other.UUID}) {
+					t.Errorf("%q listed with %q resolved to %d products %v, want the two named", product.Name, other.Name, len(got), got)
+				}
+			}
+
+			if !sealed.HasDecklist(b, code, product.UUID) {
+				continue
+			}
+			want, err := sealed.ProductDecklist(b, code, product.UUID)
+			if err != nil {
+				t.Errorf("ProductDecklist(%q): %v", product.Name, err)
+				continue
+			}
+			config := parseSearchOptionsNG(b, currentPrices(), `decklist:"`+product.Name+`"`, nil, nil, nil)
+			if config.ContentsProduct != product.UUID {
+				t.Errorf("decklist:%q searched product %q, want %q", product.Name, config.ContentsProduct, product.UUID)
+			}
+			if !slices.Equal(config.UUIDs, want) {
+				t.Errorf("decklist:%q found %d cards, its list has %d", product.Name, len(config.UUIDs), len(want))
+			}
+		}
+	}
+	if tested == 0 {
+		t.Skip("no product named with a comma")
+	}
+}
+
+// An edition named with a comma is one edition too, where the split left two
+// halves naming no set and the filter was given up as words.
+func TestEditionNameWithComma(t *testing.T) {
+	skipWithoutDatastore(t)
+	b := backend()
+
+	tested := 0
+	for _, code := range b.GetAllSets() {
+		set, err := b.GetSet(code)
+		if err != nil || !strings.Contains(set.Name, ",") {
+			continue
+		}
+		tested++
+
+		got := fixupEditionNG(b, `"`+set.Name+`","`+code+`"`)
+		if !slices.Equal(got, []string{code, code}) {
+			t.Errorf("%q listed with its code resolved to %q, want %s twice", set.Name, got, code)
+		}
+		query := `s:"` + set.Name + `"`
+		config := parseSearchOptionsNG(b, currentPrices(), query, nil, nil, nil)
+		if config.CleanQuery != "" {
+			t.Errorf("%s left free text %q", query, config.CleanQuery)
+		}
+	}
+	if tested == 0 {
+		t.Skip("no edition named with a comma")
+	}
+}
+
 // twoDisjointSealedProducts finds two products with a nonempty fixed
 // decklist that share no card, scanning rather than pinning names so the
 // test fails for being wrong instead of for a product having been reprinted

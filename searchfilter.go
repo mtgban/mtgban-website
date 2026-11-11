@@ -179,6 +179,28 @@ type FilterPostElem struct {
 	OnlyForVendor bool
 }
 
+// splitQuotedList splits a comma-separated list of values, keeping a comma
+// inside double quotes as part of its value ("Warhammer 40,000 Commander").
+// The quotes are left on each value.
+func splitQuotedList(code string) []string {
+	var fields []string
+	quoted := false
+	start := 0
+	for i := 0; i < len(code); i++ {
+		switch code[i] {
+		case '"':
+			quoted = !quoted
+		case ',':
+			if quoted {
+				continue
+			}
+			fields = append(fields, code[start:i])
+			start = i + 1
+		}
+	}
+	return append(fields, code[start:])
+}
+
 // Return a comma-separated string of set codes, from a comma-separated
 // list of codes or edition names. If no match is found, the input code
 // segment is returned as-is.
@@ -186,7 +208,7 @@ func fixupEditionNG(b *matcher.Backend, code string) []string {
 	var out []string
 
 	code = strings.TrimSpace(code)
-	for _, field := range strings.Split(code, ",") {
+	for _, field := range splitQuotedList(code) {
 		field = strings.Trim(field, "\"")
 
 		set, err := b.GetSet(field)
@@ -244,7 +266,7 @@ func setFilterNamesNothing(b *matcher.Backend, field string) bool {
 	default:
 		return false
 	}
-	for _, value := range strings.Split(field[index+1:], ",") {
+	for _, value := range splitQuotedList(field[index+1:]) {
 		if namesASet(b, value) {
 			return false
 		}
@@ -815,7 +837,7 @@ func fixupPicks(b *matcher.Backend, code string) []string {
 func fixupContents(b *matcher.Backend, code string) []string {
 	var uuids []string
 	seen := map[string]bool{}
-	for _, field := range strings.Split(code, ",") {
+	for _, field := range splitQuotedList(code) {
 		field = strings.Trim(strings.TrimSpace(field), "\"")
 		if field == "" {
 			continue
