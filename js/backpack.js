@@ -618,21 +618,37 @@
         });
     };
 
-    // ---- the Upload optimizer ----
+    // ---- the Upload results and optimizer ----
 
-    // picked adds up the copies of each entry in a store section's ticked
-    // rows, in backpack p, by each row's grade. A row without one, from an
-    // upload that ignored grades, takes the card's copies in any grade, best
-    // first.
-    function picked(section, p) {
+    // rowCard reads an Upload row, an optimizer store's or a result's, into
+    // the card, grade and copies it lists: no grade where the upload ignored
+    // grades, as the page shows it.
+    function rowCard(tr) {
+        var attr = function (n) { return tr.getAttribute(n) || ""; };
+        if (tr.getAttribute("data-opt-id") !== null) {
+            return {
+                id: attr("data-opt-id"), cond: attr("data-opt-cond"), qty: parseInt(attr("data-load-qty"), 10) || 1,
+                name: attr("data-load-name"), edition: attr("data-opt-edition"), set: attr("data-load-set"), number: attr("data-load-number"),
+                finishTag: attr("data-opt-finish-tag"), finishClass: attr("data-opt-finish-class"), img: attr("data-opt-img"), cw: attr("data-opt-cw") === "true"
+            };
+        }
+        return {
+            id: attr("data-hash"), cond: attr("data-grade"), qty: parseInt(attr("data-qtys"), 10) || 1,
+            name: attr("data-card-name"), edition: attr("data-edition"), set: attr("data-set-code"), number: attr("data-number"),
+            finishTag: attr("data-finish-tag"), finishClass: attr("data-finish-class"), img: attr("data-image-url"), cw: attr("data-has-warning") === "true"
+        };
+    }
+
+    // picked adds up the copies of each entry in rows, in backpack p, by
+    // each row's grade. A row without one, from an upload that ignored
+    // grades, takes the card's copies in any grade, best first.
+    function picked(rows, p) {
         var counts = {}, any = {};
-        section.querySelectorAll("tr[data-opt-id]").forEach(function (tr) {
-            if (tr.classList.contains("opt-removed")) return;
-            var id = tr.getAttribute("data-opt-id"), cond = tr.getAttribute("data-opt-cond");
-            var n = parseInt(tr.getAttribute("data-load-qty"), 10) || 1;
-            if (!cond) { any[id] = (any[id] || 0) + n; return; }
-            var k = key({ id: id, cond: cond, pack: p });
-            counts[k] = (counts[k] || 0) + n;
+        rows.forEach(function (tr) {
+            var c = rowCard(tr);
+            if (!c.cond) { any[c.id] = (any[c.id] || 0) + c.qty; return; }
+            var k = key({ id: c.id, cond: c.cond, pack: p });
+            counts[k] = (counts[k] || 0) + c.qty;
         });
         inPack(p).sort(function (a, b) { return CONDS.indexOf(a.cond) - CONDS.indexOf(b.cond); }).forEach(function (e) {
             var k = key(e);
@@ -644,19 +660,19 @@
         return counts;
     }
 
-    // markSections shows a section's take button while one of its ticked
-    // rows is a card in the backpack, and its add button while it has a
-    // ticked row.
+    // markSections shows an add and take pair's take button while one of
+    // its rows is a card in the backpack, and its add button while it has a
+    // row.
     function markSections() {
         var by = {};
         live().forEach(function (e) { by[key(e)] = true; });
         document.querySelectorAll(".pack-take-btn").forEach(function (b) {
-            var section = b.closest(".opt-store");
-            b.hidden = !section || !Object.keys(picked(section, source())).some(function (k) { return by[k]; });
+            var rows = rowsFor(b);
+            b.hidden = !rows || !Object.keys(picked(rows, source())).some(function (k) { return by[k]; });
         });
         document.querySelectorAll(".pack-add-btn").forEach(function (b) {
-            var section = b.closest(".opt-store");
-            b.hidden = !section || !ticked(section).length;
+            var rows = rowsFor(b);
+            b.hidden = !rows || !rows.length;
         });
     }
 
@@ -664,18 +680,30 @@
         return Array.prototype.filter.call(section.querySelectorAll("tr[data-opt-id]"), function (tr) { return !tr.classList.contains("opt-removed"); });
     }
 
-    // put adds a store section's ticked rows to backpack p as one undo step,
-    // each row's copies in its grade, NM for a row without one, held to 999
-    // a card and new cards only while there is room. It says how many
-    // copies went in and how many did not fit.
-    function put(section, p) {
+    // rowsFor is the rows a pair's button acts on: its optimizer store's
+    // ticked ones, or the results tab's own, the removed left out.
+    function rowsFor(btn) {
+        var section = btn.closest(".opt-store");
+        if (section) return ticked(section);
+        if (btn.getAttribute("data-pack-rows") !== "results" || typeof window.exportRows !== "function") return null;
+        var view = window.currentExportView();
+        if (view === "notfound") return [];
+        return Array.prototype.filter.call(window.exportRows(view), function (tr) { return !tr.classList.contains("ures-removed-row"); });
+    }
+
+    // put adds rows to backpack p as one undo step, each row's copies in
+    // its grade, NM for a row without one, held to 999 a card and new cards
+    // only while there is room. It says how many copies went in and how
+    // many did not fit.
+    function put(rows, p) {
         var list = read();
         var t = now();
-        var want = {}, rows = {}, order = [];
-        ticked(section).forEach(function (tr) {
-            var k = key({ id: tr.getAttribute("data-opt-id"), cond: tr.getAttribute("data-opt-cond"), pack: p });
-            if (!(k in want)) { want[k] = 0; rows[k] = tr; order.push(k); }
-            want[k] += parseInt(tr.getAttribute("data-load-qty"), 10) || 1;
+        var want = {}, cards = {}, order = [];
+        rows.forEach(function (tr) {
+            var c = rowCard(tr);
+            var k = key({ id: c.id, cond: c.cond, pack: p });
+            if (!(k in want)) { want[k] = 0; cards[k] = c; order.push(k); }
+            want[k] += c.qty;
         });
         var room = Math.min(MAX - inPack(p).length, MAX * TABS - live().length);
         var plan = [], copies = 0, left = 0;
@@ -699,12 +727,11 @@
                 return;
             }
             if (i >= 0) list.splice(i, 1);
-            var tr = rows[x.k];
-            var attr = function (n) { return tr.getAttribute(n) || ""; };
+            var c = cards[x.k];
             list.unshift({
-                id: attr("data-opt-id"), name: attr("data-load-name"), edition: attr("data-opt-edition"), set: attr("data-load-set"),
-                number: attr("data-load-number"), finishTag: attr("data-opt-finish-tag"), finishClass: attr("data-opt-finish-class"),
-                img: attr("data-opt-img"), cw: attr("data-opt-cw") === "true", cond: ListStorage.backpackCond({ cond: attr("data-opt-cond") }),
+                id: c.id, name: c.name, edition: c.edition, set: c.set,
+                number: c.number, finishTag: c.finishTag, finishClass: c.finishClass,
+                img: c.img, cw: c.cw, cond: ListStorage.backpackCond({ cond: c.cond }),
                 pack: p, qty: x.n, t: t, m: t
             });
         });
@@ -712,13 +739,13 @@
         return { copies: copies, left: left };
     }
 
-    // addRowsToBackpack adds a store section's ticked rows to the active
-    // backpack.
+    // addRowsToBackpack adds the button's rows, a store section's ticked
+    // ones or the results tab's, to the active backpack.
     window.addRowsToBackpack = function (btn) {
-        var section = btn.closest(".opt-store");
-        if (!section) return;
+        var rows = rowsFor(btn);
+        if (!rows) return;
         var p = active();
-        var r = put(section, p);
+        var r = put(rows, p);
         if (!r.copies) {
             if (r.left && !full(p)) toastCeiling();
             return;
@@ -727,24 +754,25 @@
         toast("Added " + r.copies + (r.copies === 1 ? " copy" : " copies") + " to " + packName(p) + (r.left ? "; " + r.left + " did not fit" : ""));
     };
 
-    // takeRowsFromBackpack takes the copies a store section's ticked rows
-    // list out of the backpack they came from, once sent to that store and
-    // the reader confirms it. Taking the last hides the button, so a focused
-    // one hands focus to the section's fold button.
+    // takeRowsFromBackpack takes the copies the button's rows list out of
+    // the backpack they came from, once the reader confirms it. Taking the
+    // last hides the button, so a focused one hands focus to the section's
+    // fold button, or to the results' add button.
     window.takeRowsFromBackpack = function (btn) {
+        var rows = rowsFor(btn);
+        if (!rows) return;
         var section = btn.closest(".opt-store");
-        if (!section) return;
         var doTake = function () {
             var focused = document.activeElement === btn;
             var p = source();
-            var copies = take(picked(section, p));
+            var copies = take(picked(rows, p));
             if (!copies) return;
             render();
             toast("Removed " + copies + (copies === 1 ? " copy" : " copies") + " from " + packName(p));
-            var fold = section.querySelector(".section-fold");
-            if (focused && btn.hidden && fold) fold.focus();
+            var next = section ? section.querySelector(".section-fold") : btn.parentNode.querySelector(".pack-add-btn");
+            if (focused && btn.hidden && next) next.focus();
         };
-        var ask = "Remove this store's ticked cards from " + packName(source()) + "?";
+        var ask = (section ? "Remove this store's ticked cards from " : "Remove these results from ") + packName(source()) + "?";
         // The dialog hands focus back to the button before it calls doTake
         if (typeof window.confirmDialog === "function") window.confirmDialog(ask, doTake, { confirmLabel: "Remove" });
         else if (window.confirm(ask)) doTake();
@@ -1469,6 +1497,10 @@
         // After the row's own handler has marked it, as upload-optimizer.js counts it
         document.addEventListener("change", function (ev) {
             if (ev.target && ev.target.closest && ev.target.closest(".opt-store")) markSections();
+        });
+        // After a result row's remove button or a result tab has had its say
+        document.addEventListener("click", function (ev) {
+            if (ev.target && ev.target.closest && ev.target.closest(".ures-remove-btn, .ures-subtab")) markSections();
         });
         window.addEventListener("storage", function (ev) { if (!ev || !ev.key || ev.key === KEY || ev.key === ACTIVE_KEY || ev.key === TABS_KEY) render(); });
         window.addEventListener("pageshow", function (ev) { if (ev && ev.persisted) render(); });

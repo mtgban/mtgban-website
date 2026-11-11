@@ -478,6 +478,7 @@
                 data-from="{{.UnpackedFrom}}" data-fromqty="{{.UnpackedQuantity}}"
                 {{with index $root.SortKeys .CardID}}data-k-name="{{.Name}}" data-k-set="{{.Set}}" data-k-release="{{.Release}}" data-k-number="{{.Number}}" data-k-finish="{{.Finish}}" data-k-color="{{.Color}}" data-k-rarity="{{.Rarity}}"{{end}}
                 data-k-cond="{{cond_rank .OriginalCondition}}"{{if .SortLead}} data-k-lead="{{.SortLead}}"{{end}}
+                data-card-name="{{$card.Name}}" data-edition="{{$card.Edition}}" data-set-code="{{$card.SetCode}}" data-number="{{$card.Number}}" data-image-url="{{$card.ImageURL}}" data-finish-tag="{{$card.FinishTag}}" data-finish-class="{{$card.FinishClass}}" data-has-warning="{{$card.HasContentWarning}}"{{with .OriginalCondition}} data-grade="{{.}}"{{end}}
                 {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
                 <td data-sort="{{$card.Name}} {{$card.Edition}} {{$card.Number}}">
                     <div class="ures-card-cell">
@@ -732,6 +733,10 @@
             <div class="res-btn-sep"></div>
             <button class="upload-btn upload-btn-secondary res-export-btn" onclick="window.openStorePrompt && openStorePrompt()">Publish as store</button>
             {{end}}
+            {{/* Shown by backpack.js while the result tab has a row, and while one of its rows is a card in the backpack */}}
+            <div class="res-btn-sep"></div>
+            <button type="button" class="upload-btn upload-btn-secondary res-mode-btn res-pack-btn pack-add-btn" data-pack-rows="results" hidden title="Add these results to the backpack" aria-label="Add these results to the backpack" onclick="window.addRowsToBackpack && addRowsToBackpack(this)">{{template "upload-icon" "backpack"}}</button>
+            <button type="button" class="upload-btn upload-btn-secondary res-mode-btn res-pack-btn remove pack-take-btn" data-pack-rows="results" hidden title="Remove these results from the backpack" aria-label="Remove these results from the backpack" onclick="window.takeRowsFromBackpack && takeRowsFromBackpack(this)">{{template "upload-icon" "backpack"}}</button>
         </div>
 
     </div>

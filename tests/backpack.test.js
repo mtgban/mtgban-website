@@ -39,7 +39,7 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], navMenu = false, sort, fetch, signedIn = false, timers } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], results, navMenu = false, sort, fetch, signedIn = false, timers } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
     if (active) m.mtgban_backpack_active = String(active);
@@ -81,6 +81,24 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
         body.appendChild(section);
         return { section, add, take, fold, rows: section.children.filter((c) => c.tag === 'tr') };
     });
+    // The results tab, when given: the toolbar's add and take pair, and its
+    // rows of [id, qty, cond, removed] that exportRows hands out by view.
+    let res = null;
+    if (results) {
+        const bar = el('div');
+        const add = el('button'); add.classes.add('pack-add-btn'); add.setAttribute('data-pack-rows', 'results'); add.hidden = true;
+        const take = el('button'); take.classes.add('pack-take-btn'); take.setAttribute('data-pack-rows', 'results'); take.hidden = true;
+        bar.append(add, take); body.appendChild(bar);
+        const rows = results.map(([id, qty, cond = '', removed]) => {
+            const tr = el('tr'); tr.setAttribute('data-hash', id); tr.setAttribute('data-qtys', String(qty)); tr.setAttribute('data-cond', cond || 'SP');
+            if (cond) tr.setAttribute('data-grade', cond);
+            Object.entries({ 'data-card-name': 'Card ' + id, 'data-edition': 'Set', 'data-set-code': 'S', 'data-number': '7', 'data-image-url': 'img/' + id, 'data-finish-tag': 'Foil', 'data-finish-class': 'foil', 'data-has-warning': 'false' }).forEach(([k, v]) => tr.setAttribute(k, v));
+            if (removed) tr.classes.add('ures-removed-row');
+            return tr;
+        });
+        const remove = el('button'); remove.classes.add('ures-remove-btn');
+        res = { add, take, rows, remove, view: 'all' };
+    }
     const storageListeners = [];
     const pageshowListeners = [];
     const window = {
@@ -92,6 +110,10 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     if (max) window.BAN_BACKPACK_MAX = max;
     if (tabs) window.BAN_BACKPACK_TABS = tabs;
     if (fetch) window.fetch = fetch;
+    if (res) {
+        window.currentExportView = () => res.view;
+        window.exportRows = (view) => (view === 'all' ? res.rows : []);
+    }
     const docListeners = {};
     const document = {
         body, readyState: 'complete', addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); },
@@ -120,7 +142,8 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     const stored = () => JSON.parse(m.mtgban_backpack);
     const pendingIds = () => (sm.mtgban_backpack_pending_clear === undefined ? undefined : JSON.parse(sm.mtgban_backpack_pending_clear));
     return {
-        window, document, m, sm, rows, minus, nav, navCount, stored, key, pendingIds, optSections,
+        window, document, m, sm, rows, minus, nav, navCount, stored, key, pendingIds, optSections, res,
+        fireClick: (target) => (docListeners.click || []).forEach((fn) => fn({ target })),
         fireChange: (target) => (docListeners.change || []).forEach((fn) => fn({ target })),
         fireStorage: (key = 'mtgban_backpack') => storageListeners.forEach((fn) => fn({ key })),
         firePageshow: (persisted) => pageshowListeners.forEach((fn) => fn({ persisted })),
@@ -1673,6 +1696,55 @@ describe('adding an Upload store section', () => {
         expect(p.window.Backpack.undo()).toBe(true);
         expect(live(p)).toEqual([[1, 'a', 'NM', 2]]);
         expect(p.window.Backpack.undo()).toBe(false);
+    });
+});
+
+describe('the Upload results\' backpack pair', () => {
+    const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.id, e.cond, e.qty]);
+
+    test('adds the tab\'s rows in their grades, the removed left out', () => {
+        const p = page({ results: [['a', 2, 'NM'], ['b', 1, 'SP'], ['c', 3, 'NM', true], ['a', 1, 'NM']] });
+        expect(p.res.add.hidden).toBe(false);
+        expect(p.res.take.hidden).toBe(true);
+        p.window.addRowsToBackpack(p.res.add);
+        expect(live(p)).toEqual([['a', 'NM', 3], ['b', 'SP', 1]]);
+        const a = p.stored()[0];
+        expect([a.name, a.edition, a.set, a.number, a.img, a.finishTag, a.finishClass]).toEqual(['Card a', 'Set', 'S', '7', 'img/a', 'Foil', 'foil']);
+        expect(ids['backpack-toast'].textContent).toBe('Added 4 copies to the backpack');
+        expect(p.res.take.hidden).toBe(false);
+    });
+
+    test('a row whose grade the upload ignored goes in ungraded, as NM', () => {
+        const p = page({ results: [['a', 2], ['a', 1, 'NM']] });
+        p.window.addRowsToBackpack(p.res.add);
+        expect(live(p)).toEqual([['a', 'NM', 3]]);
+    });
+
+    test('takes the tab\'s rows out once asked', () => {
+        const p = page({ store: [{ id: 'a', qty: 3, t: 2, m: 2 }, { id: 'b', cond: 'SP', qty: 1, t: 1, m: 1 }], results: [['a', 2, 'NM'], ['b', 1, 'SP']] });
+        p.window.takeRowsFromBackpack(p.res.take);
+        expect(confirms).toEqual(['Remove these results from the backpack?']);
+        expect(live(p)).toEqual([['a', 'NM', 1]]);
+    });
+
+    test('taking the last with the button focused moves focus to the add button', () => {
+        const p = page({ store: [{ id: 'a', qty: 1, t: 1, m: 1 }], results: [['a', 1, 'NM']] });
+        p.res.take.focus();
+        p.window.takeRowsFromBackpack(p.res.take);
+        expect(p.res.take.hidden).toBe(true);
+        expect(p.document.activeElement).toBe(p.res.add);
+    });
+
+    test('a removed row or a tab without rows hides the pair', () => {
+        const p = page({ store: [{ id: 'a', qty: 1, t: 1, m: 1 }], results: [['a', 1, 'NM']] });
+        expect([p.res.add.hidden, p.res.take.hidden]).toEqual([false, false]);
+        p.res.rows[0].classes.add('ures-removed-row');
+        p.fireClick(p.res.remove);
+        expect([p.res.add.hidden, p.res.take.hidden]).toEqual([true, true]);
+        p.res.rows[0].classes.delete('ures-removed-row');
+        p.res.view = 'notfound';
+        p.fireClick(p.res.remove);
+        expect([p.res.add.hidden, p.res.take.hidden]).toEqual([true, true]);
     });
 });
 
