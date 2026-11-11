@@ -288,6 +288,7 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 // SettingsModal serves the settings modal's body for the reader behind
 // the request. The body varies by tier, so it is never cached.
 func (s *site) SettingsModal(w http.ResponseWriter, r *http.Request) {
+	observe(r, "settings.modal_fetch", "")
 	v := settingsModalData(s, r)
 
 	baseName, files := settingsBodyFiles()
@@ -319,6 +320,7 @@ func (s *site) SettingsModal(w http.ResponseWriter, r *http.Request) {
 // that path carries them. Root cookies, the signature among them, are left
 // out, since every page reads those itself.
 func SettingsValues(w http.ResponseWriter, r *http.Request) {
+	observeScoped(r, pageLabel(strings.TrimSuffix(r.URL.Path, "/settings-values"), ""), "settings.values_fetch", "")
 	values := map[string]string{}
 	for _, name := range r.URL.Query()["name"] {
 		if cookiePath(r, name) != "/" {

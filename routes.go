@@ -176,18 +176,18 @@ func (s *site) registerRoutes() {
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(s.LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(s.LoadFromCloud)))
-	http.Handle("/api/palette/card/", noSigning(http.HandlerFunc(s.palette.CardMeta)))
-	http.Handle("/api/palette/sealed/", noSigning(http.HandlerFunc(s.palette.Sealed)))
-	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(s.palette.Sets)))
-	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(s.palette.Stores)))
+	http.Handle("/api/palette/card/", noSigning(paletteChip("card", s.palette.CardMeta)))
+	http.Handle("/api/palette/sealed/", noSigning(paletteChip("sealed", s.palette.Sealed)))
+	http.Handle("/api/palette/sets.json", noSigning(paletteList("sets", s.palette.Sets)))
+	http.Handle("/api/palette/stores.json", noSigning(paletteList("stores", s.palette.Stores)))
 	// The gateway reads the store families without a signature, so this
 	// cannot hang off the API page: a sub-page is served unsigned only when
 	// the ACL's Any tier grants the page (see enforceSigning).
 	http.Handle("/api-plans/stores.json", noSigning(http.HandlerFunc(s.APIStores)))
-	http.Handle("/api/palette/promos.json", noSigning(http.HandlerFunc(s.palette.Promos)))
-	http.Handle("/api/palette/finishes.json", noSigning(http.HandlerFunc(s.palette.Finishes)))
-	http.Handle("/api/palette/rarities.json", noSigning(http.HandlerFunc(s.palette.Rarities)))
-	http.Handle("/api/palette/colors.json", noSigning(http.HandlerFunc(s.palette.Colors)))
+	http.Handle("/api/palette/promos.json", noSigning(paletteList("promos", s.palette.Promos)))
+	http.Handle("/api/palette/finishes.json", noSigning(paletteList("finishes", s.palette.Finishes)))
+	http.Handle("/api/palette/rarities.json", noSigning(paletteList("rarities", s.palette.Rarities)))
+	http.Handle("/api/palette/colors.json", noSigning(paletteList("colors", s.palette.Colors)))
 	http.Handle("/api/offline/", noSigning(http.HandlerFunc(s.offline.Handle)))
 
 	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))

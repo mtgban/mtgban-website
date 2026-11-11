@@ -11,8 +11,45 @@ func TestLookup(t *testing.T) {
 	if _, ok := Lookup("http.status"); !ok {
 		t.Fatal("http.status is registered")
 	}
+	for _, name := range []string{
+		"search.mode", "search.sort", "search.sort_from", "search.reverse", "search.filter",
+		"search.is", "search.on", "search.region", "search.pool", "search.finish_suffix",
+		"search.syntax", "search.filter_count", "search.scope", "search.page", "search.page_size",
+		"search.source", "search.chart", "search.view", "search.misc", "search.store_factors",
+		"search.custom_buylist", "search.result", "search.results", "search.suggestion_shown",
+		"search.duration", "sets.sort", "search.oembed", "export.search", "export.decklist", "export.raw",
+		"data.chart", "data.chart_ids", "data.prices", "suggest.fetch", "palette.list", "palette.chip_fetch",
+		"settings.modal_fetch", "settings.values_fetch", "opensearch.fetch",
+	} {
+		if _, ok := Lookup(name); !ok {
+			t.Errorf("%s is registered", name)
+		}
+	}
 	if _, ok := Lookup("nope"); ok {
 		t.Fatal("an unknown name is not found")
+	}
+}
+
+// A search candidate's rate is a share of the searches that ran; the rest count page loads.
+func TestSearchDenominators(t *testing.T) {
+	want := []string{
+		"search.mode", "search.sort", "search.reverse", "search.filter", "search.is", "search.on",
+		"search.region", "search.pool", "search.finish_suffix", "search.syntax", "search.view",
+		"search.misc", "search.store_factors", "search.custom_buylist",
+	}
+	var got []string
+	for _, n := range All() {
+		if n.Denom == "search.result" {
+			got = append(got, n.Name)
+		}
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("names with the search.result denominator = %v, want %v", got, want)
+	}
+	for name, page := range map[string]string{"search.chart": "search,sealed,sets", "sets.sort": "sets", "export.search": "search,sealed", "export.decklist": "search,sealed"} {
+		if n, _ := Lookup(name); n.Page != page || n.Denom != "" {
+			t.Errorf("%s: Page %q Denom %q, want Page %q and no Denom", name, n.Page, n.Denom, page)
+		}
 	}
 }
 

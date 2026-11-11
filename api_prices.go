@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+
+	"github.com/mtgban/mtgban-website/observability"
 )
 
 type PriceResult struct {
@@ -51,6 +53,7 @@ func (s *site) BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		cardIDs = append(cardIDs, cardID)
 	}
+	observe(r, "data.prices", observability.Bucket([]int64{1, 10, 25, 50}, int64(len(cardIDs))))
 
 	// Walk each store once for all ids, rather than every store per id:
 	// the Info() copies and blocklist checks are per store, and each

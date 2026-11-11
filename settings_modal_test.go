@@ -331,7 +331,11 @@ func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 	t.Run("every grant", func(t *testing.T) {
 		sig := grantSig(t, "Search", "Upload", "Arbit", "Global", "Reverse",
 			"Newspaper", "Sleepers", "SearchOfflineMode", "UploadCustom")
+		rows := withFeatureCounter(t)
 		body := fetchSettingsModal(t, sig)
+		if got := find(rows.rows(), "settings.modal_fetch"); len(got) != 1 {
+			t.Errorf("settings.modal_fetch rows = %+v, want one", got)
+		}
 		want := []string{"search", "sleep", "upload", "global", "arbit", "reverse", "offline"}
 		if len(GetNewspaperUUIDs()) > 0 {
 			want = []string{"search", "news", "sleep", "upload", "global", "arbit", "reverse", "offline"}

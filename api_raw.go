@@ -20,6 +20,7 @@ func (s *site) RawCardAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 		return
 	}
+	observe(r, "export.raw", "")
 
 	cardID := strings.TrimPrefix(r.URL.Path, "/search/raw/")
 	co, err := s.backend().GetUUID(cardID)

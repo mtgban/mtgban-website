@@ -93,6 +93,8 @@ func chartDataAPILong(ds *datastore, w http.ResponseWriter, r *http.Request, raw
 		errorResponse(w, http.StatusNotFound, "card not found")
 		return
 	}
+	wantDays := chartRangeParam(r)
+	observeFacts(r, nil, chartDataFacts(len(ids), wantDays))
 
 	// Resolve on this goroutine, before anything is read concurrently: a
 	// resolution can reach the variants table, and a roster naming the same
@@ -107,7 +109,7 @@ func chartDataAPILong(ds *datastore, w http.ResponseWriter, r *http.Request, raw
 	// cookie: the page asks with one and no ?sig=, so reading the query alone
 	// would cap every in-page fetch at the 30-day fallback.
 	sig := verifiedRequestSignature(r)
-	lb, maxDays := chartWindow(sig, chartRangeParam(r))
+	lb, maxDays := chartWindow(sig, wantDays)
 
 	// One read per card, issued together: the series carries its own oldest
 	// date, so the axis needs no query of its own.

@@ -14,8 +14,13 @@ import (
 func (s *site) SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	sealed, _ := strconv.ParseBool(r.FormValue("sealed"))
 	ds := s.datastore()
+	scope := "cards"
+	if sealed {
+		scope = "sealed"
+	}
 
 	if r.FormValue("all") == "true" {
+		observeScoped(r, scope, "suggest.fetch", "all")
 		AllNames := ds.backend.Names(matcher.NameFormCanonical, sealed)
 		// An empty pool means the datastore isn't (fully) loaded; make sure
 		// no cache holds on to the degraded answer
@@ -45,6 +50,7 @@ func (s *site) SuggestAPI(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	observeScoped(r, scope, "suggest.fetch", "prefix")
 
 	if ds.names == nil {
 		// Names snapshot not built yet; don't let a cache hold the empty answer
