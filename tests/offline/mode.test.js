@@ -184,6 +184,21 @@ async function guardedDuring(opts) {
     return listeners.size > 0;
 }
 
+// The sync worker starts at the build of the page's own script, so a deploy
+// reaches it at once rather than when the browser's cached copy expires.
+test('the sync worker starts at the page script\'s build', async () => {
+    let url;
+    const OfflineMode = loadOfflineMode('false', { addEventListener: () => {}, removeEventListener: () => {} }, {
+        localStorage: { getItem: (k) => (k === 'offline_mode' ? 'true' : null) },
+        OfflineDB: { getMeta: () => Promise.resolve([]) },
+        Worker: class { constructor(u) { url = u; } postMessage() {} },
+    }, { currentScript: { src: 'https://example.test/js/offline/offline-mode.js?hash=abc' } });
+    OfflineMode.sync();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(url).toBe('/js/offline/offline-sync.js?hash=abc');
+});
+
 test('the page-load sync does not ask before leaving the page', async () => {
     expect(await guardedDuring()).toBe(false);
 });

@@ -14,6 +14,11 @@
 
     var state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false, authLapsed: false };
 
+    // The same ?hash= cache-buster the templates give every asset, handed to
+    // the sync worker, which passes it on to the scripts it imports.
+    var src = document.currentScript ? document.currentScript.src : '';
+    var hash = (/[?&]hash=([^&]*)/.exec(src) || [])[1] || '';
+
     function readPref(k) {
         try { return localStorage.getItem(k); } catch (e) { return null; }
     }
@@ -204,7 +209,7 @@
 
     function ensureWorker() {
         if (syncWorker) return syncWorker;
-        syncWorker = new Worker('/js/offline/offline-sync.js');
+        syncWorker = new Worker('/js/offline/offline-sync.js?hash=' + hash);
         syncWorker.onmessage = onSyncMessage;
         syncWorker.onerror = function(e) {
             setSyncing(false);
