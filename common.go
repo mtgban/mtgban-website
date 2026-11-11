@@ -400,9 +400,9 @@ func saveDatasets(ctx context.Context, value []DatasetConfig) error {
 // is persisted, each on its own channel so a peer re-reads only the file
 // that changed.
 
-func saveGrants(ctx context.Context, grants []PatreonGrant) error {
+func saveGrants(ctx context.Context, base, grants []PatreonGrant) error {
 	before := PatreonGrants()
-	err := Access.SaveGrants(ctx, grants)
+	err := Access.SaveGrants(ctx, base, grants)
 	if errors.Is(err, access.ErrGrantsChanged) {
 		// The refusal published the file's list, so the peer's NOTIFY will
 		// find nothing changed: this is the reload that sees its edit

@@ -47,7 +47,7 @@ func TestNoPathConfiguredIsRefused(t *testing.T) {
 	if err := c.SaveTable(context.Background(), Table{}); err == nil {
 		t.Error("SaveTable with no table path did not error")
 	}
-	if err := c.SaveGrants(context.Background(), nil); err == nil {
+	if err := c.SaveGrants(context.Background(), nil, nil); err == nil {
 		t.Error("SaveGrants with no grants path did not error")
 	}
 }
@@ -173,7 +173,7 @@ func TestSaveGrantsWritesThePath(t *testing.T) {
 	}
 	next := append([]Grant{}, c.Grants()...)
 	next = append(next, Grant{Email: "b@example.com", Tier: "Mods"})
-	if err := c.SaveGrants(context.Background(), next); err != nil {
+	if err := c.SaveGrants(context.Background(), c.Grants(), next); err != nil {
 		t.Fatal(err)
 	}
 	if len(c.Grants()) != 2 {
@@ -227,12 +227,12 @@ func TestSaveGrantsRefusesAStaleList(t *testing.T) {
 
 	added := append([]Grant{}, a.Grants()...)
 	added = append(added, Grant{Email: "b@example.com", Tier: "Mods"})
-	err := a.SaveGrants(context.Background(), added)
+	err := a.SaveGrants(context.Background(), a.Grants(), added)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = b.SaveGrants(context.Background(), nil)
+	err = b.SaveGrants(context.Background(), b.Grants(), nil)
 	if !errors.Is(err, ErrGrantsChanged) {
 		t.Fatalf("stale save returned %v, want ErrGrantsChanged", err)
 	}
@@ -242,6 +242,55 @@ func TestSaveGrantsRefusesAStaleList(t *testing.T) {
 	}
 	if len(b.Grants()) != 2 || len(GrantsChanged(b.Grants(), onDisk)) > 0 {
 		t.Errorf("B publishes %v, want the file's %v", b.Grants(), onDisk)
+	}
+}
+
+// A save is refused when the file moved on from the list the edit started
+// from: a peer's change to a label alone, or a reload that published the
+// peer's list after the edit was built.
+func TestSaveGrantsRefusesAMovedBase(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		reload bool
+	}{
+		{"a label edited by a peer", false},
+		{"a reload after the edit was built", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			tablePath := filepath.Join(dir, "acl.json")
+			writeJSON(t, tablePath, Table{"Root": {"Search": {}}})
+			grantsPath := filepath.Join(dir, "grants.json")
+			writeJSON(t, grantsPath, []Grant{{Email: "a@example.com", Name: "Old", Tier: "Mods"}})
+
+			c := New(fileHooks())
+			err := c.Load(context.Background(), Sources{TablePath: tablePath, GrantsPath: grantsPath})
+			if err != nil {
+				t.Fatal(err)
+			}
+			base := c.Grants()
+			peer := []Grant{{Email: "a@example.com", Name: "New", Tier: "Mods"}}
+			if tc.reload {
+				peer = append(peer, Grant{Email: "b@example.com", Tier: "Mods"})
+			}
+			writeJSON(t, grantsPath, peer)
+			if tc.reload {
+				err = c.ReloadGrants(context.Background())
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			edit := append(slices.Clone(base), Grant{Email: "c@example.com", Tier: "Mods"})
+			err = c.SaveGrants(context.Background(), base, edit)
+			if !errors.Is(err, ErrGrantsChanged) {
+				t.Fatalf("save returned %v, want ErrGrantsChanged", err)
+			}
+			onDisk := readGrants(t, grantsPath)
+			if !slices.EqualFunc(onDisk, peer, Grant.Equal) {
+				t.Errorf("file holds %v, want the peer's %v", onDisk, peer)
+			}
+		})
 	}
 }
 
@@ -263,7 +312,7 @@ func TestSaveGrantsReportsAMissingFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = c.SaveGrants(context.Background(), nil)
+	err = c.SaveGrants(context.Background(), c.Grants(), nil)
 	if err == nil || errors.Is(err, ErrGrantsChanged) {
 		t.Errorf("save over a missing file returned %v, want the read error", err)
 	}

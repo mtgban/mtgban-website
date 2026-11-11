@@ -37,6 +37,12 @@ type Grant struct {
 	Overrides map[string]map[string]string `json:"overrides,omitempty"`
 }
 
+// Equal reports whether g and other hold the same fields, Overrides included.
+func (g Grant) Equal(other Grant) bool {
+	return g.Category == other.Category && g.Email == other.Email && g.Name == other.Name && g.Tier == other.Tier &&
+		equalFeatures(g.Overrides, other.Overrides)
+}
+
 // Table is the tier -> feature -> option access table.
 type Table map[string]map[string]map[string]string
 
@@ -236,11 +242,11 @@ func (c *Client) loadGrants(ctx context.Context, sources Sources) ([]Grant, erro
 // ErrGrantsChanged is SaveGrants refusing a save made from a stale list.
 var ErrGrantsChanged = errors.New("another save changed the grants first; the table now shows them as they are, redo the edit")
 
-// SaveGrants persists a new grant list to wherever the list was read from,
-// and publishes it on success. The file is shared by every deployment, so a
-// save is refused with ErrGrantsChanged when the file no longer holds what
-// this client loaded, and the client publishes the file's list instead.
-func (c *Client) SaveGrants(ctx context.Context, grants []Grant) error {
+// SaveGrants persists grants, an edit of base, to wherever the list was read
+// from, and publishes it on success. The file is shared by every deployment,
+// so a save is refused with ErrGrantsChanged when the file no longer holds
+// base exactly, and the client publishes the file's list instead.
+func (c *Client) SaveGrants(ctx context.Context, base, grants []Grant) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -248,7 +254,7 @@ func (c *Client) SaveGrants(ctx context.Context, grants []Grant) error {
 	if err != nil {
 		return err
 	}
-	if len(GrantsChanged(c.Grants(), current)) > 0 {
+	if !slices.EqualFunc(base, current, Grant.Equal) {
 		c.setGrants(current)
 		return ErrGrantsChanged
 	}
