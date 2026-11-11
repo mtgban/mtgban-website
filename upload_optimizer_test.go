@@ -143,6 +143,18 @@ func TestUploadTiebreakCustomCredit(t *testing.T) {
 	}
 }
 
+// A custom order naming the custom buylist ranks its sealed side in the
+// same place, as the settings offer the two as one.
+func TestUploadTiebreakCustomOrder(t *testing.T) {
+	st := uploadSettings{tiebreak: uploadtie.Custom, tieOrder: []string{"CK", customStore, "SCG"}}
+	got := []string{"SCG", customSealedStore, "ABC", "CK"}
+	slices.SortFunc(got, uploadTiebreak(true, st, uploadPrices{}, nil).Compare)
+	want := []string{"CK", customSealedStore, "SCG", "ABC"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 // A row two stores tie on goes to the one the tiebreak picks: ZZW pays more
 // for four cards, both pay 9 for the fifth, and only ZZW pays credit.
 func TestOptimizerTiebreak(t *testing.T) {

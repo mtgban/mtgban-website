@@ -1098,7 +1098,13 @@ func uploadTiebreak(blMode bool, st uploadSettings, prices uploadPrices, shares 
 	case uploadtie.Consolidate:
 		return uploadtie.ByShare(shares)
 	case uploadtie.Custom:
-		return uploadtie.ByOrder(st.tieOrder)
+		// The custom buylist the reader picks answers for sealed rows too
+		order := st.tieOrder
+		at := slices.Index(order, customStore)
+		if at >= 0 {
+			order = slices.Insert(slices.Clone(order), at+1, customSealedStore)
+		}
+		return uploadtie.ByOrder(order)
 	}
 	return uploadtie.Breaker{}
 }

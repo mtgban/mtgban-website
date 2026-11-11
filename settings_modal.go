@@ -124,6 +124,7 @@ type uploadModalKeys struct {
 	SealedSellerKeys []string
 	CanUploadCustom  bool
 	VendorKeys       []string
+	SealedVendorKeys []string
 }
 
 // uploadSettingsKeys reads the Upload tab's data for a verified sig, with
@@ -131,13 +132,14 @@ type uploadModalKeys struct {
 func uploadSettingsKeys(p *prices, sig string) uploadModalKeys {
 	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
 	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
-	singlesSellers, sealedSellers, singlesVendors, _ := uploadStoreLists(p, sig)
+	singlesSellers, sealedSellers, singlesVendors, sealedVendors := uploadStoreLists(p, sig)
 	return uploadModalKeys{
 		AltKeys:          UploadIndexComparePriceList,
 		SellerKeys:       singlesSellers,
 		SealedSellerKeys: sealedSellers,
 		CanUploadCustom:  canUploadCustom,
 		VendorKeys:       singlesVendors,
+		SealedVendorKeys: sealedVendors,
 	}
 }
 
@@ -203,6 +205,7 @@ type settingsModalVars struct {
 	UploadSealedSellerKeys []string
 	CanUploadCustom        bool
 	UploadVendorKeys       []string
+	UploadSealedVendorKeys []string
 
 	// arbit, global, reverse
 	ArbitVendorKeys   []string
@@ -270,6 +273,7 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 	v.UploadSealedSellerKeys = up.SealedSellerKeys
 	v.CanUploadCustom = up.CanUploadCustom
 	v.UploadVendorKeys = up.VendorKeys
+	v.UploadSealedVendorKeys = up.SealedVendorKeys
 
 	v.ArbitVendorKeys = arbitVendorKeys(p, arbitBlockedVendors(sig), false)
 	v.GlobalVendorKeys = globalVendorKeys(p, globalProbeBlocklist(p))
