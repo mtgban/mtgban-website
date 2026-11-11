@@ -410,7 +410,8 @@ func TestNewsFilterIgnoresBoundsWithoutAColumn(t *testing.T) {
 }
 
 // The sort is the page's: numeric when either side is a nonzero number, else
-// by text, descending unless asked otherwise, ties kept in their order.
+// by text, descending unless asked otherwise, ties kept in their order, and a
+// row with no value last either way.
 func TestNewsFilterSorts(t *testing.T) {
 	b := newsFilterBackend()
 	for _, tc := range []struct {
@@ -420,7 +421,8 @@ func TestNewsFilterSorts(t *testing.T) {
 		{"", "", []int{1, 2, 3, 4, 5}},
 		{"current_price", "", []int{1, 2, 5, 3, 4}},
 		{"current_price", "asc", []int{3, 4, 5, 2, 1}},
-		{"pct_gain_7d", "desc", []int{1, 3, 5, 4, 2}},
+		{"pct_gain_7d", "desc", []int{1, 3, 5, 2, 4}},
+		{"pct_gain_7d", "asc", []int{2, 5, 3, 1, 4}},
 		{"product_name", "asc", []int{1, 2, 3, 4, 5}},
 		{"product_name", "desc", []int{5, 4, 3, 2, 1}},
 		{"ranking", "desc", []int{5, 4, 3, 2, 1}},
