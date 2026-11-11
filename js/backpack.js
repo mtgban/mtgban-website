@@ -666,8 +666,10 @@
     function markSections() {
         var by = {};
         live().forEach(function (e) { by[key(e)] = true; });
+        // An empty backpack has nothing to take, which spares reading every row
+        var empty = !inPack(source()).length;
         document.querySelectorAll(".pack-take-btn").forEach(function (b) {
-            var rows = rowsFor(b);
+            var rows = empty ? null : rowsFor(b);
             b.hidden = !rows || !Object.keys(picked(rows, source())).some(function (k) { return by[k]; });
         });
         document.querySelectorAll(".pack-add-btn").forEach(function (b) {
