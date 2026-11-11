@@ -232,6 +232,29 @@ func TestDidYouMeanNearestSet(t *testing.T) {
 	}
 }
 
+// A rewritten set or is: value is offered only where it finds cards: no
+// Urza's Mine or Lightning Bolt in the nearest set is mythic, and no
+// rippled Battlefield Forge is etched, in Alpha or on the reserved list.
+func TestDidYouMeanRewritesFindCards(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+
+	tests := []struct{ query, empty string }{
+		{"urza's mine s:atw r:mythic", "urza's mine s:atq r:mythic"},
+		{"lightning bolt s:atw r:mythic", "lightning bolt s:ath r:mythic"},
+		{"Battlefield Forge is:riple s:lea", "Battlefield Forge is:ripple s:lea"},
+		{"Battlefield Forge is:riple f:etched", "Battlefield Forge is:ripple f:etched"},
+		{"Battlefield Forge is:reserved is:riple", "Battlefield Forge is:reserved is:ripple"},
+	}
+	for _, tt := range tests {
+		config := parseSearchPage(ds, currentPrices(), tt.query, false, false, nil, nil, nil)
+		got, _ := searchSuggestions(ds, currentPrices(), tt.query, config, nil, nil, false)
+		if slices.Contains(got, tt.empty) {
+			t.Errorf("%q: did-you-mean %q offers %q, which finds nothing", tt.query, got, tt.empty)
+		}
+	}
+}
+
 // A sealed search offers only sets with sealed product: OTJ has some, OTP
 // none, and both sit one edit from the typo.
 func TestDidYouMeanNearestSetSealed(t *testing.T) {
@@ -240,6 +263,7 @@ func TestDidYouMeanNearestSetSealed(t *testing.T) {
 
 	query := "s:otx"
 	config := parseSearchPage(ds, currentPrices(), query, true, false, nil, nil, nil)
+	config.SearchMode = "sealed" // as the handler sets it
 	got, _ := searchSuggestions(ds, currentPrices(), query, config, nil, nil, true)
 	if !slices.Contains(got, "s:otj") || slices.Contains(got, "s:otp") {
 		t.Errorf("sealed %q: did-you-mean %q, want s:otj and no s:otp", query, got)
@@ -261,7 +285,7 @@ func TestDidYouMeanNearestPromoType(t *testing.T) {
 		{"Battlefield Forge is:riple", "Battlefield Forge is:ripple"},
 		{"Battlefield Forge is:riplefoil", "Battlefield Forge is:ripplefoil"},
 		{"Battlefield Forge is:riple,zzqx", "Battlefield Forge is:ripple,zzqx"},
-		{"Battlefield Forge is:reserved is:riple", "Battlefield Forge is:reserved is:ripple"},
+		{"Battlefield Forge is:painland is:riple", "Battlefield Forge is:painland is:ripple"},
 		{"Battlefield Forge s:atw is:riple", ""},
 		{"black lotus is:riple", ""},
 		{"black lotus is:surge", ""},

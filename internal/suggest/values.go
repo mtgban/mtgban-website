@@ -36,8 +36,8 @@ func Sets(p Params) []string {
 
 // Tags rewrites a query whose is: values name no promo type, "is:riple",
 // with the promo types nearest what was typed, or their short forms,
-// among those the printings of its name carry, nearest first. A value
-// with none near stays as typed, as is:reserved names no promo type.
+// among those p's printings carry, nearest first. A value with none near
+// stays as typed, as is:reserved names no promo type.
 func Tags(p Params) []string {
 	if p.Sealed || len(p.UnknownSets) != 0 {
 		return nil
@@ -70,17 +70,37 @@ func Tags(p Params) []string {
 	return rewrites(p.RawQuery, fields, nearest)
 }
 
+// TagTypos are the is: values in p's filters that name no promo type or
+// short form but sit near one, the values Tags may rewrite.
+func TagTypos(p Params) []string {
+	tags := slices.Concat(slices.Collect(maps.Keys(p.PromoAliases)), p.Backend.AllPromoTypes)
+	var typos []string
+	for _, field := range p.AppliedFilters {
+		key, values, ok := strings.Cut(field, ":")
+		if !ok || !strings.EqualFold(key, "is") {
+			continue
+		}
+		for _, value := range SplitList(values) {
+			if len(nearestTags(p, value, tags)) != 0 {
+				typos = append(typos, strings.ToLower(value))
+			}
+		}
+	}
+	return typos
+}
+
 // tagsFound are the values an is: may be rewritten to: the promo types
-// the printings of the query's name carry, or every one where it has no
-// name, each after the short forms it answers to.
+// p's printings carry, or every one where p has none, each after the
+// short forms it answers to.
 func tagsFound(p Params) []string {
 	promoTypes := p.Backend.AllPromoTypes
-	cards, named := printings(p)
-	if named {
+	if p.Printings != nil {
 		promoTypes = nil
-		for _, co := range cards {
+		seen := map[string]bool{}
+		for _, co := range printings(p) {
 			for _, promoType := range co.PromoTypes {
-				if !slices.Contains(promoTypes, promoType) {
+				if !seen[promoType] {
+					seen[promoType] = true
 					promoTypes = append(promoTypes, promoType)
 				}
 			}
@@ -115,9 +135,9 @@ func nearestTags(p Params, value string, tags []string) []string {
 	return fuzzy.Closest(value, near)
 }
 
-// queryName is the name p's query searches by: what its filters and a
-// trailing &*~` flag leave.
-func queryName(p Params) string {
+// Name is the name p's query searches by: what its filters, the set ones
+// naming nothing among them, and a trailing &*~` flag leave.
+func Name(p Params) string {
 	name := strings.TrimRight(p.RawQuery, "&*~`")
 	for _, field := range slices.Concat(p.UnknownSets, p.AppliedFilters) {
 		name = replaceField(name, field, "")
@@ -125,44 +145,37 @@ func queryName(p Params) string {
 	return strings.Trim(collapseSpaces(name), `"`)
 }
 
-// printings are the cards p's query names, every printing of its exact
-// name; named is false where the query has no name.
-func printings(p Params) (cards []*matcher.CardObject, named bool) {
-	name := queryName(p)
-	if name == "" {
-		return nil, false
-	}
-	uuids, err := p.Backend.SearchEquals(name)
-	if err != nil {
-		return nil, true
-	}
-	for _, uuid := range uuids {
+// printings are the cards of p.Printings.
+func printings(p Params) []*matcher.CardObject {
+	var cards []*matcher.CardObject
+	for _, uuid := range p.Printings {
 		co, err := p.Backend.GetUUID(uuid)
 		if err == nil {
 			cards = append(cards, co)
 		}
 	}
-	return cards, true
+	return cards
 }
 
-// setsFound are the sets a set filter may be rewritten to: those the
-// query's name is printed in, or every set where it has no name. A sealed
-// search takes the sets with sealed product, whatever it names.
+// setsFound are the sets a set filter may be rewritten to: those of p's
+// printings, or every set where p has none, every one with sealed product
+// for a sealed search.
 func setsFound(p Params) []string {
 	b := p.Backend
-	if p.Sealed {
+	if p.Printings == nil && p.Sealed {
 		return slices.DeleteFunc(slices.Clone(b.GetAllSets()), func(code string) bool {
 			set, err := b.GetSet(code)
 			return err != nil || len(set.SealedProduct) == 0
 		})
 	}
-	cards, named := printings(p)
-	if !named {
+	if p.Printings == nil {
 		return b.GetAllSets()
 	}
 	var codes []string
-	for _, co := range cards {
-		if !slices.Contains(codes, co.SetCode) {
+	seen := map[string]bool{}
+	for _, co := range printings(p) {
+		if !seen[co.SetCode] {
+			seen[co.SetCode] = true
 			codes = append(codes, co.SetCode)
 		}
 	}

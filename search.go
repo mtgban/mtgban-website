@@ -298,6 +298,9 @@ func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchC
 
 	// A set filter naming no set sits in the name's words, so no name is
 	// close until it is read as a set.
+	if len(params.UnknownSets) != 0 {
+		params.Printings = rewriteFrom(ds, p, config, params)
+	}
 	sets := suggest.Sets(params)
 	if len(sets) != 0 {
 		return sets, alts
@@ -327,9 +330,37 @@ func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchC
 		}
 	}
 	if !corrected && len(queries) == 0 {
+		if len(params.UnknownSets) == 0 {
+			params.Printings = rewriteFrom(ds, p, config, params)
+		}
 		return suggest.Tags(params), alts
 	}
 	return append(queries, asTyped...), alts
+}
+
+// rewriteFrom is what the search that found nothing finds without the
+// filters a set or is: rewrite replaces: its set typos, which the parser
+// read as words of the name, or else the is: filters holding a typo. It is
+// nil where nothing else narrows the search.
+func rewriteFrom(ds *datastore, p *prices, config SearchConfig, params suggest.Params) []string {
+	if len(params.UnknownSets) != 0 {
+		config.CleanQuery = suggest.Name(params)
+	} else {
+		typos := suggest.TagTypos(params)
+		config.CardFilters = slices.DeleteFunc(slices.Clone(config.CardFilters), func(f FilterElem) bool {
+			return f.Name == "is" && !f.Negate && slices.ContainsFunc(f.Values, func(v string) bool {
+				return slices.Contains(typos, v)
+			})
+		})
+	}
+	if config.CleanQuery == "" && len(config.CardFilters) == 0 {
+		return nil
+	}
+	uuids, _ := searchAndFilter(ds, p, config)
+	if uuids == nil {
+		return []string{}
+	}
+	return uuids
 }
 
 // filterText is the part of query the parser reads filters from: without
