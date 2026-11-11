@@ -1,6 +1,8 @@
 // Offline price sync worker: manifest diff, catalog rebuild, encrypted set blobs, image bundles.
-importScripts('/js/offline/offline-util.js', '/js/offline/offline-db.js', '/js/offline/offline-format.js');
-importScripts('/js/vendor/fflate.min.js', '/js/offline/offline-images.js');
+// The page's ?hash= rides on this script's url, so the imports are this build's.
+var build = self.location.search;
+importScripts('/js/offline/offline-util.js' + build, '/js/offline/offline-db.js' + build, '/js/offline/offline-format.js' + build);
+importScripts('/js/vendor/fflate.min.js' + build, '/js/offline/offline-images.js' + build);
 
 var cancelled = false;
 

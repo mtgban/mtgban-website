@@ -44,6 +44,7 @@ function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAt
             if (m.type === 'done' && control.onDone) control.onDone();
         },
         caches: { open: async () => ({ delete: async () => true }) },
+        location: { search: '' },
         OfflineDB: db,
         OfflineUtil: { gzipCompress: async (b) => b, normName, NAME_FOLD },
     };
@@ -70,6 +71,16 @@ function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAt
     });
     return { runSync, sync, control, imgstate, sets, posts, meta, index };
 }
+
+// The worker asks for the scripts of the build its page passed in ?hash=,
+// not whatever copy the browser cached under the bare url.
+test('the worker imports its scripts at its page\'s build', () => {
+    const urls = [];
+    const self = { location: { search: '?hash=abc' } };
+    new Function('self', 'importScripts', readFileSync(join(DIR, 'offline-sync.js'), 'utf8'))(self, (...u) => urls.push(...u));
+    expect(urls.length).toBe(5);
+    for (const url of urls) expect(url.endsWith('.js?hash=abc')).toBe(true);
+});
 
 test('a price-only sync keeps the downloaded images', async () => {
     const w = loadWorker();
