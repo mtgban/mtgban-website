@@ -126,6 +126,14 @@ output, not a claim written here.
   names the struct: `PageVars{UploadVars: UploadVars{IsBuylist: true}}`.
 - Match the surrounding code's style; this is plain idiomatic Go with a flat
   root package — most features live in one top-level file each.
+- **A feature with a package of its own keeps its logic there.** Where
+  `internal/` already holds the feature (`internal/suggest` for the
+  did-you-mean, `internal/palette` and the like), new logic goes in that
+  package, and the root file only fills its params and calls it:
+  `searchSuggestions` builds a `suggest.Params`, `suggest.Sets` and
+  `suggest.Tags` do the work. Shape the design around what the package can
+  reach, the backend rather than the parser or a full search, before adding
+  a `SearchConfig` field or a parser hook to feed it from the root.
 - Don't commit binaries, datastores (`*.json.xz`, `allprintings5.json`),
   `dump.rdb`, `.orig`/`.rej` artifacts, or `logs/`.
 - **No `reflect`**, tests included; CI's revive rejects the import. Compare
