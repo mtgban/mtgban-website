@@ -199,6 +199,7 @@ output, not a claim written here.
 | `upload_handoff.go`, `tcgcsv_service.go` | The page other sites hand a card list to; the tcgcsv ingest wired into the site |
 | `api_plans.go`, `api_handoff.go` | The public API pricing page and configurator (`/api-plans`, renders `apiproductlist`), and the Patreon handoff redirects to the gateway (`/api-trial`, `/api-login`) |
 | `utils.go`, `redirect.go`, `mobile.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle |
+| `errors/` | The 413, 500 and 502 pages: deploy.sh copies them for the droplets' nginx `error_page`s (deploy/README.md), and a recovered panic serves 500.html to a browser (`writeInternalError`, auth.go) |
 | `timeseries/` | PostgreSQL price-history client (charts) |
 | `userstate/`, `observability/` | Postgres stores for per-user favorites, recents, preferences and the search backpack, and for shared upload links (upload_shares, seven days), and for page visits (the admin usage tab) and search votes (the popular-searches ranking) |
 | `banprice/` | The price API's wire types |

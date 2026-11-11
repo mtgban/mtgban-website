@@ -59,9 +59,8 @@ else by the text, ties kept in ranking order. Other query keys are
 ignored, so a cache-busting parameter does no harm.
 
 The page and the API filter through one function, `newsFilter`, which
-answers a new slice and never reorders the cached one. Before it, no
-report named its price or change column, so the page parsed the four
-bounds and never applied them; each report now names them:
+answers a new slice and never reorders the cached one. Each report names
+the columns the price and change bounds apply to:
 
 | Report | Price column | Change column |
 |---|---|---|
