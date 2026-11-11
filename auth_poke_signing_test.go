@@ -554,7 +554,7 @@ func TestSigningRenewsAGrantedReaderWhoseGrantChanged(t *testing.T) {
 			} else {
 				edited := slices.Clone(PatreonGrants())
 				edited[0].Tier = "Vintage"
-				err = saveGrants(t.Context(), edited)
+				err = saveGrants(t.Context(), PatreonGrants(), edited)
 			}
 			if err != nil {
 				t.Fatal(err)

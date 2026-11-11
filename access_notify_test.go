@@ -341,12 +341,12 @@ func TestSaveGrantsPokesTheGrantee(t *testing.T) {
 	files := loadAccessFiles(t, `{"Legacy":{"Search":{}}}`, `[`+grantFor("a@example.com", "Legacy")+`]`)
 	a, b := userstate.HashEmail("a@example.com"), userstate.HashEmail("B@Example.com")
 
-	err := saveGrants(context.Background(), PatreonGrants())
+	err := saveGrants(context.Background(), PatreonGrants(), PatreonGrants())
 	if err != nil || pokes.Len() != 0 {
 		t.Fatalf("save of the same list: err %v, poked %v; want nobody", err, pokes.Len())
 	}
 
-	err = saveGrants(context.Background(), append(PatreonGrants()[:1:1], PatreonGrant{Email: "B@Example.com", Tier: "Vintage"}))
+	err = saveGrants(context.Background(), PatreonGrants(), append(PatreonGrants()[:1:1], PatreonGrant{Email: "B@Example.com", Tier: "Vintage"}))
 	if err != nil || pokes.Len() != 1 || !pokes.Poked(b, time.Now(), pokeWindow()) {
 		t.Fatalf("save with b granted: err %v, poked %v; want only b", err, pokes.Len())
 	}
@@ -354,7 +354,7 @@ func TestSaveGrantsPokesTheGrantee(t *testing.T) {
 		t.Errorf("the file holds %q, want the saved list", files.get("grants"))
 	}
 
-	err = saveGrants(context.Background(), PatreonGrants()[1:])
+	err = saveGrants(context.Background(), PatreonGrants(), PatreonGrants()[1:])
 	if err != nil || !pokes.Poked(a, time.Now(), pokeWindow()) || pokes.Len() != 2 {
 		t.Errorf("save with a revoked: err %v, poked %v; want a and b", err, pokes.Len())
 	}
@@ -369,7 +369,7 @@ func TestSaveGrantsRefusedPokesThePeersGrantee(t *testing.T) {
 	stale := PatreonGrants()
 	files.set("grants", `[`+grantFor("a@example.com", "Legacy")+`,`+grantFor("b@example.com", "Legacy")+`]`)
 
-	err := saveGrants(context.Background(), append(stale[:1:1], PatreonGrant{Email: "c@example.com", Tier: "Legacy"}))
+	err := saveGrants(context.Background(), stale, append(stale[:1:1], PatreonGrant{Email: "c@example.com", Tier: "Legacy"}))
 	b := userstate.HashEmail("b@example.com")
 	if !errors.Is(err, access.ErrGrantsChanged) || pokes.Len() != 1 || !pokes.Poked(b, time.Now(), pokeWindow()) {
 		t.Errorf("err %v, poked %v; want the save refused and only b poked", err, pokes.Len())

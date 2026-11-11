@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -944,12 +943,12 @@ func adminGrantSave(r *http.Request, pageVars *PageVars) {
 		pageVars.WarningMessage = warning
 	case holder >= 0 && holder != idx:
 		pageVars.WarningMessage = grant.Email + " already has a grant"
-	case idx >= 0 && sameGrant(grants[idx], grant):
+	case idx >= 0 && grants[idx].Equal(grant):
 		pageVars.InfoMessage = "No changes to the grant for " + grant.Email
 	case idx >= 0:
 		next := slices.Clone(grants)
 		next[idx] = grant
-		err := saveGrants(r.Context(), next)
+		err := saveGrants(r.Context(), grants, next)
 		if err != nil {
 			log.Println(err)
 			pageVars.WarningMessage = err.Error()
@@ -958,7 +957,7 @@ func adminGrantSave(r *http.Request, pageVars *PageVars) {
 			LogPages["Admin"].Printf("Grant updated: %+v -> %+v", grants[idx], grant)
 		}
 	default:
-		err := saveGrants(r.Context(), append(slices.Clone(grants), grant))
+		err := saveGrants(r.Context(), grants, append(slices.Clone(grants), grant))
 		if err != nil {
 			log.Println(err)
 			pageVars.WarningMessage = err.Error()
@@ -999,12 +998,6 @@ func grantFromForm(r *http.Request) (PatreonGrant, string) {
 	return grant, ""
 }
 
-// sameGrant reports whether a and b hold the same fields, Overrides included.
-func sameGrant(a, b PatreonGrant) bool {
-	return a.Category == b.Category && a.Email == b.Email && a.Name == b.Name && a.Tier == b.Tier &&
-		maps.EqualFunc(a.Overrides, b.Overrides, maps.Equal)
-}
-
 // adminGrantRevoke removes the Patreon grant of the person the request names.
 func adminGrantRevoke(r *http.Request, pageVars *PageVars) {
 	// -- People: remove a Patreon grant --
@@ -1021,7 +1014,7 @@ func adminGrantRevoke(r *http.Request, pageVars *PageVars) {
 		} else {
 			removed := grants[idx]
 
-			err := saveGrants(r.Context(), slices.Delete(slices.Clone(grants), idx, idx+1))
+			err := saveGrants(r.Context(), grants, slices.Delete(slices.Clone(grants), idx, idx+1))
 			if err != nil {
 				log.Println(err)
 				pageVars.WarningMessage = err.Error()
