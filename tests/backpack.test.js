@@ -1746,6 +1746,17 @@ describe('the Upload results\' backpack pair', () => {
         p.fireClick(p.res.remove);
         expect([p.res.add.hidden, p.res.take.hidden]).toEqual([true, true]);
     });
+
+    test('an empty backpack reads the rows for the add button only', () => {
+        for (const [store, reads] of [[[], 1], [[{ id: 'a', qty: 1, t: 1, m: 1 }], 2]]) {
+            const p = page({ store, results: [['a', 1, 'NM']] });
+            const read = p.window.exportRows;
+            let n = 0;
+            p.window.exportRows = (view) => { n++; return read(view); };
+            p.fireClick(p.res.remove);
+            expect([store.length, n]).toEqual([store.length, reads]);
+        }
+    });
 });
 
 describe('the navbar switcher', () => {
