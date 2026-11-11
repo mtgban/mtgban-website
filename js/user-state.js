@@ -263,6 +263,7 @@
         if (typeof window.renderRecentSearches === 'function') window.renderRecentSearches();
         if (typeof window.renderBackpack === 'function') window.renderBackpack();
         if (window.UploadPresets && typeof window.UploadPresets.refresh === 'function') window.UploadPresets.refresh();
+        if (typeof window.uresRefresh === 'function') window.uresRefresh();
         if (window.ArbitFilters && typeof window.ArbitFilters.refresh === 'function') window.ArbitFilters.refresh();
         if (window.NewsFilters && typeof window.NewsFilters.refresh === 'function') window.NewsFilters.refresh();
         if (window.ArbitPresets && typeof window.ArbitPresets.refresh === 'function') window.ArbitPresets.refresh();

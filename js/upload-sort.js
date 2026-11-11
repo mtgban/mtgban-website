@@ -136,6 +136,27 @@ function uresLoadChains() {
     }
 }
 
+// uresRefresh re-reads the saved orders when a sync brings another device's,
+// and sorts an area whose order changed, as a page load would, redrawing its
+// menu if open.
+function uresRefresh() {
+    var before = {results: uresFormatChain(uresChains.results), opt: uresFormatChain(uresChains.opt)};
+    uresLoadChains();
+    ['results', 'opt'].forEach(function(area) {
+        if (uresFormatChain(uresChains[area]) === before[area]) return;
+        if (area === 'opt') uresStoreChains = new WeakMap();
+        uresShowChain(area);
+        uresAreaTables(area).forEach(uresResort);
+        var menu = document.getElementById('sort-ties-' + area);
+        if (menu && uresMenuButton && menu.matches(':popover-open')) {
+            var focused = menu.contains(document.activeElement) ? document.activeElement : null;
+            var row = focused && focused.closest('[data-key]');
+            uresRenderMenu(menu, area, uresButtonTable(uresMenuButton));
+            if (focused) uresFocusControl(menu, row ? row.getAttribute('data-key') : '', focused.getAttribute('data-act'));
+        }
+    });
+}
+
 function uresSaveChains() {
     try {
         localStorage.setItem(UPLOAD_SORT_STORE, JSON.stringify({
@@ -326,12 +347,17 @@ function uresMenu(area) {
         var table = uresButtonTable(uresMenuButton);
         uresMenuAct(area, key, act, table);
         uresRenderMenu(menu, area, table);
-        // The menu is drawn anew: keep the keyboard on the same control
-        var again = menu.querySelector(key ? '[data-key="' + key + '"] [data-act="' + act + '"]' : '[data-act="clear"]');
-        if (again && !again.disabled) again.focus();
+        uresFocusControl(menu, key, act);
     });
     document.body.appendChild(menu);
     return menu;
+}
+
+// The menu is drawn anew: keep the keyboard on the same control, Clear
+// without a key, if it is still there and enabled.
+function uresFocusControl(menu, key, act) {
+    var el = menu.querySelector(key ? '[data-key="' + key + '"] [data-act="' + act + '"]' : '[data-act="clear"]');
+    if (el && !el.disabled) el.focus();
 }
 
 var uresMenuButton = null;

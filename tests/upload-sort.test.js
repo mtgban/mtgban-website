@@ -61,7 +61,7 @@ function table(headers, rows, above = [], kind = 'ures-table') {
 
 function load(document = { addEventListener: () => {} }, localStorage = storage()) {
     return new Function('document', 'localStorage', source +
-        '\nreturn {uresSortBy, uresParseChain, uresMenuAct, uresRenderMenu, chains: () => uresChains};')(document, localStorage);
+        '\nreturn {uresSortBy, uresParseChain, uresMenuAct, uresRenderMenu, uresRefresh, opened: (btn) => { uresMenuButton = btn; }, chains: () => uresChains};')(document, localStorage);
 }
 
 // A localStorage that counts its writes
@@ -413,4 +413,32 @@ test("the toolbar's button says it sorts every store", () => {
     load(doc, store);
     doc.listeners.DOMContentLoaded.forEach((fn) => fn());
     expect(btn.title).toBe('Stores sorted by Color \u25BC');
+});
+
+test("an order synced after the page loaded is kept by the next edit, sorts the area and redraws its open menu, focus kept", () => {
+    const a = table([element({})], [keyed('x', { name: 'zap', set: '2' }), keyed('y', { name: 'opt', set: '1' })], [], 'opt-table');
+    const store = storage();
+    const doc = page([a]);
+    // The keyboard is on the Set row's checkbox
+    const active = { getAttribute: (n) => (n === 'data-act' ? 'toggle' : null), closest: () => element({ 'data-key': 'set' }) };
+    const control = { disabled: false, focused: false, focus() { this.focused = true; } };
+    const menu = {
+        innerHTML: '',
+        matches: (sel) => sel === ':popover-open',
+        contains: (el) => el === active,
+        querySelector: (sel) => (sel === '[data-key="set"] [data-act="toggle"]' ? control : null),
+    };
+    doc.getElementById = (id) => (id === 'sort-ties-opt' ? menu : null);
+    doc.activeElement = active;
+    const { uresMenuAct, uresRefresh, opened } = load(doc, store);
+    doc.listeners.DOMContentLoaded.forEach((fn) => fn());
+    opened(button('opt'));
+    store.map.mtgban_upload_sort = JSON.stringify({ results: '', opt: 'set:a' });
+    uresRefresh();
+    expect(hashes(a)).toEqual(['y', 'x']);
+    // The open menu shows the synced order
+    expect(menu.innerHTML).toContain('data-key="set"><label><input type="checkbox" data-act="toggle" checked>');
+    expect(control.focused).toBe(true);
+    uresMenuAct('results', 'name', 'toggle');
+    expect(JSON.parse(store.map.mtgban_upload_sort)).toEqual({ results: 'name:a', opt: 'set:a' });
 });
