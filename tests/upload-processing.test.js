@@ -5,6 +5,7 @@ const html = readFileSync(new URL('../templates/upload.html', import.meta.url), 
 const submitScript = html.match(/<script type="text\/javascript">(\s*const hiddenBools[\s\S]*?)<\/script\b[^>]*>/i)[1];
 const exportsSrc = readFileSync(new URL('../js/upload-exports.js', import.meta.url), 'utf8');
 const processingSrc = readFileSync(new URL('../js/upload-processing.js', import.meta.url), 'utf8');
+const storePromptSrc = readFileSync(new URL('../js/upload-store-prompt.js', import.meta.url), 'utf8');
 
 // Only a post that comes back as a page may open the overlay: an export
 // answers with a file and the page stays, so the overlay would never close.
@@ -81,6 +82,28 @@ test('the results page exports leave it closed', () => {
         page.api.runExport(field, 'singles', field === 'estimate');
         expect(page.opened.length).toBe(0);
     }
+});
+
+test('publishing a store closes its prompt and opens the overlay', () => {
+    const prompt = new Set(['open']);
+    const fields = { store_name: { value: 'Shop' }, store_shorthand: { value: 'SH' } };
+    const els = {
+        'store-overlay': {
+            classList: { add: (c) => prompt.add(c), remove: (c) => prompt.delete(c) },
+            querySelector: (sel) => fields[sel.match(/name="([^"]+)"/)[1]],
+            querySelectorAll: () => [],
+        },
+        res_publishstore: { value: '' },
+        upload_form: { target: '_blank', submit: () => {}, querySelectorAll: () => [], appendChild: () => {} },
+    };
+    const document = { addEventListener: () => {}, getElementById: (id) => els[id] || null };
+    const opened = [];
+    const window = { showUploadProcessing: () => opened.push(true), ensureHashesLoaded: () => {}, resExportFields: [] };
+    const run = new Function('window', 'document', 'with (window) {' + storePromptSrc + '}\nreturn runPublishStore;')(window, document);
+    run();
+    expect(els.res_publishstore.value).toBe('true');
+    expect(prompt.has('open')).toBe(false);
+    expect(opened.length).toBe(1);
 });
 
 function overlayPage(focusedId) {
