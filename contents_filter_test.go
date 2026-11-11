@@ -112,28 +112,6 @@ func TestCommaQuotedListsTokenize(t *testing.T) {
 	}
 }
 
-// A comma inside a quoted value is part of the value, and only one outside
-// the quotes separates two of them.
-func TestSplitQuotedList(t *testing.T) {
-	for _, tt := range []struct {
-		in   string
-		want []string
-	}{
-		{`a,b`, []string{`a`, `b`}},
-		{`"A B"`, []string{`"A B"`}},
-		{`"A, B"`, []string{`"A, B"`}},
-		{`"A, B","C"`, []string{`"A, B"`, `"C"`}},
-		{`"A","B, C",d`, []string{`"A"`, `"B, C"`, `d`}},
-		{`"A, B`, []string{`"A, B`}},
-		{``, []string{``}},
-	} {
-		got := splitQuotedList(tt.in)
-		if !slices.Equal(got, tt.want) {
-			t.Errorf("splitQuotedList(%q) = %q, want %q", tt.in, got, tt.want)
-		}
-	}
-}
-
 // A product named with a comma is one product, alone or in a list. Split at
 // its comma, the first half named no product and fell back to every product
 // containing it: "Warhammer 40" answered with a Secret Lair drop's decklist.

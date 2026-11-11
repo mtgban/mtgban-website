@@ -54,3 +54,25 @@ func TestRelaxedSearches(t *testing.T) {
 		}
 	}
 }
+
+// A comma inside a quoted value is part of the value, and only one outside
+// the quotes separates two of them.
+func TestSplitList(t *testing.T) {
+	for _, tt := range []struct {
+		in   string
+		want []string
+	}{
+		{`a,b`, []string{`a`, `b`}},
+		{`"A B"`, []string{`"A B"`}},
+		{`"A, B"`, []string{`"A, B"`}},
+		{`"A, B","C"`, []string{`"A, B"`, `"C"`}},
+		{`"A","B, C",d`, []string{`"A"`, `"B, C"`, `d`}},
+		{`"A, B`, []string{`"A, B`}},
+		{``, []string{``}},
+	} {
+		got := SplitList(tt.in)
+		if !slices.Equal(got, tt.want) {
+			t.Errorf("SplitList(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
