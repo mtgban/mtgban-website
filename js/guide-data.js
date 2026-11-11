@@ -603,7 +603,7 @@ window.__BAN_GUIDE = {
             icon: 'gift',
             summary: 'Filter promos and special foil treatments: is:promo, is:prerelease, is:buyabox, is:surge, is:serialized.',
             snippets: ['is:promo', 'is:prerelease', 'is:buyabox', 'is:serialized', 'is:altfoil', 'is:surge'],
-            keywords: ['promo', 'prerelease', 'buyabox', 'buy a box', 'serialized', 'variant', 'retro', 'retroframe', 'stamped', 'convention', 'fnm', 'wpn', 'gameday', 'judge', 'arena', 'release', 'bundle', 'altfoil', 'foil', 'surge', 'galaxy', 'ripple', 'rainbow', 'halo', 'mana', 'neon', 'gilded', 'textured', 'oilslick', 'confetti', 'fracture', 'embossed', 'godzilla', 'dracula', 'concept', 'poster', 'glossy', 'storechampionship', 'draftweekend', 'intropack', 'starterdeck'],
+            keywords: ['promo', 'prerelease', 'buyabox', 'buy a box', 'serialized', 'variant', 'retro', 'retroframe', 'stamped', 'convention', 'fnm', 'wpn', 'gameday', 'judge', 'arena', 'release', 'bundle', 'altfoil', 'foil', 'surge', 'galaxy', 'ripple', 'rainbow', 'halo', 'mana', 'neon', 'gilded', 'textured', 'oilslick', 'confetti', 'fracture', 'embossed', 'godzilla', 'dracula', 'concept', 'poster', 'glossy', 'storechampionship', 'draftweekend', 'intropack', 'starterdeck', 'premiereshop', 'mps'],
             content: {
                 table: [
                     { value: 'promo', short: 'Any promo (matches every type below)' },
@@ -621,6 +621,7 @@ window.__BAN_GUIDE = {
                     { value: 'playerrewards / rewards / mpr' },
                     { value: 'wizardsplaynetwork / wpn' },
                     { value: 'storechampionship' },
+                    { value: 'premiereshop / mps' },
                     { value: 'convention' },
                     { value: 'tourney' },
                     { value: 'intropack' },
@@ -635,6 +636,7 @@ window.__BAN_GUIDE = {
                     { value: 'godzillaseries', note: 'Ikoria' },
                     { value: 'ruderiders' },
                     { value: 'boosterfun / bf / v' },
+                    { value: 'retroframe / retro' },
                     { value: 'surgefoil / surge' },
                     { value: 'galaxyfoil / galaxy' },
                     { value: 'ripplefoil / ripple' },
@@ -863,7 +865,7 @@ window.__BAN_GUIDE = {
                 ],
                 examples: [
                     { query: 'sort:retail', desc: 'Highest TCG price first' },
-                    { query: 's:mh3 sort:velocity', desc: 'Fastest sellers of a set first' },
+                    { query: 's:mh3 sort:velocity', desc: 'Fastest-selling cards of a set first' },
                     { query: 'r:mythic sort:retail', desc: 'Most expensive mythics first' },
                     { query: 'is:fetchland sort:buylist', desc: 'Fetchlands by buylist value' }
                 ]
