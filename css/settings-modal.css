@@ -673,6 +673,22 @@ body.settings-open {
 .settings-field-row > .settings-inline-num {
     margin: 0;
 }
+/* The custom tiebreak order, shown only while it is the one picked */
+.settings-tie-order {
+    display: none;
+}
+.settings-upload-fields:has(#opt-tiebreak option[value="custom"]:checked) .settings-tie-order {
+    display: grid;
+}
+.settings-tie-stores {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+}
+.settings-tie-stores > select {
+    width: 10em;
+    min-width: 0;
+}
 
 /* === Settings store subgroups (Singles / Sealed) === */
 .settings-subgroup {
