@@ -20,7 +20,8 @@
     // first if it sorts. page.typing says an answer is still being typed. Optional
     // are ready() at page load, cleared() when the box empties, queryChanged(q) when
     // the query or the singles or sealed mode may have, page load included, move(step)
-    // for an arrow key, and closeKeyboard to give up the box on Enter.
+    // for an arrow key, recount(total, shown) when only an answer's size changed,
+    // and closeKeyboard to give up the box on Enter.
     function start(hooks) {
         var dicts = null;
         var env = null;
@@ -164,12 +165,24 @@
                 answer.results.every(function (row, i) { return row.uuid === shown.ids[i]; });
         }
 
-        function draw(draft) {
+        // samePage says a draft would draw the rows a typed screen already has,
+        // leaving only the count to change.
+        function samePage(answer) {
+            return !!shown && !shown.settled && answer.page.length === Math.min(shown.ids.length, TYPING_ROWS) &&
+                answer.page.every(function (row, i) { return row.uuid === shown.ids[i]; });
+        }
+
+        function remember(answer, draft) {
+            exec = answer;
             shown = {
-                ids: exec.results.map(function (row) { return row.uuid; }),
+                ids: answer.results.map(function (row) { return row.uuid; }),
                 settled: !draft,
-                notices: notices(exec)
+                notices: notices(answer)
             };
+        }
+
+        function draw(draft) {
+            remember(exec, draft);
             var page = Object.assign({}, exec, {
                 results: exec.page,
                 typing: draft,
@@ -226,6 +239,12 @@
             latestDraw++;
             if (draft && !answer.results.length) return;
             if (keep && unchanged(answer, draft)) return;
+            if (keep && draft && samePage(answer)) {
+                remember(answer, draft);
+                if (hooks.recount) hooks.recount(answer.results.length, Math.min(answer.results.length, PAGE_SIZE));
+                followTop(answer);
+                return;
+            }
             exec = answer;
             draw(draft);
         }
