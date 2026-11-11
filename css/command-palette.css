@@ -598,7 +598,8 @@ body.dark-theme .cp-result-icon img[src*="cardconduit"] {
     white-space: nowrap;
     max-width: 200px;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 .cp-chip-delete {

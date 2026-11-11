@@ -115,7 +115,8 @@
     color: var(--greytext);
     white-space: nowrap;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 

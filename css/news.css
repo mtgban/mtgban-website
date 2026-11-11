@@ -332,7 +332,8 @@
     font-size: var(--text-md);
     white-space: nowrap;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
     color: var(--text-dim);
 }
@@ -347,7 +348,8 @@
     color: var(--text-dim);
     white-space: nowrap;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 

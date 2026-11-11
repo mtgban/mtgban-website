@@ -96,7 +96,8 @@
     color: var(--greytext);
     white-space: nowrap;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 
@@ -351,7 +352,8 @@
     font-size: 0.85rem;
     white-space: nowrap;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 
@@ -360,7 +362,8 @@
     color: var(--greytext);
     white-space: nowrap;
     min-width: 0;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 

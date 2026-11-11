@@ -186,7 +186,8 @@
     font-weight: 600;
     font-size: 0.9rem;
     white-space: nowrap;
-    overflow-x: clip;
+    overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
 }
 
