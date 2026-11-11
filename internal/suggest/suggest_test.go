@@ -76,3 +76,24 @@ func TestSplitList(t *testing.T) {
 		}
 	}
 }
+
+// A field is replaced where it stands as a term of its own, never inside a
+// longer one it starts or ends.
+func TestReplaceField(t *testing.T) {
+	for _, tt := range []struct{ query, field, value, want string }{
+		{"s:atw s:at", "s:at", "s:ath", "s:atw s:ath"},
+		{"s:atw s:at", "s:atw", "s:atq", "s:atq s:at"},
+		{"bolt -s:lea s:lea", "s:lea", "", "bolt -s:lea "},
+		{"bolt s:atw&", "s:atw", "s:atq", "bolt s:atq&"},
+		{"bolt s:lea", "s:m10", "", "bolt s:lea"},
+	} {
+		got := replaceField(tt.query, tt.field, tt.value)
+		if got != tt.want {
+			t.Errorf("replaceField(%q, %q, %q) = %q, want %q", tt.query, tt.field, tt.value, got, tt.want)
+		}
+	}
+	got := rewrites("s:atw s:at", []string{"s:atw", "s:at"}, [][][]string{{{"atq"}}, {{"ath"}}})
+	if !slices.Equal(got, []string{"s:atq s:ath"}) {
+		t.Errorf("rewrites = %q, want [s:atq s:ath]", got)
+	}
+}

@@ -120,7 +120,7 @@ func nearestTags(p Params, value string, tags []string) []string {
 func queryName(p Params) string {
 	name := strings.TrimRight(p.RawQuery, "&*~`")
 	for _, field := range slices.Concat(p.UnknownSets, p.AppliedFilters) {
-		name = strings.Replace(name, field, "", 1)
+		name = replaceField(name, field, "")
 	}
 	return strings.Trim(collapseSpaces(name), `"`)
 }
@@ -222,11 +222,29 @@ func rewrites(raw string, fields []string, nearest [][][]string) []string {
 				values = append(values, near[min(n, len(near)-1)])
 			}
 			key, _, _ := strings.Cut(field, ":")
-			query = strings.Replace(query, field, key+":"+strings.Join(values, ","), 1)
+			query = replaceField(query, field, key+":"+strings.Join(values, ","))
 		}
 		out = append(out, query)
 	}
 	return out
+}
+
+// replaceField replaces the first field in query that stands as a term of
+// its own, not inside a longer one, with value: in "s:atw s:at", s:at is
+// the second term, not the start of the first.
+func replaceField(query, field, value string) string {
+	for from := 0; ; {
+		at := strings.Index(query[from:], field)
+		if at < 0 {
+			return query
+		}
+		at += from
+		end := at + len(field)
+		if (at == 0 || query[at-1] == ' ') && (end == len(query) || strings.IndexByte(" &*~`", query[end]) >= 0) {
+			return query[:at] + value + query[end:]
+		}
+		from = at + 1
+	}
 }
 
 // SplitList splits a comma-separated list of values, keeping a comma
