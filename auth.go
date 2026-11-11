@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -472,12 +473,13 @@ func openPage(path string) string {
 // keeps the one an invite link carries in ?sig= as the cookie, once that
 // checks out.
 func noSigning(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		w := &startedWriter{ResponseWriter: rw}
 		defer recoverPanic(r, w)
 
 		// Bounded as signing bounds it: FormValue parses a multipart body
 		// whole, spilling past memory to disk.
-		r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBodySize)
+		r.Body = http.MaxBytesReader(rw, r.Body, MaxUploadBodySize)
 
 		querySig := r.FormValue("sig")
 		_, signed := signatureIsValid(querySig)
@@ -539,7 +541,8 @@ func signedByGateway(r *http.Request) bool {
 }
 
 func enforceAPISigning(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		w := &startedWriter{ResponseWriter: rw}
 		defer recoverPanic(r, w)
 
 		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
@@ -659,12 +662,13 @@ func (ref signingRefusal) write(w http.ResponseWriter, r *http.Request, s *site,
 }
 
 func signing(s *site, next http.Handler, script bool) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		w := &startedWriter{ResponseWriter: rw}
 		defer recoverPanic(r, w)
 
 		// Bound the body before anything below reads the form: FormValue
 		// parses a multipart body whole, on every path through here.
-		r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBodySize)
+		r.Body = http.MaxBytesReader(rw, r.Body, MaxUploadBodySize)
 
 		// A page the ACL opens to everyone needs no signature
 		if openPage(r.URL.Path) != "" {
@@ -855,12 +859,51 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 	})
 }
 
-func recoverPanic(r *http.Request, w http.ResponseWriter) {
+// recoverPanic reports a panic in the handler w was handed to and answers
+// with the error page, or, where the response had begun, aborts it, so a
+// half-sent file ends broken rather than with a page appended.
+func recoverPanic(r *http.Request, w *startedWriter) {
 	errPanic := recover()
-	if errPanic != nil {
-		reportPanic(errPanic, "source request: "+r.URL.String())
-		writeInternalError(w, r)
+	if errPanic == nil {
+		return
 	}
+	// An inner wrapper's abort, its panic already reported: signing runs
+	// noSigning inside it for an open page.
+	if errPanic == http.ErrAbortHandler {
+		panic(errPanic)
+	}
+	reportPanic(errPanic, "source request: "+r.URL.String())
+	if w.started {
+		panic(http.ErrAbortHandler)
+	}
+	writeInternalError(w, r)
+}
+
+// startedWriter notes whether a handler began its response.
+type startedWriter struct {
+	http.ResponseWriter
+	started bool
+}
+
+func (w *startedWriter) WriteHeader(code int) {
+	w.started = true
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *startedWriter) Write(b []byte) (int, error) {
+	w.started = true
+	return w.ResponseWriter.Write(b)
+}
+
+// ReadFrom keeps the underlying writer's own copy, sendfile on a file.
+func (w *startedWriter) ReadFrom(src io.Reader) (int64, error) {
+	w.started = true
+	return io.Copy(w.ResponseWriter, src)
+}
+
+// Unwrap lets http.ResponseController reach the writer's Flush and the like.
+func (w *startedWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
 
 // writeInternalError answers a browser with errors/500.html, and anything
