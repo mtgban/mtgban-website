@@ -1409,7 +1409,7 @@
 /* The toolbar's, which sorts every optimizer store, shows on that tab only */
 .res-sort-btn { padding: 8px 12px; }
 .res-sort-btn.on { color: var(--ainfo); }
-body:not(:has(#panel-optimizer.active)) .res-sort-btn { display: none; }
+body:not(:has(#panel-optimizer.active)) :is(.res-sort-btn, .res-sort-sep) { display: none; }
 .sort-ties-menu { position: fixed; inset: auto; margin: 0; padding: 4px; width: 240px; max-width: calc(100vw - 16px); background: var(--surface-1); color: var(--normal); border: 1px solid var(--border-moderate); border-radius: var(--radius-sm); box-shadow: 0 6px 20px rgba(0,0,0,0.18); font-size: var(--text-sm); }
 .sort-ties-row { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: var(--radius-sm); }
 .sort-ties-row:hover { background: var(--row-hover); }
