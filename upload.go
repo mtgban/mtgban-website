@@ -36,6 +36,7 @@ import (
 	"github.com/mtgban/mtgban-website/cubecobra"
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
+	"github.com/mtgban/mtgban-website/internal/uploadsort"
 	"github.com/mtgban/mtgban-website/internal/xlsread"
 	"github.com/mtgban/mtgban-website/manabox"
 	"github.com/mtgban/mtgban-website/moxfield"
@@ -473,6 +474,8 @@ type UploadVars struct {
 	MissingPrices       map[string]float64
 	ResultPrices        map[string]map[string]float64
 	UploadQuery         string
+	// Each matched card's keys for the results' tie-breakers, by id
+	SortKeys map[string]uploadsort.Keys
 	// Original link of a remote-URL upload, so the results header can
 	// point back at the source
 	UploadSourceURL string
@@ -790,6 +793,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.Metadata = uploadMetadata(b, p, st, uploadedData)
 	pageVars.Metadata.fillSales(salesVelocityStore.Snapshot())
+	pageVars.SortKeys = uploadSortKeys(b, uploadedData)
 
 	rows := priceUploadRows(b, blMode, st, prices, indexes, uploadedData)
 	pageVars.TotalEntries = rows.totalEntries
@@ -882,6 +886,18 @@ func uploadMetadata(b *matcher.Backend, p *prices, st uploadSettings, uploadedDa
 	}
 
 	return metadata
+}
+
+// uploadSortKeys is every matched card's tie-breaker keys, by id.
+func uploadSortKeys(b *matcher.Backend, uploadedData []UploadEntry) map[string]uploadsort.Keys {
+	keys := map[string]uploadsort.Keys{}
+	for _, data := range uploadedData {
+		if data.MismatchError != nil {
+			continue
+		}
+		keys[data.CardID] = uploadsort.For(b, data.CardID)
+	}
+	return keys
 }
 
 // fillUploadResults sorts the rows and the optimizer's picks, and lays them

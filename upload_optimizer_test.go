@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/uploadsort"
 )
 
 // closeVendors serves two vendors buying the same five cards within 10% of
@@ -504,5 +505,32 @@ func TestNumberSortTiesKeepsAPrintingTogether(t *testing.T) {
 	}
 	if want := []int{1, 2, 1, 1, 2, 1}; !slices.Equal(got, want) {
 		t.Errorf("groups %v, want %v", got, want)
+	}
+}
+
+// TestUploadRowsCarryTheirSortKeys writes each row's tie-breaker keys and,
+// where the sorting setting grouped it, its tie group.
+func TestUploadRowsCarryTheirSortKeys(t *testing.T) {
+	keys := map[string]uploadsort.Keys{"a": {Name: "counterspell", Set: "1999-04-11 seventh edition", Number: "67", Finish: "0 nonfoil", Color: "1.01", Rarity: "3"}}
+	want := `data-k-name="counterspell" data-k-set="1999-04-11 seventh edition" data-k-number="67" data-k-finish="0 nonfoil" data-k-color="1.01" data-k-rarity="3"`
+	out := renderUpload(t, PageVars{
+		Metadata: cardMetadata{"a": {Name: "Counterspell"}, "b": {Name: "Opt"}},
+		UploadVars: UploadVars{
+			SortKeys:       keys,
+			SinglesEntries: []UploadEntry{{CardID: "a", OriginalCondition: "SP", SortLead: 2}, {CardID: "b"}},
+			Optimized:      map[string][]OptimizedUploadEntry{"CK": {{CardID: "a", Condition: "SP", SortLead: 3}, {CardID: "b"}}},
+			OptimizedKeys:  []string{"CK"},
+		},
+	})
+	for _, w := range []string{
+		`data-opt-id="a"`, want + ` data-k-cond="1" data-k-lead="3"`,
+		`data-hash="a"`, `data-k-cond="1" data-k-lead="2"`,
+	} {
+		if !strings.Contains(out, w) {
+			t.Errorf("no %s", w)
+		}
+	}
+	if strings.Count(out, "data-k-lead=") != 2 {
+		t.Errorf("%d rows carry a tie group, want the 2 grouped ones", strings.Count(out, "data-k-lead="))
 	}
 }
