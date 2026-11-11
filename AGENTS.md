@@ -359,6 +359,10 @@ stale the moment an item lands.
   `docs/search-column-layout.md` has the reasoning, and
   `tests/offline/search-sticky-offsets.test.js` pins the parts a browserless
   test can reach.
+- `main.css` gives every span `line-height: 1`, a box shorter than its
+  glyphs, so a span (or a child of one) ending in an ellipsis clips with
+  `overflow-x: clip` and `min-width: 0`, not `overflow: hidden`, which cuts
+  its descenders off.
 - The API gateway (`mtgban/api-gatewahy`) imports seven packages from this
   module: `apisig`, `apihandoff`, `apiproductlist`, `observability`,
   `ratelimit`, `timeseries` and `mailer`. A change to any of them is a change to the
