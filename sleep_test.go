@@ -187,7 +187,7 @@ func TestVelocityTiers(t *testing.T) {
 	}
 	setTestSalesVelocity(t, sales)
 
-	got, err := sleepersLayout(b, currentPrices(), getVelocity(b, nil))
+	got, err := sleepersLayout(b, currentPrices(), getVelocity(b, salesVelocityStore.Snapshot(), nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestVelocityTiers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, ranked := getVelocity(b, []string{co.SetCode})[cards[0]]
+	_, ranked := getVelocity(b, salesVelocityStore.Snapshot(), []string{co.SetCode})[cards[0]]
 	if ranked {
 		t.Errorf("%s: a skipped edition was ranked", co.SetCode)
 	}
