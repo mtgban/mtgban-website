@@ -275,8 +275,8 @@
     // A body past GZIP_OVER goes gzipped where the browser can, so a full
     // backpack stays under the server's 1 MB cap. Resolves to the fetch
     // options' headers and body. The 7000-card ceiling assumes
-    // CompressionStream (Safari 16.4, Firefox 113): plain, nginx refuses a
-    // body past about 2000 cards and as many removed ones.
+    // CompressionStream (Safari 16.4, Firefox 113): plain, the server refuses
+    // a body past about 2000 cards and as many removed ones.
     var GZIP_OVER = 32 * 1024;
     function encodeBody(body) {
         var plain = { headers: { 'Content-Type': 'application/json' }, body: body };

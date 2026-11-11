@@ -16,8 +16,7 @@ import (
 	"github.com/mtgban/mtgban-website/ratelimit"
 )
 
-// maxBody is the server-side cap on a sync payload, nginx's default
-// client_max_body_size, so a body the droplets pass is one this takes.
+// maxBody is the server-side cap on a sync payload as sent, gzipped or not.
 const maxBody = 1 << 20
 
 // maxDecoded caps a gzipped body once unpacked: a backpack's 7000 cards and
