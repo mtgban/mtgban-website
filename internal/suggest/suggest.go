@@ -57,6 +57,11 @@ type Params struct {
 	UnknownSets []string
 	// PromoAliases maps the short forms an is: takes to their promo types.
 	PromoAliases map[string]string
+	// Printings are the uuids a set or is: rewrite picks its values from:
+	// what the search finds with the filters the rewrite replaces left out,
+	// so that every rewrite finds cards. Nil where nothing is left to
+	// narrow that search: every set or promo type may be picked.
+	Printings []string
 }
 
 // collapseSpaces trims and squeezes runs of whitespace into single spaces.
