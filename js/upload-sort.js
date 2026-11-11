@@ -19,6 +19,10 @@ function uresSortKey(cell, numeric, attr) {
 // moves it.
 var uresServerPlace = new WeakMap();
 
+// Text compares with numbers in order, "2" before "10"; one collator for
+// every comparison of a sort.
+var uresCollator = new Intl.Collator(undefined, {numeric: true});
+
 // The rows in the column's order: missing values last either way, ties by
 // the tie-breakers (uresTieOrder), then in the order they had. With no
 // column, the tie-breakers' ties fall back to the server's order, as on a
@@ -26,16 +30,17 @@ var uresServerPlace = new WeakMap();
 function uresSortedRows(rows, col, numeric, descending, ties) {
     var keyed = rows.map(function(row, i) {
         var index = col === null && uresServerPlace.has(row) ? uresServerPlace.get(row) : i;
-        return {row: row, key: uresSortKey(row.cells[col], numeric), index: index};
+        var tieKeys = (ties || []).map(function(t) { return uresSortKey(row, t.numeric, t.attr); });
+        return {row: row, key: uresSortKey(row.cells[col], numeric), tieKeys: tieKeys, index: index};
     });
     keyed.sort(function(a, b) {
         if (a.key === null || b.key === null) {
-            if (a.key === b.key) return uresTieOrder(a.row, b.row, ties) || a.index - b.index;
+            if (a.key === b.key) return uresTieOrder(a.tieKeys, b.tieKeys, ties) || a.index - b.index;
             return a.key === null ? 1 : -1;
         }
-        var c = numeric ? a.key - b.key : a.key.localeCompare(b.key, undefined, {numeric: true});
+        var c = numeric ? a.key - b.key : uresCollator.compare(a.key, b.key);
         if (descending) c = -c;
-        return c || uresTieOrder(a.row, b.row, ties) || a.index - b.index;
+        return c || uresTieOrder(a.tieKeys, b.tieKeys, ties) || a.index - b.index;
     });
     return keyed.map(function(k) { return k.row; });
 }
@@ -79,8 +84,8 @@ function uresMoveRows(table, col, numeric, descending) {
 
 // The tie-breakers: card properties picked from the Card header's menu,
 // which order the rows the column (or else the sorting setting) ties on.
-// The card properties ties can be broken by. Each row carries its value as
-// data-k-<key> (internal/uploadsort); rarity and condition are ranks.
+// Each row carries its value as data-k-<key> (internal/uploadsort); rarity
+// and condition are ranks.
 var uresTieKeys = [
     {key: 'name', label: 'Name'},
     {key: 'set', label: 'Set'},
@@ -177,15 +182,16 @@ function uresTies(table, led) {
     return ties;
 }
 
-// How two rows order under the tie-breakers: each step decides only between
-// rows the steps before it tie on, a missing value last either way.
+// How two rows order under the tie-breakers, given each row's keys for
+// them: each step decides only between rows the steps before it tie on, a
+// missing value last either way.
 function uresTieOrder(x, y, ties) {
     for (var s = 0; s < ties.length; s++) {
-        var a = uresSortKey(x, ties[s].numeric, ties[s].attr);
-        var b = uresSortKey(y, ties[s].numeric, ties[s].attr);
+        var a = x[s];
+        var b = y[s];
         if (a === b) continue;
         if (a === null || b === null) return a === null ? 1 : -1;
-        var c = ties[s].numeric ? a - b : a.localeCompare(b, undefined, {numeric: true});
+        var c = ties[s].numeric ? a - b : uresCollator.compare(a, b);
         if (c) return ties[s].descending ? -c : c;
     }
     return 0;
