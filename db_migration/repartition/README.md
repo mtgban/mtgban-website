@@ -547,7 +547,8 @@ It ends with a report, every field read after each session:
 - `parent_index` with `indisvalid`: true for both.
 - `stray`: relations on `from` that are not of `prices`, which keep the
   tablespace from being dropped; it must be empty, or each is moved or
-  dropped before step 17.
+  dropped before step 17. The TOAST tables of `prices` and their indexes
+  move with their partitions and are left out.
 - `databases_using_from`: the databases with a directory under `from`.
 
 `databases_using_from` lists the current database even after everything
