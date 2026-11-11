@@ -418,3 +418,91 @@ func TestSortByProfitabilityLeadsWithOffersOverTheBase(t *testing.T) {
 		t.Errorf("sorted as %v, want %v", got, want)
 	}
 }
+
+// TestNumberSortTiesGroupsEqualRows gives rows the sort cannot tell apart one
+// group, for the page to break their ties.
+func TestNumberSortTiesGroupsEqualRows(t *testing.T) {
+	uploaded := []UploadEntry{
+		{CardID: "b", OriginalPrice: 5},
+		{CardID: "d", OriginalPrice: 5},
+		{CardID: "a", OriginalPrice: 1},
+		{CardID: "c", OriginalPrice: 1},
+	}
+	results := map[string][]OptimizedUploadEntry{"store": {
+		{CardID: "y", BestPrice: 3},
+		{CardID: "x", BestPrice: 2},
+		{CardID: "z", BestPrice: 2},
+	}}
+	numberSortTies(uploaded, results, "highprice")
+
+	var got []int
+	for _, e := range uploaded {
+		got = append(got, e.SortLead)
+	}
+	if want := []int{1, 1, 2, 2}; !slices.Equal(got, want) {
+		t.Errorf("uploaded groups %v, want %v", got, want)
+	}
+	got = nil
+	for _, e := range results["store"] {
+		got = append(got, e.SortLead)
+	}
+	if want := []int{1, 2, 2}; !slices.Equal(got, want) {
+		t.Errorf("optimized groups %v, want %v", got, want)
+	}
+}
+
+// TestNumberSortTiesLeavesUnsortedListsUngrouped keeps SortLead 0 on a list
+// the setting does not sort, so the page's tie-breakers lead it.
+func TestNumberSortTiesLeavesUnsortedListsUngrouped(t *testing.T) {
+	for _, sorting := range []string{"", "highspread"} {
+		uploaded := []UploadEntry{{CardID: "a", OriginalPrice: 1}, {CardID: "b", OriginalPrice: 5}}
+		results := map[string][]OptimizedUploadEntry{"store": {{CardID: "x", Spread: 20}, {CardID: "y", Spread: 10}}}
+		numberSortTies(uploaded, results, sorting)
+		if uploaded[0].SortLead != 0 || uploaded[1].SortLead != 0 {
+			t.Errorf("%q: uploaded rows %+v, want them ungrouped", sorting, uploaded)
+		}
+		led := results["store"][0].SortLead != 0
+		if led != (sorting == "highspread") {
+			t.Errorf("%q: optimized rows %+v", sorting, results["store"])
+		}
+	}
+}
+
+// TestNumberSortTiesFollowsProfitability ties offers at or over the base on
+// their factor and spread, and the rest on the spread alone.
+func TestNumberSortTiesFollowsProfitability(t *testing.T) {
+	results := map[string][]OptimizedUploadEntry{"store": {
+		{CardID: "a", Spread: 140},
+		{CardID: "b", Spread: 140},
+		{CardID: "c", Spread: 100},
+		{CardID: "d", Spread: 50, Profitability: 2},
+		{CardID: "e", Spread: -5, Profitability: 1},
+		{CardID: "f", Spread: -5, Profitability: 3},
+	}}
+	numberSortTies(nil, results, "profitability")
+	var got []int
+	for _, e := range results["store"] {
+		got = append(got, e.SortLead)
+	}
+	if want := []int{1, 1, 2, 3, 4, 4}; !slices.Equal(got, want) {
+		t.Errorf("groups %v, want %v", got, want)
+	}
+}
+
+// TestNumberSortTiesKeepsAPrintingTogether gives one printing's rows one
+// group though a card-data sort left another printing between them.
+func TestNumberSortTiesKeepsAPrintingTogether(t *testing.T) {
+	uploaded := []UploadEntry{{CardID: "a"}, {CardID: "b"}, {CardID: "a"}}
+	results := map[string][]OptimizedUploadEntry{"store": {{CardID: "b"}, {CardID: "a"}, {CardID: "b"}}}
+	numberSortTies(uploaded, results, "setchrono")
+	var got []int
+	for _, e := range uploaded {
+		got = append(got, e.SortLead)
+	}
+	for _, e := range results["store"] {
+		got = append(got, e.SortLead)
+	}
+	if want := []int{1, 2, 1, 1, 2, 1}; !slices.Equal(got, want) {
+		t.Errorf("groups %v, want %v", got, want)
+	}
+}

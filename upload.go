@@ -315,6 +315,10 @@ type OptimizedUploadEntry struct {
 
 	// Profitability index
 	Profitability float64
+
+	// The row's tie group under the sorting setting, from 1, or 0 when the
+	// setting leaves the list in its order (numberSortTies)
+	SortLead int
 }
 
 // Checkbox options enabled by default in the settings UI when the
@@ -901,6 +905,7 @@ func (v *UploadVars) fillCarts(p *prices, keys []string) {
 
 func fillUploadResults(pageVars *UploadVars, b *matcher.Backend, p *prices, reprintParents map[string]string, st uploadSettings, ids uploadIDs, prices uploadPrices, rows uploadRows, uploadedData []UploadEntry) {
 	sortResults(b, reprintParents, uploadedData, rows.optimizedResults, st.sorting)
+	numberSortTies(uploadedData, rows.optimizedResults, st.sorting)
 
 	// Split sorted entries into singles, sealed, and not-found for the tabbed view
 	singlesEntries, sealedEntries, notFoundEntries := docparse.PartitionEntries(uploadedData, ids.sealedProductIDs)
@@ -2375,6 +2380,77 @@ func sortResults(b *matcher.Backend, reprintParents map[string]string, uploadedD
 				}
 				return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
 			})
+		}
+	}
+}
+
+// sortTie is what sortResults orders a row by: rows with the same one are a
+// tie. Under a card-data sort only the same printing ties.
+type sortTie struct {
+	first, second float64
+	id            string
+}
+
+// uploadedTie is the row's tie under sorting, false where sortResults
+// leaves the rows as uploaded.
+func uploadedTie(entry UploadEntry, sorting string) (sortTie, bool) {
+	switch sorting {
+	case "highprice":
+		return sortTie{first: entry.OriginalPrice}, true
+	case "alphabetical", "setalpha", "setchrono":
+		return sortTie{id: entry.CardID}, true
+	}
+	return sortTie{}, false
+}
+
+// optimizedTie is the optimized row's tie under sorting, false where
+// sortResults leaves the rows as they came.
+func optimizedTie(entry OptimizedUploadEntry, sorting string) (sortTie, bool) {
+	switch sorting {
+	case "highprice":
+		return sortTie{first: entry.BestPrice}, true
+	case "highspread":
+		return sortTie{first: entry.Spread}, true
+	case "profitability":
+		// A negative spread is ordered by the spread alone
+		if entry.Spread < 0 {
+			return sortTie{first: entry.Spread}, true
+		}
+		return sortTie{first: entry.Profitability, second: entry.Spread}, true
+	case "alphabetical", "setalpha", "setchrono":
+		return sortTie{id: entry.CardID}, true
+	}
+	return sortTie{}, false
+}
+
+// numberSortTies gives each row sortResults ordered its tie group, from 1 in
+// SortLead, for the page's tie-breakers to sort within. A group is numbered
+// where its first row stands: a card-data sort can interleave one printing's
+// rows with another's it calls equal.
+func numberSortTies(uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string) {
+	groups := map[sortTie]int{}
+	for i := range uploadedData {
+		tie, sorted := uploadedTie(uploadedData[i], sorting)
+		if !sorted {
+			break
+		}
+		if groups[tie] == 0 {
+			groups[tie] = len(groups) + 1
+		}
+		uploadedData[i].SortLead = groups[tie]
+	}
+
+	for _, entries := range optimizedResults {
+		groups = map[sortTie]int{}
+		for i := range entries {
+			tie, sorted := optimizedTie(entries[i], sorting)
+			if !sorted {
+				break
+			}
+			if groups[tie] == 0 {
+				groups[tie] = len(groups) + 1
+			}
+			entries[i].SortLead = groups[tie]
 		}
 	}
 }
