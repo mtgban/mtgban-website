@@ -84,7 +84,7 @@ func relaxedSearches(rawQuery, cleanQuery string, appliedFilters []string) []Alt
 	// With a single filter, removing it is the same as the bare name above
 	if len(appliedFilters) > 1 {
 		for _, filter := range appliedFilters {
-			query := collapseSpaces(strings.Replace(rawQuery, filter, "", 1))
+			query := collapseSpaces(replaceField(rawQuery, filter, ""))
 			if query == "" || seen[query] {
 				continue
 			}
