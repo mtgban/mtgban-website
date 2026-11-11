@@ -92,12 +92,14 @@
 
     // shown is a preset as this page can show it: the stores it offers, none
     // for a tier that cannot change them, and under forced retail the page's
-    // own mode and seller picks. A list the preset lacks takes the page's ticks.
+    // own mode and seller picks. A list the preset lacks takes the page's ticks,
+    // and a setting it lacks its default, as applying it sets.
     function shown(opts, cur, ctx) {
         var o = {};
         Object.keys(opts).forEach(function (k) {
             if (ctx.canChangeStores || STORE_LISTS.indexOf(k) < 0) o[k] = opts[k];
         });
+        TEXTS.forEach(function (t) { if (!(t[0] in o)) o[t[0]] = t[2]; });
         if (ctx.canChangeStores) {
             STORE_LISTS.forEach(function (k) { if (!Array.isArray(o[k]) && k in cur) o[k] = cur[k]; });
         }

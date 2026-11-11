@@ -406,6 +406,19 @@ test('apply selects the chosen preset when it matches the page exactly', () => {
     expect(select._text()).toBe('B');
 });
 
+test('a preset saved before a setting existed matches with that setting at its default', () => {
+    const { doc, win, select } = mountDoc();
+    const { P } = loadPresets({ win });
+    const old = Object.assign({}, P.current(doc), { stores: ['CK'] });
+    delete old.tiebreak;
+    delete old.tieorder;
+    const a = P.store.save({ name: 'A', opts: old }).preset;
+    P.mount(doc);
+    pick(select, a.id);
+    expect(select.value).toBe(a.id);
+    expect(select._text()).toBe('A');
+});
+
 test('refresh shows presets synced into storage without rebinding the form', () => {
     const { doc, win, select, form } = mountDoc();
     const { P, localStorage } = loadPresets({ win });
