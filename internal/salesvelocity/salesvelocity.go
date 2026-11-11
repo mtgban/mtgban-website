@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"weak"
 
 	"github.com/mtgban/go-mtgban/matcher"
 )
@@ -42,6 +43,10 @@ type Snapshot struct {
 	Day    time.Time
 	Cards  map[string]*Sales
 	Window int
+
+	// The backend whose card ids key Cards, held weakly so a snapshot
+	// outliving a datastore reload does not keep the old backend alive
+	Backend weak.Pointer[matcher.Backend]
 }
 
 // failure is the sale day whose load last failed, and when.
@@ -154,6 +159,10 @@ func (s *Store) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, game s
 	}
 	day := lastCompleteSaleDay(newest)
 	current := s.current.Load()
+	// A datastore reload brings new card ids, so the day is read again for them
+	if current != nil && current.Backend != weak.Make(b) {
+		current = nil
+	}
 	if current != nil && current.Day.Equal(day) {
 		return fmt.Sprintf("%d cards over the %d days to %s, already loaded",
 			len(current.Cards), current.Window, day.Format(time.DateOnly)), ""
@@ -168,7 +177,7 @@ func (s *Store) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, game s
 		s.failed.Store(&failure{Day: day, At: time.Now()})
 		return "", "failed to load " + day.Format(time.DateOnly) + ": " + err.Error()
 	}
-	snap := &Snapshot{Day: day, Cards: cards, Window: Window}
+	snap := &Snapshot{Day: day, Cards: cards, Window: Window, Backend: weak.Make(b)}
 	s.current.Store(snap)
 	result = report(snap, unmatched)
 	log.Println("sales velocity:", result)

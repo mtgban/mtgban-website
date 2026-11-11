@@ -124,8 +124,8 @@ mid-request cannot filter on one day and show or sort by another.
 It runs right after the Newspaper pages refresh, every three hours and
 after each datastore load, because the newspaper writes one sale day a day.
 It reads whether this game has a sale in the window, then the newest sale day
-of any game, and stops if the day before it is already loaded, or if its last
-load failed less than six hours ago. Two queries then run in one
+of any game, and stops if the day before it is already loaded for the
+current datastore, or if its last load failed less than six hours ago. Two queries then run in one
 read-only transaction, their date bounds computed in Go from that day:
 the window grouped by product and printing, and the last sale per pair
 over the year.
