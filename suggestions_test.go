@@ -247,3 +247,31 @@ func TestDidYouMeanNearestSetSealed(t *testing.T) {
 		t.Errorf("%q: did-you-mean %q, want s:otp among them", query, got)
 	}
 }
+
+// An is: naming no promo type is read as the nearest one, or its short
+// form, among those the printings of the query's name carry.
+func TestDidYouMeanNearestPromoType(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+
+	tests := []struct{ query, want string }{
+		{"Battlefield Forge is:riple", "Battlefield Forge is:ripple"},
+		{"Battlefield Forge is:riplefoil", "Battlefield Forge is:ripplefoil"},
+		{"Battlefield Forge is:riple,zzqx", "Battlefield Forge is:ripple,zzqx"},
+		{"Battlefield Forge is:reserved is:riple", "Battlefield Forge is:reserved is:ripple"},
+		{"Battlefield Forge s:atw is:riple", ""},
+		{"black lotus is:riple", ""},
+		{"black lotus is:surge", ""},
+		{"Battlefield Forge is:riple f:foil", "Battlefield Forge is:ripple f:foil"},
+		{"Battlefield Forge is:riple,surge", "Battlefield Forge is:ripple,surge"},
+		{"is:riple", "is:ripple"},
+		{"lightning bolt is:xyz", ""},
+	}
+	for _, tt := range tests {
+		config := parseSearchPage(ds, currentPrices(), tt.query, false, false, nil, nil, nil)
+		got, _ := searchSuggestions(ds, currentPrices(), tt.query, config, nil, nil, false)
+		if nearest(got) != tt.want {
+			t.Errorf("%q: did-you-mean %q, want %q", tt.query, got, tt.want)
+		}
+	}
+}

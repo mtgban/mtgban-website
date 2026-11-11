@@ -287,6 +287,7 @@ func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchC
 		AppliedFilters: config.AppliedFilters,
 		Sealed:         sealed,
 		Backend:        b,
+		PromoAliases:   isKnownPromo,
 	}
 	for _, field := range re.FindAllString(rawQuery, -1) {
 		if setFilterNamesNothing(b, field) {
@@ -326,7 +327,7 @@ func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchC
 		}
 	}
 	if !corrected && len(queries) == 0 {
-		return nil, alts
+		return suggest.Tags(params), alts
 	}
 	return append(queries, asTyped...), alts
 }

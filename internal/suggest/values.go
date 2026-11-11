@@ -1,6 +1,7 @@
 package suggest
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -31,6 +32,87 @@ func Sets(p Params) []string {
 		}
 	}
 	return rewrites(p.RawQuery, p.UnknownSets, nearest)
+}
+
+// Tags rewrites a query whose is: values name no promo type, "is:riple",
+// with the promo types nearest what was typed, or their short forms,
+// among those the printings of its name carry, nearest first. A value
+// with none near stays as typed, as is:reserved names no promo type.
+func Tags(p Params) []string {
+	if p.Sealed || len(p.UnknownSets) != 0 {
+		return nil
+	}
+	tags := tagsFound(p)
+	var fields []string
+	var nearest [][][]string
+	var rewritten bool
+	for _, field := range p.AppliedFilters {
+		key, values, ok := strings.Cut(field, ":")
+		if !ok || !strings.EqualFold(key, "is") {
+			continue
+		}
+		var fieldNearest [][]string
+		for _, value := range strings.Split(values, ",") {
+			near := nearestTags(p, value, tags)
+			if len(near) == 0 {
+				near = []string{value}
+			} else {
+				rewritten = true
+			}
+			fieldNearest = append(fieldNearest, near)
+		}
+		fields = append(fields, field)
+		nearest = append(nearest, fieldNearest)
+	}
+	if !rewritten {
+		return nil
+	}
+	return rewrites(p.RawQuery, fields, nearest)
+}
+
+// tagsFound are the values an is: may be rewritten to: the promo types
+// the printings of the query's name carry, or every one where it has no
+// name, each after the short forms it answers to.
+func tagsFound(p Params) []string {
+	promoTypes := p.Backend.AllPromoTypes
+	cards, named := printings(p)
+	if named {
+		promoTypes = nil
+		for _, co := range cards {
+			for _, promoType := range co.PromoTypes {
+				if !slices.Contains(promoTypes, promoType) {
+					promoTypes = append(promoTypes, promoType)
+				}
+			}
+		}
+	}
+	var tags []string
+	for _, short := range slices.Sorted(maps.Keys(p.PromoAliases)) {
+		if slices.Contains(promoTypes, p.PromoAliases[short]) {
+			tags = append(tags, short)
+		}
+	}
+	return append(tags, promoTypes...)
+}
+
+// nearestTags returns the tags nearest value, nearest first, or none
+// where value is a promo type or a short form already. An edit is allowed
+// per four letters, so a value too short for one, "lea", is no typo of a
+// tag, "ea".
+func nearestTags(p Params, value string, tags []string) []string {
+	value = strings.ToLower(value)
+	_, short := p.PromoAliases[value]
+	if short || slices.Contains(p.Backend.AllPromoTypes, value) {
+		return nil
+	}
+	limit := len(value) / 4
+	if limit == 0 {
+		return nil
+	}
+	near := slices.DeleteFunc(slices.Clone(tags), func(tag string) bool {
+		return fuzzy.Distance(value, tag, limit) > limit
+	})
+	return fuzzy.Closest(value, near)
 }
 
 // queryName is the name p's query searches by: what its filters leave.
