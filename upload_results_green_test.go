@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -63,6 +64,40 @@ func TestUploadResultsGreenFollowsTheLegend(t *testing.T) {
 		got := greenCells(t, tc.buylist, tc.loaded, prices)
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("%s: green %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// A row the list came with no price for sorts as missing, last whichever
+// way the Your Price column is sorted, as the store columns' empty cells
+// do; a priced row sorts by its price.
+func TestUploadYourPriceSortsUnpricedLast(t *testing.T) {
+	tmpl, err := template.New("upload.html").Funcs(funcMap).ParseFiles("templates/upload.html")
+	if err != nil {
+		t.Fatalf("parsing upload.html: %v", err)
+	}
+	for _, table := range []string{"ures-results-table", "ures-notfound-table"} {
+		for _, tc := range []struct {
+			loaded float64
+			want   string
+		}{
+			{0, `<td class="ures-price" data-sort="">`},
+			{7.5, `<td class="ures-price" data-sort="7.50">`},
+		} {
+			var b bytes.Buffer
+			err = tmpl.ExecuteTemplate(&b, table, map[string]any{
+				"Entries":   []UploadEntry{{CardID: "card-1", OriginalCondition: "NM", OriginalPrice: tc.loaded, Quantity: 1}},
+				"StoreKeys": []string{},
+				"Quantity":  1,
+				"Noun":      "card",
+				"Root":      PageVars{Metadata: map[string]GenericCard{"card-1": {Name: "Test Card"}}},
+			})
+			if err != nil {
+				t.Fatalf("%s: %v", table, err)
+			}
+			if !strings.Contains(b.String(), tc.want) {
+				t.Errorf("%s, loaded %v: no %s", table, tc.loaded, tc.want)
+			}
 		}
 	}
 }
