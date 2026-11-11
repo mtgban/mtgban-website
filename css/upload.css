@@ -909,8 +909,10 @@
     flex-shrink: 0;
 }
 
-/* The results' backpack pair: .upload-btn's inline-flex outranks [hidden] */
+/* The results' backpack pair: .upload-btn's inline-flex outranks [hidden];
+   its divider goes with it */
 .res-pack-btn[hidden] { display: none; }
+.res-btn-sep:has(+ .res-pack-btn[hidden] + .res-pack-btn[hidden]) { display: none; }
 .res-pack-btn.remove { background: rgba(248,81,73,0.1); color: var(--adanger); border-color: rgba(248,81,73,0.2); }
 .res-pack-btn.remove:hover { background: rgba(248,81,73,0.2); }
 
