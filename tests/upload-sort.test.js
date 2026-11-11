@@ -185,3 +185,8 @@ test('headers marked data-sort-method="none" are not made sortable', () => {
 test('the results totals row is marked to stay at the end', () => {
     expect(html).toContain('<tr class="ures-totals-row" data-sort-method="none">');
 });
+
+test('optimizer Loaded and Spread sort by their values, blank with no loaded price', () => {
+    expect(html).toContain('<td class="opt-loaded" data-sort="{{if .Price}}{{printf "%.2f" .Price}}{{end}}">');
+    expect(html).toContain('<td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}" data-sort="{{if .Price}}{{printf "%.2f" .Spread}}{{end}}">');
+});
