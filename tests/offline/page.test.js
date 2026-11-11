@@ -707,6 +707,18 @@ for (const [file, ids, box, results] of [
         expect(page.log.rendered).toHaveLength(2);
     });
 
+    test(file + ' draws the pause after a sync landed while typing the same rows', async () => {
+        const page = await liveStart({ queries: { 'sol ring': rows(3), 'sol ring ': rows(3) } });
+        page.type('sol ring');
+        await page.pause();
+        const drawn = page.log.rendered.length;
+        page.type('sol ring ');
+        page.synced();
+        await page.pause();
+        expect(page.log.rendered.length).toBeGreaterThan(drawn);
+        expect(page.log.rendered.at(-1).page.typing).toBe(false);
+    });
+
     test(file + ' with the setting off leaves the order and the scroll alone', async () => {
         const page = await started(file, { ids, queries: { sol: rows(3), bolt: rows(2) } });
         expect(page.log.mounted.live()).toBe(false);
