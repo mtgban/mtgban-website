@@ -55,6 +55,8 @@ type Params struct {
 	// UnknownSets lists the set filters in RawQuery that name no set,
 	// which the parser read as words of the name.
 	UnknownSets []string
+	// PromoAliases maps the short forms an is: takes to their promo types.
+	PromoAliases map[string]string
 }
 
 // collapseSpaces trims and squeezes runs of whitespace into single spaces.
