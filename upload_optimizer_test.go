@@ -14,6 +14,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/uploadsort"
+	"github.com/mtgban/mtgban-website/internal/uploadtie"
 )
 
 // closeVendors serves two vendors buying the same five cards within 10% of
@@ -114,9 +115,82 @@ func TestBestOffers(t *testing.T) {
 		{"retail keeps the lowest", map[string]float64{"C": 5, "B": 4, "A": 4.5}, false, 1, []string{"B"}},
 		{"no offers", map[string]float64{}, true, 0.9, nil},
 	} {
-		got := bestOffers(tc.offers, tc.blMode, tc.percMargin)
+		got := bestOffers(tc.offers, tc.blMode, tc.percMargin, uploadtie.Breaker{})
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// The custom buylist pays in credit what it pays in cash, so a credit
+// tiebreak ranks it at its price, above a store paying no credit and, on
+// offers priced in credit, above a store whose credit is worth less.
+func TestUploadTiebreakCustomCredit(t *testing.T) {
+	prices := uploadPrices{credits: map[string]float64{"ABC": 0, customStore: 0, "CK": 1.3}}
+	for _, tc := range []struct {
+		rule, unit string
+		want       []string
+	}{
+		{uploadtie.Credit, "", []string{"CK", customStore, "ABC"}},
+		{uploadtie.MarketCredit, uploadtie.Credit, []string{customStore, "CK", "ABC"}},
+	} {
+		st := uploadSettings{tiebreak: tc.rule, priceSource: tc.unit}
+		got := []string{"ABC", "CK", customStore}
+		slices.SortFunc(got, uploadTiebreak(true, st, prices, nil).Compare)
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("%s on %q offers: got %q, want %q", tc.rule, tc.unit, got, tc.want)
+		}
+	}
+}
+
+// A row two stores tie on goes to the one the tiebreak picks: ZZW pays more
+// for four cards, both pay 9 for the fifth, and only ZZW pays credit.
+func TestOptimizerTiebreak(t *testing.T) {
+	cards := closeVendors(t)
+	v, w := mtgban.BuylistRecord{}, mtgban.BuylistRecord{}
+	for k, card := range cards {
+		v[card] = []mtgban.BuylistEntry{{Conditions: "NM", BuyPrice: 5}}
+		w[card] = []mtgban.BuylistEntry{{Conditions: "NM", BuyPrice: 6}}
+		if k == len(cards)-1 {
+			v[card][0].BuyPrice, w[card][0].BuyPrice = 9, 9
+		}
+	}
+	credit := sessionInfo("ZZW")
+	credit.CreditMultiplier = 1.3
+	withPrices(t, currentPrices().sellers, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(v, sessionInfo("ZZV")),
+		mtgban.NewVendorFromBuylist(w, credit),
+	})
+
+	for _, tc := range []struct {
+		tiebreak, order string
+		zzv             bool
+	}{
+		{"", "", true},
+		{uploadtie.Consolidate, "", false},
+		{uploadtie.Custom, "ZZW", false},
+		{uploadtie.Custom, "ZZX,ZZV", true},
+		{uploadtie.Credit, "", false},
+		{uploadtie.MarketCredit, "", false},
+	} {
+		form := url.Values{"mode": {"true"}, "stores": {"ZZV", "ZZW"}, "minmargin": {""},
+			"lowval": {""}, "lowvalabs": {""}, "tiebreak": {tc.tiebreak}, "tieorder": {tc.order}}
+		var rows strings.Builder
+		for _, card := range cards {
+			fmt.Fprintf(&rows, "%s\t1\t\t0\t\n", card)
+		}
+		form.Set("rows", rows.String())
+		req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		testSite.Upload(rec, req)
+
+		page := rec.Body.String()
+		if !strings.Contains(page, `id="opt-ZZW"`) {
+			t.Fatalf("%q %q: no ZZW section", tc.tiebreak, tc.order)
+		}
+		if got := strings.Contains(page, `id="opt-ZZV"`); got != tc.zzv {
+			t.Errorf("%q %q: ZZV listed %v, want %v", tc.tiebreak, tc.order, got, tc.zzv)
 		}
 	}
 }
