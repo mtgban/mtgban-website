@@ -37,6 +37,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/internal/uploadsort"
+	"github.com/mtgban/mtgban-website/internal/uploadtie"
 	"github.com/mtgban/mtgban-website/internal/xlsread"
 	"github.com/mtgban/mtgban-website/manabox"
 	"github.com/mtgban/mtgban-website/moxfield"
@@ -391,15 +392,19 @@ func keepInOrder(all, enabled []string) []string {
 // bestOffers returns the stores the optimizer keeps for a row: the one with
 // the best offer, the highest on a buylist and the lowest at retail, then,
 // best first, every other within the margin of it, where the lower of the
-// two prices is above percMargin times the higher. A tie goes to the store
-// whose shorthand sorts first, so the order of the map plays no part.
-func bestOffers(offers map[string]float64, blMode bool, percMargin float64) []string {
-	stores := slices.Sorted(maps.Keys(offers))
-	slices.SortStableFunc(stores, func(a, b string) int {
+// two prices is above percMargin times the higher. Stores tied on a price
+// are ordered by tie, so the order of the map plays no part.
+func bestOffers(offers map[string]float64, blMode bool, percMargin float64, tie uploadtie.Breaker) []string {
+	stores := slices.Collect(maps.Keys(offers))
+	slices.SortFunc(stores, func(a, b string) int {
+		c := cmp.Compare(offers[a], offers[b])
 		if blMode {
-			return cmp.Compare(offers[b], offers[a])
+			c = -c
 		}
-		return cmp.Compare(offers[a], offers[b])
+		if c != 0 {
+			return c
+		}
+		return tie.Compare(a, b)
 	})
 	if len(stores) == 0 {
 		return nil
@@ -1022,6 +1027,8 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 		tallies:          map[string]*unpackedTally{},
 	}
 
+	var priced []pricedRow
+	shares := uploadtie.Shares{}
 	for i := range uploadedData {
 		// Skip unmatched cards
 		if uploadedData[i].MismatchError != nil {
@@ -1036,7 +1043,18 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 		}
 
 		offers := rows.tallyOffers(row, blMode, st, prices, indexes)
-		bestStores := bestOffers(offers, blMode, st.percMargin)
+		priced = append(priced, pricedRow{row, offers})
+		if row.counts {
+			shares.Add(offers, blMode)
+		}
+	}
+
+	// A tie may go to the store with the most of the list, which is known
+	// only once every row is priced
+	tie := uploadTiebreak(blMode, st, prices, shares)
+	for _, pr := range priced {
+		row, offers := pr.row, pr.offers
+		bestStores := bestOffers(offers, blMode, st.percMargin, tie)
 
 		// What the box is worth whole, which is the number its section is read
 		// against. The cards it became are the optimizer's business; it is not.
@@ -1052,6 +1070,37 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 	}
 
 	return rows
+}
+
+// pricedRow is a matched row and its offers, by store.
+type pricedRow struct {
+	row    uploadRow
+	offers map[string]float64
+}
+
+// uploadTiebreak is the tiebreak the settings pick. Credit is a buylist's
+// alone, so at retail the credit rules compare shorthands.
+func uploadTiebreak(blMode bool, st uploadSettings, prices uploadPrices, shares uploadtie.Shares) uploadtie.Breaker {
+	switch st.tiebreak {
+	case uploadtie.Credit, uploadtie.MarketCredit:
+		if !blMode {
+			return uploadtie.Breaker{}
+		}
+		rates := map[string]uploadtie.Rates{}
+		for store, credit := range prices.credits {
+			rates[store] = uploadtie.Rates{Credit: credit, Market: Config().BuylistMarketCredit[store]}
+			// The custom buylist pays what the reader set, in credit as in cash
+			if store == customStore || store == customSealedStore {
+				rates[store] = uploadtie.Rates{Credit: 1, Market: 1}
+			}
+		}
+		return uploadtie.ByCredit(st.tiebreak, st.priceSource, rates)
+	case uploadtie.Consolidate:
+		return uploadtie.ByShare(shares)
+	case uploadtie.Custom:
+		return uploadtie.ByOrder(st.tieOrder)
+	}
+	return uploadtie.Breaker{}
 }
 
 // optimizeRow files the row under each of its best stores that the
@@ -1502,6 +1551,10 @@ type uploadSettings struct {
 	priceSource      string
 	altPriceSource   string
 	preferFlavor     bool
+	// What breaks a tie on a row's best offer (uploadtie's rules), and
+	// the stores that win it under the Custom rule, first one first
+	tiebreak string
+	tieOrder []string
 }
 
 // readUploadSettings parses the upload page's settings from the request. The
@@ -1602,6 +1655,14 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 
 	preferFlavor := readSearchMiscOpts(r).has("preferFlavor")
 
+	tiebreak := getUploadSetting(r, "tiebreak", "UploadTiebreak")
+	var tieOrder []string
+	for store := range strings.SplitSeq(getUploadSetting(r, "tieorder", "UploadTiebreakOrder"), ",") {
+		if store != "" && len(tieOrder) < maxTieOrder {
+			tieOrder = append(tieOrder, store)
+		}
+	}
+
 	return uploadSettings{
 		canChangeStores:  canChangeStores,
 		canUploadCustom:  canUploadCustom,
@@ -1627,8 +1688,13 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 		priceSource:      priceSource,
 		altPriceSource:   altPriceSource,
 		preferFlavor:     preferFlavor,
+		tiebreak:         tiebreak,
+		tieOrder:         tieOrder,
 	}
 }
+
+// maxTieOrder is how many stores the Custom tiebreak names.
+const maxTieOrder = 3
 
 // uploadStores are the stores and index prices an upload is priced against,
 // the store lists the page offers, and the ones it shows ticked.
@@ -2188,7 +2254,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 			mergePrices(results, getVendorPrices(b, p, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
 		}
 
-		if st.priceSource != "" {
+		if st.priceSource != "" || st.tiebreak == uploadtie.Credit || st.tiebreak == uploadtie.MarketCredit {
 			credits = map[string]float64{}
 			allStores := append(enabledStores, enabledSealedStores...)
 			for _, store := range allStores {
