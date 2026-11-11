@@ -44,5 +44,7 @@ function runPublishStore() {
     }
     document.getElementById("res_publishstore").value = "true";
     form.target = '';
+    closeStorePrompt();
+    if (window.showUploadProcessing) showUploadProcessing();
     form.submit();
 }
