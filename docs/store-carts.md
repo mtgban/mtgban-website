@@ -737,7 +737,8 @@ the section's, as `scraperCompare` picks its seller.
   (`redirectorMax`, a couple of hundred rows) keeps the list after it
   instead (`throughRedirector`), where the browser carries it through the
   redirect and a tool that skips the redirect loses it.
-  `js/load-lists.js` rewrites the list inside `u` as rows are unticked.
+  `js/load-lists.js` rewrites the list inside `u` as rows are unticked
+  or the table is sorted, listing the ticked rows in the order shown.
 - Pressing the button first shows a panel (`js/cart-prompt.js`, from the
   `cart-prompt` partial both pages share), named for the store and side
   pressed, holding the loader to drag to the bookmarks bar:

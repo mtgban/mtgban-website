@@ -45,7 +45,8 @@ function table(headers, rows, above = []) {
         },
     };
     const headRow = { cells: headers };
-    const t = { tBodies: [tbody], tHead: { rows: above.concat([headRow]) } };
+    const t = { tBodies: [tbody], tHead: { rows: above.concat([headRow]) }, events: [] };
+    t.dispatchEvent = (e) => t.events.push(e.type + (e.bubbles ? ' bubbles' : ''));
     headers.forEach((th, i) => { th.cellIndex = i; th.closest = () => t; th.parentNode = headRow; });
     return t;
 }
@@ -189,4 +190,12 @@ test('the results totals row is marked to stay at the end', () => {
 test('optimizer Loaded and Spread sort by their values, blank with no loaded price', () => {
     expect(html).toContain('<td class="opt-loaded" data-sort="{{if .Price}}{{printf "%.2f" .Price}}{{end}}">');
     expect(html).toContain('<td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}" data-sort="{{if .Price}}{{printf "%.2f" .Spread}}{{end}}">');
+});
+
+test('a sort tells the page its rows moved', () => {
+    const { uresSortBy } = load();
+    const card = element({});
+    const t = table([card], [optRow([cell('b')], 0), optRow([cell('a')], 1)]);
+    uresSortBy(card);
+    expect(t.events).toEqual(['rowsmoved bubbles']);
 });

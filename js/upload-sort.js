@@ -59,6 +59,9 @@ function uresSortBy(th) {
         cell.removeAttribute('aria-sort');
     });
     th.setAttribute('aria-sort', descending ? 'descending' : 'ascending');
+
+    // The optimizer's load lists follow the rows (load-lists.js)
+    table.dispatchEvent(new Event('rowsmoved', {bubbles: true}));
 }
 
 document.addEventListener('DOMContentLoaded', function() {
