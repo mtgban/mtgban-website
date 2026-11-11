@@ -305,9 +305,11 @@
                 runQuery(q).catch(showErrorNotice);
             });
 
-            // A sync brings new prices, so a settled answer is read again
+            // A sync brings new prices, so a settled answer is read again, and one
+            // still being typed draws afresh rather than keeping the screen
             document.addEventListener('offline:synced', function () {
-                if (exec && !typing) runQuery(lastQuery).catch(showErrorNotice);
+                if (typing) shown = null;
+                else if (exec) runQuery(lastQuery).catch(showErrorNotice);
             });
 
             setup().then(function () {
