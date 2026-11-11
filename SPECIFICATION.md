@@ -141,7 +141,8 @@ Boot sequence (`main()`):
      `s.cacheNewspaper()`, then `s.loadSalesVelocity()`, which reloads
      TCGplayer's copies sold per card over the 30 days to the newspaper's
      last complete sale day, and each card's last sale in the year before, for
-     search's sales velocity row, once the newspaper adds a sale day;
+     search's sales velocity row, once the newspaper adds a sale day or a
+     datastore reload brings new card ids;
      retries a day whose load failed every 6 hours
    - `45 * * * *` — `s.refreshCKSignals()` (ckbuylist.go): reloads CK's
      stock history once the newspaper has a new day, rereads the odds its

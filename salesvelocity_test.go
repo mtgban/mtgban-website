@@ -19,6 +19,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"weak"
 
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -324,6 +325,41 @@ func TestLoadSalesVelocityEndsOnEveryGamesCompleteDay(t *testing.T) {
 	}
 }
 
+// TestLoadSalesVelocityAfterADatastoreReload reads a day already loaded
+// again once the datastore changes, since its card ids key the snapshot.
+func TestLoadSalesVelocityAfterADatastoreReload(t *testing.T) {
+	skipWithoutDatastore(t)
+	_, productID := counterspellProduct(t, backend())
+	newest := time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)
+	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
+		switch query {
+		case salesvelocity.DayQuery, salesvelocity.GlobalDayQuery:
+			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{newest}}}, nil
+		case salesvelocity.WindowQuery:
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}, vals: [][]driver.Value{
+				{productID, "Normal", int64(3), int64(2), int64(1)},
+			}}, nil
+		}
+		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{productID, "Normal", newest}}}, nil
+	}}
+	s := withFakeNewspaper(t, f)
+	s.ds.Store(testSite.datastore())
+	s.loadSalesVelocity()
+	if salesVelocityStore.Snapshot() == nil {
+		t.Fatal("no snapshot")
+	}
+
+	s.loadSalesVelocity()
+	if n := len(f.seen()); n != 6 {
+		t.Errorf("same datastore: got %d queries, want the day's two only", n)
+	}
+	s.ds.Store(&datastore{backend: &matcher.Backend{AllUUIDs: []string{"a-card"}}})
+	s.loadSalesVelocity()
+	if n := len(f.seen()); n != 10 {
+		t.Errorf("new datastore: got %d queries, want the window and lookback read again", n)
+	}
+}
+
 // TestLoadSalesVelocityNoSalesYet reports no problem and stores no snapshot
 // when the day query finds no sales for this deployment's game.
 func TestLoadSalesVelocityNoSalesYet(t *testing.T) {
@@ -357,7 +393,7 @@ func TestLoadSalesVelocityClearsAPastProblem(t *testing.T) {
 	var answer func(string) (*fakeRows, error)
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) { return answer(query) }}
 	s := withFakeNewspaper(t, f)
-	setTestSalesVelocity(t, nil)
+	salesVelocityStore.Publish(&salesvelocity.Snapshot{Day: time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC), Window: salesvelocity.Window, Backend: weak.Make(s.backend())})
 	setTestJobs(t)
 
 	for _, next := range []struct {
