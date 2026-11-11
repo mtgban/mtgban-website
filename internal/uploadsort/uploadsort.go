@@ -19,7 +19,7 @@ type Keys struct {
 	// The name, lowercased
 	Name string
 
-	// The release date, then the lowercased edition
+	// The set's release date, then the lowercased edition
 	Set string
 
 	// The collector number
@@ -46,13 +46,13 @@ func For(b *matcher.Backend, cardID string) Keys {
 
 	keys := Keys{
 		Name:   strings.ToLower(co.Name),
-		Set:    strings.ToLower(co.Edition),
 		Number: co.Number,
 		Color:  colorKey(b.Colors, co.Colors),
 	}
-	released, err := b.CardReleaseDate(cardID)
-	if err == nil {
-		keys.Set = released.Format("2006-01-02") + " " + keys.Set
+	// An undated set gets no key, so it files last either way
+	set, err := b.GetSet(co.SetCode)
+	if err == nil && !set.ReleaseDateTime.IsZero() {
+		keys.Set = set.ReleaseDateTime.Format("2006-01-02") + " " + strings.ToLower(co.Edition)
 	}
 
 	finish := 0
