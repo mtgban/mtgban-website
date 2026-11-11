@@ -36,6 +36,8 @@ function syncUploadOptionsFromSettings() {
     add('sorting',        getCookie('UploadSorting')       || '');
     add('altPrice',       getCookie('UploadAltPrice')      || '');
     add('pricesource',    getCookie('UploadPriceSource')   || '');
+    add('tiebreak',       getCookie('UploadTiebreak')      || '');
+    add('tieorder',       getCookie('UploadTiebreakOrder') || '');
     var customOpts = (getCookie('UploadCustomOpts') || '').split(',').filter(Boolean);
     if (customOpts.indexOf('enabled') >= 0) {
         add('custombuylist',      'true');

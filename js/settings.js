@@ -38,7 +38,7 @@
             // search
             'SearchSellersPriority', 'SearchVendorsPriority',
             // upload
-            'UploadSorting', 'UploadAltPrice', 'UploadPriceSource',
+            'UploadSorting', 'UploadAltPrice', 'UploadPriceSource', 'UploadTiebreak',
             'UploadCustomBuyer', 'UploadCustomSealedBuyer',
             'UploadCustomSinglesFallback', 'UploadCustomSealedFallback',
         ],
@@ -57,6 +57,10 @@
         miscDefaults: {
             // upload
             'settings-upload-checks': ['lowval', 'lowvalabs', 'minmargin', 'customperc'],
+        },
+        // A row of selects, each picking one store → comma-separated cookie
+        orders: {
+            'opt-tieorder': 'UploadTiebreakOrder',
         },
         texts: {
             // upload
@@ -262,6 +266,28 @@
         });
     }
 
+    // ─── Ordered picks (row of selects → CSV cookie, in order) ──
+    function readOrder(c) {
+        const names = [];
+        c.querySelectorAll('select').forEach(function (sel) {
+            if (sel.value && names.indexOf(sel.value) < 0) names.push(sel.value);
+        });
+        return names.join(',');
+    }
+    function bindOrder(containerId, cookieName) {
+        const c = document.getElementById(containerId);
+        if (!c) return;
+        const owner = claim(cookieName, c);
+        addBinding({
+            load: function () {
+                const items = (readSetting(cookieName) || '').split(',').filter(Boolean);
+                c.querySelectorAll('select').forEach(function (sel, i) { sel.value = items[i] || ''; });
+            },
+            save: function () { writeSetting(cookieName, readOrder(c), owner); },
+            serialize: function () { return cookieName + '=' + readOrder(c); },
+        });
+    }
+
     // ─── Text input (single value → cookie) ──────────────────────
     function bindText(elementId, cookieName) {
         const el = document.getElementById(elementId);
@@ -344,6 +370,7 @@
         });
         (BINDINGS.selects || []).forEach(bindSelect);
         Object.entries(BINDINGS.texts || {}).forEach(function (e) { bindText(e[0], e[1]); });
+        Object.entries(BINDINGS.orders || {}).forEach(function (e) { bindOrder(e[0], e[1]); });
         bindStoreFactors('settings-store-factors');
         Object.entries(BINDINGS.misc || {}).forEach(function (e) {
             const defaults = (BINDINGS.miscDefaults || {})[e[0]];

@@ -9,6 +9,7 @@
         ['margin', 'UploadMargin', '10'], ['custompercmax', 'UploadCustomPercMax', '100'],
         ['multiplier', 'UploadMultiplier', '1'], ['maxqty', 'UploadMaxQty', '0'],
         ['sorting', 'UploadSorting', ''], ['altPrice', 'UploadAltPrice', ''], ['pricesource', 'UploadPriceSource', ''],
+        ['tiebreak', 'UploadTiebreak', ''], ['tieorder', 'UploadTiebreakOrder', ''],
     ];
     var CUSTOM = [
         ['customseller', 'UploadCustomBuyer', 'TCGLow'], ['customsealedseller', 'UploadCustomSealedBuyer', 'TCGSealed'],
