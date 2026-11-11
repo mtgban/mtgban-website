@@ -207,6 +207,30 @@ func TestOptimizerTiebreak(t *testing.T) {
 	}
 }
 
+// TestUploadTiebreakNeedsMultiSelectOff ignores the tie rule only where
+// multi-select lists a row under every tied store: on a buylist, with a margin.
+func TestUploadTiebreakNeedsMultiSelectOff(t *testing.T) {
+	for _, tc := range []struct {
+		minmargin, margin string
+		blMode            bool
+		want              string
+	}{
+		{"", "10", true, uploadtie.Custom},
+		{"true", "10", true, ""},
+		{"true", "0", true, uploadtie.Custom},
+		{"true", "10", false, uploadtie.Custom},
+	} {
+		form := url.Values{"tiebreak": {uploadtie.Custom}, "tieorder": {"ZZW"}, "minmargin": {tc.minmargin}, "margin": {tc.margin}}
+		req := httptest.NewRequest(http.MethodGet, "/upload?"+form.Encode(), nil)
+		if err := req.ParseForm(); err != nil {
+			t.Fatal(err)
+		}
+		if got := readUploadSettings(req, tc.blMode).tiebreak; got != tc.want {
+			t.Errorf("minmargin %q margin %q, buylist %v: tiebreak %q, want %q", tc.minmargin, tc.margin, tc.blMode, got, tc.want)
+		}
+	}
+}
+
 // TestOptimizerCountsTheStoreItKept adds a row to the highest totals at the
 // store the optimizer lists it under: when the high-value filter drops the
 // best offer, that is the next one it kept.
