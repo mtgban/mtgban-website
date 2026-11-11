@@ -387,11 +387,13 @@ func historyBackend() *matcher.Backend {
 // returns the request log.
 func historyFixture(t *testing.T, rows map[int64]map[string]timeseries.ProviderPrices, readErr error) *[][]int64 {
 	t.Helper()
-	prevRead, prevBan, prevKeys := historyRead, historyBanID, historyKeyTable.Load()
+	prevRead, prevBan, prevKeys, prevWarm := historyRead, historyBanID, historyKeyTable.Load(), variantCacheWarm.Load()
 	t.Cleanup(func() {
 		historyRead, historyBanID = prevRead, prevBan
 		historyKeyTable.Store(prevKeys)
+		variantCacheWarm.Store(prevWarm)
 	})
+	variantCacheWarm.Store(true)
 	var asked [][]int64
 	historyRead = func(ctx context.Context, ids []int64, since time.Time) (map[int64]map[string]timeseries.ProviderPrices, error) {
 		asked = append(asked, slices.Clone(ids))
@@ -813,6 +815,18 @@ func TestHistoryAPIEmptyAndUnavailable(t *testing.T) {
 	rec, out = historyGet(t, s, "/api/v2/history/h-1.json", "history", "365", nil)
 	if rec.Code != 503 || out.Error == "" || rec.Header().Get("Retry-After") != "30" {
 		t.Errorf("read error: %d %q Retry-After %q", rec.Code, out.Error, rec.Header().Get("Retry-After"))
+	}
+}
+
+// Before the variant cache warms, a request is told to come back rather than
+// answered with no cards.
+func TestHistoryAPIColdCache(t *testing.T) {
+	s := historySite(t)
+	asked := historyFixture(t, historyRows, nil)
+	variantCacheWarm.Store(false)
+	rec, out := historyGet(t, s, "/api/v2/history/h-1.json", "history", "365", nil)
+	if rec.Code != 503 || out.Error == "" || rec.Header().Get("Retry-After") != "30" || len(*asked) != 0 {
+		t.Errorf("cold cache: %d %q Retry-After %q asked %v", rec.Code, out.Error, rec.Header().Get("Retry-After"), *asked)
 	}
 }
 

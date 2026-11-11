@@ -347,7 +347,9 @@ whatever the gateway's limit is:
   `chartRosterConcurrency`, so the archive's load is bounded by the site
   and not by how many accounts are subscribed. Built: four at a time; a
   request waits at most 5 s for a slot, then gets a 503 with
-  `Retry-After: 5`; a failed read is a 503 with `Retry-After: 30`.
+  `Retry-After: 5`; a failed read is a 503 with `Retry-After: 30`, and
+  so is a request made before the host's variant cache warms after a
+  start, since every card's archive id comes from it.
 
 ### Caching
 

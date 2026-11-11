@@ -1146,14 +1146,14 @@ func variantCacheScope() timeseries.VariantScope {
 
 // warmVariantCacheIfEnabled warms the cache when there is an archive,
 // reporting a failure rather than returning it: every caller is past the point
-// where it could do anything about one, and a cold cache costs round-trips
-// rather than answers.
+// where it could do anything about one, and a cold cache costs round-trips,
+// or a 503 from history, rather than wrong answers.
 func warmVariantCacheIfEnabled() {
 	if PricesArchiveDB == nil {
 		return
 	}
 	if err := warmVariantCache(context.Background()); err != nil {
-		log.Println("warning: could not warm variant cache:", err)
+		ServerNotify("timeseries", fmt.Sprintf("could not warm the variant cache: %s", err))
 	}
 }
 
@@ -1167,5 +1167,10 @@ func warmVariantCache(ctx context.Context) error {
 		return err
 	}
 	log.Printf("variant cache warmed: %d magic, %d non-magic", counts.Magic, counts.TCG)
+	variantCacheWarm.Store(true)
 	return nil
 }
+
+// variantCacheWarm is set once a warm has loaded the cache, which history
+// reads its ids from alone.
+var variantCacheWarm atomic.Bool

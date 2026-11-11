@@ -545,6 +545,13 @@ func (s *site) HistoryAPI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Until the cache is warm every card would be left out, an empty answer
+	// that reads as no history
+	if !variantCacheWarm.Load() {
+		w.Header().Set("Retry-After", "30")
+		historyError(w, http.StatusServiceUnavailable, "price history is loading")
+		return
+	}
 	cards, banIDs := historyCardsOf(b, p, idMode, cos)
 	if !acquireSlot(r.Context(), historySlots, historySlotWait) {
 		w.Header().Set("Retry-After", "5")
