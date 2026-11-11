@@ -2,7 +2,7 @@ module github.com/mtgban/mtgban-website
 
 go 1.26.0
 
-toolchain go1.26.10
+toolchain go1.26.11
 
 require (
 	github.com/BlueMonday/go-scryfall v0.10.0
