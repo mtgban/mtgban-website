@@ -115,9 +115,10 @@ func nearestTags(p Params, value string, tags []string) []string {
 	return fuzzy.Closest(value, near)
 }
 
-// queryName is the name p's query searches by: what its filters leave.
+// queryName is the name p's query searches by: what its filters and a
+// trailing &*~` flag leave.
 func queryName(p Params) string {
-	name := p.RawQuery
+	name := strings.TrimRight(p.RawQuery, "&*~`")
 	for _, field := range slices.Concat(p.UnknownSets, p.AppliedFilters) {
 		name = strings.Replace(name, field, "", 1)
 	}

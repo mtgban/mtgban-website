@@ -289,7 +289,7 @@ func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchC
 		Backend:        b,
 		PromoAliases:   isKnownPromo,
 	}
-	for _, field := range re.FindAllString(rawQuery, -1) {
+	for _, field := range re.FindAllString(filterText(rawQuery), -1) {
 		if setFilterNamesNothing(b, field) {
 			params.UnknownSets = append(params.UnknownSets, field)
 		}
@@ -330,6 +330,13 @@ func searchSuggestions(ds *datastore, p *prices, rawQuery string, config SearchC
 		return suggest.Tags(params), alts
 	}
 	return append(queries, asTyped...), alts
+}
+
+// filterText is the part of query the parser reads filters from: without
+// a trailing &*~` flag, its in: terms and its quoted names.
+func filterText(query string) string {
+	_, _, rest := splitQuery(strings.TrimRight(query, "&*~`"))
+	return rest
 }
 
 // searchFallback re-reads a search whose name matched nothing, in the order a
