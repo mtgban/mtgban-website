@@ -55,7 +55,9 @@ between 33 and 322 rows per report.
 | `min_change`, `max_change` | a number, in percent (20 is 20%) | inclusive bounds on the report's weekly change, in the unit its `percent` column is served in; a row with no change fails them |
 
 The sort is the page's: numeric when either side is a nonzero number,
-else by the text, ties kept in ranking order. Other query keys are
+else by the text, ties kept in ranking order, and a row with no value
+last in either direction. The reports store a missing number as 0, so an
+exact 0 counts as no value here, as it does for the bounds. Other query keys are
 ignored, so a cache-busting parameter does no harm.
 
 The page and the API filter through one function, `newsFilter`, which

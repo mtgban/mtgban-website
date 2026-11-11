@@ -318,7 +318,8 @@ components:
       description: >-
         A sortable column's field from reports.json, or one of ranking,
         name, set, number, finish. Numbers sort as numbers, the rest as
-        text, ties in ranking order
+        text, ties in ranking order, rows with no value (an exact 0
+        included) last
       schema: { type: string, default: ranking }
     newsDir:
       name: dir

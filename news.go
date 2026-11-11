@@ -1266,11 +1266,15 @@ func newsPercent(v float64) float64 {
 	return math.Round(v*100*100) / 100
 }
 
-// newsSort orders rows by a field, numerically when either side is a nonzero number, ties kept.
+// newsSort orders rows by a field, numerically when either side is a nonzero number, ties kept;
+// a row with no value, which includes an exact 0, goes last either way.
 func newsSort(rows []NewspaperResult, field, dir string) {
 	sort.SliceStable(rows, func(i, j int) bool {
 		vi := rows[i].FieldValue(field)
 		vj := rows[j].FieldValue(field)
+		if (vi == "") != (vj == "") {
+			return vj == ""
+		}
 		var vif, vjf float64
 		vif, _ = strconv.ParseFloat(vi, 64)
 		vjf, _ = strconv.ParseFloat(vj, 64)
