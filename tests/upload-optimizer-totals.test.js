@@ -40,8 +40,8 @@ function load(rows) {
         listeners: {},
         addEventListener(type, fn) { this.listeners[type] = fn; },
     };
-    const updateOptTotals = new Function('window', 'document', 'Tablesort', 'wireLoadLists',
-        source + '\nreturn updateOptTotals;')({}, document, function() {}, () => {});
+    const updateOptTotals = new Function('window', 'document', 'wireLoadLists',
+        source + '\nreturn updateOptTotals;')({}, document, () => {});
     const untick = (n) => { trs[n].classList.removed = true; };
     // A tick change as the page sends it, from a checkbox in a section or not
     const change = (inSection) => document.listeners.change({

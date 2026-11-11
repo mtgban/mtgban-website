@@ -530,7 +530,7 @@
                 {{end}}
             </tr>
         {{end}}
-        <tr class="ures-totals-row">
+        <tr class="ures-totals-row" data-sort-method="none">
             <td><span class="ures-totals-label">Totals ({{.Quantity}} {{.Noun}}{{if ne .Quantity 1}}s{{end}})</span></td>
             <td></td>
             <td></td>
@@ -1039,12 +1039,12 @@
                     </div>
                     </td></tr>
                         <tr>
-                            <th>Card</th>
-                            <th>Set</th>
+                            <th role="columnheader">Card</th>
+                            <th role="columnheader">Set</th>
                             <th data-sort-method="none">INFO</th>
-                            <th class="c" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Offer</th>
-                            <th class="c" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Loaded</th>
-                            <th data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Spread</th>
+                            <th class="c" role="columnheader" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Offer</th>
+                            <th class="c" role="columnheader" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Loaded</th>
+                            <th role="columnheader" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Spread</th>
                             <th class="c" data-sort-method="none"><input type="checkbox" checked autocomplete="off" title="Toggle all" onchange="window.toggleAllOptRows && toggleAllOptRows(this)"></th>
                         </tr></thead>
                         <tbody>
@@ -1093,8 +1093,6 @@
     <script type="text/javascript" src="/js/upload-tabs.js?hash={{.Hash}}" defer></script>
 
     {{if .Optimized}}
-    <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
-    <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
     <script type="text/javascript" src="/js/load-lists.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-optimizer.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/section-fold.js?hash={{.Hash}}" defer></script>

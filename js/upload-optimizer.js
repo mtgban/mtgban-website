@@ -1,10 +1,3 @@
-document.querySelectorAll('.opt-table').forEach(function(t) {
-    var sorter = new Tablesort(t);
-    t.addEventListener('beforeSort', function() {
-        sorter.options.descending = sorter.current.getAttribute('data-sort-descending') === 'true';
-    });
-});
-
 // optTableOut takes the card art down when the pointer leaves a table's
 // rows, out of the table or up into the store header pinned in its head.
 function optTableOut(table, event) {
