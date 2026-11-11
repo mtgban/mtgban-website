@@ -694,6 +694,19 @@ for (const [file, ids, box, results] of [
         expect(page.log.rendered).toHaveLength(3);
     });
 
+    test(file + ' only counts again when typing keeps the first screen', async () => {
+        const page = await liveStart({ queries: { sol: rows(150), 'sol r': rows(120), 'sol ri': rows(5) } });
+        page.type('sol');
+        await page.settle();
+        page.type('sol r');
+        await page.settle();
+        expect(page.log.rendered).toHaveLength(1);
+        if (page.els['offline-count']) expect(page.els['offline-count'].textContent).toBe('120 results found (100 shown)');
+        page.type('sol ri');
+        await page.settle();
+        expect(page.log.rendered).toHaveLength(2);
+    });
+
     test(file + ' with the setting off leaves the order and the scroll alone', async () => {
         const page = await started(file, { ids, queries: { sol: rows(3), bolt: rows(2) } });
         expect(page.log.mounted.live()).toBe(false);

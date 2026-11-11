@@ -127,6 +127,7 @@
             var first = el.querySelector('.result-header');
             if (first && !shown.typing) showRowImage(first);
         },
+        recount: paintCount,
         cleared: function () {
             document.getElementById('offline-count').textContent = '';
         }
