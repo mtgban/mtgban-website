@@ -597,8 +597,8 @@ func TestNumberSortTiesKeepsAPrintingTogether(t *testing.T) {
 // TestUploadRowsCarryTheirSortKeys writes each row's tie-breaker keys and,
 // where the sorting setting grouped it, its tie group.
 func TestUploadRowsCarryTheirSortKeys(t *testing.T) {
-	keys := map[string]uploadsort.Keys{"a": {Name: "counterspell", Set: "1999-04-11 seventh edition", Number: "67", Finish: "0 nonfoil", Color: "1.01", Rarity: "3"}}
-	want := `data-k-name="counterspell" data-k-set="1999-04-11 seventh edition" data-k-number="67" data-k-finish="0 nonfoil" data-k-color="1.01" data-k-rarity="3"`
+	keys := map[string]uploadsort.Keys{"a": {Name: "counterspell", Set: "1999-04-11 seventh edition", Release: "1999-04-11", Number: "67", Finish: "0 nonfoil", Color: "1.01", Rarity: "3"}}
+	want := `data-k-name="counterspell" data-k-set="1999-04-11 seventh edition" data-k-release="1999-04-11" data-k-number="67" data-k-finish="0 nonfoil" data-k-color="1.01" data-k-rarity="3"`
 	out := renderUpload(t, PageVars{
 		Metadata: cardMetadata{"a": {Name: "Counterspell"}, "b": {Name: "Opt"}},
 		UploadVars: UploadVars{

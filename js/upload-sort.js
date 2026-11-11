@@ -89,6 +89,7 @@ function uresMoveRows(table, col, numeric, descending) {
 var uresTieKeys = [
     {key: 'name', label: 'Name'},
     {key: 'set', label: 'Set'},
+    {key: 'release', label: 'Release date'},
     {key: 'number', label: 'Number'},
     {key: 'finish', label: 'Finish'},
     {key: 'color', label: 'Color'},

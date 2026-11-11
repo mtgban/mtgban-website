@@ -44,14 +44,14 @@ func TestUploadSortKeysOrderMagicPrintings(t *testing.T) {
 		t.Errorf("Alpha's set key %q not before M10's %q", alpha.Set, m10.Set)
 	}
 
-	// A later drop files under its set's date
+	// A later drop files under its set's date, released on its own
 	sld, err := b.Match(&matcher.InputCard{Name: "Archaeomancer", Edition: "Secret Lair Drop", Variation: "2242"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	drop := uploadsort.For(b, sld)
-	if !strings.HasPrefix(drop.Set, "2019-12-02 ") {
-		t.Errorf("Secret Lair drop's set key %q", drop.Set)
+	if !strings.HasPrefix(drop.Set, "2019-12-02 ") || drop.Release != "2025-12-01" {
+		t.Errorf("Secret Lair drop's set key %q, release %q", drop.Set, drop.Release)
 	}
 
 	foil := matchKeys(t, b, "Lightning Bolt", "Magic 2010", true)
@@ -98,5 +98,32 @@ func TestUploadSortKeysFollowAnotherGamesOrder(t *testing.T) {
 	first, second := byColor[b.Colors[0]], byColor[b.Colors[1]]
 	if first == "" || second == "" || first >= second {
 		t.Errorf("%s files as %q, %s as %q: want the game's order", b.Colors[0], first, b.Colors[1], second)
+	}
+}
+
+// A sealed product files under its own release date, where it has one apart
+// from its set's.
+func TestUploadSortKeysDateSealedProducts(t *testing.T) {
+	skipWithoutDatastore(t)
+	t.Parallel()
+	b := backend()
+
+	checked := 0
+	for id, co := range b.UUIDs {
+		if !co.Sealed || co.OriginalReleaseDate == "" {
+			continue
+		}
+		set, err := b.GetSet(co.SetCode)
+		if err != nil || set.ReleaseDate == co.OriginalReleaseDate {
+			continue
+		}
+		keys := uploadsort.For(b, id)
+		if keys.Release != co.OriginalReleaseDate || !strings.HasPrefix(keys.Set, set.ReleaseDate+" ") {
+			t.Fatalf("%s: release %q, set %q; want %s and %s", co.Name, keys.Release, keys.Set, co.OriginalReleaseDate, set.ReleaseDate)
+		}
+		checked++
+	}
+	if checked == 0 {
+		t.Error("no sealed product released apart from its set")
 	}
 }

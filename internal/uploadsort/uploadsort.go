@@ -22,6 +22,9 @@ type Keys struct {
 	// The set's release date, then the lowercased edition
 	Set string
 
+	// The printing's own release date, or a sealed product's
+	Release string
+
 	// The collector number
 	Number string
 
@@ -53,6 +56,10 @@ func For(b *matcher.Backend, cardID string) Keys {
 	set, err := b.GetSet(co.SetCode)
 	if err == nil && !set.ReleaseDateTime.IsZero() {
 		keys.Set = set.ReleaseDateTime.Format("2006-01-02") + " " + strings.ToLower(co.Edition)
+	}
+	released, err := b.CardReleaseDate(cardID)
+	if err == nil && !released.IsZero() {
+		keys.Release = released.Format("2006-01-02")
 	}
 
 	finish := 0
