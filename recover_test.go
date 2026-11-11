@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -126,7 +127,7 @@ func TestRecoverPanicReportsItsOwnStack(t *testing.T) {
 	posts := serverWebhook(t)
 
 	go func() {
-		defer recoverPanic(httptest.NewRequest(http.MethodGet, "/search", nil), httptest.NewRecorder())
+		defer recoverPanic(httptest.NewRequest(http.MethodGet, "/search", nil), &startedWriter{ResponseWriter: httptest.NewRecorder()})
 		panic("a shallow goroutine")
 	}()
 
@@ -207,7 +208,7 @@ func TestReportPanicKeepsAWindowPerSite(t *testing.T) {
 	raise := func(value string) { panic(value) }
 	for range 2 {
 		func() {
-			defer recoverPanic(httptest.NewRequest(http.MethodGet, "/search", nil), httptest.NewRecorder())
+			defer recoverPanic(httptest.NewRequest(http.MethodGet, "/search", nil), &startedWriter{ResponseWriter: httptest.NewRecorder()})
 			raise("the handler broke")
 		}()
 	}
@@ -450,7 +451,7 @@ func TestRecoverPanicAnswersBrowsersWithThePage(t *testing.T) {
 		req.Header.Set("Accept", tc.accept)
 		rec := httptest.NewRecorder()
 		func() {
-			defer recoverPanic(req, rec)
+			defer recoverPanic(req, &startedWriter{ResponseWriter: rec})
 			panic("the page broke")
 		}()
 
@@ -460,5 +461,49 @@ func TestRecoverPanicAnswersBrowsersWithThePage(t *testing.T) {
 		if !strings.Contains(rec.Body.String(), tc.want) {
 			t.Errorf("Accept %q: body %.80q, want it to hold %q", tc.accept, rec.Body.String(), tc.want)
 		}
+	}
+}
+
+// A handler that panics after its response began, a CSV half written, has
+// the connection aborted: the client sees the body break, not the error
+// page appended to the file. Behind two wrappers, as signing runs noSigning
+// for an open page, the panic is reported once, not again as the abort.
+func TestRecoverPanicAbortsAStartedResponse(t *testing.T) {
+	serverWebhook(t)
+
+	server := httptest.NewServer(noSigning(noSigning(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/csv")
+		_, err := io.WriteString(w, "name,price\n")
+		if err == nil {
+			err = http.NewResponseController(w).Flush()
+		}
+		if err != nil {
+			t.Error(err)
+		}
+		panic("the export broke")
+	}))))
+	t.Cleanup(server.Close)
+
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/search/export.csv", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Accept", "text/html,*/*")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err == nil {
+		t.Error("body read whole, want it cut off")
+	}
+	if strings.Contains(string(body), "<title>") || strings.Contains(string(body), "Internal Server Error") {
+		t.Errorf("body %q has an error appended", body)
+	}
+	panicReportMu.Lock()
+	defer panicReportMu.Unlock()
+	if len(panicWindows) != 1 {
+		t.Errorf("panics reported from %d sites, want the handler's alone: %v", len(panicWindows), slices.Collect(maps.Keys(panicWindows)))
 	}
 }
