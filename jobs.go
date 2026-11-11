@@ -28,6 +28,7 @@ const (
 	jobPopular         = "Popular searches"
 	jobUploadShares    = "Upload shares"
 	jobPatreonSessions = "Patreon sessions"
+	jobFeatureCounter  = "Feature counter"
 )
 
 // backgroundJobs records every run of the jobs above.

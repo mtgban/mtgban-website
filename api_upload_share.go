@@ -132,6 +132,7 @@ func serveUploadShare(w http.ResponseWriter, r *http.Request, store uploadShareW
 		return
 	}
 	if !uploadShareLimiter.Allow(email) {
+		observe(r, "ratelimit.reject", "upload_share")
 		writeShareError(w, http.StatusTooManyRequests, "too many requests")
 		return
 	}

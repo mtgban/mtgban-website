@@ -39,6 +39,7 @@ func (s *site) PopularVoteAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !popularVoteLimiter.Allow(email) {
+		observe(r, "ratelimit.reject", "vote")
 		w.WriteHeader(http.StatusTooManyRequests)
 		return
 	}

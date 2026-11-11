@@ -91,6 +91,7 @@ func (s *site) favoritesShared(w http.ResponseWriter, r *http.Request, store sha
 	id := r.FormValue("id")
 	switch {
 	case !sharedPageLimiter.Allow(sharedClientKey(r)):
+		observe(r, "ratelimit.reject", "favorites_share")
 		vars.SharedNotice, status = sharedBusyText, http.StatusTooManyRequests
 	case store == nil:
 		vars.SharedNotice, status = sharedUnavailableText, http.StatusServiceUnavailable

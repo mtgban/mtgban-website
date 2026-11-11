@@ -43,13 +43,16 @@ func shouldRecordHit(r *http.Request) bool {
 	return recordablePath(r.URL.Path) && isPageView(r)
 }
 
-// recordPageHit emits one telemetry event for a served gated request. It is a
-// no-op when telemetry is disabled and never blocks the request.
+// recordPageHit emits one telemetry event and one page.view count for a served
+// gated request. Each is a no-op when disabled, and neither blocks the request.
 func recordPageHit(r *http.Request) {
-	if ObservabilityRecorder == nil {
+	if !shouldRecordHit(r) {
 		return
 	}
-	if !shouldRecordHit(r) {
+	if label := pageLabel(r.URL.Path, r.FormValue("page")); label != "other" {
+		observe(r, "page.view", label)
+	}
+	if ObservabilityRecorder == nil {
 		return
 	}
 	ObservabilityRecorder.Record(pageHitEvent(r))

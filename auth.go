@@ -555,6 +555,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		}
 
 		if !APIRateLimiter.Allow(string(ip)) {
+			observe(r, "ratelimit.reject", "api")
 			errorResponse(w, http.StatusTooManyRequests, http.StatusText(http.StatusTooManyRequests))
 			return
 		}
@@ -647,6 +648,7 @@ type signingRefusal struct {
 // write answers the refused request: the JSON error for a script, the error
 // page for a reader.
 func (ref signingRefusal) write(w http.ResponseWriter, r *http.Request, s *site, sig string, script bool) {
+	observeScoped(r, routeLabel(r.Pattern, r.URL.Path), "auth.refuse", refusalReason(ref.status))
 	if script {
 		errorResponse(w, ref.status, ref.msg)
 		return
@@ -724,6 +726,11 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 		// cannot spend somebody else's.
 		limitKey := ""
 		checked, ok := signatureIsValid(sig)
+		// The dimensions read a signature that checks out, not one in grace.
+		var dimsFrom url.Values
+		if ok {
+			dimsFrom = checked
+		}
 		// A cookie signature that ran out within grace_days is not sig any
 		// more, but it still names its reader, to count and to renew.
 		expired := graceSignature(r, sig, querySig)
@@ -737,6 +744,7 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 			}
 		}
 		if !UserRateLimiter.Allow(limitKey) && r.URL.Path != "/admin" {
+			observe(r, "ratelimit.reject", "page")
 			signingRefusal{status: http.StatusTooManyRequests, title: "Too Many Requests", msg: ErrMsgUseAPI}.write(w, r, s, sig, script)
 			return
 		}
@@ -747,13 +755,16 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 		if refused {
 			// The pledge is gone: logged out, with the way back in
 			ref := signingRefusal{status: http.StatusUnauthorized, title: "Unauthorized", msg: ErrMsgExpired, login: true}
+			r = withSignedDims(r, nil)
 			ref.write(w, withSignatureCookie(r, ""), s, "", script)
 			return
 		}
 		if renewed != "" {
 			sig = renewed
 			r = withSignatureCookie(r, renewed)
+			dimsFrom = parseSig(renewed)
 		}
+		r = withSignedDims(r, dimsFrom)
 
 		raw, err := base64.StdEncoding.DecodeString(sig)
 		if SigCheck && err != nil {
@@ -826,6 +837,7 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 					canDo = true
 				}
 				if SigCheck && !canDo {
+					observeScoped(r, routeLabel(r.Pattern, r.URL.Path), "auth.refuse", "no_access")
 					pageVars := genPageNav(s, r, nav.Name, sig)
 					pageVars.Title = "This feature is BANned"
 					pageVars.ErrorMessage = ErrMsgPlus
