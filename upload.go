@@ -1662,6 +1662,11 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 	preferFlavor := readSearchMiscOpts(r).has("preferFlavor")
 
 	tiebreak := getUploadSetting(r, "tiebreak", "UploadTiebreak")
+	// A buylist's multi-select margin lists a row under every tied store,
+	// leaving no tie to break
+	if percMargin < 1 {
+		tiebreak = ""
+	}
 	var tieOrder []string
 	for store := range strings.SplitSeq(getUploadSetting(r, "tieorder", "UploadTiebreakOrder"), ",") {
 		if store != "" && len(tieOrder) < maxTieOrder {
