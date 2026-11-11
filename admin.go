@@ -1098,6 +1098,8 @@ type UsageDashboard struct {
 	ByTier      []observability.TierAgg
 	ByDevice    []observability.DeviceAgg
 	SubViews    []observability.PathAgg
+	Dropped     int64
+	Failed      int64
 }
 
 type usageCacheEntry struct {
@@ -1121,7 +1123,7 @@ func loadUsageDashboard(ctx context.Context, includeBots bool) *UsageDashboard {
 
 	entry, found := usageCache.byBots[includeBots]
 	if found && time.Since(entry.fetched) < usageCacheTTL {
-		return entry.dash
+		return withRecorderLoss(entry.dash)
 	}
 
 	since := time.Now().AddDate(0, 0, -30)
@@ -1152,7 +1154,15 @@ func loadUsageDashboard(ctx context.Context, includeBots bool) *UsageDashboard {
 		usageCache.byBots[includeBots] = usageCacheEntry{dash: dash, fetched: time.Now()}
 	}
 
-	return dash
+	return withRecorderLoss(dash)
+}
+
+// withRecorderLoss copies a dashboard with this process's live, uncached loss counts.
+func withRecorderLoss(d *UsageDashboard) *UsageDashboard {
+	c := *d
+	c.Dropped = ObservabilityRecorder.Dropped()
+	c.Failed = ObservabilityRecorder.Failed()
+	return &c
 }
 
 // subViewPrefixes are the paths the Usage tab breaks out in their own table.
