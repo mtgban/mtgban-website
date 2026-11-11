@@ -10,9 +10,10 @@ const ROWS = [
 ];
 
 // loadPage runs the script against a stand-in for one section of a page:
-// its rows, shown in reverse as a sorted table would, and the lists and forms
-// its load buttons send. untick and tick mark a row as the page's own
-// checkbox handler does, then fire the change event that follows.
+// its rows, and the lists and forms its load buttons send. untick and tick
+// mark a row as the page's own checkbox handler does, then fire the change
+// event that follows; show puts the rows in the order given, by
+// data-load-idx, as a sort does, then fires the rowsmoved event that follows.
 function loadPage({lists = [], forms = []}) {
     const trs = ROWS.map((r, idx) => {
         const tr = {
@@ -30,7 +31,7 @@ function loadPage({lists = [], forms = []}) {
         tr.classList = {contains: (name) => name === 'opt-removed' && tr.removed};
         return tr;
     });
-    const shown = [...trs].reverse();
+    let shown = [...trs];
     const section = {
         querySelectorAll: (selector) => ({
             'tr[data-load-idx]': shown,
@@ -40,22 +41,24 @@ function loadPage({lists = [], forms = []}) {
     };
     const checkbox = {closest: (selector) => (selector === '.opt-store' ? section : null)};
 
-    let onChange;
+    const handlers = {};
     const document = {
-        addEventListener: (type, handler) => {
-            if (type === 'change') onChange = handler;
-        },
+        addEventListener: (type, handler) => { handlers[type] = handler; },
     };
     const wire = new Function('document', source + '\nreturn wireLoadLists;')(document);
     wire({section: '.opt-store', removed: 'opt-removed'});
 
     const toggle = (idx, removed) => {
         trs[idx].removed = removed;
-        onChange({target: checkbox});
+        handlers.change({target: checkbox});
     };
     return {
         untick: (idx) => toggle(idx, true),
         tick: (idx) => toggle(idx, false),
+        show: (order) => {
+            shown = order.map((idx) => trs[idx]);
+            handlers.rowsmoved({target: checkbox});
+        },
     };
 }
 
@@ -65,7 +68,7 @@ function listInput(format, value) {
 }
 
 describe('load lists', () => {
-    test('a TCGplayer list keeps its product ids in the server order', () => {
+    test('a TCGplayer list keeps its product ids', () => {
         const input = listInput('tcg', '2-101||1-102||3-103||');
         const page = loadPage({lists: [input]});
         page.untick(1);
@@ -183,26 +186,79 @@ describe('load lists', () => {
         expect(link.href).toBe(href.replace('SGL-A1:2,', '') + '&skip=1');
     });
 
-    test('a hashes form disables only the unticked row, even for a repeated card', () => {
-        const inputs = [
-            {name: 'tag', value: 'SCGRetail'},
-            {name: 'mode', value: 'false'},
-        ];
-        // The same card twice, in two conditions
-        for (const [id, cond] of [['card-a', 'NM'], ['card-a', 'SP'], ['card-b', 'NM']]) {
-            inputs.push({name: 'SCGRetailhashes', value: id});
-            inputs.push({name: 'SCGRetailhashesQtys', value: '1'});
-            inputs.push({name: 'SCGRetailhashesCond', value: cond});
-        }
+    test('a sorted table sends its lists in the order shown, and the server\'s again once sorted back', () => {
+        const input = listInput('tcg', '2-101||1-102||3-103||');
+        const page = loadPage({lists: [input]});
+        page.show([2, 0, 1]);
+        expect(input.value).toBe('3-103||2-101||1-102||');
+        page.untick(0);
+        expect(input.value).toBe('3-103||1-102||');
+        page.tick(0);
+        page.show([0, 1, 2]);
+        expect(input.value).toBe('2-101||1-102||3-103||');
+    });
+
+    test('a sorted table sends its cart link in the order shown', () => {
+        const href = 'https://abugames.com/cartview/shop#ban=301:2,302:1,303:3&v=abc&side=retail';
+        const link = cartButton(href, '301,302,303');
+        const page = loadPage({lists: [link]});
+        page.show([1, 2, 0]);
+        expect(link.href).toBe('https://abugames.com/cartview/shop#ban=302:1,303:3,301:2&v=abc&side=retail');
+        page.show([0, 1, 2]);
+        expect(link.href).toBe(href);
+    });
+
+    // A /upload form as the server writes it: its tag and mode, a group of
+    // hashes inputs per row (the same card twice, in two conditions), and the
+    // link that submits it, with insertBefore moving a child as a form's does
+    function hashesForm() {
+        const children = [];
         const form = {
-            querySelectorAll: (selector) => (selector === 'input[type="hidden"]' ? inputs : []),
+            querySelectorAll: (selector) => (selector === 'input[type="hidden"]'
+                ? children.filter((c) => c.name !== undefined) : []),
+            insertBefore(node, ref) {
+                children.splice(children.indexOf(node), 1);
+                children.splice(ref ? children.indexOf(ref) : children.length, 0, node);
+            },
         };
-        const page = loadPage({forms: [form]});
+        const add = (node) => {
+            Object.defineProperty(node, 'nextSibling', {get: () => children[children.indexOf(node) + 1] || null});
+            node.parentNode = form;
+            children.push(node);
+        };
+        add({name: 'tag', value: 'SCGRetail'});
+        add({name: 'mode', value: 'false'});
+        for (const [id, cond] of [['card-a', 'NM'], ['card-a', 'SP'], ['card-b', 'NM']]) {
+            add({name: 'SCGRetailhashes', value: id + '/' + cond});
+            add({name: 'SCGRetailhashesQtys', value: '1'});
+            add({name: 'SCGRetailhashesCond', value: cond});
+        }
+        add({link: 'Load at SCG'});
+        return {form, children, sent: () => children.filter((c) => c.name && !c.disabled).map((c) => c.value),
+            order: () => children.map((c) => c.link || c.value)};
+    }
+
+    test('a hashes form disables only the unticked row, even for a repeated card', () => {
+        const f = hashesForm();
+        const page = loadPage({forms: [f.form]});
         page.untick(1);
-        expect(inputs.filter((i) => !i.disabled).map((i) => i.value))
-            .toEqual(['SCGRetail', 'false', 'card-a', '1', 'NM', 'card-b', '1', 'NM']);
+        expect(f.sent()).toEqual(['SCGRetail', 'false', 'card-a/NM', '1', 'NM', 'card-b/NM', '1', 'NM']);
         page.tick(1);
-        expect(inputs.every((i) => !i.disabled)).toBe(true);
+        expect(f.children.every((c) => !c.disabled)).toBe(true);
+    });
+
+    test('a hashes form follows a sorted table, before the link that submits it', () => {
+        const f = hashesForm();
+        const before = f.order();
+        const page = loadPage({forms: [f.form]});
+        page.show([2, 0, 1]);
+        expect(f.order()).toEqual(['SCGRetail', 'false', 'card-b/NM', '1', 'NM', 'card-a/NM', '1', 'NM',
+            'card-a/SP', '1', 'SP', 'Load at SCG']);
+        page.untick(0);
+        expect(f.sent()).toEqual(['SCGRetail', 'false', 'card-b/NM', '1', 'NM', 'card-a/SP', '1', 'SP']);
+        page.tick(0);
+        page.show([0, 1, 2]);
+        expect(f.order()).toEqual(before);
     });
 });
 

@@ -1,15 +1,18 @@
 // The upload optimizer and the arbit page list a store's cards in a table
 // whose rows can be unticked, and send them to the store with load buttons.
-// Every list a button sends is built by the server from all of the rows, so
-// each time a row is ticked or unticked the section's lists are rebuilt from
-// the rows still ticked, or put back as the server built them when none is
-// unticked. A link opened by middle click or from its menu is current too.
+// Every list a button sends is built by the server from all of the rows, in
+// its order. Each time a row is ticked or unticked, or the table is sorted
+// (a rowsmoved event), the section's lists are rebuilt from the rows still
+// ticked in the order they stand, or put back as the server built them when
+// every row is ticked in the server's order. A link opened by middle click
+// or from its menu is current too.
 //
 // Each row carries data-load-idx, its place in the server's lists, and the
 // fields a list is built from (data-load-qty, -name, -ckid, -tcgid, -set,
 // -number). An input or link holding a list names its format in
 // data-load-list; a form without one lists rows as hashes inputs, one group
-// per row, and the groups of unticked rows are disabled.
+// per row, moved to follow the rows, and the groups of unticked rows are
+// disabled.
 
 var loadListFormats = {
     ck: function(rows) {
@@ -46,6 +49,10 @@ var loadListFormats = {
 // rows are all ticked again.
 var loadListOriginals = new WeakMap();
 
+// Each hashes form's input groups in the server's order, read before any
+// group has moved.
+var loadListGroups = new WeakMap();
+
 function loadListRows(section, removedClass) {
     var rows = [];
     section.querySelectorAll('tr[data-load-idx]').forEach(function(tr) {
@@ -60,8 +67,6 @@ function loadListRows(section, removedClass) {
             number: tr.dataset.loadNumber || ''
         });
     });
-    // A sorted table has moved its rows: the lists keep the server's order
-    rows.sort(function(a, b) { return a.idx - b.idx; });
     return rows;
 }
 
@@ -107,11 +112,14 @@ function cartPage(href) {
     return page && page.indexOf('#') >= 0 ? page : href;
 }
 
-// rebuildLoadLists rewrites every list in section from its ticked rows.
+// rebuildLoadLists rewrites every list in section from its ticked rows, in
+// the order they stand.
 function rebuildLoadLists(section, removedClass) {
     var rows = loadListRows(section, removedClass);
     var active = rows.filter(function(r) { return !r.removed; });
-    var whole = active.length === rows.length;
+    var whole = active.length === rows.length && rows.every(function(r, i) {
+        return i === 0 || rows[i - 1].idx < r.idx;
+    });
 
     section.querySelectorAll('[data-load-list]').forEach(function(el) {
         var format = el.dataset.loadList;
@@ -134,31 +142,46 @@ function rebuildLoadLists(section, removedClass) {
         }
     });
 
-    var removed = {};
-    rows.forEach(function(r) {
-        if (r.removed) removed[r.idx] = true;
-    });
     section.querySelectorAll('form').forEach(function(form) {
-        var group = -1;
-        form.querySelectorAll('input[type="hidden"]').forEach(function(input) {
-            if (input.name && input.name.match(/hashes$/)) {
-                group++;
-            }
-            if (group >= 0) {
-                input.disabled = removed[group] === true;
-            }
+        var groups = loadListGroups.get(form);
+        if (!groups) {
+            groups = [];
+            form.querySelectorAll('input[type="hidden"]').forEach(function(input) {
+                if (input.name && input.name.match(/hashes$/)) {
+                    groups.push([]);
+                }
+                if (groups.length) {
+                    groups[groups.length - 1].push(input);
+                }
+            });
+            loadListGroups.set(form, groups);
+        }
+        if (!groups.length) return;
+        // The groups stand together in the form: put them back where they
+        // stand, in the order the rows do
+        var inputs = form.querySelectorAll('input[type="hidden"]');
+        var last = inputs[inputs.length - 1];
+        var after = last.nextSibling;
+        var parent = last.parentNode;
+        rows.forEach(function(r) {
+            (groups[r.idx] || []).forEach(function(input) {
+                input.disabled = r.removed;
+                parent.insertBefore(input, after);
+            });
         });
     });
 }
 
 // wireLoadLists rebuilds a section's lists when one of its rows is ticked or
-// unticked, after the page's own handler has marked the row. opts names the
-// page's section and unticked row classes.
+// unticked, after the page's own handler has marked the row, and when its
+// table is sorted. opts names the page's section and unticked row classes.
 function wireLoadLists(opts) {
-    document.addEventListener('change', function(e) {
+    function rebuild(e) {
         var section = e.target.closest(opts.section);
         if (section) {
             rebuildLoadLists(section, opts.removed);
         }
-    });
+    }
+    document.addEventListener('change', rebuild);
+    document.addEventListener('rowsmoved', rebuild);
 }
