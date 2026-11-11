@@ -78,6 +78,11 @@ type Entry struct {
 	// the page posts itself back: a box is priced per box, and two boxes'
 	// worth of cards has to be read against two boxes.
 	UnpackedQuantity int
+
+	// SortLead is the row's tie group under the upload's sorting setting,
+	// from 1, or 0 when the setting leaves the rows in their order. The
+	// results sort a reader's tie-breakers within it.
+	SortLead int
 }
 
 // QuantityOrOne is the quantity the source data gave, or 1 when it gave
