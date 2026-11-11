@@ -484,6 +484,44 @@ func TestSettingsModalSplitsSealedVendors(t *testing.T) {
 	}
 }
 
+// The upload tiebreak's custom order offers the sealed stores beside the
+// singles ones, and the custom buylist to a reader who may define one.
+func TestSettingsModalTieOrderListsSealedStores(t *testing.T) {
+	signingEnabled(t, true)
+	store := func(shorthand string, sealed bool) mtgban.ScraperInfo {
+		return mtgban.ScraperInfo{Name: shorthand + " Store", Shorthand: shorthand, SealedMode: sealed}
+	}
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, store("ZZSHOPSEALED", true)),
+	}, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, store("ZZBUY", false)),
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, store("ZZBUYSEALED", true)),
+	})
+	for _, tc := range []struct {
+		grants []string
+		custom bool
+	}{
+		{[]string{"Upload"}, false},
+		{[]string{"Upload", "UploadCustom"}, true},
+	} {
+		body := fetchSettingsModal(t, grantSig(t, tc.grants...))
+		at := strings.Index(body, `id="opt-tieorder"`)
+		if at < 0 {
+			t.Fatalf("%v: no custom order in the upload tab", tc.grants)
+		}
+		order := body[at:]
+		order = order[:strings.Index(order, "</section>")]
+		for _, shorthand := range []string{"ZZBUY", "ZZBUYSEALED", "ZZSHOPSEALED"} {
+			if !strings.Contains(order, `<option value="`+shorthand+`">`) {
+				t.Errorf("%v: the custom order lists no %s", tc.grants, shorthand)
+			}
+		}
+		if strings.Contains(order, `<option value="CUSTOM">`) != tc.custom {
+			t.Errorf("%v: the custom order lists the custom buylist: %v, want %v", tc.grants, !tc.custom, tc.custom)
+		}
+	}
+}
+
 // gridCells is the body of the settings grid with this id, or "".
 func gridCells(body, id string) string {
 	re := regexp.MustCompile(`(?s)<div class="settings-grid" id="` + regexp.QuoteMeta(id) + `"[^>]*>(.*?)</div>`)
