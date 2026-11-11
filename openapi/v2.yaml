@@ -430,8 +430,8 @@ components:
         the end, 405 not GET, 429 rate limited (Retry-After),
         502/503/504 upstream or database trouble, 503 with Retry-After also
         for a newspaper report whose query has never succeeded, and on the
-        history endpoints when every read slot stays busy or the archive
-        read fails
+        history endpoints when every read slot stays busy, the archive
+        read fails, or the host is still loading its card ids after a start
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
