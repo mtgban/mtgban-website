@@ -213,6 +213,8 @@ func TestDidYouMeanNearestSet(t *testing.T) {
 		{"lightning bolt s:atw", "lightning bolt s:ath"},
 		{"black lotus s:atw", ""},
 		{`s:"Warhammer 40,000 Comander"`, "s:40k"},
+		{"urza's mine s:atw&", "urza's mine s:atq&"},
+		{`"urza's mine s:atw"`, ""},
 	}
 	for _, tt := range tests {
 		config := parseSearchPage(ds, currentPrices(), tt.query, false, false, nil, nil, nil)
