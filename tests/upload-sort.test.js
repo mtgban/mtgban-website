@@ -36,7 +36,7 @@ function optRow(cells, idx) {
 // A table: its header row, under the rows above it in the head (an
 // optimizer table's store header), its rows, and a tbody whose
 // appendChild moves a row to the end the way a real one does.
-function table(headers, rows, above = []) {
+function table(headers, rows, above = [], kind = 'ures-table') {
     const tbody = {
         rows: rows.slice(),
         appendChild(r) {
@@ -45,14 +45,68 @@ function table(headers, rows, above = []) {
         },
     };
     const headRow = { cells: headers };
-    const t = { tBodies: [tbody], tHead: { rows: above.concat([headRow]) }, events: [] };
+    const t = {
+        tBodies: [tbody], tHead: { rows: above.concat([headRow]) }, events: [],
+        classList: { contains: (c) => c === kind },
+        // The menu asks whether any row has a value for a key
+        querySelector: (sel) => {
+            const key = (sel.match(/data-k-(\w+)/) || [])[1];
+            return tbody.rows.find((r) => r.getAttribute('data-k-' + key)) || null;
+        },
+    };
     t.dispatchEvent = (e) => t.events.push(e.type + (e.bubbles ? ' bubbles' : ''));
     headers.forEach((th, i) => { th.cellIndex = i; th.closest = () => t; th.parentNode = headRow; });
     return t;
 }
 
-function load(document = { addEventListener: () => {} }) {
-    return new Function('document', source + '\nreturn {uresSortBy};')(document);
+function load(document = { addEventListener: () => {} }, localStorage = storage()) {
+    return new Function('document', 'localStorage', source +
+        '\nreturn {uresSortBy, uresParseChain, uresMenuAct, uresRenderMenu, chains: () => uresChains};')(document, localStorage);
+}
+
+// A localStorage that counts its writes
+function storage(saved = {}) {
+    const map = Object.assign({}, saved);
+    return {
+        writes: 0,
+        getItem: (k) => (k in map ? map[k] : null),
+        setItem(k, v) { map[k] = String(v); this.writes++; },
+        map,
+    };
+}
+
+// A page holding tables and Card-header buttons, as the menu reaches them
+function page(tables, buttons = []) {
+    const listeners = {};
+    return {
+        listeners,
+        body: { appendChild: () => {} },
+        addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
+        getElementById: () => null,
+        createElement: () => Object.assign(element({}), { addEventListener: () => {}, style: {} }),
+        querySelectorAll: (sel) => {
+            if (sel === '.ures-table, .opt-table') return tables;
+            const area = (sel.match(/data-sort-area="(\w+)"/) || [])[1];
+            if (area) return buttons.filter((b) => b.getAttribute('data-sort-area') === area);
+            return [];
+        },
+    };
+}
+
+// A Card-header button for an area
+function button(area) {
+    const classes = new Set();
+    return Object.assign(element({ 'data-sort-area': area }), {
+        addEventListener: () => {},
+        classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), has: (c) => classes.has(c) },
+    });
+}
+
+// A row with card-property keys, as the template writes them
+function keyed(hash, keys) {
+    const attrs = { 'data-hash': hash };
+    Object.entries(keys).forEach(([k, v]) => { attrs['data-k-' + k] = v; });
+    return Object.assign(element(attrs), { cells: [cell(hash)] });
 }
 
 function hashes(t) {
@@ -174,10 +228,14 @@ test('headers marked data-sort-method="none" are not made sortable', () => {
     ths.forEach((th) => { th.events = []; th.addEventListener = (type) => th.events.push(type); });
     let asked = '';
     load({
-        addEventListener: (type, fn) => { listeners[type] = fn; },
-        querySelectorAll: (sel) => { asked = sel; return ths; },
+        addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
+        querySelectorAll: (sel) => {
+            if (!sel.includes('thead th')) return [];
+            asked = sel;
+            return ths;
+        },
     });
-    listeners.DOMContentLoaded();
+    listeners.DOMContentLoaded.forEach((fn) => fn());
     expect(asked).toBe('.ures-table thead th, .opt-table thead th');
     expect(ths.map((th) => th.events.join(','))).toEqual(['click,keydown', '', 'click,keydown']);
     expect(ths.map((th) => th.getAttribute('tabindex'))).toEqual(['0', null, '0']);
@@ -198,4 +256,99 @@ test('a sort tells the page its rows moved', () => {
     const t = table([card], [optRow([cell('b')], 0), optRow([cell('a')], 1)]);
     uresSortBy(card);
     expect(t.events).toEqual(['rowsmoved bubbles']);
+});
+
+test('the tie-breakers order rows a column ties on', () => {
+    const { uresSortBy, uresMenuAct } = load(page([]));
+    const price = element({ 'data-sort-method': 'number', 'data-sort-descending': '' });
+    const t = table([element({}), price], [
+        Object.assign(keyed('a', { color: '1.04' }), { cells: [cell('a'), cell('$ 2', '2')] }),
+        Object.assign(keyed('b', { color: '1.00' }), { cells: [cell('b'), cell('$ 2', '2')] }),
+        Object.assign(keyed('c', { color: '3' }), { cells: [cell('c'), cell('$ 9', '9')] }),
+    ]);
+    uresMenuAct('results', 'color', 'toggle');
+    uresSortBy(price);
+    expect(hashes(t)).toEqual(['c', 'b', 'a']);
+    uresMenuAct('results', 'color', 'dir');
+    uresSortBy(price);
+    uresSortBy(price);
+    expect(hashes(t)).toEqual(['c', 'a', 'b']);
+});
+
+test("with no column sorted, the setting's tie groups lead and the chain breaks their ties", () => {
+    const t = table([element({})], [
+        keyed('a', { lead: '2', set: '1993-08-05 alpha' }),
+        keyed('b', { lead: '1', set: '2009-07-17 magic 2010' }),
+        keyed('c', { lead: '1', set: '1993-08-05 alpha' }),
+        keyed('d', { lead: '2', rarity: '0' }),
+    ]);
+    const { uresMenuAct } = load(page([t]));
+    uresMenuAct('results', 'set', 'toggle');
+    // A row missing the key goes last in its group, either way round
+    expect(hashes(t)).toEqual(['c', 'b', 'a', 'd']);
+    uresMenuAct('results', 'set', 'dir');
+    expect(hashes(t)).toEqual(['b', 'c', 'a', 'd']);
+    expect(t.events.length).toBe(2);
+});
+
+test('with no tie groups, the chain leads, a later key deciding only the ties', () => {
+    const t = table([element({})], [
+        keyed('a', { color: '1.01', rarity: '3' }),
+        keyed('b', { color: '1.00', rarity: '3' }),
+        keyed('c', { color: '1.01', rarity: '0' }),
+    ]);
+    const { uresMenuAct } = load(page([t]));
+    uresMenuAct('results', 'color', 'toggle');
+    uresMenuAct('results', 'rarity', 'toggle');
+    expect(hashes(t)).toEqual(['b', 'c', 'a']);
+    // Rarity first now: a number, rarest first
+    uresMenuAct('results', 'rarity', 'up');
+    expect(hashes(t)).toEqual(['c', 'b', 'a']);
+});
+
+test("each area keeps its own chain, and only its own tables follow it", () => {
+    const res = table([element({})], [keyed('a', { name: 'zap' }), keyed('b', { name: 'opt' })]);
+    const opt = table([element({})], [keyed('x', { name: 'zap' }), keyed('y', { name: 'opt' })], [], 'opt-table');
+    const store = storage();
+    const { uresMenuAct, chains } = load(page([res, opt]), store);
+    uresMenuAct('opt', 'name', 'toggle');
+    expect(hashes(opt)).toEqual(['y', 'x']);
+    expect(hashes(res)).toEqual(['a', 'b']);
+    expect(chains()).toEqual({ results: [], opt: [{ key: 'name', descending: false }] });
+    expect(JSON.parse(store.map.mtgban_upload_sort)).toEqual({ results: '', opt: 'name:a' });
+    uresMenuAct('opt', '', 'clear');
+    expect(chains().opt).toEqual([]);
+});
+
+test('a stored chain keeps only known keys, each once', () => {
+    const { uresParseChain } = load();
+    expect(uresParseChain('color:d,bogus:a,set:a,color:a,')).toEqual([
+        { key: 'color', descending: true }, { key: 'set', descending: false },
+    ]);
+    expect(uresParseChain(undefined)).toEqual([]);
+});
+
+test('a saved chain sorts the page on load, lights its buttons, and writes nothing', () => {
+    const t = table([element({})], [keyed('a', { cond: '2' }), keyed('b', { cond: '0' })]);
+    const btn = button('results');
+    const doc = page([t], [btn]);
+    const store = storage({ mtgban_upload_sort: JSON.stringify({ results: 'cond:a', opt: '' }) });
+    load(doc, store);
+    doc.listeners.DOMContentLoaded.forEach((fn) => fn());
+    expect(hashes(t)).toEqual(['b', 'a']);
+    expect(btn.classList.has('on')).toBe(true);
+    expect(btn.getAttribute('title')).toBe(null);
+    expect(btn.title).toBe('Ties broken by Condition \u25B2');
+    expect(store.writes).toBe(0);
+});
+
+test('the menu lists the keys some row has, the chain first in its order', () => {
+    const t = table([element({})], [keyed('a', { name: 'zap', color: '1.00', rarity: '' }), keyed('b', { name: 'opt' })]);
+    const { uresMenuAct, uresRenderMenu } = load(page([t]));
+    uresMenuAct('results', 'color', 'toggle');
+    const menu = {};
+    uresRenderMenu(menu, 'results');
+    const keys = [...menu.innerHTML.matchAll(/data-key="(\w+)"/g)].map((m) => m[1]);
+    expect(keys).toEqual(['color', 'name']);
+    expect(menu.innerHTML).toContain('data-act="up" title="Earlier" disabled');
 });
