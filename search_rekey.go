@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/mtgban-website/internal/suggest"
 )
 
 // rekeyFilters reads a filter whose key does not take its value under the
@@ -60,7 +61,7 @@ func rekeyFilters(ds *datastore, p *prices, name, filters []string, pinned []Fil
 		key, op, value := strings.ToLower(filter[:index]), filter[index:index+1], filter[index+1:]
 		negate := strings.HasPrefix(key, "-")
 		key = strings.TrimPrefix(key, "-")
-		if FilterOperations[key] == nil || op != ":" || strings.Count(value, ",") >= maxRekeyValues {
+		if FilterOperations[key] == nil || op != ":" || len(suggest.SplitList(value)) > maxRekeyValues {
 			others = append(others, filter)
 			continue
 		}
@@ -282,7 +283,7 @@ type rekeyCandidate struct {
 // one value.
 func newRekeyCandidate(ds *datastore, p *prices, key, value string, sealed bool, plainMode string) (rekeyCandidate, bool) {
 	var c rekeyCandidate
-	for _, part := range strings.Split(value, ",") {
+	for _, part := range suggest.SplitList(value) {
 		elem, ok := cardFilterOf(ds, p, key+part, sealed, plainMode)
 		if !ok || len(elem.Values) != 1 {
 			return c, false

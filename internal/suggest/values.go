@@ -23,7 +23,7 @@ func Sets(p Params) []string {
 		if !ok {
 			return nil
 		}
-		for _, value := range strings.Split(values, ",") {
+		for _, value := range SplitList(values) {
 			near := nearestSets(p.Backend, value, codes)
 			if len(near) == 0 {
 				return nil
@@ -52,7 +52,7 @@ func Tags(p Params) []string {
 			continue
 		}
 		var fieldNearest [][]string
-		for _, value := range strings.Split(values, ",") {
+		for _, value := range SplitList(values) {
 			near := nearestTags(p, value, tags)
 			if len(near) == 0 {
 				near = []string{value}
@@ -226,4 +226,26 @@ func rewrites(raw string, fields []string, nearest [][][]string) []string {
 		out = append(out, query)
 	}
 	return out
+}
+
+// SplitList splits a comma-separated list of values, keeping a comma
+// inside double quotes as part of its value ("Warhammer 40,000 Commander").
+// The quotes are left on each value.
+func SplitList(code string) []string {
+	var fields []string
+	quoted := false
+	start := 0
+	for i := 0; i < len(code); i++ {
+		switch code[i] {
+		case '"':
+			quoted = !quoted
+		case ',':
+			if quoted {
+				continue
+			}
+			fields = append(fields, code[start:i])
+			start = i + 1
+		}
+	}
+	return append(fields, code[start:])
 }
