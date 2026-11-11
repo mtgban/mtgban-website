@@ -662,6 +662,38 @@ for (const [file, ids, box, results] of [
         expect(page.log.scrolls).toEqual([['to', 0]]);
     });
 
+    test(file + ' leaves a settled page up while typing finds the same rows', async () => {
+        const page = await liveStart({ queries: { sol: rows(150), 'sol ': rows(150), 'sol r': rows(150), 'sol ri': rows(2) } });
+        page.type('sol');
+        await page.pause();
+        const drawn = page.log.rendered.length;
+        page.type('sol ');
+        page.type('sol r');
+        await page.settle();
+        expect(page.log.rendered).toHaveLength(drawn);
+        expect(page.els[results].innerHTML).toBe('drawn 100');
+        page.type('sol ri');
+        await page.settle();
+        expect(page.log.rendered).toHaveLength(drawn + 1);
+        expect(page.els[results].innerHTML).toBe('drawn 2');
+    });
+
+    test(file + ' draws a typed page once, and a pause only when it changes it', async () => {
+        const page = await liveStart({ queries: { sol: rows(3), 'sol ': rows(3), 'sol r': rows(3) } });
+        page.type('sol');
+        page.type('sol ');
+        await page.settle();
+        expect(page.log.rendered.map((r) => r.page.typing)).toEqual([true]);
+        await page.pause();
+        expect(page.log.rendered.map((r) => r.page.typing)).toEqual([true, false]);
+        page.type('sol r');
+        await page.pause();
+        expect(page.log.rendered).toHaveLength(2);
+        page.synced();
+        await page.settle();
+        expect(page.log.rendered).toHaveLength(3);
+    });
+
     test(file + ' with the setting off leaves the order and the scroll alone', async () => {
         const page = await started(file, { ids, queries: { sol: rows(3), bolt: rows(2) } });
         expect(page.log.mounted.live()).toBe(false);

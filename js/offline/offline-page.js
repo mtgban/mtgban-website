@@ -41,6 +41,8 @@
         var pauseTimer = null;
         // The top of what is on screen, null until something is.
         var shownTop = null;
+        // The rows on screen, in order, whether they settled, and their notices.
+        var shown = null;
 
         function live() {
             return root.OfflineLive.on(hooks.surface);
@@ -145,7 +147,29 @@
             shownTop = top;
         }
 
+        function notices(answer) {
+            return (answer.unsupported || []).join('\n') + (answer.truncated ? '+' : '');
+        }
+
+        // unchanged says an answer would only draw what is on screen again. A
+        // draft with the same rows keeps them in the order shown, which a settled
+        // one has to match row for row.
+        function unchanged(answer, draft) {
+            if (!shown || shown.ids.length !== answer.results.length) return false;
+            if (draft) {
+                var have = new Set(shown.ids);
+                return answer.results.every(function (row) { return have.has(row.uuid); });
+            }
+            return shown.settled && shown.notices === notices(answer) &&
+                answer.results.every(function (row, i) { return row.uuid === shown.ids[i]; });
+        }
+
         function draw(draft) {
+            shown = {
+                ids: exec.results.map(function (row) { return row.uuid; }),
+                settled: !draft,
+                notices: notices(exec)
+            };
             var page = Object.assign({}, exec, {
                 results: exec.page,
                 typing: draft,
@@ -157,9 +181,9 @@
 
         async function redraw() {
             var turn = ++latestDraw;
-            var shown = exec;
-            var complete = await OfflineQuery.showPage(shown, env, view(false));
-            if (turn !== latestDraw || shown !== exec) return;
+            var answer = exec;
+            var complete = await OfflineQuery.showPage(answer, env, view(false));
+            if (turn !== latestDraw || answer !== exec) return;
             // A set that could not be opened changes the answer itself
             if (complete) draw(false);
             else runQuery(lastQuery).catch(showErrorNotice);
@@ -171,7 +195,9 @@
             return parsed;
         }
 
-        async function runQuery(q) {
+        // keep leaves the screen alone when the answer would not change it, as
+        // typing asks; anything else draws, as new prices or a new sort may.
+        async function runQuery(q, keep) {
             var search = ++latestSearch;
             var draft = typing;
             latestDraw++;
@@ -179,6 +205,7 @@
             if (!q) {
                 exec = null;
                 shownTop = null;
+                shown = null;
                 resultsEl().innerHTML = '';
                 call('cleared');
                 return;
@@ -198,18 +225,19 @@
             if (search !== latestSearch) return;
             latestDraw++;
             if (draft && !answer.results.length) return;
+            if (keep && unchanged(answer, draft)) return;
             exec = answer;
             draw(draft);
         }
 
         // settle gives the exact answer to q: read as finished, in best-match
         // order, the whole page. Back lands here rather than on a half-typed query.
-        function settle(q) {
+        function settle(q, keep) {
             clearTimeout(pauseTimer);
             typing = false;
             history.replaceState(null, '', buildUrl(q));
             queryChanged(q);
-            return runQuery(q);
+            return runQuery(q, keep);
         }
 
         // The URL waits for the pause: Safari throws on over 100 history changes
@@ -228,13 +256,14 @@
             queryChanged(q);
             pauseTimer = setTimeout(function () {
                 // A letter or two can't be said to find nothing; Enter still asks
-                if (OfflineQuery.answerable(read(value, true), env)) settle(q).catch(showErrorNotice);
+                if (OfflineQuery.answerable(read(value, true), env)) settle(q, true).catch(showErrorNotice);
                 else history.replaceState(null, '', buildUrl(q));
             }, PAUSE_MS);
-            runQuery(value).catch(showErrorNotice);
+            runQuery(value, true).catch(showErrorNotice);
         }
 
         function showErrorNotice(err) {
+            shown = null;
             resultsEl().innerHTML =
                 '<div class="offline-notice offline-notice-warn">Offline data is not ready. Enable offline mode in Settings and let a sync finish.</div>';
             console.error('offline shell setup failed', err);
@@ -277,7 +306,7 @@
                     live: live,
                     onType: typed,
                     onArrow: function (step) {
-                        var ready = typing ? settle(lastQuery.trim()) : Promise.resolve();
+                        var ready = typing ? settle(lastQuery.trim(), true) : Promise.resolve();
                         ready.then(function () {
                             if (hooks.move) hooks.move(step);
                         }).catch(showErrorNotice);
@@ -285,7 +314,7 @@
                     onSubmit: function (q) {
                         if (live() && hooks.closeKeyboard) box.blur();
                         if (typing) {
-                            settle(q).catch(showErrorNotice);
+                            settle(q, true).catch(showErrorNotice);
                             return;
                         }
                         // Live, Enter on what has already settled has nothing to add
