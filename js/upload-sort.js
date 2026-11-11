@@ -15,11 +15,18 @@ function uresSortKey(cell, numeric, attr) {
     return isNaN(n) ? null : n;
 }
 
+// Each row's place in the order the server sent, noted before a sort first
+// moves it.
+var uresServerPlace = new WeakMap();
+
 // The rows in the column's order: missing values last either way, ties by
-// the tie-breakers (uresTieOrder), then in the order they had.
+// the tie-breakers (uresTieOrder), then in the order they had. With no
+// column, the tie-breakers' ties fall back to the server's order, as on a
+// reload.
 function uresSortedRows(rows, col, numeric, descending, ties) {
     var keyed = rows.map(function(row, i) {
-        return {row: row, key: uresSortKey(row.cells[col], numeric), index: i};
+        var index = col === null && uresServerPlace.has(row) ? uresServerPlace.get(row) : i;
+        return {row: row, key: uresSortKey(row.cells[col], numeric), index: index};
     });
     keyed.sort(function(a, b) {
         if (a.key === null || b.key === null) {
@@ -58,7 +65,8 @@ function uresMoveRows(table, col, numeric, descending) {
     var tbody = table.tBodies[0];
     if (!tbody) return;
     var entries = [], rest = [];
-    Array.prototype.forEach.call(tbody.rows, function(row) {
+    Array.prototype.forEach.call(tbody.rows, function(row, i) {
+        if (!uresServerPlace.has(row)) uresServerPlace.set(row, i);
         (row.getAttribute('data-sort-method') === 'none' ? rest : entries).push(row);
     });
     uresSortedRows(entries, col, numeric, descending, uresTies(table, col === null)).concat(rest).forEach(function(row) {
