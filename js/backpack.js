@@ -526,15 +526,18 @@
 
     // markRows marks each card's buttons, which add and take NM copies in the
     // active backpack: the count is those NM copies, and a card held there
-    // only in other grades shows no minus and words the add for NM.
+    // only in other grades shows no minus and words the add for NM. With
+    // several backpacks the words name the active one.
     function markRows() {
         var nm = {}, other = {};
         inPack(active()).forEach(function (e) { if (e.cond === "NM") nm[e.id] = e.qty; else other[e.id] = true; });
+        var name = tabs().length > 1 ? packName(active()) : "";
+        var to = name ? " to " + name : "", from = name ? " from " + name : "";
         document.querySelectorAll(".pack-btn").forEach(function (b) {
             var id = b.getAttribute("data-card-id");
             var qty = nm[id], grade = other[id] ? " NM" : "";
             b.classList.toggle("active", !!(qty || other[id]));
-            describe(b, qty ? "Add another" + grade + " copy" : other[id] ? "Add an NM copy" : "Add to backpack");
+            describe(b, qty ? "Add another" + grade + to : other[id] ? "Add NM" + to : "Add to " + (name || "backpack"));
             var span = b.querySelector(".pack-btn-count");
             if (span) { span.textContent = qty ? String(qty) : ""; span.hidden = !qty; }
         });
@@ -542,7 +545,7 @@
             var id = b.getAttribute("data-card-id");
             var qty = nm[id];
             b.hidden = !qty;
-            describe(b, qty > 1 ? "Remove one" + (other[id] ? " NM" : "") + " copy" : other[id] ? "Remove the NM copy" : "Remove from backpack");
+            describe(b, qty > 1 ? "Remove one" + (other[id] ? " NM" : "") + from : other[id] ? "Remove NM" + from : "Remove from " + (name || "backpack"));
         });
     }
 

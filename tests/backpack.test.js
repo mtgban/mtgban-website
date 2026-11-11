@@ -138,7 +138,7 @@ describe('adding', () => {
         expect(p.rows[0].classes.has('active')).toBe(true);
         expect(p.rows[0].children[0].textContent).toBe('1');
         expect(p.rows[0].children[0].hidden).toBe(false);
-        expect(p.rows[0].getAttribute('title')).toBe('Add another copy');
+        expect(p.rows[0].getAttribute('title')).toBe('Add another');
         expect(p.navCount.textContent).toBe('1');
         expect(p.navCount.hidden).toBe(false);
         expect(p.nav.getAttribute('aria-label')).toBe('Backpack, 1 copy');
@@ -176,7 +176,7 @@ describe('adding', () => {
         const label = el('span'); label.classes.add('pack-btn-label'); label.textContent = 'Add to backpack'; item.appendChild(label);
         p.rows[0].parentNode.appendChild(item);
         p.window.addToBackpack(item);
-        expect(label.textContent).toBe('Add another copy');
+        expect(label.textContent).toBe('Add another');
         expect(p.rows[0].classes.has('active')).toBe(true);
     });
 
@@ -185,8 +185,8 @@ describe('adding', () => {
         const label = el('span'); label.classes.add('qi-label'); label.textContent = 'Remove from backpack'; p.minus[0].appendChild(label);
         p.window.addToBackpack(p.rows[0]);
         p.window.addToBackpack(p.rows[0]);
-        expect(p.minus[0].getAttribute('title')).toBe('Remove one copy');
-        expect(label.textContent).toBe('Remove one copy');
+        expect(p.minus[0].getAttribute('title')).toBe('Remove one');
+        expect(label.textContent).toBe('Remove one');
     });
 
     test('the add and minus buttons are named by their action, not the count they show', () => {
@@ -195,8 +195,8 @@ describe('adding', () => {
         p.window.addToBackpack(p.rows[0]);
         p.window.addToBackpack(p.rows[0]);
         expect(p.rows[0].children[0].textContent).toBe('2');
-        expect(p.rows[0].getAttribute('aria-label')).toBe('Add another copy');
-        expect(p.minus[0].getAttribute('aria-label')).toBe('Remove one copy');
+        expect(p.rows[0].getAttribute('aria-label')).toBe('Add another');
+        expect(p.minus[0].getAttribute('aria-label')).toBe('Remove one');
     });
 
     test('the phone menu items carry the same names as their labels', () => {
@@ -205,7 +205,7 @@ describe('adding', () => {
         const less = el('button'); less.classes.add('pack-minus-btn'); less.setAttribute('data-card-id', 'uuid-1');
         p.rows[0].parentNode.append(item, less);
         p.window.addToBackpack(item);
-        expect(item.getAttribute('aria-label')).toBe('Add another copy');
+        expect(item.getAttribute('aria-label')).toBe('Add another');
         expect(less.getAttribute('aria-label')).toBe('Remove from backpack');
     });
 
@@ -308,7 +308,7 @@ describe('the minus button', () => {
 
     test('takes one copy out, then the card at 1', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
-        expect(p.minus[0].getAttribute('title')).toBe('Remove one copy');
+        expect(p.minus[0].getAttribute('title')).toBe('Remove one');
         p.window.takeFromBackpack(p.minus[0]);
         expect(p.stored()[0].qty).toBe(1);
         expect(p.rows[0].children[0].textContent).toBe('1');
@@ -385,18 +385,18 @@ describe('grades', () => {
         const p = page({ store: [{ id: 'uuid-1', cond: 'SP', qty: 2, t: 1, m: 1 }] });
         expect(p.rows[0].classes.has('active')).toBe(true);
         expect(p.rows[0].children[0].hidden).toBe(true);
-        expect(p.rows[0].getAttribute('title')).toBe('Add an NM copy');
+        expect(p.rows[0].getAttribute('title')).toBe('Add NM');
         expect(p.minus[0].hidden).toBe(true);
     });
 
     test('beside another grade the buttons count and name NM copies', () => {
         const p = page({ store: [{ id: 'uuid-1', cond: 'SP', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', qty: 3, t: 1, m: 1 }] });
         expect(p.rows[0].children[0].textContent).toBe('3');
-        expect(p.rows[0].getAttribute('title')).toBe('Add another NM copy');
-        expect(p.minus[0].getAttribute('title')).toBe('Remove one NM copy');
+        expect(p.rows[0].getAttribute('title')).toBe('Add another NM');
+        expect(p.minus[0].getAttribute('title')).toBe('Remove one NM');
         p.window.Backpack.setQty('uuid-1', 1);
         p.window.renderBackpack();
-        expect(p.minus[0].getAttribute('title')).toBe('Remove the NM copy');
+        expect(p.minus[0].getAttribute('title')).toBe('Remove NM');
     });
 
     test('the search minus takes NM copies only', () => {
@@ -449,6 +449,18 @@ describe('numbered backpacks', () => {
         p.window.takeFromBackpack(p.minus[1]);
         expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2], [2, 'uuid-1', 'NM', 6]]);
         expect(p.stored().find((e) => e.id === 'uuid-2').del).toBeDefined();
+    });
+
+    test('the search buttons name the active backpack once there are several', () => {
+        const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', pack: 2, qty: 1, t: 1, m: 1 }], active: 2, tabList: [{ pack: 1, name: 'Trades' }, { pack: 2, name: 'Deck' }] });
+        expect(p.rows[0].getAttribute('title')).toBe('Add another to Deck');
+        expect(p.minus[0].getAttribute('title')).toBe('Remove from Deck');
+        expect(p.rows[1].getAttribute('title')).toBe('Add to Deck');
+        p.window.addToBackpack(p.rows[0]);
+        expect(p.minus[0].getAttribute('title')).toBe('Remove one from Deck');
+        const one = page({ store: [{ id: 'uuid-1', qty: 1, t: 1, m: 1 }], tabList: [{ pack: 1, name: 'Trades' }] });
+        expect(one.rows[1].getAttribute('title')).toBe('Add to backpack');
+        expect(one.minus[0].getAttribute('title')).toBe('Remove from backpack');
     });
 
     test('the add starts a card in the active backpack beside another backpack\'s copy', () => {
