@@ -44,6 +44,16 @@ func TestUploadSortKeysOrderMagicPrintings(t *testing.T) {
 		t.Errorf("Alpha's set key %q not before M10's %q", alpha.Set, m10.Set)
 	}
 
+	// A later drop files under its set's date
+	sld, err := b.Match(&matcher.InputCard{Name: "Archaeomancer", Edition: "Secret Lair Drop", Variation: "2242"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	drop := uploadsort.For(b, sld)
+	if !strings.HasPrefix(drop.Set, "2019-12-02 ") {
+		t.Errorf("Secret Lair drop's set key %q", drop.Set)
+	}
+
 	foil := matchKeys(t, b, "Lightning Bolt", "Magic 2010", true)
 	if !strings.HasPrefix(m10.Finish, "0 ") || !strings.HasPrefix(foil.Finish, "1 ") {
 		t.Errorf("finishes %q and %q, want nonfoil before foil", m10.Finish, foil.Finish)
