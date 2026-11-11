@@ -306,6 +306,21 @@ test('with no tie groups, the chain leads, a later key deciding only the ties', 
     expect(hashes(t)).toEqual(['c', 'b', 'a']);
 });
 
+test("clearing the chain with no column sorted puts the rows back in the server's order", () => {
+    const res = table([element({})], [keyed('z', { name: 'zap' }), keyed('a', { name: 'abc' }), keyed('m', { name: 'mox' })]);
+    const opt = table([element({})], ['zap', 'abc', 'mox'].map((name, i) =>
+        Object.assign(element({ 'data-load-idx': String(i), 'data-k-name': name }), { cells: [cell(name)] })), [], 'opt-table');
+    const { uresMenuAct } = load(page([res, opt]));
+    uresMenuAct('results', 'name', 'toggle');
+    expect(hashes(res)).toEqual(['a', 'm', 'z']);
+    uresMenuAct('results', 'name', 'toggle');
+    expect(hashes(res)).toEqual(['z', 'a', 'm']);
+    uresMenuAct('opt', 'name', 'toggle');
+    expect(idxs(opt)).toEqual(['1', '2', '0']);
+    uresMenuAct('opt', 'name', 'clear');
+    expect(idxs(opt)).toEqual(['0', '1', '2']);
+});
+
 test("each area keeps its own chain, and only its own tables follow it", () => {
     const res = table([element({})], [keyed('a', { name: 'zap' }), keyed('b', { name: 'opt' })]);
     const opt = table([element({})], [keyed('x', { name: 'zap' }), keyed('y', { name: 'opt' })], [], 'opt-table');
