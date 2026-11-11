@@ -602,7 +602,8 @@ td.admin-stale-date { color: var(--adanger); font-weight: 600; }
 .uuid-result span {
     font-size: var(--text-sm);
     color: var(--text-dim);
-    overflow: hidden;
+    min-width: 0;
+    overflow-x: clip;
     text-overflow: ellipsis;
     white-space: nowrap;
 }

@@ -930,6 +930,8 @@ pre {
     visibility: hidden;
 }
 
+/* A line box this short cuts off descenders under overflow: hidden, so a
+   span ending in an ellipsis clips only sideways: overflow-x: clip. */
 span {
     line-height: 1;
 }
