@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/ratelimit"
@@ -108,5 +110,36 @@ func TestNavOffersNoUnknownPage(t *testing.T) {
 	withSigMode(t, true, false)
 	if navOffers(testSite, url.Values{}, "NoSuchPage") {
 		t.Error("the navbar offers a page the registry lacks")
+	}
+}
+
+// signing records an open page and a signed gated page once each, and a
+// refused request not at all.
+func TestSigningRecordsEachPageOnce(t *testing.T) {
+	handler := anyTierNav(t, "BODY")
+	// The verifier hashes only SignedFields, built from the real nav.
+	savedFields := SignedFields
+	SignedFields = append(slices.Clone(SignedFields), "Gated")
+	t.Cleanup(func() { SignedFields = savedFields })
+	signed := signedAs(t, url.Values{"UserTier": {"Legacy"}, "Gated": {"true"}}, time.Now().Add(time.Hour))
+
+	for _, c := range []struct {
+		path, sig string
+		want      int
+	}{
+		{"/open", "", 1},
+		{"/gated", signed, 1},
+		{"/gated", "", 0},
+	} {
+		hits := countHits(t)
+		req := httptest.NewRequest(http.MethodGet, c.path, nil)
+		if c.sig != "" {
+			req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: c.sig})
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if len(*hits) != c.want {
+			t.Errorf("%s signed=%v: hits %v, want %d (body %q)", c.path, c.sig != "", *hits, c.want, rec.Body.String())
+		}
 	}
 }

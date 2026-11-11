@@ -192,7 +192,7 @@ func (s *site) UploadHandoff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The middleware used to count this page; it no longer sees it.
-	recordPageHit(r)
+	recordHit(r)
 
 	// A phone gets the handoff in the mobile layout, though the Upload page
 	// it belongs to keeps the desktop one, so it marks the mobile view itself.

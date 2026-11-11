@@ -3,7 +3,9 @@ package observability
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"maps"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,6 +36,15 @@ var pageSubviews = map[string]map[string]bool{
 		"reprint": true, "mismatch": true, "gap": true,
 		"hotlist": true, "velocity": true, "options": true,
 	},
+}
+
+// Subviews is the sorted ?page= values base recognises; nil for a route with none.
+func Subviews(base string) []string {
+	subs, ok := pageSubviews[base]
+	if !ok {
+		return nil
+	}
+	return slices.Sorted(maps.Keys(subs))
 }
 
 // NormalizePath maps a request path plus its page param to a low-cardinality key.
@@ -73,6 +84,9 @@ func IsBot(userAgent string) bool {
 	return useragent.Parse(userAgent).Bot
 }
 
+// pathURLs are the keys PathURL does not derive: "other" is no page, so has no link.
+var pathURLs = map[string]string{"other": "", "upload/handoff": "/upload/handoff"}
+
 // PathURL turns a NormalizePath key into a same-host absolute path for links.
 // newspaper/index maps to /newspaper; newspaper/syp to /newspaper?page=syp.
 // Keys are produced by NormalizePath, so the result is safe for an href.
@@ -80,6 +94,9 @@ func PathURL(key string) string {
 	key = strings.Trim(key, "/")
 	if key == "" || key == "home" {
 		return "/"
+	}
+	if u, ok := pathURLs[key]; ok {
+		return u
 	}
 	base, sub, cut := strings.Cut(key, "/")
 	if !cut {

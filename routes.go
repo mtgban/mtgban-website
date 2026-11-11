@@ -97,21 +97,21 @@ func (s *site) registerRoutes() {
 	})
 
 	// Public changelog sourced from the Discord announcement channel.
-	http.Handle("/changelog", noSigning(http.HandlerFunc(s.Changelog)))
+	http.Handle("/changelog", publicPage(http.HandlerFunc(s.Changelog)))
 	// Public account page: the tier table, and the reader's own account when signed in.
-	http.Handle("/user", noSigning(http.HandlerFunc(s.User)))
+	http.Handle("/user", publicPage(http.HandlerFunc(s.User)))
 
 	// when navigating to /home it should serve the home page
-	http.Handle("/", noSigning(http.HandlerFunc(s.Home)))
+	http.Handle("/", publicPage(http.HandlerFunc(s.Home)))
 
 	// Public guide page
-	http.Handle("/guide", noSigning(http.HandlerFunc(s.Guide)))
+	http.Handle("/guide", publicPage(http.HandlerFunc(s.Guide)))
 
 	// Public privacy policy (cookie + Amazon Associates disclosures)
-	http.Handle("/privacy", noSigning(http.HandlerFunc(s.Privacy)))
+	http.Handle("/privacy", publicPage(http.HandlerFunc(s.Privacy)))
 
 	// Offline shell page, precached by the service worker
-	http.Handle("/offline", noSigning(http.HandlerFunc(s.OfflinePage)))
+	http.Handle("/offline", publicPage(http.HandlerFunc(s.OfflinePage)))
 
 	// Mobile/desktop view toggle
 	http.HandleFunc("/toggle-mobile", toggleMobileView)

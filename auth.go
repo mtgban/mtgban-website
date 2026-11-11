@@ -676,7 +676,7 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 
 		// A page the ACL opens to everyone needs no signature
 		if openPage(r.URL.Path) != "" {
-			recordPageHit(r)
+			recordHit(r)
 			noSigning(next).ServeHTTP(w, r)
 			return
 		}
@@ -858,7 +858,7 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 			}
 		}
 
-		recordPageHit(r)
+		recordHit(r)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -883,26 +883,35 @@ func recoverPanic(r *http.Request, w *startedWriter) {
 	writeInternalError(w, r)
 }
 
-// startedWriter notes whether a handler began its response.
+// startedWriter notes whether a handler began its response, and its status.
 type startedWriter struct {
 	http.ResponseWriter
 	started bool
+	status  int
 }
 
 func (w *startedWriter) WriteHeader(code int) {
-	w.started = true
+	w.start(code)
 	w.ResponseWriter.WriteHeader(code)
 }
 
 func (w *startedWriter) Write(b []byte) (int, error) {
-	w.started = true
+	w.start(http.StatusOK)
 	return w.ResponseWriter.Write(b)
 }
 
 // ReadFrom keeps the underlying writer's own copy, sendfile on a file.
 func (w *startedWriter) ReadFrom(src io.Reader) (int64, error) {
-	w.started = true
+	w.start(http.StatusOK)
 	return io.Copy(w.ResponseWriter, src)
+}
+
+// start keeps the first status the response was given.
+func (w *startedWriter) start(code int) {
+	w.started = true
+	if w.status == 0 {
+		w.status = code
+	}
 }
 
 // Unwrap lets http.ResponseController reach the writer's Flush and the like.
