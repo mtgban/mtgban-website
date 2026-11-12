@@ -26,7 +26,7 @@ func TestMobileSettingsOfferSealedContents(t *testing.T) {
 	page := renderPage(t, "search.html", true, PageVars{UserNav: &NavElem{Short: "b"}, IsMobile: true})
 	for _, want := range []string{
 		`getCookie('SearchSealedContents')`,
-		`setCookie('SearchSealedContents'`,
+		`set('SearchSealedContents'`, // writeDrawer hands it to the save's setCookie
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("mobile settings script lacks %s", want)

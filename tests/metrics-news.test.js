@@ -18,6 +18,7 @@ test.each([
     ['mobile', 'class="m-news-detail-search"', 'ui.news.card', undefined, undefined],
     ['syp', 'class="arb-load-btn csv"', 'ui.news.syp', 'csv', undefined],
     ['syp', 'class="arb-qlink buy"', 'ui.news.syp', 'buy_link', undefined],
+    ['syp', 'href="{{$card.SearchURL}}" lang="{{$card.LangTag}}"', 'ui.news.syp', 'card', undefined],
 ])('%s: the tag with %s tracks %s:%s', (file, marker, name, value, scope) => {
     const found = tagsWith({ desktop, mobile, syp }[file], marker);
     expect(found.length).toBe(1);

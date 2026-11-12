@@ -17,6 +17,7 @@ test.each([
     ['screener', '&index={{.PrevIndex}}"', 'ui.screener.pager', 'prev', undefined],
     ['screener', '&index={{.NextIndex}}"', 'ui.screener.pager', 'next', undefined],
     ['screener', 'class="news-upload-btn"', 'ui.screener.upload_page', undefined, undefined],
+    ['screener', 'class="card-name" href="{{$card.SearchURL}}"', 'ui.screener.card', undefined, undefined],
 ])('%s: the tag with %s tracks %s:%s', (file, marker, name, value, scope) => {
     const found = tagsWith(files[file], marker);
     expect(found.length).toBe(1);

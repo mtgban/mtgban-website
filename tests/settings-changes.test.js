@@ -151,40 +151,94 @@ test('snapshot reads exactly the drawer cookies', () => {
     expect(snap.SearchDefaultTab).toBe('buyers');
 });
 
-// runDrawer runs the mobile drawer's inline saveSettings over a cookie jar.
-function runDrawer({ jar = {}, listing = true, factors = null, BAN, loaded = true } = {}) {
+// runDrawer opens the mobile drawer over a cookie jar with the controls at open, then saves
+// with the controls at save. Controls map a pill group's id to its active value, the toggle and
+// checkbox groups to arrays; opened null saves with no open recorded.
+function runDrawer({ jar = {}, listing = true, factors = null, BAN, loaded = true, opened, controls = {} } = {}) {
     const page = read('templates/mobile/search.html');
-    const start = page.indexOf('function saveSettings()');
-    const fn = page.slice(start, page.indexOf('\n}\n', start) + 2);
+    const start = page.indexOf('function writeDrawer(');
+    const save = page.indexOf('function saveSettings()', start);
+    const fn = page.slice(start, page.indexOf('\n}\n', save) + 2);
     const cookies = new Map(Object.entries(jar));
     const win = {};
     if (loaded) win.SettingsChanges = SettingsChanges;
     if (BAN) win.BAN = BAN;
     if (factors) win.StoreFactors = { saveEditor: () => cookies.set('SearchStoreFactors', factors) };
+    const state = { c: opened || controls };
     const document = {
-        querySelector: () => null,
-        querySelectorAll: () => [],
-        getElementById: (id) => (id === 'm-set-sellers-priority' || id === 'm-set-vendors-priority' ? { value: '' }
+        querySelector: (sel) => {
+            const m = sel.match(/^#([\w-]+) \.m-settings-pill\.active$/);
+            const v = m && state.c[m[1]];
+            return v ? { getAttribute: () => v } : null;
+        },
+        querySelectorAll: (sel) => {
+            const id = sel.match(/^#([\w-]+) /)[1];
+            return (state.c[id] || []).map((v) => ({ name: v, getAttribute: () => v }));
+        },
+        getElementById: (id) => (id === 'm-set-sellers-priority' || id === 'm-set-vendors-priority' ? { value: state.c[id] || '' }
             : id === 'm-set-listing-priority' ? (listing ? {} : null)
                 : id === 'm-set-store-factors' ? (factors ? {} : null) : null),
     };
+    const body = (opened === null ? '' : 'markDrawerOpened();\n') + 'state.c = controls;\nsaveSettings();';
     // The shared file reads window.BAN from the window it was loaded into.
     window.BAN = win.BAN;
     try {
-        new Function('window', 'document', 'setCookie', 'getCookie', 'localStorage', 'closeSettings', 'SettingsChanges', fn + '\nsaveSettings();')(
+        new Function('window', 'document', 'setCookie', 'getCookie', 'localStorage', 'closeSettings', 'SettingsChanges', 'state', 'controls', fn + '\n' + body)(
             win, document, (k, v) => cookies.set(k, v), (k) => (cookies.has(k) ? cookies.get(k) : null),
-            { setItem() {} }, () => {}, win.SettingsChanges);
+            { setItem() {} }, () => {}, win.SettingsChanges, state, controls);
     } finally {
         delete window.BAN;
     }
     return cookies;
 }
 
-// Review focus: a reader's first save writes a default into every unset cookie.
-test("the drawer's first save reports only the listing priority it writes off its default", () => {
+// Review focus: a reader's first save writes a default into every unset cookie, By Store among them.
+test('a drawer applied untouched counts the save and no setting, though it writes store order', () => {
     const { BAN, calls } = fakeBAN();
-    runDrawer({ BAN });
-    expect(calls).toEqual([['ui.settings.change', 'stores', 'SearchListingPriority'], ['ui.settings.save', 'mobile_drawer', undefined]]);
+    const cookies = runDrawer({ BAN, controls: { 'm-set-listing-priority': 'stores' } });
+    expect(calls).toEqual([['ui.settings.save', 'mobile_drawer', undefined]]);
+    expect(cookies.get('SearchListingPriority')).toBe('stores');
+});
+
+test('a drawer save counts the control the reader moved and nothing it writes on its own', () => {
+    const { BAN, calls } = fakeBAN();
+    const opened = { 'm-set-listing-priority': 'stores', 'm-set-layout': 'expanded' };
+    runDrawer({ BAN, opened, controls: { 'm-set-listing-priority': 'stores', 'm-set-layout': 'compact' } });
+    expect(calls).toEqual([['ui.settings.change', 'compact', 'MobileSearchLayout'], ['ui.settings.save', 'mobile_drawer', undefined]]);
+});
+
+test('a listing priority the reader picked is counted', () => {
+    const { BAN, calls } = fakeBAN();
+    runDrawer({ BAN, opened: { 'm-set-listing-priority': 'stores' }, controls: { 'm-set-listing-priority': 'credit' } });
+    expect(calls).toEqual([['ui.settings.change', 'credit', 'SearchListingPriority'], ['ui.settings.save', 'mobile_drawer', undefined]]);
+});
+
+test('opening the drawer records its controls after it loads them from the cookies', () => {
+    expect(read('templates/mobile/search.html')).toMatch(/function openSettings\(\) \{\s+loadSettings\(\);\s+markDrawerOpened\(\);/);
+});
+
+test('a control left where it opened is not a change', () => {
+    const { BAN, calls } = fakeBAN();
+    const controls = { 'm-set-misc-opts': ['noSussy'], 'm-set-sellers': ['CK'] };
+    runDrawer({ BAN, jar: { SearchMiscOpts: 'noSussy,', SearchSellersList: 'CK,' }, opened: { 'm-set-misc-opts': ['noSussy'], 'm-set-sellers': ['CK'] }, controls });
+    expect(calls).toEqual([['ui.settings.save', 'mobile_drawer', undefined]]);
+});
+
+test('a toggle and a store list the reader changed are counted', () => {
+    const { BAN, calls } = fakeBAN();
+    runDrawer({ BAN, opened: {}, controls: { 'm-set-misc-opts': ['hidePromos'], 'm-set-sellers': ['CK'] } });
+    expect(calls).toEqual([
+        ['ui.settings.change', 'on', 'SearchMiscOpts.hidePromos'],
+        ['ui.settings.change', 'set', 'SearchSellersList'],
+        ['ui.settings.save', 'mobile_drawer', undefined]]);
+});
+
+test('report with only counts the settings named, by the name before a flag', () => {
+    const { BAN, calls } = fakeBAN();
+    window.BAN = BAN;
+    SettingsChanges.report({ SearchMiscOpts: '', SearchDefaultSort: 'chrono' }, { SearchMiscOpts: 'noSussy,', SearchDefaultSort: 'alpha' }, 'modal', ['SearchMiscOpts']);
+    delete window.BAN;
+    expect(calls).toEqual([['ui.settings.change', 'on', 'SearchMiscOpts.noSussy'], ['ui.settings.save', 'modal', undefined]]);
 });
 
 test('the drawer reads the store factors after their save wrote them', () => {
@@ -195,7 +249,7 @@ test('the drawer reads the store factors after their save wrote them', () => {
 
 test('a drawer save over unknown cookie text sends no scope or value outside the registry', () => {
     const { BAN, calls } = fakeBAN();
-    runDrawer({ BAN, jar: { SearchMiscOpts: 'noSussy,Black Lotus alpha', SearchDefaultView: 'my secret text', SearchDefaultTab: 'https://example.com/' } });
+    runDrawer({ BAN, opened: null, jar: { SearchMiscOpts: 'noSussy,Black Lotus alpha', SearchDefaultView: 'my secret text', SearchDefaultTab: 'https://example.com/' } });
     expect(calls.length).toBeGreaterThan(1);
     for (const [name, value, scope] of calls) {
         if (name !== 'ui.settings.change') continue;

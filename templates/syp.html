@@ -57,7 +57,7 @@
                                 <div class="arb-card-cell">
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 24 "Class" "set-icon"}}
                                     <span class="card-name-line">
-                                        <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
+                                        <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener" data-track="ui.news.syp" data-track-value="card">{{$card.Name}}</a>
                                         {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}
                                         {{buylist_badge $.ScraperShort $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}
                                     </span>

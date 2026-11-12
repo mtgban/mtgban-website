@@ -83,6 +83,8 @@ const COOKIE_INDIRECT = {
     },
     'js/upload-presets.js': () => quoted(read('js/upload-presets.js')).filter((s) => /^(Upload|enabled[A-Z])[A-Za-z]*$/.test(s)),
     'js/upload-tabs.js': () => quoted(read('js/upload-tabs.js')).filter((s) => /^Upload[A-Za-z]*$/.test(s)),
+    // The phone drawer's save writes each name writeDrawer hands it.
+    'templates/mobile/search.html': () => [...read('templates/mobile/search.html').matchAll(/\bset\('([A-Za-z]+)'/g)].map((m) => m[1]),
 };
 const LOCAL_INDIRECT = {
     'js/chartopts.js': () => ['BANChart', 'BANChartSealed'],
@@ -92,7 +94,7 @@ const LOCAL_INDIRECT = {
     'js/user-state.js': () => [],
 };
 // Unreadable write sites per file today: a new one fails until its names are added above.
-const COOKIE_INDIRECT_SITES = { 'js/cookies.js': 3, 'js/settings.js': 9, 'js/arbit-filters.js': 1, 'js/upload-presets.js': 4, 'js/upload-tabs.js': 1 };
+const COOKIE_INDIRECT_SITES = { 'js/cookies.js': 3, 'js/settings.js': 10, 'js/arbit-filters.js': 1, 'js/upload-presets.js': 4, 'js/upload-tabs.js': 1, 'templates/mobile/search.html': 1 };
 const LOCAL_INDIRECT_SITES = { 'js/chartopts.js': 1, 'js/command-palette.js': 1, 'js/list-storage.js': 1, 'js/offline/offline-mode.js': 1, 'js/user-state.js': 2 };
 
 // Runs one collector over sources; an indirect write in a file with no entry is an error.

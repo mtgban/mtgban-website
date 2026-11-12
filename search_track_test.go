@@ -441,6 +441,15 @@ func TestRowControlsTrack(t *testing.T) {
 		track("ui.row.locked", "velocity_upsell", ""): 1,
 		`data-track="ui.row.admin_fix"`:               0,
 	})
+	// The phone drawer's Join link shows only while the listing priority is locked.
+	wantTracks(t, "mobile drawer unlocked", renderPage(t, "search.html", true, v), map[string]int{
+		track("ui.row.locked", "listing_priority", ""): 0,
+	})
+	v.ListingLocked = true
+	wantTracks(t, "mobile drawer locked", renderPage(t, "search.html", true, v), map[string]int{
+		track("ui.row.locked", "listing_priority", ""): 1,
+	})
+	v.ListingLocked = false
 	v.FoundSellers["card"]["INDEX"] = []SearchEntry{{ScraperName: "TCG Market", Shorthand: "TCGMarket", Price: 9}}
 	wantTracks(t, "mobile compact with an index", renderPage(t, "search.html", true, v), map[string]int{
 		track("ui.row.condition", "INDEX", ""): 1,

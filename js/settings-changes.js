@@ -139,10 +139,11 @@
         return out;
     }
 
-    // report tracks each change, then the save itself, by surface.
-    function report(before, after, surface) {
+    // report tracks each change, then the save itself, by surface; only, when given, lists the settings it may count.
+    function report(before, after, surface, only) {
         if (!(window.BAN && window.BAN.track)) return;
         diff(before, after).forEach(function (c) {
+            if (only && only.indexOf(c.name.split('.')[0]) < 0) return;
             if (window.BAN && window.BAN.track) window.BAN.track('ui.settings.change', c.value, c.name);
         });
         if (window.BAN && window.BAN.track) window.BAN.track('ui.settings.save', surface);

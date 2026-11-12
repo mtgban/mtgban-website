@@ -501,22 +501,7 @@ func TestInvestRowsCarryHelp(t *testing.T) {
 	}
 }
 
-// expectedLater are the names the rules read that a later stage registers, with the shape
-// each rule assumes; once registered, the shape is checked.
-var expectedLater = []struct {
-	name, stage string
-	shape       func(observability.Name) bool
-}{
-	{uiLoad, "2a", func(n observability.Name) bool {
-		return n.Family == observability.FamilyUI && n.Scope == observability.ScopePage // scope read as the page
-	}},
-	{"ui.search.sort_locked", "2b", func(n observability.Name) bool { return n.Family == observability.FamilyUI }},
-	{"ui.row.locked", "2b", func(n observability.Name) bool {
-		return n.Family == observability.FamilyUI && n.Values != observability.ValueNone
-	}},
-}
-
-// Every name the rules read is pinned: registered now with the shape read, or listed as expected later.
+// Every name the rules read is registered with the shape read.
 func TestEveryNameReadIsPinned(t *testing.T) {
 	flush, ok := observability.Lookup(flushName)
 	if !ok || flush.Report != observability.ReportInternal || flush.Scope != observability.ScopeNone || flush.Values != observability.ValueNone {
@@ -542,23 +527,28 @@ func TestEveryNameReadIsPinned(t *testing.T) {
 	if !ok || offlineSync.Family != observability.FamilyUI || offlineSync.Scope == observability.ScopeNone || !slices.Contains(offlineSync.Enum, "fail") {
 		t.Errorf("ui.offline.sync = %+v: Failures reads fail over every sync, per scope", offlineSync)
 	}
-	later := map[string]bool{}
-	for _, e := range expectedLater {
-		later[e.name] = true
-		if n, ok := observability.Lookup(e.name); ok && !e.shape(n) {
-			t.Errorf("%s, expected from stage %s, is registered with a shape the rules do not read: %+v", e.name, e.stage, n)
-		}
+	load, ok := observability.Lookup(uiLoad)
+	if !ok || load.Family != observability.FamilyUI || load.Scope != observability.ScopePage {
+		t.Errorf("%s = %+v: denominatorOf and Coverage read its scope as the page", uiLoad, load)
+	}
+	sortLocked, ok := observability.Lookup("ui.search.sort_locked")
+	if !ok || sortLocked.Family != observability.FamilyUI {
+		t.Errorf("ui.search.sort_locked = %+v: Walls reads it as a ui name", sortLocked)
+	}
+	rowLocked, ok := observability.Lookup("ui.row.locked")
+	if !ok || rowLocked.Family != observability.FamilyUI || rowLocked.Values == observability.ValueNone {
+		t.Errorf("ui.row.locked = %+v: Walls reads it by value", rowLocked)
 	}
 	for _, p := range append(slices.Clone(walls), failures...) {
 		for _, pt := range append([]part{p.num}, p.denom...) {
-			if _, ok := observability.Lookup(pt.name); !ok && !later[pt.name] {
-				t.Errorf("%s: %s is neither registered nor expected later", p.label, pt.name)
+			if _, ok := observability.Lookup(pt.name); !ok {
+				t.Errorf("%s: %s is not registered", p.label, pt.name)
 			}
 		}
 	}
 	for _, name := range []string{uiLoad, stateReader} {
-		if _, ok := observability.Lookup(name); !ok && !later[name] {
-			t.Errorf("%s is neither registered nor expected later", name)
+		if _, ok := observability.Lookup(name); !ok {
+			t.Errorf("%s is not registered", name)
 		}
 	}
 }
