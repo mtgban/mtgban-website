@@ -701,9 +701,11 @@ also carries its card-property keys from `internal/uploadsort` (name, the
 set's release date, the printing's own, number, finish, color, rarity) as
 `data-k-*`. `js/upload-sort.js` sorts the results and each optimizer store
 by any column, breaks ties by the reader's chain of those keys (saved in
-localStorage, synced), and falls back to the server's order. Stores tied on
-a row's best offer are ordered by `internal/uploadtie`, by the
-`UploadTiebreak` rule (store credit, market credit, the store with most of
+localStorage, synced), and falls back to the server's order. With no
+column sorted, the tie groups lead a page as it loads; once the reader
+picks from the chain's menu, the chain leads and the groups break its
+ties. Stores tied on a row's best offer are ordered by
+`internal/uploadtie`, by the `UploadTiebreak` rule (store credit, market credit, the store with most of
 the list, or the `UploadTiebreakOrder` custom order, shorthand last); on a
 buylist with a multi-select margin (`minmargin`) the rule is not read,
 since every tied store gets the row there.

@@ -275,20 +275,37 @@ test('the tie-breakers order rows a column ties on', () => {
     expect(hashes(t)).toEqual(['c', 'a', 'b']);
 });
 
-test("with no column sorted, the setting's tie groups lead and the chain breaks their ties", () => {
+test("on load, the setting's tie groups lead and a saved chain breaks their ties", () => {
     const t = table([element({})], [
         keyed('a', { lead: '2', set: '1993-08-05 alpha' }),
         keyed('b', { lead: '1', set: '2009-07-17 magic 2010' }),
         keyed('c', { lead: '1', set: '1993-08-05 alpha' }),
         keyed('d', { lead: '2', rarity: '0' }),
     ]);
-    const { uresMenuAct } = load(page([t]));
-    uresMenuAct('results', 'set', 'toggle');
-    // A row missing the key goes last in its group, either way round
+    const doc = page([t], [button('results')]);
+    load(doc, storage({ mtgban_upload_sort: JSON.stringify({ results: 'set:a', opt: '' }) }));
+    doc.listeners.DOMContentLoaded.forEach((fn) => fn());
+    // A row missing the key goes last in its group
     expect(hashes(t)).toEqual(['c', 'b', 'a', 'd']);
-    uresMenuAct('results', 'set', 'dir');
-    expect(hashes(t)).toEqual(['b', 'c', 'a', 'd']);
-    expect(t.events.length).toBe(2);
+});
+
+test("a pick from the menu leads, the setting's tie groups breaking its ties", () => {
+    // A card-data sort: each printing its own group
+    const t = table([element({})], [
+        keyed('a', { lead: '1', release: '2026-09-29' }),
+        keyed('b', { lead: '2', release: '2026-05-12' }),
+        keyed('c', { lead: '3', release: '2026-09-29' }),
+        keyed('d', { lead: '4' }),
+    ]);
+    const { uresMenuAct } = load(page([t]));
+    uresMenuAct('results', 'release', 'toggle');
+    expect(hashes(t)).toEqual(['b', 'a', 'c', 'd']);
+    // A row missing the key goes last either way round
+    uresMenuAct('results', 'release', 'dir');
+    expect(hashes(t)).toEqual(['a', 'c', 'b', 'd']);
+    uresMenuAct('results', '', 'clear');
+    expect(hashes(t)).toEqual(['a', 'b', 'c', 'd']);
+    expect(t.events.length).toBe(3);
 });
 
 test('with no tie groups, the chain leads, a later key deciding only the ties', () => {
@@ -319,6 +336,29 @@ test("clearing the chain with no column sorted puts the rows back in the server'
     expect(idxs(opt)).toEqual(['1', '2', '0']);
     uresMenuAct('opt', 'name', 'clear');
     expect(idxs(opt)).toEqual(['0', '1', '2']);
+});
+
+test("a pick from one store's own button leads in that store only", () => {
+    const rows = () => [
+        keyed('x', { lead: '1', release: '2026-09-29' }),
+        keyed('y', { lead: '1', release: '2026-05-12' }),
+        keyed('z', { lead: '2', release: '2026-06-16' }),
+    ];
+    const a = table([element({})], rows(), [], 'opt-table');
+    const b = table([element({})], rows(), [], 'opt-table');
+    const doc = page([a, b], [button('opt')]);
+    const store = storage({ mtgban_upload_sort: JSON.stringify({ results: '', opt: 'release:a' }) });
+    const { uresMenuAct, uresRefresh } = load(doc, store);
+    doc.listeners.DOMContentLoaded.forEach((fn) => fn());
+    expect(hashes(a)).toEqual(['y', 'x', 'z']);
+    uresMenuAct('opt', 'release', 'dir', a);
+    expect(hashes(a)).toEqual(['x', 'z', 'y']);
+    expect(hashes(b)).toEqual(['y', 'x', 'z']);
+    // A synced order sorts both again: the other store still groups first
+    store.map.mtgban_upload_sort = JSON.stringify({ results: '', opt: 'release:d' });
+    uresRefresh();
+    expect(hashes(a)).toEqual(['x', 'z', 'y']);
+    expect(hashes(b)).toEqual(['x', 'y', 'z']);
 });
 
 test("each area keeps its own chain, and only its own tables follow it", () => {
