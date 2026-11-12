@@ -35,6 +35,7 @@ import (
 	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/cubecobra"
 	"github.com/mtgban/mtgban-website/internal/docparse"
+	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/internal/uploadsort"
 	"github.com/mtgban/mtgban-website/internal/uploadtie"
@@ -499,6 +500,10 @@ type UploadVars struct {
 	// One section per opened product, replacing the category split when the
 	// list was unpacked
 	UnpackedSections []UnpackedSection
+
+	// SharePreview is a share link's unfurl, set on the page refusing a
+	// reader with no signature, which is what a link unfurler is.
+	SharePreview *embed.SharePreview
 }
 
 func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
@@ -1964,6 +1969,20 @@ func loadUploadShare(ctx context.Context, rd uploadShareReader, key string) (use
 		return userstate.UploadShare{}, false
 	}
 	return share, found
+}
+
+// uploadSharePreview is the link preview of the share r names, or nil.
+func uploadSharePreview(r *http.Request, b *matcher.Backend) *embed.SharePreview {
+	share, found := loadUploadShare(r.Context(), uploadShareSource(), r.URL.Query().Get("share"))
+	if !found {
+		return nil
+	}
+	hashes, qtys, _, _, _, _, _, _ := splitRows(share.Rows)
+	preview := embed.UploadShare(b, hashes, qtys, share.Buylist, share.ExpiresAt)
+	if preview.Title == "" {
+		return nil
+	}
+	return &preview
 }
 
 // knownShareCondition reports whether a shared row's condition is one of

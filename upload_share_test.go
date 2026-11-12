@@ -13,7 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/internal/pledge"
+	"github.com/mtgban/mtgban-website/ratelimit"
 	"github.com/mtgban/mtgban-website/userstate"
 )
 
@@ -241,5 +243,63 @@ func TestSharedRowsKeepOnlyKnownConditions(t *testing.T) {
 		if string(entry.OriginalCondition) != want[i] {
 			t.Errorf("row %d condition %q, want %q", i, entry.OriginalCondition, want[i])
 		}
+	}
+}
+
+// A link unfurler carries no signature: the page refusing it previews the
+// share instead of only saying Unauthorized.
+func TestShareLinkUnfurlsWithoutASignature(t *testing.T) {
+	signingEnabled(t, true)
+	savedLimiter := UserRateLimiter
+	t.Cleanup(func() { UserRateLimiter = savedLimiter })
+	UserRateLimiter = ratelimit.NewLimiter(1000, 1000)
+	savedSrc := uploadShareSource
+	t.Cleanup(func() { uploadShareSource = savedSrc })
+
+	b := matcher.NewBackend()
+	co := &matcher.CardObject{}
+	co.UUID, co.Name, co.SetCode = "uuid-1", "The One Ring", "LTR"
+	b.UUIDs[co.UUID] = co
+	s := newSite()
+	s.ds.Store(&datastore{backend: b})
+	reached := false
+	page := enforceSigning(s, http.HandlerFunc(func(http.ResponseWriter, *http.Request) { reached = true }))
+
+	share := userstate.UploadShare{Key: goodShareKey, Rows: "uuid-1\t4\t\t\t\t\t", ExpiresAt: time.Date(2026, 11, 18, 0, 0, 0, 0, time.UTC)}
+	for _, tc := range []struct {
+		name   string
+		rd     uploadShareReader
+		target string
+		want   bool
+	}{
+		{"live share", shareTestReader{share: share, found: true}, "/upload?share=" + goodShareKey, true},
+		{"dead share", shareTestReader{}, "/upload?share=" + goodShareKey, false},
+		{"another page", shareTestReader{share: share, found: true}, "/arbit?share=" + goodShareKey, false},
+	} {
+		uploadShareSource = func() uploadShareReader { return tc.rd }
+		rec := httptest.NewRecorder()
+		page.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.target, nil))
+		body := rec.Body.String()
+		if reached || !strings.Contains(body, "<title>Unauthorized</title>") {
+			t.Fatalf("%s: reached %v; want the refusal page", tc.name, reached)
+		}
+		for _, meta := range []string{
+			`<meta property="og:title" content="Shared retail list" />`,
+			`<meta property="og:description" content="4 cards. Link expires Nov 18." />`,
+		} {
+			if strings.Contains(body, meta) != tc.want {
+				t.Errorf("%s: carries %q = %v, want %v", tc.name, meta, !tc.want, tc.want)
+			}
+		}
+	}
+
+	// A throttled request is refused before the share is read.
+	UserRateLimiter = ratelimit.NewLimiter(0, 0)
+	rd := &fakeShareReader{share: share, found: true}
+	uploadShareSource = func() uploadShareReader { return rd }
+	rec := httptest.NewRecorder()
+	page.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/upload?share="+goodShareKey, nil))
+	if reached || !strings.Contains(rec.Body.String(), "<title>Too Many Requests</title>") || len(rd.asked) != 0 {
+		t.Errorf("throttled: reached %v, asked %v; want the 429 page and no read", reached, rd.asked)
 	}
 }
