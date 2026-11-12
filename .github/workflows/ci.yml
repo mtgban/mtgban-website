@@ -156,3 +156,6 @@ jobs:
 
       - name: go test ./...
         run: go test ./...
+
+      - name: go test -race (metrics)
+        run: go test -race ./observability/ ./internal/metricsreport/
