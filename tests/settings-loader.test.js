@@ -24,7 +24,8 @@ function page({ search = '', toast = false, activeTag = 'BODY', linked = [] } = 
         removeEventListener(type, fn) { listeners[type] = (listeners[type] || []).filter(f => f !== fn); },
     };
     const sessionStorage = { getItem: (k) => (toast && k === 'settingsSavedToast' ? '1' : null) };
-    const window = { location: { search }, console: { error(m) { errors.push(m); } } };
+    const tracked = [];
+    const window = { location: { search }, console: { error(m) { errors.push(m); } }, BAN: { track: (...a) => tracked.push(a) } };
     new Function('window', 'document', 'sessionStorage', source)(window, document, sessionStorage);
     const press = (init) => {
         const e = Object.assign({ defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } }, init);
@@ -33,7 +34,7 @@ function page({ search = '', toast = false, activeTag = 'BODY', linked = [] } = 
     };
     const settle = () => new Promise(r => setTimeout(r, 0));
     const of = (tag, rel) => head.filter(el => el.tagName === tag && (!rel || el.rel === rel));
-    return { window, head, listeners, errors, press, settle, of };
+    return { window, head, listeners, errors, press, settle, of, tracked };
 }
 
 test('the gear links both sheets, then runs the scripts in order, then opens the tab asked for', async () => {
@@ -164,4 +165,23 @@ test('the base hands the modal to the loader; the pages with the alert dialog ke
     expect(shell).toContain('id="settings-backdrop" hidden>');
     expect(shell).toContain('aria-labelledby="settings-modal-title" hidden>');
     expect(readFileSync(new URL('../js/settings.js', import.meta.url), 'utf8')).toContain('modalEl.hidden = false;');
+});
+
+test('Ctrl+Comma is counted by the loader until settings.js has the key', async () => {
+    const p = page();
+    const keys = () => p.tracked.filter(t => t[0] === 'ui.key');
+    p.press({ ctrlKey: true, key: ',' });
+    expect(keys()).toEqual([['ui.key', 'settings_hotkey']]);
+    p.of('link', 'stylesheet').forEach(l => l.onload());
+    await p.settle();
+    p.of('script').forEach(s => s.onload());
+    await p.settle();
+    p.press({ ctrlKey: true, key: ',' }); // the loader's listener is gone
+    expect(keys()).toHaveLength(1);
+});
+
+test('Ctrl+Comma in a field is not the settings hotkey', () => {
+    const p = page({ activeTag: 'INPUT' });
+    p.press({ ctrlKey: true, key: ',' });
+    expect(p.tracked).toEqual([]);
 });

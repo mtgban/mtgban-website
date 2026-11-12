@@ -28,6 +28,7 @@
         if (dialogOpen()) return;
         var box = document.getElementById('searchbox') || document.getElementById('nav-searchbox');
         if (!box || !box.checkVisibility()) return;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.key', 'type_to_focus');
         box.focus();
         box.setSelectionRange(0, box.value.length);
     });

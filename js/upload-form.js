@@ -268,6 +268,7 @@ window.selectTab = function(tab) {
         var transfer = new DataTransfer();
         transfer.items.add(file);
         fileInput.files = transfer.files;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.file_drop');
         pressed();
     });
 })();

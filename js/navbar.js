@@ -168,6 +168,7 @@
             var tool = dragged.getAttribute('data-tool');
             navSections.insertBefore(createSectionBtn(tool), navSections.querySelector('.nav2-tools-wrap'));
             dragged.remove();
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'promote');
             saveLayout();
         });
         navSections.insertBefore(promoteSlot, navSections.querySelector('.nav2-tools-wrap'));
@@ -221,15 +222,19 @@
             e.stopPropagation();
             if (isTile(dragged) && isTile(slot)) {
                 var after = slot.classList.contains('drop-after');
+                var was = dragged.nextSibling;
                 clearIndicators();
                 if (after) {
                     slot.parentNode.insertBefore(dragged, slot.nextSibling);
                 } else {
                     slot.parentNode.insertBefore(dragged, slot);
                 }
+                // Dropped where it already was, nothing changed.
+                if (dragged.nextSibling !== was && window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'reorder');
             } else {
                 clearIndicators();
                 swapEntries(dragged, slot);
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'swap');
             }
             saveLayout();
         });
@@ -266,6 +271,7 @@
         navSections.insertBefore(createSectionBtn(tool), navSections.querySelector('.nav2-tools-wrap'));
         dragged.remove();
         clearIndicators();
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'promote');
         saveLayout();
     });
 
@@ -286,6 +292,7 @@
         e.preventDefault();
         demote(dragged);
         clearIndicators();
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'demote');
         saveLayout();
     });
 
@@ -316,6 +323,7 @@
             e.stopPropagation();
             demote(dragged);
             clearIndicators();
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'demote');
             saveLayout();
         });
     }
@@ -331,6 +339,7 @@
     function dockUtil(el) {
         dock.appendChild(el);
         clearIndicators();
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'dock');
         saveLayout();
     }
     function placeUtil(el) {
@@ -345,6 +354,7 @@
     function undockUtil(el) {
         placeUtil(el);
         clearIndicators();
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'undock');
         saveLayout();
     }
     function applyDock(wide) {

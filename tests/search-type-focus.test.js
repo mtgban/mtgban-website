@@ -27,13 +27,15 @@ function load(opts) {
         getElementById: id => (id === 'nav-searchbox' ? box : null),
     };
     const Element = { prototype: opts.noCheckVisibility ? {} : { checkVisibility() {} } };
-    new Function('document', 'Element', source)(document, Element);
+    const tracked = [];
+    const window = { BAN: { track: (...a) => tracked.push(a) } };
+    new Function('window', 'document', 'Element', source)(window, document, Element);
     const press = (key, extra) => onKey && onKey(Object.assign({
         key, target: { tagName: 'BODY' }, defaultPrevented: false,
         isComposing: false, ctrlKey: false, metaKey: false,
         getModifierState: m => !!(extra && extra.altGraph && m === 'AltGraph'),
     }, extra));
-    return { box, press };
+    return { box, press, tracked };
 }
 
 test('a printable key focuses the search box with its query selected', () => {
@@ -89,4 +91,19 @@ test('a browser without checkVisibility leaves keys alone', () => {
     const { box, press } = load({ noCheckVisibility: true, dialogs: [false] });
     press('a');
     expect(box.focused).toBe(false);
+});
+
+test('typing to focus the search box is counted; a key it leaves alone is not', () => {
+    const { press, tracked } = load();
+    press('s');
+    press('s', { target: { tagName: 'INPUT' } });
+    press('/');
+    press('k', { ctrlKey: true });
+    expect(tracked).toEqual([['ui.key', 'type_to_focus']]);
+});
+
+test('with a dialog open the key is the dialog\'s and nothing is counted', () => {
+    const { press, tracked } = load({ dialogs: [true] });
+    press('s');
+    expect(tracked).toEqual([]);
 });

@@ -25,6 +25,7 @@ function load(headers, opts) {
     const navbar = { getBoundingClientRect: () => ({ height: 0 }) };
     const cover = { getBoundingClientRect: () => ({ height: 0 }) };
     const showHoverCalls = [];
+    const tracked = [];
 
     const document = {
         querySelectorAll: sel => (sel === '.result-header' ? headers : []),
@@ -33,7 +34,7 @@ function load(headers, opts) {
             if (sel === '.result-header-cover') return cover;
             return null;
         },
-        getElementById: () => null,
+        getElementById: () => opts.searchbox || null,
         elementFromPoint: () => (opts.pointerTarget === undefined ? null : opts.pointerTarget),
         addEventListener: (ev, fn) => { listeners.document[ev] = fn; },
         body: {},
@@ -48,6 +49,7 @@ function load(headers, opts) {
         parent: null,
         location: { origin: 'http://localhost' },
         showHoverFor: (el, trusted) => { showHoverCalls.push([el, trusted]); },
+        BAN: { track: (...a) => tracked.push(a) },
     };
     const getComputedStyle = () => ({ getPropertyValue: () => '0' });
     function MouseEvent(type, init) { this.type = type; Object.assign(this, init || {}); }
@@ -56,7 +58,7 @@ function load(headers, opts) {
     new Function('document', 'window', 'getComputedStyle', 'MouseEvent', 'requestAnimationFrame', '__mx', '__my',
         source)(document, window, getComputedStyle, MouseEvent, requestAnimationFrame, opts.mx, opts.my);
 
-    return { listeners, showHoverCalls };
+    return { listeners, showHoverCalls, tracked };
 }
 
 test('a scroll with the pointer over a row calls showHoverFor(row, true) once and not again for the same row', () => {
@@ -105,4 +107,34 @@ test('a scroll with the pointer over nothing calls showHoverFor(stuckHeader, fal
     h1._top = 0;
     listeners.window.scroll();
     expect(showHoverCalls).toEqual([[h0, false], [h1, false]]);
+});
+
+test('paging the results and Tab to the search box are counted by name, never by key', () => {
+    const box = { focus() {}, blur() {}, setSelectionRange() {}, value: '' };
+    const { listeners, tracked } = load([makeHeader(0), makeHeader(500)], { searchbox: box });
+    const press = (key, tagName = 'BODY') => listeners.document.keydown({ key, target: { tagName }, preventDefault() {} });
+    press('PageDown');
+    press('PageUp');
+    press('PageUp'); // already at the top: still a use of the key
+    press('Tab');
+    press('Tab', 'INPUT');
+    press('a');
+    expect(tracked).toEqual([
+        ['ui.search.key', 'result_page_down'], ['ui.search.key', 'result_page_up'], ['ui.search.key', 'result_page_up'], ['ui.search.key', 'tab_to_search'],
+    ]);
+});
+
+test('a held PageDown or PageUp pages on every repeat but counts once', () => {
+    const h0 = makeHeader(0);
+    const h1 = makeHeader(500);
+    const h2 = makeHeader(1000);
+    const { listeners, tracked, showHoverCalls } = load([h0, h1, h2]);
+    const hold = (key, repeat) => listeners.document.keydown({ key, repeat, target: { tagName: 'BODY' }, preventDefault() {} });
+    hold('PageDown', false);
+    hold('PageDown', true);
+    hold('PageUp', false);
+    hold('PageUp', true);
+    expect(tracked).toEqual([['ui.search.key', 'result_page_down'], ['ui.search.key', 'result_page_up']]);
+    // The repeats still paged: down to h2, then back up to h0.
+    expect(showHoverCalls.map((c) => c[0])).toEqual([h1, h2, h1, h0]);
 });

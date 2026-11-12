@@ -1121,11 +1121,12 @@
         return o;
     }
 
-    // moveCard moves the entry k names to backpack p and says so.
+    // moveCard moves the entry k names to backpack p and says so, reporting whether it moved.
     function moveCard(k, p) {
-        if (!moveTo(k, p)) return;
+        if (!moveTo(k, p)) return false;
         render();
         toast("Moved to " + packName(p));
+        return true;
     }
 
     // condSelect moves the entry to a grade, or adds the card in one more,
@@ -1275,10 +1276,15 @@
                 // Alt carries the tab a place along the strip instead.
                 if (ev.altKey) {
                     var by = list[i + step];
-                    if (by && moveTab(t.pack, by.pack)) { render(); focusTab(t.pack); }
+                    if (by && moveTab(t.pack, by.pack)) {
+                        if (!ev.repeat && window.BAN && window.BAN.track) window.BAN.track("ui.key", "backpack_tab_move");
+                        render();
+                        focusTab(t.pack);
+                    }
                     return;
                 }
                 var next = list[(i + step + list.length) % list.length];
+                if (!ev.repeat && next.pack !== t.pack && window.BAN && window.BAN.track) window.BAN.track("ui.key", "backpack_tab_switch");
                 setActive(next.pack);
                 render();
                 focusTab(next.pack);
@@ -1320,7 +1326,7 @@
             ev.preventDefault();
             // A refused move renders nothing, so the outline goes here
             b.classList.remove("drop-target");
-            moveCard(ev.dataTransfer.getData(DRAG_TYPE), p);
+            if (moveCard(ev.dataTransfer.getData(DRAG_TYPE), p) && window.BAN && window.BAN.track) window.BAN.track("ui.backpack.drag", "card_to_tab");
         });
     }
 
@@ -1356,7 +1362,10 @@
             unmark();
             var moved = draggedTab;
             draggedTab = 0;
-            if (moveTab(moved, p)) render();
+            if (moveTab(moved, p)) {
+                if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.drag", "tab_reorder");
+                render();
+            }
         });
     }
 

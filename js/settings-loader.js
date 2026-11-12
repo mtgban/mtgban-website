@@ -86,6 +86,7 @@
         if (!(e.ctrlKey || e.metaKey) || e.key !== ',') return;
         var tag = (document.activeElement && document.activeElement.tagName) || '';
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.key', 'settings_hotkey');
         e.preventDefault();
         open();
     }

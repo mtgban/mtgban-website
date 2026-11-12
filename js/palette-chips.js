@@ -5,7 +5,8 @@
 (function () {
     'use strict';
 
-    function createChipManager(containerEl, inputEl, onChange) {
+    // onDelete, optional, is handed a chip just before its delete button removes it.
+    function createChipManager(containerEl, inputEl, onChange, onDelete) {
         var chips = [];
         var activeIndex = -1;
 
@@ -68,6 +69,7 @@
             (function (index) {
                 delBtn.addEventListener('click', function (e) {
                     e.stopPropagation();
+                    if (onDelete && chips[index]) onDelete(chips[index]);
                     remove(index);
                 });
             })(idx);

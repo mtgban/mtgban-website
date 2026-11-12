@@ -160,7 +160,8 @@ func TestSearchUIPages(t *testing.T) {
 			t.Errorf("%s: denom %q, want %q", n.Name, n.Denom, denoms[n.Name])
 		}
 	}
-	if seen != 56 {
-		t.Errorf("%d names under this phase's prefixes, want 56", seen)
+	// 56 from this phase and ui.search.key, the palette stage's results page shortcuts.
+	if seen != 57 {
+		t.Errorf("%d names under this phase's prefixes, want 57", seen)
 	}
 }

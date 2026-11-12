@@ -55,6 +55,47 @@
     // "page=syp", "sort=retail". Anything else is dropped rather than appended.
     var NAV_PARAM_RE = /^[A-Za-z0-9_.-]+=[A-Za-z0-9_.,%-]*$/;
 
+    // Usage counts send only values looked up in these tables, never what a row shows.
+    // A context kind, or a mode's key, to its ui.palette.mode value.
+    var MODE_VALUES = {
+        provider: 'provider', subview: 'subview', 'sealed-actions': 'sealed_actions', search: 'search',
+        nav: 'nav', help: 'help', saved: 'saved', recent: 'recent', sealed: 'sealed', upload: 'upload'
+    };
+
+    // A row type to its ui.palette.pick scope.
+    var PICK_SCOPES = {
+        shortcut: 'shortcut', nav: 'nav', 'nav-sub': 'nav_sub', card: 'card',
+        'filter-candidate': 'filter_candidate', recent: 'recent', saved: 'saved', help: 'help',
+        command: 'command', search: 'search', 'sealed-suggestion': 'sealed_suggestion',
+        'sealed-fallback': 'sealed_fallback', 'sealed-action': 'sealed_action',
+        'upload-url': 'upload_url', 'upload-file': 'upload_file',
+        'upload-page-results': 'upload_page_results', 'upload-export': 'upload_export'
+    };
+
+    // A nav entry's name to its ui.palette.nav value; any other name is other, Admin is not counted.
+    var NAV_SLUGS = {
+        'Home': 'home', 'Changelog': 'changelog', 'Account': 'account', 'Search': 'search',
+        'Sets': 'sets', 'Sealed': 'sealed', 'Newspaper': 'newspaper', 'TCG Syp List': 'syp',
+        'Screener (Beta)': 'screener', 'Sleepers': 'sleepers', 'Upload': 'upload', 'Global': 'global',
+        'Arbitrage': 'arbitrage', 'Reverse': 'reverse', 'Alerts': 'alerts', 'API': 'api'
+    };
+
+    // The filter prefixes ui.palette.filter takes, each also negated; a provider not here is not counted.
+    var FILTER_PREFIXES = [
+        'r', 'f', 'cond', 'sm', 'sort', 'on', 'format', 'is', 'not', 'skip',
+        'region', 'c', 'ci', 's', 'e', 'in', 'store', 'seller', 'vendor'
+    ];
+
+    // A chip type to its ui.palette.chip scope; a chip of any other type is not counted.
+    var CHIP_SCOPES = {
+        card: 'card', filter: 'filter', sealed: 'sealed', nav: 'nav', 'nav-sub': 'nav_sub'
+    };
+
+    // The table's own entry for key, or '' (an inherited name like "constructor" is none).
+    function own(table, key) {
+        return Object.prototype.hasOwnProperty.call(table, key) ? table[key] : '';
+    }
+
     // State
     var S = {
         open:               false,
@@ -73,7 +114,11 @@
         suppressChipOnChange: false,
         saveModalOpen:      false,
         inputTimer:         null,
-        toastTimer:         null
+        toastTimer:         null,
+        acted:              false,  // a pick ended this open
+        modesSeen:          {},     // modes counted this open
+        modeVia:            '',     // 'tile' while a tile's handleInput runs
+        heldPick:           false   // the pick running is a held key's repeat
     };
 
     // ════════════════════════════════════════════════════════════════
@@ -189,13 +234,13 @@
     function parseUploadURL(s) {
         try {
             var u = new URL(s);
-            if (u.host === 'store.tcgplayer.com')                            return { label: 'TCGplayer collection' };
-            if (u.host === 'moxfield.com' || u.host === 'www.moxfield.com')  return { label: 'Moxfield deck' };
-            if (u.host === 'manabox.app' || u.host === 'www.manabox.app')    return { label: 'ManaBox deck' };
-            if (u.host === 'archidekt.com' || u.host === 'www.archidekt.com') return { label: 'Archidekt deck' };
-            if (u.host === 'cubecobra.com' || u.host === 'www.cubecobra.com') return { label: 'CubeCobra cube' };
-            if (u.host === 'mythic.tools' || u.host === 'www.mythic.tools')   return { label: 'Mythic Tools list' };
-            if (u.host === 'docs.google.com')                                 return { label: 'Google Sheets' };
+            if (u.host === 'store.tcgplayer.com')                            return { label: 'TCGplayer collection', slug: 'tcgplayer' };
+            if (u.host === 'moxfield.com' || u.host === 'www.moxfield.com')  return { label: 'Moxfield deck', slug: 'moxfield' };
+            if (u.host === 'manabox.app' || u.host === 'www.manabox.app')    return { label: 'ManaBox deck', slug: 'manabox' };
+            if (u.host === 'archidekt.com' || u.host === 'www.archidekt.com') return { label: 'Archidekt deck', slug: 'archidekt' };
+            if (u.host === 'cubecobra.com' || u.host === 'www.cubecobra.com') return { label: 'CubeCobra cube', slug: 'cubecobra' };
+            if (u.host === 'mythic.tools' || u.host === 'www.mythic.tools')   return { label: 'Mythic Tools list', slug: 'mythictools' };
+            if (u.host === 'docs.google.com')                                 return { label: 'Google Sheets', slug: 'sheets' };
             return null;
         } catch (e) {
             return null;
@@ -305,6 +350,7 @@
     }
 
     function sealedAction(kind, name) {
+        if (!S.heldPick && window.BAN && window.BAN.track) window.BAN.track('ui.palette.sealed', kind === 'contents' ? 'contents' : (kind === 'unpack' ? 'unpack' : 'search'));
         // contents:/unpack: must route through /search; /sealed force-sets SearchMode="sealed".
         var path;
         if      (kind === 'contents') path = '/search?q=' + encodeURIComponent(sealedContentsFilter(name) + ':"' + name + '"');
@@ -315,6 +361,7 @@
 
     function deleteRecentSearch(query) {
         if (!query) return;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.recent', 'delete');
         var now = Date.now();
         var recent = getJSON(RECENT_KEY);
         recent.forEach(function (r) {
@@ -328,10 +375,10 @@
     //  Nav helpers (parent/sub-view URL composition)
     // ════════════════════════════════════════════════════════════════
 
-    function isParentNav(name) { return !!NAV_PARENTS[name]; }
+    function isParentNav(name) { return !!own(NAV_PARENTS, name); }
 
     function getNavTargets(name) {
-        var key = NAV_PARENTS[name];
+        var key = own(NAV_PARENTS, name);
         if (!key) return null;
         return (window.__BAN_PALETTE_TARGETS || {})[key] || null;
     }
@@ -370,10 +417,10 @@
         // and the link comes from the table the page rendered. A name that
         // no longer exists - a page the reader lost access to, an entry that
         // was renamed - resolves to nothing and navigates nowhere.
-        var link = NAV_LINKS[first.navName];
+        var link = own(NAV_LINKS, first.navName);
         if (!link) return null;
 
-        var parentKey = first.navName ? NAV_PARENTS[first.navName] : null;
+        var parentKey = first.navName ? own(NAV_PARENTS, first.navName) : null;
         if (!parentKey) return link;                      // leaf nav
 
         var base = link.split('?')[0];
@@ -387,7 +434,7 @@
     }
 
     function composeSubViewURL(parentChip, entry) {
-        var key  = NAV_PARENTS[parentChip.navName];
+        var key  = own(NAV_PARENTS, parentChip.navName);
         var base = (parentChip.navLink || '').split('?')[0];
         return base + '?' + subViewParam(key) + '=' + encodeURIComponent(entry.value);
     }
@@ -538,7 +585,13 @@
     var chips = null;
 
     if (chipsAPI && typeof chipsAPI.create === 'function') {
-        chips = chipsAPI.create(DOM.chipBox, input, onChipChange);
+        chips = chipsAPI.create(DOM.chipBox, input, onChipChange, function (chip) { trackChip('remove', chip); });
+    }
+
+    // Counts a chip locked, removed or edited, by its type alone.
+    function trackChip(what, chip) {
+        var scope = chip ? own(CHIP_SCOPES, chip.type) : '';
+        if (scope && window.BAN && window.BAN.track) window.BAN.track('ui.palette.chip', what, scope);
     }
 
     function onChipChange() {
@@ -560,6 +613,7 @@
 
     function addChipSilent(chip) {
         if (!chips) return;
+        trackChip('lock', chip);
         S.suppressChipOnChange = true;
         chips.add(chip);
         S.suppressChipOnChange = false;
@@ -611,7 +665,7 @@
     }
 
     function lockSubViewChip(item) {
-        var pKey = NAV_PARENTS[item._parentChip.navName];
+        var pKey = own(NAV_PARENTS, item._parentChip.navName);
         var urlParam = subViewParam(pKey) + '=' + encodeURIComponent(item._subView.value);
 
         // A parent takes one sub-view: the new one replaces the old.
@@ -631,12 +685,24 @@
         });
     }
 
-    function runComposedQuery() {
+    // counted: Enter ran the chips with no row picked (a filter row's run is its pick).
+    function runComposedQuery(counted) {
         if (!chips) return;
         var navUrl = chipsNavURL(chips.all());
-        if (navUrl) { window.location.href = navUrl; return; }
+        if (navUrl) {
+            if (counted) {
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.composed_run', 'nav');
+                acted();
+            }
+            window.location.href = navUrl;
+            return;
+        }
         var q = chips.composedQuery();
         if (!q) return;
+        if (counted) {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.composed_run', 'search');
+            acted();
+        }
         recordRecentSearch(q);
         window.location.href = '/search?q=' + encodeURIComponent(q);
     }
@@ -895,7 +961,7 @@
     function getStaticCommands(query) {
         var cmds = [
             {
-                name: 'Toggle Theme',
+                name: 'Toggle Theme', slug: 'toggle_theme',
                 icon: (function () {
                     var p = localStorage.getItem('theme');
                     return p === 'dark' ? 'moon' : (p === 'light' ? 'sun' : 'sun-moon');
@@ -916,13 +982,13 @@
                     showToast('Theme: ' + next);
                 }
             },
-            { name: 'Random Card',   icon: 'dice-5',     keywords: ['random', 'surprise', 'lucky'],
+            { name: 'Random Card',   slug: 'random_card',   icon: 'dice-5',     keywords: ['random', 'surprise', 'lucky'],
               action: function () { window.location.href = '/random'; } },
-            { name: 'Random Sealed', icon: 'package',    keywords: ['random', 'sealed', 'booster', 'pack'],
+            { name: 'Random Sealed', slug: 'random_sealed', icon: 'package',    keywords: ['random', 'sealed', 'booster', 'pack'],
               action: function () { window.location.href = '/randomsealed'; } },
-            { name: 'Open Guide',    icon: 'book-open',  keywords: ['guide', 'help', 'documentation', 'syntax'],
+            { name: 'Open Guide',    slug: 'open_guide',    icon: 'book-open',  keywords: ['guide', 'help', 'documentation', 'syntax'],
               action: function () { window.location.href = '/guide'; } },
-            { name: 'Copy Page URL', icon: 'link',       keywords: ['copy', 'url', 'link', 'share', 'clipboard'],
+            { name: 'Copy Page URL', slug: 'copy_url',      icon: 'link',       keywords: ['copy', 'url', 'link', 'share', 'clipboard'],
               action: function () {
                   if (navigator.clipboard) {
                       navigator.clipboard.writeText(window.location.href)
@@ -938,7 +1004,7 @@
         var hasComposed   = chips && chips.count() > 0 && chips.composedQuery();
         if (hasComposed || currentPageQuery()) {
             cmds.push({
-                name: 'Save Current Search', icon: 'bookmark-plus',
+                name: 'Save Current Search', slug: 'save_search', icon: 'bookmark-plus',
                 keywords: ['save', 'bookmark', 'store', 'command'],
                 action: function () { showSaveModal(); }
             });
@@ -949,7 +1015,7 @@
             var c = cmds[i];
             if (!query || scoreMatch(query, c.name, c.keywords) > 0) {
                 out.push({
-                    type: 'command', title: c.name, subtitle: '', icon: c.icon, action: c.action,
+                    type: 'command', title: c.name, subtitle: '', icon: c.icon, action: c.action, commandSlug: c.slug,
                     score: query ? scoreMatch(query, c.name, c.keywords) : 0
                 });
             }
@@ -1254,7 +1320,7 @@
             if (parsed) {
                 rows.push({
                     type: 'upload-url', title: 'Upload from ' + parsed.label,
-                    subtitle: query, icon: 'link', uploadURL: query
+                    subtitle: query, icon: 'link', uploadURL: query, uploadHost: parsed.slug
                 });
             } else {
                 rows.push({
@@ -1657,7 +1723,7 @@
                 subtitle: def.tile.subtitle,
                 icon:     def.tile.icon,
                 shortcut: def.prefix,
-                action:   (function (p) { return function () { input.value = p; handleInput(); }; })(def.prefix)
+                action:   (function (p) { return function () { S.modeVia = 'tile'; input.value = p; handleInput(); }; })(def.prefix)
             });
         }
         renderResults(tiles);
@@ -1721,7 +1787,7 @@
                     var it = S.items[rowIdx];
                     if (!it || it.disabled) return;
                     S.activeIndex = rowIdx;
-                    executeActive(false);
+                    executeActive(false, true);
                 });
             })(r);
         }
@@ -1758,14 +1824,105 @@
         setActive(next);
     }
 
-    function executeActive(shiftKey) {
+    // Marks this open as ended by a pick, once.
+    function acted() {
+        if (S.acted) return;
+        S.acted = true;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.close', 'acted');
+    }
+
+    // Whether a pick ends the session: the steps that keep the palette open do not.
+    function pickEnds(how, item) {
+        if (item.type === 'shortcut') return false;
+        if (how === 'tab') return item.type === 'nav' && !isParentNav(item.navName);
+        if (item.type === 'saved' && how === 'shift_enter') return false;
+        if (item.type === 'command' && item.commandSlug === 'save_search') return false;
+        return true;
+    }
+
+    // Counts a row picked, by how, and what it did; called before the row's own handler runs.
+    function trackPick(how, item, repeat) {
+        S.heldPick = !!repeat;
+        if (repeat || !item || item.disabled) return;
+        var scope = own(PICK_SCOPES, item.type);
+        if (scope && window.BAN && window.BAN.track) window.BAN.track('ui.palette.pick', how, scope);
+        trackRow(how, item);
+        if (pickEnds(how, item)) acted();
+    }
+
+    // Counts a page opened from the palette.
+    function trackNav(scope, name) {
+        if (name === 'Admin') return;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.nav', own(NAV_SLUGS, name) || 'other', scope);
+    }
+
+    // A provider prefix ("-is:") to its ui.palette.filter value, or '' when not in FILTER_PREFIXES.
+    function filterValue(prefix) {
+        var p = String(prefix || '').toLowerCase().replace(/:$/, '');
+        var neg = p.charAt(0) === '-';
+        var i = FILTER_PREFIXES.indexOf(neg ? p.substring(1) : p);
+        return i < 0 ? '' : (neg ? '-' : '') + FILTER_PREFIXES[i];
+    }
+
+    // Counts what a picked row did, by its type; sealed rows count in sealedAction.
+    function trackRow(how, item) {
+        if (!(window.BAN && window.BAN.track)) return;
+        var v;
+        switch (item.type) {
+            case 'nav':
+                // Tab on a parent page locks a chip and opens nothing.
+                if (how === 'tab' && isParentNav(item.navName)) return;
+                trackNav(isParentNav(item.navName) ? 'parent' : 'leaf', item.navName);
+                return;
+            case 'nav-sub':
+                if (how === 'tab') return;
+                trackNav('sub', item._parentChip && item._parentChip.navName);
+                return;
+            case 'filter-candidate':
+                v = filterValue(item._providerPrefix);
+                if (v) window.BAN.track('ui.palette.filter', v);
+                return;
+            case 'recent':
+                window.BAN.track('ui.palette.recent', 'run');
+                return;
+            case 'saved':
+                window.BAN.track('ui.palette.saved', how === 'shift_enter' ? 'restore' : 'run');
+                return;
+            case 'help':
+                window.BAN.track('ui.palette.help', item.isSyntax && how !== 'shift_enter' ? 'copy' : 'open_guide');
+                return;
+            case 'command':
+                if (item.commandSlug) window.BAN.track('ui.palette.command', item.commandSlug, 'row');
+                return;
+            case 'upload-url':
+                if (item.uploadHost) window.BAN.track('ui.palette.upload', 'url', item.uploadHost);
+                return;
+            case 'upload-file':
+                window.BAN.track('ui.palette.upload', 'file', 'picker');
+                return;
+            case 'upload-page-results':
+                window.BAN.track('ui.palette.upload', 'page_results', 'page');
+                return;
+            case 'upload-export':
+                if (item.exportField) window.BAN.track('ui.palette.upload', 'export', item.exportField);
+                return;
+        }
+    }
+
+    function executeActive(shiftKey, click, repeat) {
         if (S.activeIndex < 0 || S.activeIndex >= S.items.length) return;
         var item = S.items[S.activeIndex];
         if (!item || item.disabled) return;
         var def = ROW_TYPES[item.type];
         if (!def) return;
-        if (shiftKey && def.onShiftEnter) def.onShiftEnter(item);
-        else if (def.onEnter)             def.onEnter(item);
+        var shift = !!(shiftKey && def.onShiftEnter);
+        S.heldPick = !!repeat;
+        // Shift+Enter on a row with nowhere to go does nothing, so is no pick.
+        if (!(shift && 'altAction' in item && !item.altAction)) {
+            trackPick(click ? 'click' : (shift ? 'shift_enter' : 'enter'), item, repeat);
+        }
+        if (shift)            def.onShiftEnter(item);
+        else if (def.onEnter) def.onEnter(item);
     }
 
     function updateDeleteHint() {
@@ -1811,9 +1968,33 @@
     // skipCap lives on each MODES entry alongside its other metadata.
     var KINDS_SKIP_CAP = { provider: true, subview: true, 'sealed-actions': true, search: true };
 
+    // Counts the mode an input landed in, once an open; a tile's mark lasts one call.
+    function trackMode(ctx, raw) {
+        var via = S.modeVia;
+        S.modeVia = '';
+        if (!S.open) return;
+        var scope;
+        switch (ctx.kind) {
+            case 'mode':           scope = via === 'tile' ? 'tile' : 'prefix'; break;
+            case 'provider':       scope = 'prefix'; break;
+            case 'subview':
+            case 'sealed-actions': scope = 'chip'; break;
+            case 'search':
+                if (!raw.trim()) return;
+                scope = 'typed';
+                break;
+            default: return;
+        }
+        var mode = own(MODE_VALUES, ctx.kind === 'mode' ? ctx.mode : ctx.kind);
+        if (!mode || S.modesSeen[mode]) return;
+        S.modesSeen[mode] = true;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.mode', mode, scope);
+    }
+
     function handleInput() {
         var raw = input.value;
         var ctx = resolveContext(raw);
+        trackMode(ctx, raw);
 
         applyPlaceholder(ctx);
         applyModeIndicator(ctx);
@@ -1855,6 +2036,7 @@
     //  Save modal
     // ════════════════════════════════════════════════════════════════
 
+    // Opens the save modal; false when there is nothing to save.
     function showSaveModal() {
         removeSaveModal();
 
@@ -1864,7 +2046,7 @@
         } else {
             queryToSave = currentPageQuery();
         }
-        if (!queryToSave) { showToast('No search to save'); return; }
+        if (!queryToSave) { showToast('No search to save'); return false; }
 
         var backdrop = document.createElement('div');
         backdrop.className = 'cp-save-modal-backdrop';
@@ -1955,6 +2137,7 @@
         backdrop.addEventListener('click', function (e) {
             if (e.target === backdrop) { removeSaveModal(); input.focus(); }
         });
+        return true;
     }
 
     function removeSaveModal() {
@@ -1988,6 +2171,7 @@
                 saved[i].chips    = chipsSnapshot;
                 saved[i].lastUsed = Date.now();
                 setJSON(SAVED_KEY, saved);
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.saved', 'updated');
                 showToast('Updated: ' + name);
                 return null;
             }
@@ -2001,12 +2185,14 @@
                 saved[j].chips    = chipsSnapshot;
                 saved[j].lastUsed = Date.now();
                 setJSON(SAVED_KEY, saved);
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.saved', 'overwrite');
                 showToast('Overwritten: ' + name);
                 return null;
             }
         }
 
         if (saved.length >= MAX_SAVED) {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.saved', 'cap');
             showToast('Maximum ' + MAX_SAVED + ' saved commands reached');
             return null;
         }
@@ -2023,6 +2209,7 @@
             useCount:  0
         });
         setJSON(SAVED_KEY, saved);
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.saved', 'new');
         showToast('Saved: ' + name);
         return null;
     }
@@ -2036,6 +2223,7 @@
         if (!target) return;
         if (!window.confirm('Delete saved command "' + target.name + '"?')) return;
         setJSON(SAVED_KEY, saved.filter(function (s) { return s.id !== savedId; }));
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.saved', 'delete');
         showToast('Command deleted');
         handleInput();
     }
@@ -2048,6 +2236,7 @@
             if (saved[i].id === savedId) { target = saved[i]; break; }
         }
         if (!target) return;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.saved', 'delete_silent');
         setJSON(SAVED_KEY, saved.filter(function (s) { return s.id !== savedId; }));
         showToast('Deleted: ' + target.name);
     }
@@ -2075,6 +2264,7 @@
     function openPalette() {
         if (S.open) return;
         S.open = true;
+        S.acted = false; S.modesSeen = {}; S.modeVia = '';
         ensureLucide();
         S.previousFocus = document.activeElement;
         DOM.overlay.classList.add('open');
@@ -2098,6 +2288,7 @@
 
     function closePalette() {
         if (!S.open) return;
+        if (!S.acted && window.BAN && window.BAN.track) window.BAN.track('ui.palette.close', 'dismissed');
         S.open = false;
         DOM.overlay.classList.remove('open');
         document.body.style.overflow = '';
@@ -2115,14 +2306,23 @@
 
         if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.keyCode === 75)) {
             e.preventDefault();
-            S.open ? closePalette() : openPalette();
+            if (S.open) {
+                closePalette();
+            } else {
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.open', 'ctrl_k');
+                openPalette();
+            }
             return;
         }
         if (e.key === '/' && !S.open) {
             var tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
             var isInput    = tag === 'input' || tag === 'textarea' || tag === 'select';
             var isEditable = document.activeElement && document.activeElement.isContentEditable;
-            if (!isInput && !isEditable) { e.preventDefault(); openPalette(); }
+            if (!isInput && !isEditable) {
+                e.preventDefault();
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.palette.open', 'slash');
+                openPalette();
+            }
         }
     });
 
@@ -2133,7 +2333,7 @@
             var item = S.items[S.activeIndex];
             if (!item || !item._userPicked) {
                 e.preventDefault();
-                runComposedQuery();
+                runComposedQuery(true);
                 return;
             }
         }
@@ -2142,12 +2342,13 @@
             var cd = ci && ROW_TYPES[ci.type];
             if (cd && cd.onCtrlEnter) {
                 e.preventDefault();
+                trackPick('ctrl_enter', ci, e.repeat);
                 cd.onCtrlEnter(ci);
                 return;
             }
         }
         e.preventDefault();
-        executeActive(e.shiftKey);
+        executeActive(e.shiftKey, false, e.repeat);
     }
 
     function handleTabKey(e) {
@@ -2159,6 +2360,7 @@
         var def = ROW_TYPES[item.type];
         if (!def || !def.onTab) { e.preventDefault(); input.focus(); return; }
 
+        trackPick('tab', item, e.repeat);
         var locked = def.onTab(item);
         e.preventDefault();
         if (locked) {
@@ -2196,7 +2398,7 @@
         // Ctrl/Cmd+S → save current search.
         if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.keyCode === 83)) {
             e.preventDefault();
-            showSaveModal();
+            if (showSaveModal() && window.BAN && window.BAN.track) window.BAN.track('ui.palette.command', 'save_search', 'hotkey');
             return;
         }
 
@@ -2233,12 +2435,14 @@
         }
         if (e.key === 'Delete' || e.keyCode === 46) {
             e.preventDefault();
+            trackChip('remove', chips.get(idx));
             chips.remove(idx);
             chips.activate(idx < chips.count() ? idx : -1);
             return;
         }
         if (e.key === 'Backspace' || e.keyCode === 8) {
             e.preventDefault();
+            trackChip('remove', chips.get(idx));
             chips.remove(idx);
             chips.activate(idx - 1 >= 0 ? idx - 1 : -1);
             return;
@@ -2254,9 +2458,10 @@
             // Execute the highlighted dropdown item, or run the composed query.
             var item = S.items[S.activeIndex];
             if (item && ROW_TYPES[item.type] && ROW_TYPES[item.type].onEnter) {
+                trackPick('enter', item, e.repeat);
                 ROW_TYPES[item.type].onEnter(item);
             } else if (chips.composedQuery()) {
-                runComposedQuery();
+                runComposedQuery(true);
             }
             return;
         }
@@ -2265,6 +2470,7 @@
             e.preventDefault();
             var chip = chips.get(idx);
             if (!chip) return;
+            trackChip('edit', chip);
             chips.remove(idx);
             // For filter chips, restore "prefix + first value" so the dropdown shows
             // that provider again. Other chip types just drop their value into input.

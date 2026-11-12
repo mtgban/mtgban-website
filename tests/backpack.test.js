@@ -101,10 +101,12 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     }
     const storageListeners = [];
     const pageshowListeners = [];
+    const tracked = [];
     const window = {
         localStorage, sessionStorage, confirm: (msg) => { confirms.push(msg); return true; },
         addEventListener: (ev, fn) => { if (ev === 'storage') storageListeners.push(fn); if (ev === 'pageshow') pageshowListeners.push(fn); },
         location: { pathname: '/search' },
+        BAN: { track: (...a) => tracked.push(a) },
     };
     if (ban) window.BAN_BACKPACK = ban;
     if (max) window.BAN_BACKPACK_MAX = max;
@@ -142,7 +144,7 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     const stored = () => JSON.parse(m.mtgban_backpack);
     const pendingIds = () => (sm.mtgban_backpack_pending_clear === undefined ? undefined : JSON.parse(sm.mtgban_backpack_pending_clear));
     return {
-        window, document, m, sm, rows, minus, nav, navCount, stored, key, pendingIds, optSections, res,
+        window, document, m, sm, rows, minus, nav, navCount, stored, key, pendingIds, optSections, res, tracked,
         fireClick: (target) => (docListeners.click || []).forEach((fn) => fn({ target })),
         fireChange: (target) => (docListeners.change || []).forEach((fn) => fn({ target })),
         fireStorage: (key = 'mtgban_backpack') => storageListeners.forEach((fn) => fn({ key })),
@@ -2034,5 +2036,73 @@ describe('searching the backpack', () => {
 
     test('an empty backpack has nothing to search', () => {
         expect(open(page({ signedIn: true })).disabled).toBe(true);
+    });
+});
+
+describe('the backpack keys and drags are counted', () => {
+    const tabsOf = () => ids['backpack-tabs'].children.filter((b) => b.classes.has('backpack-tab'));
+    const rowsOf = () => ids['backpack-list'].children;
+    const fire = (n, type, ev) => (n.listeners[type] || []).forEach((fn) => fn(ev));
+    const press = (n, key, altKey, repeat) => fire(n, 'keydown', { key, altKey: !!altKey, repeat: !!repeat, preventDefault() {} });
+    const transfer = (types = []) => ({ types, data: {}, setData(t, v) { this.data[t] = v; this.types = [t]; }, getData(t) { return this.data[t]; } });
+    const dragEvent = (dt) => ({ dataTransfer: dt, preventDefault() {} });
+    const tabList = [{ pack: 1 }, { pack: 2, name: 'Trades' }, { pack: 3 }];
+    const store = [{ id: 'uuid-1', name: 'One', qty: 2, t: 2, m: 2 }, { id: 'uuid-2', name: 'Two', cond: 'SP', qty: 1, t: 1, m: 1 }];
+    const keys = (p) => p.tracked.filter((t) => t[0] === 'ui.key');
+    const drags = (p) => p.tracked.filter((t) => t[0] === 'ui.backpack.drag');
+
+    test('an arrow switches tabs, Alt+arrow moves one, and a move the strip refuses is not counted', () => {
+        const p = page({ store, tabs: 3, tabList });
+        p.nav.click();
+        press(tabsOf()[0], 'ArrowRight');
+        press(tabsOf()[1], 'ArrowRight', true);
+        press(tabsOf()[2], 'ArrowRight', true); // at the end already
+        press(tabsOf()[2], 'Enter');
+        expect(keys(p)).toEqual([['ui.key', 'backpack_tab_switch'], ['ui.key', 'backpack_tab_move']]);
+    });
+
+    test('a held arrow switches and moves on every repeat but counts only the first press', () => {
+        const p = page({ store, tabs: 3, tabList });
+        p.nav.click();
+        press(tabsOf()[0], 'ArrowRight');
+        press(tabsOf()[1], 'ArrowRight', false, true);
+        expect(tabsOf()[2].getAttribute('aria-selected')).toBe('true');
+        press(tabsOf()[2], 'ArrowLeft', true);
+        press(tabsOf()[1], 'ArrowLeft', true, true);
+        expect(tabsOf().map((b) => b.getAttribute('data-pack'))).toEqual(['3', '1', '2']);
+        expect(keys(p)).toEqual([['ui.key', 'backpack_tab_switch'], ['ui.key', 'backpack_tab_move']]);
+    });
+
+    test('an arrow on the only tab switches nothing and is not counted', () => {
+        const p = page({ store, tabs: 3, tabList: [{ pack: 1 }] });
+        p.nav.click();
+        expect(tabsOf()).toHaveLength(1);
+        press(tabsOf()[0], 'ArrowRight');
+        press(tabsOf()[0], 'ArrowLeft');
+        expect(keys(p)).toEqual([]);
+    });
+
+    test('a card dropped on a full backpack moves nothing and is not counted', () => {
+        const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 2, m: 2 }, { id: 'a', pack: 2, qty: 1, t: 1, m: 1 }], max: 1, tabs: 2, tabList });
+        p.nav.click();
+        const dt = transfer();
+        fire(rowsOf()[0].querySelector('.backpack-row-art'), 'dragstart', dragEvent(dt));
+        fire(tabsOf()[1], 'drop', dragEvent(dt));
+        expect(ids['backpack-toast'].textContent).toBe('Trades is full (1 products)');
+        expect(drags(p)).toEqual([]);
+    });
+
+    test('a card dropped on a tab and a tab dropped on a tab are counted; a foreign drag is not', () => {
+        const p = page({ store, tabs: 3, tabList });
+        p.nav.click();
+        fire(tabsOf()[1], 'drop', dragEvent(transfer(['text/plain'])));
+        expect(drags(p)).toEqual([]);
+        const dt = transfer();
+        fire(rowsOf()[0].querySelector('.backpack-row-art'), 'dragstart', dragEvent(dt));
+        fire(tabsOf()[2], 'drop', dragEvent(dt));
+        const tab = transfer();
+        fire(tabsOf()[2], 'dragstart', dragEvent(tab));
+        fire(tabsOf()[0], 'drop', dragEvent(tab));
+        expect(drags(p)).toEqual([['ui.backpack.drag', 'card_to_tab'], ['ui.backpack.drag', 'tab_reorder']]);
     });
 });
