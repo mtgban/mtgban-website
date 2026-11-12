@@ -322,6 +322,7 @@
 
     function flushHidden() {
         try {
+            finishPerf();
             var entries = take();
             if (!entries.length) return;
             if (offline()) {
@@ -682,6 +683,210 @@
         go();
     }
 
+    // Script errors: a closed list of places and classes, never the message, stack or URL.
+    var ERROR_CLASSES = ['Error', 'TypeError', 'ReferenceError', 'RangeError', 'SyntaxError', 'URIError', 'EvalError', 'AggregateError', 'AbortError', 'NetworkError', 'QuotaExceededError', 'NotAllowedError', 'SecurityError', 'InvalidStateError', 'NotFoundError', 'TimeoutError', 'ScriptError', 'other'];
+    var SCRIPTS = ['admin-metrics.js', 'admin-people.js', 'alerts.js', 'api-plans.js', 'arbit-filters.js', 'arbit-presets.js', 'arbit-rows.js', 'autocomplete.js', 'backpack.js', 'ban-to-cart.js', 'card-art-fallback.js', 'card-row.js', 'cart-prompt.js', 'chart-range.js', 'chartopts.js', 'command-palette.js', 'confirm-dialog.js', 'cookies.js', 'copy2clip.js', 'edition-combobox.js', 'editions-picker.js', 'favorites-shared.js', 'favorites.js', 'fetchnames.js', 'fflate.min.js', 'filtering.js', 'followmouse.js', 'guide-data.js', 'guide.js', 'icons.js', 'list-storage.js', 'load-lists.js', 'metrics.js', 'mobile-chart.js', 'navbar.js', 'news-filters.js', 'nightmode.js', 'offline-age.js', 'offline-banner.js', 'offline-db.js', 'offline-format.js', 'offline-images-ui.js', 'offline-images.js', 'offline-live.js', 'offline-mode.js', 'offline-page-desktop.js', 'offline-page-mobile.js', 'offline-page.js', 'offline-prefer.js', 'offline-query.js', 'offline-render-mobile.js', 'offline-render-shared.js', 'offline-render.js', 'offline-search.js', 'offline-settings-mobile.js', 'offline-sync.js', 'offline-util.js', 'offline-watch.js', 'palette-chips.js', 'palette-loader.js', 'palette-providers.js', 'printings-panel.js', 'recent-searches.js', 'scope.js', 'screener.js', 'sealed.js', 'search-chart.js', 'search-modal.js', 'search-quick-icons.js', 'search-result-nav.js', 'search-sidebar.js', 'search-track.js', 'search-type-focus.js', 'section-fold.js', 'settings-changes.js', 'settings-loader.js', 'settings-shell.js', 'settings.js', 'store-factors.js', 'store-picker.js', 'tooltips.js', 'upload-exports.js', 'upload-form.js', 'upload-handoff.js', 'upload-optimizer.js', 'upload-options.js', 'upload-presets.js', 'upload-printings.js', 'upload-processing.js', 'upload-share.js', 'upload-sort.js', 'upload-store-prompt.js', 'upload-tabs.js', 'user-state.js', 'utils.js'];
+    var MAX_ERRORS = 5;
+    var MAX_LINE = 1000000;
+    var SCRIPT_PATH = /^\/js\/(?:[a-z0-9-]+\/)*([a-z0-9.-]+\.js)$/;
+    var FRAME_AT = /(https?:\/\/[^\s()]+?):(\d+):(\d+)\)?\s*$/;
+    var BUILD_SHAPE = /^[0-9a-f]{40}(?:-[0-9]+)?$/;
+    var reported = 0;
+
+    function classOf(err) {
+        var name = err && typeof err === 'object' ? err.name : undefined;
+        return typeof name === 'string' && ERROR_CLASSES.indexOf(name) >= 0 ? name : 'other';
+    }
+
+    // scriptOf is a listed basename under /js/ on this origin, inline for this origin's pages, else other.
+    function scriptOf(url) {
+        if (typeof url !== 'string' || !url) return 'other';
+        if (typeof location === 'undefined' || typeof URL === 'undefined') return 'other';
+        var u;
+        try {
+            u = new URL(url, location.href);
+        } catch (e) {
+            return 'other';
+        }
+        if (u.origin !== location.origin) return 'other';
+        var m = SCRIPT_PATH.exec(u.pathname);
+        if (!m) return 'inline';
+        return SCRIPTS.indexOf(m[1]) >= 0 ? m[1] : 'other';
+    }
+
+    function lineOf(script, n) {
+        if (script === 'inline' || script === 'other') return 0;
+        return typeof n === 'number' && n % 1 === 0 && n >= 1 && n <= MAX_LINE ? n : 0;
+    }
+
+    function textOf(v) {
+        return typeof v === 'string' ? v : '';
+    }
+
+    function trimLeft(s) {
+        return s.replace(/^\s+/, '');
+    }
+
+    // headerLines counts the lines of V8's "name: message" header, so no frame is read from the message.
+    function headerLines(reason, stack, lines, v8) {
+        var name = textOf(reason.name) || 'Error';
+        var msg = textOf(reason.message);
+        var head = msg ? name + ': ' + msg : name;
+        if (stack === head || stack.indexOf(head + '\n') === 0) return head.split('\n').length;
+        if (v8 && trimLeft(lines[0]).indexOf('at ') !== 0) return msg.split('\n').length;
+        return 0;
+    }
+
+    // topFrame returns the url and line of the first frame in the engine's own format, never from the message.
+    function topFrame(reason) {
+        var stack = reason.stack;
+        if (typeof stack !== 'string') return null;
+        var lines = stack.split('\n');
+        var v8 = false;
+        for (var i = 0; i < lines.length; i++) {
+            if (trimLeft(lines[i]).indexOf('at ') === 0) v8 = true;
+        }
+        for (i = headerLines(reason, stack, lines, v8); i < lines.length; i++) {
+            var line = trimLeft(lines[i]);
+            if (v8 ? line.indexOf('at ') !== 0 : line.indexOf('@') < 0) continue;
+            var m = FRAME_AT.exec(line);
+            return m ? { url: m[1], line: parseInt(m[2], 10) } : null;
+        }
+        return null;
+    }
+
+    function onError(e) {
+        try {
+            if (reported >= MAX_ERRORS || !e) return;
+            if (e.target && e.target !== window) return;
+            var script = scriptOf(e.filename);
+            var cls = 'ScriptError';
+            var line = 0;
+            if (e.error || script !== 'other') {
+                cls = classOf(e.error);
+                line = lineOf(script, e.lineno);
+            }
+            reported++;
+            bump('ui.js.error', cls, script, { l: line, b: cfg.build });
+        } catch (err) {}
+    }
+
+    function onRejection(e) {
+        try {
+            if (reported >= MAX_ERRORS || !e) return;
+            var reason = e.reason;
+            var frame = reason && typeof reason === 'object' ? topFrame(reason) : null;
+            var script = frame ? scriptOf(frame.url) : 'other';
+            var line = frame ? lineOf(script, frame.line) : 0;
+            reported++;
+            bump('ui.js.rejection', classOf(reason), script, { l: line, b: cfg.build });
+        } catch (err) {}
+    }
+
+    // startErrors listens only on a build with a commit hash, so every row can be placed.
+    function startErrors() {
+        if (typeof cfg.build !== 'string' || !BUILD_SHAPE.test(cfg.build)) return;
+        window.addEventListener('error', onError);
+        window.addEventListener('unhandledrejection', onRejection);
+    }
+
+    // Page timings: one load in ten, bucketed and scoped by page; a value below an edge takes its label.
+    var PERF_SAMPLE = 0.1;
+    var TTFB_BUCKETS = [[200, '<200ms'], [500, '<500ms'], [800, '<800ms'], [1800, '<1.8s'], [Infinity, '1.8s+']];
+    var LCP_BUCKETS = [[1000, '<1s'], [2500, '<2.5s'], [4000, '<4s'], [8000, '<8s'], [Infinity, '8s+']];
+    var DOM_READY_BUCKETS = [[500, '<500ms'], [1000, '<1s'], [2000, '<2s'], [4000, '<4s'], [8000, '<8s'], [Infinity, '8s+']];
+    var perfOn = false;
+    var lcpMs = 0;
+    var lcpDone = false;
+    var lcpObserver = null;
+
+    function bucketOf(buckets, ms) {
+        for (var i = 0; i < buckets.length - 1; i++) {
+            if (ms < buckets[i][0]) return buckets[i][1];
+        }
+        return buckets[buckets.length - 1][1];
+    }
+
+    function measured(ms) {
+        return typeof ms === 'number' && isFinite(ms) && ms > 0;
+    }
+
+    function navEntry() {
+        try {
+            var list = performance.getEntriesByType('navigation');
+            return list && list[0] ? list[0] : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // timing is a navigation field in ms from the start, from the old timing object when there is no entry.
+    function timing(field) {
+        var n = navEntry();
+        if (n) return n[field];
+        try {
+            var t = performance.timing;
+            return t ? t[field] - t.navigationStart : NaN;
+        } catch (e) {
+            return NaN;
+        }
+    }
+
+    // prerendered says the times were taken before the reader saw the page.
+    function prerendered() {
+        if (document.prerendering === true) return true;
+        var n = navEntry();
+        return !!n && n.activationStart > 0;
+    }
+
+    function readTimings() {
+        try {
+            if (document.visibilityState === 'hidden') return; // hidden before load: background timings are throttled
+            if (prerendered()) return;
+            var ttfb = timing('responseStart');
+            if (measured(ttfb)) bump('ui.perf.ttfb', bucketOf(TTFB_BUCKETS, ttfb), cfg.page);
+            var dom = timing('domContentLoadedEventEnd');
+            if (measured(dom)) bump('ui.perf.dom_ready', bucketOf(DOM_READY_BUCKETS, dom), cfg.page);
+        } catch (e) {}
+    }
+
+    // finishPerf adds the paint time once, before the first hidden flush takes the buffer.
+    function finishPerf() {
+        try {
+            if (!perfOn || lcpDone) return;
+            lcpDone = true;
+            try {
+                if (lcpObserver) lcpObserver.disconnect();
+            } catch (e) {}
+            if (measured(lcpMs) && !prerendered()) bump('ui.perf.lcp', bucketOf(LCP_BUCKETS, lcpMs), cfg.page);
+        } catch (e) {}
+    }
+
+    function observePaint() {
+        try {
+            if (typeof PerformanceObserver === 'undefined' || !PerformanceObserver) return;
+            var types = PerformanceObserver.supportedEntryTypes;
+            if (!types || types.indexOf('largest-contentful-paint') < 0) return;
+            lcpObserver = new PerformanceObserver(function (list) {
+                try {
+                    var got = list.getEntries();
+                    if (got.length) lcpMs = got[got.length - 1].startTime;
+                } catch (e) {}
+            });
+            lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
+        } catch (e) {}
+    }
+
+    // startPerf decides the sample once; a page with no label, in the background or prerendered is left out.
+    function startPerf() {
+        if (!cfg.page || !(Math.random() < PERF_SAMPLE)) return;
+        if (document.visibilityState === 'hidden' || prerendered()) return;
+        perfOn = true;
+        observePaint();
+        if (document.readyState === 'complete') readTimings();
+        else window.addEventListener('load', readTimings);
+    }
+
     BAN.track = track;
     BAN.metrics = { bump: bump };
     BAN.snapshot = { MARK: SNAP, scopes: scopes, cookies: cookies, value: value, entries: entries, due: due, run: run };
@@ -695,6 +900,12 @@
         window.addEventListener('online', sendQueue);
         sendQueue();
         if (cfg.page) countLoad();
+    } catch (e) {}
+    try {
+        startErrors();
+    } catch (e) {}
+    try {
+        startPerf();
     } catch (e) {}
     try {
         startSnapshot();

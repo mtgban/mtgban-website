@@ -43,13 +43,32 @@ func TestGenPageNavSwitchesMetricsWithTheCounter(t *testing.T) {
 	}
 }
 
+// A binary with no commit renders no build, so the script sends no error rows.
+func TestGenPageNavRendersNoBuildWithoutACommit(t *testing.T) {
+	withSigMode(t, true, false)
+	prevCommit, prevDev := BuildCommit, DevMode
+	t.Cleanup(func() { BuildCommit, DevMode = prevCommit, prevDev })
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	for _, dev := range []bool{false, true} {
+		DevMode = dev
+		BuildCommit = ""
+		if got := genPageNav(testSite, r, "Home", "").MetricsBuild; got != "" {
+			t.Errorf("dev=%v, no commit: MetricsBuild = %q, want empty", dev, got)
+		}
+		BuildCommit = strings.Repeat("0f", 20)
+		if got := genPageNav(testSite, r, "Home", "").MetricsBuild; got != assetHash() || !strings.HasPrefix(got, BuildCommit) {
+			t.Errorf("dev=%v: MetricsBuild = %q, want %q", dev, got, assetHash())
+		}
+	}
+}
+
 // Each base hands the script its flag before loading it, deferred.
 func TestEveryBaseLoadsMetrics(t *testing.T) {
 	for _, c := range []struct {
 		tmpl   string
 		mobile bool
 	}{{"search.html", false}, {"home.html", false}, {"search.html", true}, {"home.html", true}} {
-		pv := PageVars{UserNav: &NavElem{Short: "b"}, Hash: "abc", MetricsVars: MetricsVars{MetricsOn: true, MetricsPage: "search"}}
+		pv := PageVars{UserNav: &NavElem{Short: "b"}, Hash: "abc", MetricsVars: MetricsVars{MetricsOn: true, MetricsBuild: "abc", MetricsPage: "search"}}
 		page := renderPage(t, c.tmpl, c.mobile, pv)
 		flag := strings.Index(page, `window.BAN_METRICS = {on: true, page: "search", build: "abc"};`)
 		tag := strings.Index(page, `<script type="text/javascript" src="/js/metrics.js?hash=abc" defer></script>`)
@@ -75,7 +94,7 @@ func TestMetricsPageIsEscapedInTheScript(t *testing.T) {
 		tmpl   string
 		mobile bool
 	}{{"search.html", false}, {"home.html", false}, {"search.html", true}} {
-		pv := PageVars{UserNav: &NavElem{Short: "b"}, Hash: "abc", MetricsVars: MetricsVars{MetricsOn: true, MetricsPage: label}}
+		pv := PageVars{UserNav: &NavElem{Short: "b"}, Hash: "abc", MetricsVars: MetricsVars{MetricsOn: true, MetricsBuild: "abc", MetricsPage: label}}
 		page := renderPage(t, c.tmpl, c.mobile, pv)
 		if strings.Contains(page, label) {
 			t.Errorf("%s (mobile=%v): the label is printed unescaped", c.tmpl, c.mobile)
@@ -90,7 +109,7 @@ func TestMetricsPageIsEscapedInTheScript(t *testing.T) {
 func TestMetricsPageIsEmptyWhereNoPageWasShown(t *testing.T) {
 	const empty = `window.BAN_METRICS = {on: true, page: "", build: "abc"};`
 	const home = `window.BAN_METRICS = {on: true, page: "home", build: "abc"};`
-	base := PageVars{UserNav: &NavElem{Short: "b"}, Hash: "abc", MetricsVars: MetricsVars{MetricsOn: true, MetricsPage: "home"}}
+	base := PageVars{UserNav: &NavElem{Short: "b"}, Hash: "abc", MetricsVars: MetricsVars{MetricsOn: true, MetricsBuild: "abc", MetricsPage: "home"}}
 	withError, inModal := base, base
 	withError.ErrorMessage = "Your session has expired"
 	inModal.ModalMode = true

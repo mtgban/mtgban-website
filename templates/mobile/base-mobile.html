@@ -20,7 +20,7 @@
     <meta name="theme-color" content="#ff0000">
 
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
-    <script>window.BAN_METRICS = {on: {{if .MetricsOn}}true{{else}}false{{end}}, page: "{{if not (or .ModalMode .ErrorMessage)}}{{.MetricsPage}}{{end}}", build: "{{.Hash}}"};</script>
+    <script>window.BAN_METRICS = {on: {{if .MetricsOn}}true{{else}}false{{end}}, page: "{{if not (or .ModalMode .ErrorMessage)}}{{.MetricsPage}}{{end}}", build: "{{.MetricsBuild}}"};</script>
     <script type="text/javascript" src="/js/metrics.js?hash={{.Hash}}" defer></script>
     {{if not .NoBackpack}}
     <script>window.BAN_BACKPACK = {canUpload: {{if .CanUpload}}true{{else}}false{{end}}};</script>

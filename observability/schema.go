@@ -135,6 +135,18 @@ END $$`,
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (instance, name, value, scope)
 )`,
+	// Script errors by place and class; at most errorRowsPerDay rows a day an instance, so no further index.
+	`CREATE TABLE IF NOT EXISTS feature_errors (
+    day      date    NOT NULL,
+    instance text    NOT NULL,
+    device   text    NOT NULL,
+    build    text    NOT NULL,
+    script   text    NOT NULL,
+    line     integer NOT NULL,
+    class    text    NOT NULL,
+    n        bigint  NOT NULL DEFAULT 1,
+    PRIMARY KEY (day, instance, device, build, script, line, class)
+)`,
 }
 
 // ensureSchema applies both lists in one transaction under the schema lock. Idempotent (IF NOT EXISTS).

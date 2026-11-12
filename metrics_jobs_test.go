@@ -99,6 +99,7 @@ type fakeFoldStore struct {
 	cancel      func()    // called after the prune numbered cancelAfter
 	cancelAfter int
 	prunes      int
+	failErrors  bool // PruneErrors fails
 }
 
 func (f *fakeFoldStore) MinuteDaysBefore(_ context.Context, before time.Time) ([]time.Time, error) {
@@ -131,6 +132,14 @@ func (f *fakeFoldStore) PruneMinutes(_ context.Context, before time.Time) (int64
 	return n, nil
 }
 
+func (f *fakeFoldStore) PruneErrors(_ context.Context, before time.Time) (int64, error) {
+	f.calls = append(f.calls, "prune errors "+before.Format(time.DateOnly))
+	if f.failErrors {
+		return 0, errors.New("prune failed")
+	}
+	return 7, nil
+}
+
 // dateOf is the UTC midnight of a YYYY-MM-DD date.
 func dateOf(s string) time.Time {
 	d, err := time.Parse(time.DateOnly, s)
@@ -147,11 +156,11 @@ func TestFoldFeatureDays(t *testing.T) {
 
 	store := &fakeFoldStore{minutes: []time.Time{dateOf("2026-11-10"), dateOf("2026-11-11")}}
 	result, err := foldFeatureDays(context.Background(), store, now, false)
-	want := []string{"days 2026-11-11", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "prune 2026-10-28"}
+	want := []string{"days 2026-11-11", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "prune 2026-10-28", "prune errors 2026-08-13"}
 	if err != nil || !slices.Equal(store.calls, want) {
 		t.Fatalf("calls %v, err %v, want %v", store.calls, err, want)
 	}
-	if result != "folded 3 of 3 days, 30 rows; pruned 0 days, 0 minutes; swept 0 minutes" {
+	if result != "folded 3 of 3 days, 30 rows; pruned 0 days, 0 minutes; swept 0 minutes; swept 7 errors" {
 		t.Errorf("result = %q", result)
 	}
 
@@ -159,14 +168,14 @@ func TestFoldFeatureDays(t *testing.T) {
 	store = &fakeFoldStore{minutes: []time.Time{dateOf("2026-10-20"), dateOf("2026-10-22"), dateOf("2026-11-01"), dateOf("2026-11-09"), dateOf("2026-11-11")}}
 	result, err = foldFeatureDays(context.Background(), store, now, false)
 	want = []string{"days 2026-11-11", "fold 2026-10-20", "prune 2026-10-21", "fold 2026-10-22", "prune 2026-10-23",
-		"fold 2026-11-01", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "prune 2026-10-28"}
+		"fold 2026-11-01", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "prune 2026-10-28", "prune errors 2026-08-13"}
 	if err != nil || !slices.Equal(store.calls, want) {
 		t.Fatalf("outage: calls %v, err %v, want %v", store.calls, err, want)
 	}
 	if left := []time.Time{dateOf("2026-11-01"), dateOf("2026-11-09"), dateOf("2026-11-11")}; !slices.Equal(store.minutes, left) {
 		t.Errorf("minutes left on %v, want %v", store.minutes, left)
 	}
-	if result != "folded 6 of 6 days, 60 rows; pruned 2 days, 2 minutes; swept 0 minutes" {
+	if result != "folded 6 of 6 days, 60 rows; pruned 2 days, 2 minutes; swept 0 minutes; swept 7 errors" {
 		t.Errorf("outage: result = %q", result)
 	}
 
@@ -212,7 +221,7 @@ func TestFoldFeatureDays(t *testing.T) {
 	// A run by hand folds the day in progress too, and prunes no differently.
 	store = &fakeFoldStore{minutes: []time.Time{dateOf("2026-11-11")}}
 	_, err = foldFeatureDays(context.Background(), store, now, true)
-	want = []string{"days 2026-11-11", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "fold 2026-11-11", "prune 2026-10-28"}
+	want = []string{"days 2026-11-11", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "fold 2026-11-11", "prune 2026-10-28", "prune errors 2026-08-13"}
 	if err != nil || !slices.Equal(store.calls, want) {
 		t.Fatalf("by hand: calls %v, err %v, want %v", store.calls, err, want)
 	}
@@ -227,6 +236,61 @@ func TestFoldPrunes(t *testing.T) {
 		if p.what == "" || p.days <= 0 || p.run == nil {
 			t.Errorf("prune %+v is incomplete", p)
 		}
+	}
+}
+
+// Error rows go at 90 days, after the minutes.
+func TestFoldPrunesErrorRows(t *testing.T) {
+	i := slices.IndexFunc(foldPrunes, func(p foldPrune) bool { return p.what == "errors" })
+	if i < 1 || foldPrunes[i].days != errorRetentionDays || errorRetentionDays != 90 {
+		t.Fatalf("foldPrunes = %+v, want errors at 90 days after minutes", foldPrunes)
+	}
+	store := &fakeFoldStore{}
+	before := time.Date(2026, 8, 13, 0, 0, 0, 0, time.UTC)
+	if n, err := foldPrunes[i].run(context.Background(), store, before); err != nil || n != 7 {
+		t.Fatalf("run = %d, %v", n, err)
+	}
+	if !slices.Equal(store.calls, []string{"prune errors 2026-08-13"}) {
+		t.Errorf("calls = %v", store.calls)
+	}
+}
+
+// The cutoff is today's UTC midnight less 90 days, at any hour of the run.
+func TestFoldCutsErrorRowsFromToday(t *testing.T) {
+	now := time.Date(2026, 11, 11, 23, 59, 0, 0, time.UTC)
+	for _, byHand := range []bool{false, true} {
+		store := &fakeFoldStore{}
+		if _, err := foldFeatureDays(context.Background(), store, now, byHand); err != nil {
+			t.Fatalf("by hand %v: %v", byHand, err)
+		}
+		minutes := slices.Index(store.calls, "prune 2026-10-28")
+		errs := slices.Index(store.calls, "prune errors 2026-08-13")
+		if minutes < 0 || errs <= minutes {
+			t.Errorf("by hand %v: calls %v, want the error prune at 2026-08-13 after the minutes", byHand, store.calls)
+		}
+	}
+}
+
+// A failed error prune fails the run, after the folds and the minutes.
+func TestFailedErrorPruneFailsTheFoldRun(t *testing.T) {
+	now := time.Date(2026, 11, 11, 0, 40, 0, 0, time.UTC)
+	store := &fakeFoldStore{failErrors: true}
+	result, err := foldFeatureDays(context.Background(), store, now, false)
+	if err == nil || !slices.Contains(store.calls, "fold 2026-11-10") || !slices.Contains(store.calls, "prune 2026-10-28") {
+		t.Fatalf("calls %v, err %v, want an error after the folds and the minute prune", store.calls, err)
+	}
+	if !strings.HasSuffix(result, "; swept 0 minutes") {
+		t.Errorf("result = %q", result)
+	}
+
+	setTestJobs(t)
+	rows := withFeatureCounter(t)
+	free := func(ctx context.Context, _ string, fn func(context.Context) error) (bool, error) {
+		return true, fn(ctx)
+	}
+	metricsFoldJob(free, &fakeFoldStore{failErrors: true}, func() time.Time { return now }, false)()
+	if got := find(rows.rows(), "job.run"); len(got) != 1 || got[0].Scope != "fold" || got[0].Value != "fail" {
+		t.Errorf("job.run rows = %+v, want one fold fail", got)
 	}
 }
 

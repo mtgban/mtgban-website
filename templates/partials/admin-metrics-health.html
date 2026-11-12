@@ -136,10 +136,49 @@
 <div class="admin-section">
     <div class="admin-section-header">
         <h2>Script errors</h2>
+        {{with .ScriptErrors}}{{if .Build}}<span class="count">build {{.ShortBuild}}</span>{{end}}{{end}}
     </div>
-    {{with .ScriptErrors}}{{/* phase 2f puts its table here */}}{{else}}
-    <p class="admin-metrics-dim">Script errors: not measured.</p>
+    {{if .ScriptErrorsRead.Failed}}
+    <p class="admin-metrics-dim">{{.ScriptErrorsRead.Message}}</p>
+    {{else}}{{with .ScriptErrors}}
+    {{if .Unstamped}}<p>Script errors are not collected here: this build has no version stamp, so an error could not be tied to its code.</p>{{end}}
+    {{if .Build}}
+    {{if .Full}}
+    <div class="admin-msg admin-msg-error">{{.RowsToday}} of {{.Cap}} rows used today: errors in new places are not recorded until midnight UTC. Counts by script and type are still kept.</div>
+    {{else}}
+    <p class="admin-metrics-dim">{{.RowsToday}} of {{.Cap}} rows used today</p>
     {{end}}
+    {{if .Rows}}
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table{{if $.IsMobile}} admin-metrics-stack{{end}}">
+        <thead><tr><th>Script</th><th class="num">Line</th><th>Class</th><th class="num">Count</th><th class="num">Desktop</th><th class="num">Mobile</th><th>First seen</th><th>Last seen</th></tr></thead>
+        <tbody>
+        {{range .Rows}}
+            <tr>
+                <td class="admin-mono">{{.Script}}</td>
+                <td class="num admin-mono"{{if $.IsMobile}} data-label="Line"{{end}}>{{if .Line}}{{.Line}}{{else}}<span class="admin-metrics-dim">none</span>{{end}}</td>
+                <td class="admin-mono"{{if $.IsMobile}} data-label="Class"{{end}}>{{.Class}}</td>
+                <td class="num admin-mono"{{if $.IsMobile}} data-label="Count"{{end}}>{{.N}}</td>
+                <td class="num admin-mono"{{if $.IsMobile}} data-label="Desktop"{{end}}>{{.Desktop}}</td>
+                <td class="num admin-mono"{{if $.IsMobile}} data-label="Mobile"{{end}}>{{.Mobile}}</td>
+                <td class="admin-mono"{{if $.IsMobile}} data-label="First seen"{{end}}>{{.FirstSeen.Format "2006-01-02"}}</td>
+                <td class="admin-mono"{{if $.IsMobile}} data-label="Last seen"{{end}}>{{.LastSeen.Format "2006-01-02"}}</td>
+            </tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    <p class="admin-metrics-dim">Line is none for a page's own code and for scripts from other sites.</p>
+    {{else}}
+    <p>No script errors recorded for this build.</p>
+    {{end}}
+    {{else if not .Unstamped}}
+    <p>No script errors recorded for this site in any build. A site whose build has no version stamp collects none.</p>
+    {{end}}
+    <p class="admin-metrics-dim">Errors thrown before the page finished loading its scripts are not counted. Bots are not counted here. Errors from pages an earlier build served, as during a deploy, are not kept.</p>
+    {{else}}
+    <p class="admin-metrics-dim">Script errors: not measured.</p>
+    {{end}}{{end}}
 </div>
 {{end}}
 {{end}}

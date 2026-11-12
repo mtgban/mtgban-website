@@ -2,11 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -468,6 +472,17 @@ func TestMetricsSettingsIsCacheableJSON(t *testing.T) {
 	}
 }
 
+// With no hash, as an unstamped build asks, the registry is not cached for a day.
+func TestMetricsSettingsWithNoHashIsNotCached(t *testing.T) {
+	for _, url := range []string{"/api/metrics/settings.json", "/api/metrics/settings.json?hash="} {
+		rec := httptest.NewRecorder()
+		MetricsSettings(rec, httptest.NewRequest(http.MethodGet, url, nil))
+		if got := rec.Header().Get("Cache-Control"); rec.Code != http.StatusOK || got != "no-cache" {
+			t.Errorf("%s: status %d, Cache-Control %q", url, rec.Code, got)
+		}
+	}
+}
+
 func TestMetricsSettingsRefusesAPost(t *testing.T) {
 	rec := httptest.NewRecorder()
 	MetricsSettings(rec, httptest.NewRequest(http.MethodPost, "/api/metrics/settings.json", nil))
@@ -503,4 +518,330 @@ func TestMetricsAPITakesASnapshot(t *testing.T) {
 	wantRow(t, got, "", "metrics.client", "value", 3)
 	wantRow(t, got, "", "metrics.rejected", "", 3)
 	wantRow(t, got, "", "metrics.beacon", "ok", 1)
+}
+
+// fakeErrorStore keeps every error row upserted; refuse says how many of each call it refuses.
+type fakeErrorStore struct {
+	mu      sync.Mutex
+	written []observability.ErrorRow
+	refuse  int
+}
+
+func (f *fakeErrorStore) UpsertErrors(_ context.Context, _ string, rows []observability.ErrorRow) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.written = append(f.written, rows...)
+	return min(f.refuse, len(rows)), nil
+}
+
+// snapshot is a copy of the rows written so far.
+func (f *fakeErrorStore) snapshot() []observability.ErrorRow {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.written)
+}
+
+// fakeErrors is the error buffer a test installed and its store.
+type fakeErrors struct {
+	t      *testing.T
+	buffer *observability.ErrorBuffer
+	store  *fakeErrorStore
+	once   sync.Once
+}
+
+// withFeatureErrors installs an error buffer over a fake store as FeatureErrors, its
+// refusals counted through rejectChecked, testBuild as this binary's; call it after withFeatureCounter.
+func withFeatureErrors(t *testing.T) *fakeErrors {
+	t.Helper()
+	withBuildCommit(t, testBuild)
+	prev := FeatureErrors
+	t.Cleanup(func() { FeatureErrors = prev })
+	now := time.Date(2026, 11, 11, 12, 0, 30, 0, time.UTC)
+	f := &fakeErrors{t: t, store: &fakeErrorStore{}}
+	f.buffer = observability.NewErrorBuffer(f.store, "test", func() time.Time { return now }, rejectChecked)
+	FeatureErrors = f.buffer
+	return f
+}
+
+// rows closes the buffer on its first call and returns every row it wrote.
+func (f *fakeErrors) rows() []observability.ErrorRow {
+	f.once.Do(func() {
+		if err := f.buffer.Close(context.Background()); err != nil {
+			f.t.Errorf("closing the error buffer: %v", err)
+		}
+	})
+	return f.store.snapshot()
+}
+
+// testBuild is a build hash as BuildCommit holds one.
+var testBuild = strings.Repeat("0f", 20)
+
+func TestErrorRow(t *testing.T) {
+	sha, foreign := testBuild, strings.Repeat("ab", 20)
+	withBuildCommit(t, sha)
+	n := func(i int) *int { return &i }
+	cases := []struct {
+		scope  string
+		line   *int
+		build  string
+		wantL  int
+		reason string
+	}{
+		{"navbar.js", n(42), sha, 42, ""},
+		{"navbar.js", nil, sha, 0, ""},
+		{"navbar.js", n(42), sha + "-1731300000000000000", 42, ""},
+		{"navbar.js", n(observability.MaxErrorLine), sha, observability.MaxErrorLine, ""},
+		{"inline", n(913), sha, 0, ""}, // an inline line is the page's, not the build's
+		{"other", n(1), sha, 0, ""},
+		{"navbar.js", n(-1), sha, 0, "value"},
+		{"navbar.js", n(observability.MaxErrorLine + 1), sha, 0, "value"},
+		{"other", n(-1), sha, 0, "value"},
+		{"navbar.js", n(42), "", 0, "value"},
+		{"navbar.js", n(42), "-1731300000000000000", 0, "value"}, // dev with no commit
+		{"navbar.js", n(42), "<script>", 0, "value"},
+		{"navbar.js", n(42), strings.ToUpper(sha), 0, "value"},
+		{"navbar.js", n(42), foreign, 0, "build"}, // well formed, but not this binary's
+		{"navbar.js", n(42), foreign + "-1731300000000000000", 0, "build"},
+	}
+	for i, c := range cases {
+		l, b, reason := errorRow(c.scope, c.line, c.build)
+		if reason != c.reason || l != c.wantL || (reason == "" && b != sha) || (reason != "" && b != "") {
+			t.Errorf("case %d: got (%d, %q, %q)", i, l, b, reason)
+		}
+	}
+
+	// An unstamped binary keeps no row for any build.
+	BuildCommit = ""
+	for _, build := range []string{sha, foreign, "-1731300000000000000"} {
+		if _, _, reason := errorRow("navbar.js", n(42), build); reason == "" {
+			t.Errorf("unstamped: %q was kept", build)
+		}
+	}
+}
+
+// errorEntry is one ui.js.error entry on navbar.js.
+func errorEntry(class string, c, line int, build string) string {
+	return fmt.Sprintf(`{"n":"ui.js.error","s":"navbar.js","v":%q,"c":%d,"l":%d,"b":%q}`, class, c, line, build)
+}
+
+func TestMetricsAPIStoresAnErrorRow(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	errs := withFeatureErrors(t)
+	r := beacon("[" + errorEntry("TypeError", 2, 42, testBuild) + "]")
+	r.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+	if code := postBeacon(t, r); code != http.StatusNoContent {
+		t.Fatalf("status %d, want 204", code)
+	}
+	got := errs.rows()
+	counts := rows.rows()
+	wantRow(t, counts, "navbar.js", "ui.js.error", "TypeError", 2)
+	wantNoRow(t, counts, "metrics.rejected")
+	day := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
+	want := observability.ErrorRow{Day: day, Device: "desktop", Build: testBuild, Script: "navbar.js", Line: 42, Class: "TypeError", N: 2}
+	if len(got) != 1 || got[0] != want {
+		t.Errorf("error rows = %+v, want [%+v]", got, want)
+	}
+}
+
+// Dev renders <sha>-<nanos>; the row keeps the sha.
+func TestMetricsAPIStoresADevBuildAsItsCommit(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	withFeatureCounter(t)
+	errs := withFeatureErrors(t)
+	postBeacon(t, beacon("["+errorEntry("TypeError", 1, 42, testBuild+"-1731300000000000000")+"]"))
+	if got := errs.rows(); len(got) != 1 || got[0].Build != testBuild {
+		t.Errorf("error rows = %+v, want one under the bare commit", got)
+	}
+}
+
+func TestMetricsAPIKeepsTheCountWhenTheRowIsBad(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	for _, entry := range []string{
+		errorEntry("TypeError", 1, 42, "nope"),
+		errorEntry("TypeError", 1, 42, ""),
+		errorEntry("TypeError", 1, -4, testBuild),
+		errorEntry("TypeError", 1, observability.MaxErrorLine+1, testBuild),
+		`{"n":"ui.js.error","s":"navbar.js","v":"TypeError","c":1}`, // no line or build
+	} {
+		rows := withFeatureCounter(t)
+		errs := withFeatureErrors(t)
+		postBeacon(t, beacon("["+entry+"]"))
+		if got := errs.rows(); len(got) != 0 {
+			t.Errorf("%s: error rows = %+v, want none", entry, got)
+		}
+		counts := rows.rows()
+		wantRow(t, counts, "navbar.js", "ui.js.error", "TypeError", 1)
+		wantRow(t, counts, "", "metrics.client", "accepted", 1)
+		wantRow(t, counts, "", "metrics.rejected", "", 1)
+	}
+}
+
+func TestMetricsAPIRefusesLineAndBuildOnOtherNames(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	for _, entry := range []string{
+		`{"n":"ui.load","s":"search","c":1,"l":3,"b":"` + testBuild + `"}`,
+		`{"n":"ui.load","s":"search","c":1,"l":3}`,
+		`{"n":"ui.load","s":"search","c":1,"l":0}`,
+		`{"n":"ui.load","s":"search","c":1,"b":"` + testBuild + `"}`,
+	} {
+		rows := withFeatureCounter(t)
+		errs := withFeatureErrors(t)
+		postBeacon(t, beacon("["+entry+"]"))
+		if got := errs.rows(); len(got) != 0 {
+			t.Errorf("%s: error rows = %+v, want none", entry, got)
+		}
+		counts := rows.rows()
+		wantNoRow(t, counts, "ui.load")
+		wantRow(t, counts, "", "metrics.client", "value", 1)
+		wantRow(t, counts, "", "metrics.rejected", "", 1)
+	}
+}
+
+// What an old cached script sends, with neither field, is counted as before.
+func TestMetricsAPIAcceptsEntriesWithNoLineOrBuild(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	withFeatureErrors(t)
+	postBeacon(t, beacon(`[{"n":"ui.load","s":"search","c":2}]`))
+	counts := rows.rows()
+	wantRow(t, counts, "search", "ui.load", "", 2)
+	wantNoRow(t, counts, "metrics.rejected")
+}
+
+func TestMetricsAPINeverStoresAMessage(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	errs := withFeatureErrors(t)
+	postBeacon(t, beacon("["+errorEntry("x is not a function", 1, 1, testBuild)+","+
+		`{"n":"ui.js.error","s":"https://evil.example/a.js?q=1","v":"TypeError","c":1,"l":1,"b":"`+testBuild+`"}]`))
+	if got := errs.rows(); len(got) != 0 {
+		t.Errorf("error rows = %+v, want none", got)
+	}
+	counts := rows.rows()
+	wantNoRow(t, counts, "ui.js.error")
+	wantRow(t, counts, "", "metrics.rejected", "", 2)
+}
+
+func TestMetricsAPISkipsErrorRowsFromBots(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	errs := withFeatureErrors(t)
+	r := beacon("[" + errorEntry("TypeError", 1, 42, testBuild) + "]")
+	r.Header.Set("User-Agent", "Googlebot/2.1")
+	postBeacon(t, r)
+	if got := errs.rows(); len(got) != 0 {
+		t.Errorf("error rows = %+v, want none from a bot", got)
+	}
+	counts := rows.rows()
+	if got := find(counts, "ui.js.error"); len(got) != 1 || !got[0].Bot || got[0].N != 1 {
+		t.Errorf("ui.js.error rows = %+v, want one counted as a bot", got)
+	}
+	wantNoRow(t, counts, "metrics.rejected")
+}
+
+func TestMetricsAPIWithNoErrorBuffer(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	withBuildCommit(t, testBuild)
+	prev := FeatureErrors
+	t.Cleanup(func() { FeatureErrors = prev })
+	FeatureErrors = nil
+	if code := postBeacon(t, beacon("["+errorEntry("TypeError", 1, 42, testBuild)+"]")); code != http.StatusNoContent {
+		t.Errorf("status %d, want 204", code)
+	}
+	counts := rows.rows()
+	wantRow(t, counts, "navbar.js", "ui.js.error", "TypeError", 1)
+	wantNoRow(t, counts, "metrics.rejected")
+}
+
+// Each line is its own key: two lines at the cap are both stored in full; another build's row is refused.
+func TestMetricsAPIKeysAnErrorByLineAndBuild(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	errs := withFeatureErrors(t)
+	other := strings.Repeat("ab", 20)
+	postBeacon(t, beacon("["+errorEntry("TypeError", 50, 42, testBuild)+","+errorEntry("TypeError", 50, 43, testBuild)+","+
+		errorEntry("TypeError", 50, 42, other)+","+errorEntry("TypeError", 50, 42, testBuild)+"]"))
+	got := errs.rows()
+	if len(got) != 2 {
+		t.Fatalf("error rows = %+v, want two", got)
+	}
+	for _, row := range got {
+		if row.N != metricsMaxCount {
+			t.Errorf("row %+v, want N %d", row, metricsMaxCount)
+		}
+	}
+	counts := rows.rows()
+	wantRow(t, counts, "navbar.js", "ui.js.error", "TypeError", 3*metricsMaxCount)
+	wantRow(t, counts, "", "metrics.client", "count", 1) // the repeat of the first key
+	wantRow(t, counts, "", "metrics.rejected", "", 2)    // the repeat, and the other build's row
+}
+
+// A row for another build is refused; its count is kept.
+func TestMetricsAPIRefusesARowForAnotherBuild(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	errs := withFeatureErrors(t)
+	postBeacon(t, beacon("["+errorEntry("TypeError", 1, 42, strings.Repeat("ab", 20))+"]"))
+	if got := errs.rows(); len(got) != 0 {
+		t.Errorf("error rows = %+v, want none", got)
+	}
+	counts := rows.rows()
+	wantRow(t, counts, "navbar.js", "ui.js.error", "TypeError", 1)
+	wantRow(t, counts, "", "metrics.client", "accepted", 1)
+	wantRow(t, counts, "", "metrics.rejected", "", 1)
+}
+
+// A post adds at most metricsMaxErrorEntries error entries; the rest are refused as count.
+func TestMetricsAPICapsErrorEntriesPerPost(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	errs := withFeatureErrors(t)
+	var entries []string
+	for i := range metricsMaxErrorEntries + 5 {
+		entries = append(entries, errorEntry("TypeError", 1, i+1, testBuild))
+	}
+	entries = append(entries, `{"n":"ui.load","s":"search","c":1}`)
+	postBeacon(t, beacon("["+strings.Join(entries, ",")+"]"))
+	if got := errs.rows(); len(got) != metricsMaxErrorEntries {
+		t.Errorf("%d error rows, want %d", len(got), metricsMaxErrorEntries)
+	}
+	counts := rows.rows()
+	wantRow(t, counts, "navbar.js", "ui.js.error", "TypeError", metricsMaxErrorEntries)
+	wantRow(t, counts, "search", "ui.load", "", 1)
+	wantRow(t, counts, "", "metrics.client", "count", 5)
+	wantRow(t, counts, "", "metrics.client", "accepted", metricsMaxErrorEntries+1)
+	wantRow(t, counts, "", "metrics.rejected", "", 5)
+}
+
+// A row the store refuses is counted as rejected; its count stays accepted.
+func TestMetricsAPICountsARowTheStoreRefuses(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	errs := withFeatureErrors(t)
+	errs.store.refuse = 1
+	postBeacon(t, beacon("["+errorEntry("TypeError", 1, 42, testBuild)+"]"))
+	errs.rows()
+	counts := rows.rows()
+	wantRow(t, counts, "navbar.js", "ui.js.error", "TypeError", 1)
+	wantRow(t, counts, "", "metrics.client", "accepted", 1)
+	wantRow(t, counts, "", "metrics.rejected", "", 1)
+}
+
+// The error buffer closes before the counter, so its refusals reach the counter's last flush.
+func TestShutdownClosesTheErrorsBeforeTheCounter(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	errs := withFeatureErrors(t)
+	errs.store.refuse = 1
+	postBeacon(t, beacon("["+errorEntry("TypeError", 1, 42, testBuild)+"]"))
+	prev := discordCleanup
+	t.Cleanup(func() { discordCleanup = prev })
+	discordCleanup = func() {}
+	(&site{}).shutdownTelemetry(context.Background())
+	if got := errs.store.snapshot(); len(got) != 1 {
+		t.Errorf("error rows written by the shutdown = %+v, want one", got)
+	}
+	wantRow(t, rows.store.snapshot(), "", "metrics.rejected", "", 1)
 }

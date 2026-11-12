@@ -132,6 +132,8 @@ var notUse = map[string]bool{
 	"ui.offline.sync":     true, // offline syncs, most run at a page load
 	"ui.offline.sw":       true, // the service worker's registration when offline mode is switched on
 	"ui.offline.failover": true, // the offline shell served for a page the network could not reach
+	"ui.js.error":         true, // uncaught script errors
+	"ui.js.rejection":     true, // unhandled promise rejections
 	pageView:              true, // every page's traffic, a candidate in area site
 }
 

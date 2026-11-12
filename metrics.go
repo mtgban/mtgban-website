@@ -13,6 +13,9 @@ import (
 // FeatureCounter counts feature use by minute; nil when feature counts are off.
 var FeatureCounter *observability.Counter
 
+// FeatureErrors holds script error rows until they are written; nil when feature counts are off.
+var FeatureErrors *observability.ErrorBuffer
+
 // dimsKey is the context key of a request's dimsHolder.
 type dimsKey struct{}
 

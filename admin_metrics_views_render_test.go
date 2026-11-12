@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"html/template"
 	"net/url"
 	"strings"
 	"testing"
@@ -255,6 +257,54 @@ func TestHealthRenders(t *testing.T) {
 	wantAll(t, html, "a broken count", "Missing although their pages had views", "An arbit page view.",
 		"<li>1 count missing for 30 days although its pages were used</li>")
 	wantNone(t, html, "a broken count", "No problems found")
+}
+
+func TestHealthShowsScriptErrors(t *testing.T) {
+	build := strings.Repeat("ab", 20)
+	day := metricsRenderDay
+	block := func(e *MetricsScriptErrors, read MetricsRead) *MetricsView {
+		v := metricsShellFor("health")
+		v.Health = &MetricsHealth{ScriptErrors: e, ScriptErrorsRead: read, Checked: true}
+		return v
+	}
+	full := &MetricsScriptErrors{Build: build, RowsToday: 200, Cap: 200, Rows: []MetricsScriptError{
+		{Script: "navbar.js", Line: 42, Class: "TypeError", N: 31, Desktop: 27, Mobile: 4, FirstSeen: day, LastSeen: day},
+		{Script: "other", Class: "ScriptError", N: 9, Desktop: 9, FirstSeen: day, LastSeen: day},
+	}}
+	limits := []string{"Errors thrown before the page finished loading its scripts are not counted.", "Bots are not counted here.",
+		"Errors from pages an earlier build served, as during a deploy, are not kept."}
+	capProblem := fmt.Sprintf(metricsErrorCapProblem, 200)
+	for _, mobile := range []bool{false, true} {
+		v := block(full, MetricsRead{})
+		v.Health.Problems = []string{capProblem}
+		html := metricsSection(t, v, mobile)
+		wantAll(t, html, "a full day", append([]string{"navbar.js", "build abababa", "TypeError", "2026-03-04",
+			"200 of 200 rows used today: errors in new places are not recorded until midnight UTC. Counts by script and type are still kept.",
+			`class="admin-msg admin-msg-error"`, "1 found", "<li>" + template.HTMLEscapeString(capProblem) + "</li>"}, limits...)...)
+		wantNone(t, html, "a full day", "Script errors: not measured", "No script errors recorded", "not collected here", "No problems found")
+		if mobile {
+			wantAll(t, html, "a full day on a phone", "admin-metrics-stack", `data-label="First seen"`)
+		}
+	}
+
+	quiet := &MetricsScriptErrors{Build: build, RowsToday: 3, Cap: 200}
+	html := metricsSection(t, block(quiet, MetricsRead{}), false)
+	wantAll(t, html, "no rows", "No script errors recorded for this build.", "3 of 200 rows used today", "build abababa")
+	wantNone(t, html, "no rows", "not recorded until midnight", "<th>First seen</th>")
+
+	html = metricsSection(t, block(&MetricsScriptErrors{Cap: 200, Unstamped: true}, MetricsRead{}), false)
+	wantAll(t, html, "an unstamped build", "Script errors are not collected here: this build has no version stamp")
+	wantNone(t, html, "an unstamped build", "No script errors recorded", "rows used today", "Script errors: not measured", "The rows below")
+
+	html = metricsSection(t, block(&MetricsScriptErrors{Cap: 200}, MetricsRead{}), false)
+	wantAll(t, html, "another site with none", "No script errors recorded for this site in any build.")
+
+	html = metricsSection(t, block(nil, metricsRead(false)), false)
+	wantAll(t, html, "a failed read", metricsReadFailedText)
+	wantNone(t, html, "a failed read", "Script errors: not measured", "rows used today")
+
+	html = metricsSection(t, block(nil, MetricsRead{}), false)
+	wantAll(t, html, "not measured", "Script errors: not measured.")
 }
 
 func TestHealthJobAndCounterRowsRender(t *testing.T) {

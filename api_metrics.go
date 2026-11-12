@@ -15,6 +15,8 @@ const (
 	metricsMaxEntries = 100
 	metricsMaxCount   = 50
 	metricsMaxString  = 40
+
+	metricsMaxErrorEntries = 20 // error entries a post may add
 )
 
 // beaconEntry is one count on the wire.
@@ -23,7 +25,12 @@ type beaconEntry struct {
 	S string `json:"s"`
 	V string `json:"v"`
 	C int    `json:"c"`
+	L *int   `json:"l"` // error names only: the line; nil when absent
+	B string `json:"b"` // error names only: the page's build
 }
+
+// errorNames are the names whose entries also add a feature_errors row.
+var errorNames = []string{"ui.js.error", "ui.js.rejection"}
 
 // clientStateNames are the state names a browser sends: the settings snapshot.
 var clientStateNames = []string{"state.set", "state.reader"}
@@ -134,7 +141,11 @@ func MetricsSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	if r.URL.Query().Get("hash") == "" {
+		w.Header().Set("Cache-Control", "no-cache") // an unstamped build's registry can change without a new hash
+	} else {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+	}
 	w.Write(observability.SettingsJSON())
 }
 
@@ -144,13 +155,59 @@ func beaconValidators(s *site) observability.Validators {
 }
 
 // beaconKey is one stored key; a post adds at most metricsMaxCount to each.
-// The per-post identity is scope, name and value; an entry kind differing by another field must extend it.
-type beaconKey struct{ scope, name, value string }
+// An error entry's line and build are part of it, since each makes its own row.
+type beaconKey struct {
+	scope, name, value string
+	line               int
+	build              string
+}
+
+// errorEntriesKey sums a post's error entries; no registered name is empty.
+var errorEntriesKey = beaconKey{}
+
+// errorRow says what an accepted error entry adds to feature_errors, or why it adds none: value or build.
+func errorRow(scope string, line *int, build string) (l int, b, reason string) {
+	b, ok := observability.NormalizeBuild(build)
+	if !ok {
+		return 0, "", "value"
+	}
+	if line != nil {
+		l = *line
+	}
+	if l < 0 || l > observability.MaxErrorLine {
+		return 0, "", "value"
+	}
+	// a row is kept only for this binary's own build
+	if own, ok := observability.NormalizeBuild(BuildCommit); !ok || b != own {
+		return 0, "", "build"
+	}
+	if scope == "inline" || scope == "other" {
+		l = 0 // a line there is the page's or another origin's, not the build's
+	}
+	return l, b, ""
+}
 
 // countEntry stores one entry or counts why it was refused; added is this post's sums by key.
 func countEntry(r *http.Request, d observability.Dims, v observability.Validators, added map[beaconKey]int64, e beaconEntry) {
+	isError := slices.Contains(errorNames, e.N)
+	if !isError && (e.L != nil || e.B != "") {
+		rejectChecked()
+		observe(r, "metrics.client", "value")
+		return
+	}
 	scope, value, n, reason := checkEntry(e, v)
-	k := beaconKey{scope: scope, name: e.N, value: value}
+	var line int
+	var build string
+	rowOK := false
+	if reason == "" && isError {
+		var why string
+		line, build, why = errorRow(scope, e.L, e.B)
+		rowOK = why == ""
+		if added[errorEntriesKey] >= metricsMaxErrorEntries {
+			reason = "count"
+		}
+	}
+	k := beaconKey{scope: scope, name: e.N, value: value, line: line, build: build}
 	if reason == "" && added[k] >= metricsMaxCount {
 		reason = "count"
 	}
@@ -163,4 +220,15 @@ func countEntry(r *http.Request, d observability.Dims, v observability.Validator
 	added[k] += n
 	addChecked(d, scope, e.N, value, n)
 	observe(r, "metrics.client", "accepted")
+	if !isError {
+		return
+	}
+	added[errorEntriesKey]++
+	switch {
+	case !rowOK:
+		rejectChecked()
+	case d.Bot, FeatureErrors == nil: // the table has no bot column; the count above keeps it
+	case !FeatureErrors.Add(d.Device, build, scope, value, line, n):
+		rejectChecked()
+	}
 }

@@ -51,7 +51,7 @@ const (
 	titleRemove = "New to consider removing"
 	titleMoved  = "Moved most"
 	titleNotCmp = "Not compared"
-	titleErrors = "New errors"
+	titleErrors = "New errors: a script and error type no build had shown before this week"
 	titleHealth = "Health"
 )
 

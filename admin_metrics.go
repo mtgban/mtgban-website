@@ -32,6 +32,10 @@ type metricsStore interface {
 	Reviews(ctx context.Context, instance string) ([]observability.Review, error)
 	SetReview(context.Context, observability.Review) error
 	DeleteReview(ctx context.Context, instance, name, scope, value string) error
+	TopErrors(ctx context.Context, instance, build string, limit int) ([]observability.ErrorTop, error)
+	NewestErrorBuild(ctx context.Context, instance string) (string, error)
+	CountErrorRows(ctx context.Context, instance string, day time.Time) (int, error)
+	ErrorFirstSeen(ctx context.Context, instance string, limit int) ([]observability.ErrorTop, error)
 }
 
 var _ metricsStore = (*observability.Client)(nil)
@@ -834,7 +838,8 @@ func loadMetricsViewFor(ctx context.Context, store metricsStore, cache *metricsr
 			tiers, tiersOK := l.tiers(params.Instance, day, w)
 			visits, visitsOK := l.visits(params.Instance, day)
 			if ok {
-				v.Invest = buildMetricsInvest(names, totals, tiers, tiersOK, metricsreport.PageDepths(visits, lists.Pages, pageHasMobile), visitsOK, params)
+				errs := l.errorSignals(names, params.Instance)
+				v.Invest = buildMetricsInvest(names, totals, tiers, tiersOK, metricsreport.PageDepths(visits, lists.Pages, pageHasMobile), visitsOK, errs, params)
 				v.Coverage = metricsCoverage(totals, nil, false, w)
 			}
 			v.Invest.Counted, v.Invest.Read = ok, metricsRead(ok)
@@ -932,7 +937,8 @@ func (l *metricsLoader) overview(v *MetricsView, names []observability.Name, lis
 		if len(ov.Remove) == 0 {
 			ov.RemoveEmpty = metricsRemoveEmpty(names, lists, totals, w)
 		}
-		signals := metricsreport.WithErrors(metricsreport.Invest(names, totals, metricsreport.PageDepths(visits, lists.Pages, pageHasMobile), w), nil, false)
+		errs := l.errorSignals(names, params.Instance)
+		signals := errs.with(metricsreport.Invest(names, totals, metricsreport.PageDepths(visits, lists.Pages, pageHasMobile), w))
 		days, prevDays := metricsreport.WindowDays(totals, w)
 		registered := metricsRegistered(names)
 		for _, s := range metricsreport.Top(signals, metricsTopRows) {
@@ -957,7 +963,8 @@ func (l *metricsLoader) digest(names []observability.Name, lists metricsreport.L
 	nowRows, okNow := l.query("bundle", loads.Now)
 	prevRows, okPrev := l.query("bundle", loads.Prev)
 	allReaders, okSilent := l.silent(inst, day)
-	if !okWeek || !okDevices || !okNow || !okPrev || !okSilent || !healthOK {
+	nowErrors, prevErrors, okErrors := l.errorWeeks(names, inst, day)
+	if !okWeek || !okDevices || !okNow || !okPrev || !okSilent || !healthOK || !okErrors {
 		return metricsreport.Digest{}, false
 	}
 	broken, _ := metricsreport.Silent(names, allReaders)
@@ -969,6 +976,7 @@ func (l *metricsLoader) digest(names []observability.Name, lists metricsreport.L
 		Week: week, Now: nowRows, Prev: prevRows,
 		Devices: devices, Pages: lists.Pages, HasMobile: pageHasMobile,
 		Reviews: reviews, Problems: problems, Foreign: inst != observabilityInstance,
+		NowErrors: nowErrors, PrevErrors: prevErrors,
 	})
 	return metricsreport.Changes(now, prev), true
 }
@@ -1364,11 +1372,11 @@ func metricsKinds(kinds map[string][]MetricsCandidateRow) []string {
 	return out
 }
 
-// buildMetricsInvest is Invest's six sections over the window, script errors not measured until 2f;
+// buildMetricsInvest is Invest's six sections over the window, with the script error rows errs;
 // visitsOK says the page hits behind pages were read.
-func buildMetricsInvest(names []observability.Name, totals, tiers []observability.DayTotal, tiersOK bool, pages []metricsreport.PageDepth, visitsOK bool, p metricsParams) *MetricsInvest {
+func buildMetricsInvest(names []observability.Name, totals, tiers []observability.DayTotal, tiersOK bool, pages []metricsreport.PageDepth, visitsOK bool, errs metricsErrorRows, p metricsParams) *MetricsInvest {
 	w := p.window()
-	signals := metricsreport.WithErrors(metricsreport.Invest(names, totals, pages, w), nil, false)
+	signals := errs.with(metricsreport.Invest(names, totals, pages, w))
 	days, prevDays := metricsreport.WindowDays(totals, w)
 	registered := metricsRegistered(names)
 	var rows []MetricsSignalRow
@@ -1449,6 +1457,9 @@ func metricsSignalRow(s metricsreport.Signal, tiers []observability.DayTotal, da
 	if s.Section == metricsreport.SectionWalls {
 		r.Tiers = metricsreport.TierLine(tiers, metricsreport.Unit{Name: s.Name, Scope: s.Scope, Value: s.Value})
 	}
+	if s.Name == metricsErrorName && s.Denom == 0 {
+		return r // a count of one build's errors: no earlier period to compare
+	}
 	r.PrevText, r.Trend = metricsreport.PreviousText(s, days, prevDays)
 	return r
 }
@@ -1485,6 +1496,159 @@ func metricsRead(ok bool) MetricsRead {
 		return MetricsRead{}
 	}
 	return MetricsRead{Failed: true, Message: metricsReadFailedText}
+}
+
+// metricsErrorName is the registry name behind a script error row.
+const metricsErrorName = "ui.js.error"
+
+// The script error rows each place reads.
+const (
+	metricsHealthErrors    = 20  // Health's table
+	metricsInvestErrors    = 10  // Invest's and the Overview's Failures rows
+	metricsFirstSeenErrors = 200 // script and class pairs the digest reads
+)
+
+// The not-measured script errors row's Help where none can be shown.
+const (
+	metricsErrorsUnreadHelp = "Could not be read just now; reload the page to try again."
+	metricsUnstampedHelp    = "Not collected: this build has no version stamp, so an error could not be tied to its code."
+)
+
+// metricsErrorCapProblem is Health's problem line when today's error rows reached the cap.
+const metricsErrorCapProblem = "Script errors reached today's limit of %d rows, so errors in new places are dropped until midnight UTC. Counts by script and type are still kept."
+
+// metricsScriptErrorsLabel is the label of metricsreport.WithErrors' not-measured row.
+const metricsScriptErrorsLabel = "Script errors"
+
+// errorBuild picks the build whose rows a view shows for an instance.
+func errorBuild(instance, newest string) string {
+	if instance == observabilityInstance {
+		if b, ok := observability.NormalizeBuild(BuildCommit); ok {
+			return b
+		}
+	}
+	return newest
+}
+
+// unstampedHere says instance is this site and its build has no version stamp, so it collects no errors.
+func unstampedHere(instance string) bool {
+	_, ok := observability.NormalizeBuild(BuildCommit)
+	return instance == observabilityInstance && !ok
+}
+
+// currentErrorBuild is errorBuild, asking the store for the newest build only when it must.
+func currentErrorBuild(ctx context.Context, store metricsStore, instance string) (string, error) {
+	if b := errorBuild(instance, ""); b != "" {
+		return b, nil
+	}
+	newest, err := store.NewestErrorBuild(ctx, instance)
+	if err != nil {
+		return "", err
+	}
+	return errorBuild(instance, newest), nil
+}
+
+// scriptErrors reads the Health block; nil when a query failed. It skips the report cache.
+func scriptErrors(ctx context.Context, store metricsStore, instance string, now time.Time) *MetricsScriptErrors {
+	var build string
+	var err error
+	if !unstampedHere(instance) { // an unstamped build keeps no rows, so another build's are not shown as its own
+		if build, err = currentErrorBuild(ctx, store, instance); err != nil {
+			log.Printf("metrics: script errors: %v", err)
+			return nil
+		}
+	}
+	out := &MetricsScriptErrors{Build: build, Cap: observability.ErrorRowsPerDay, Unstamped: unstampedHere(instance)}
+	if out.RowsToday, err = store.CountErrorRows(ctx, instance, utcDay(now)); err != nil {
+		log.Printf("metrics: script errors: %v", err)
+		return nil
+	}
+	if build == "" {
+		return out
+	}
+	rows, err := store.TopErrors(ctx, instance, build, metricsHealthErrors)
+	if err != nil {
+		log.Printf("metrics: script errors: %v", err)
+		return nil
+	}
+	for _, r := range rows {
+		out.Rows = append(out.Rows, MetricsScriptError{Script: r.Script, Class: r.Class, Line: r.Line,
+			N: r.N, Desktop: r.Desktop, Mobile: r.Mobile, FirstSeen: r.FirstDay, LastSeen: r.LastDay})
+	}
+	return out
+}
+
+// errorLabels is the labels of the rows first seen in the seven days ending at to.
+func errorLabels(rows []observability.ErrorTop, to time.Time) []string {
+	from := to.AddDate(0, 0, -6)
+	var out []string
+	for _, r := range rows {
+		if !r.FirstDay.Before(from) && !r.FirstDay.After(to) {
+			out = append(out, metricsreport.ErrorLabel(r.Script, r.Line, r.Class))
+		}
+	}
+	return out
+}
+
+// metricsErrorRows is what a view puts in Failures for script errors.
+type metricsErrorRows struct {
+	Signals  []metricsreport.Signal
+	Measured bool
+	Help     string // the not-measured row's Help, saying why; "" for plain not measured
+}
+
+// with puts the rows into signals, the not-measured row carrying Help.
+func (e metricsErrorRows) with(signals []metricsreport.Signal) []metricsreport.Signal {
+	out := metricsreport.WithErrors(signals, e.Signals, e.Measured)
+	if e.Measured || e.Help == "" {
+		return out
+	}
+	for i := range out {
+		if out[i].NotMeasured && out[i].Section == metricsreport.SectionFailures && out[i].Name == "" && out[i].Label == metricsScriptErrorsLabel {
+			out[i].Help = e.Help
+		}
+	}
+	return out
+}
+
+// errorSignals reads the instance's error rows for Failures, skipping the report cache.
+func (l *metricsLoader) errorSignals(names []observability.Name, inst string) metricsErrorRows {
+	if _, ok := metricsName(names, metricsErrorName); !ok {
+		return metricsErrorRows{}
+	}
+	if unstampedHere(inst) {
+		return metricsErrorRows{Help: metricsUnstampedHelp}
+	}
+	build, err := currentErrorBuild(l.ctx, l.store, inst)
+	if err != nil {
+		log.Printf("metrics: script errors: %v", err)
+		l.failed = true
+		return metricsErrorRows{Help: metricsErrorsUnreadHelp}
+	}
+	if build == "" {
+		return metricsErrorRows{Measured: true}
+	}
+	rows, err := l.store.TopErrors(l.ctx, inst, build, metricsInvestErrors)
+	if err != nil {
+		log.Printf("metrics: script errors: %v", err)
+		l.failed = true
+		return metricsErrorRows{Help: metricsErrorsUnreadHelp}
+	}
+	return metricsErrorRows{Signals: metricsreport.ErrorSignals(rows, build), Measured: true}
+}
+
+// errorWeeks is the digest's two weeks of error labels, by first sighting in any build; ok is false when the read failed.
+func (l *metricsLoader) errorWeeks(names []observability.Name, inst string, day time.Time) (now, prev []string, ok bool) {
+	if _, measured := metricsName(names, metricsErrorName); !measured || unstampedHere(inst) {
+		return nil, nil, true
+	}
+	rows, err := l.store.ErrorFirstSeen(l.ctx, inst, metricsFirstSeenErrors)
+	if err != nil {
+		log.Printf("metrics: script errors: %v", err)
+		l.failed = true
+		return nil, nil, false
+	}
+	return errorLabels(rows, day), errorLabels(rows, day.AddDate(0, 0, -7)), true
 }
 
 // MetricsFeature is the Feature view: the area index, an area's names, or one name.
@@ -1554,7 +1718,9 @@ type MetricsHealth struct {
 	ClientCounted  bool                 // the reasons were read on a complete day; only then is an empty Client "no reasons in 7 days"
 	ClientRead     MetricsRead          // Failed too when the newest complete day could not be read
 	Client         []MetricsClientRow   // the last 7 folded days' reasons
-	ScriptErrors   *MetricsScriptErrors // nil reads "not measured"; 2f fills it
+	ScriptErrors   *MetricsScriptErrors // nil reads "not measured" unless ScriptErrorsRead failed
+	// ScriptErrorsRead is Failed when the error rows could not be read.
+	ScriptErrorsRead MetricsRead
 	// Checked is true when every block above was read on a complete day, so an empty Problems means none.
 	Checked   bool
 	Unchecked []string // what could not be checked and why, one line a block; empty when Checked
@@ -1605,9 +1771,22 @@ type MetricsClientRow struct {
 
 // MetricsScriptErrors is the Health view's script error block.
 type MetricsScriptErrors struct {
-	Build     string // the build the rows are for
+	Build     string // the build the rows are for; "" when none is known
 	RowsToday int    // feature_errors rows written today, of the day's cap
+	Cap       int    // the day's cap on rows: observability.ErrorRowsPerDay
 	Rows      []MetricsScriptError
+	// Unstamped says the instance is this site and its build has no version stamp, so it collects none.
+	Unstamped bool
+}
+
+// ShortBuild is the build's first seven characters.
+func (e *MetricsScriptErrors) ShortBuild() string {
+	return e.Build[:min(7, len(e.Build))]
+}
+
+// Full says today's cap is reached, so errors in new places are dropped.
+func (e *MetricsScriptErrors) Full() bool {
+	return e.RowsToday >= e.Cap
 }
 
 // MetricsScriptError is one script error row.
@@ -2060,6 +2239,16 @@ func (l *metricsLoader) healthView(names []observability.Name, p metricsParams, 
 			Now: l.now, Instance: p.Instance, Counters: health.Counters, Jobs: health.Jobs, JobNames: jobs, Broken: broken,
 		})
 	}
+	if _, measured := metricsName(names, metricsErrorName); measured {
+		h.ScriptErrors = scriptErrors(l.ctx, l.store, p.Instance, l.now)
+		if h.ScriptErrors == nil {
+			l.failed = true
+			h.ScriptErrorsRead = metricsRead(false)
+		}
+	}
+	if h.ScriptErrors != nil && h.ScriptErrors.Full() {
+		h.Problems = append(h.Problems, fmt.Sprintf(metricsErrorCapProblem, h.ScriptErrors.Cap))
+	}
 	h.Unchecked = metricsUnchecked(h)
 	h.Checked = len(h.Unchecked) == 0
 	return h
@@ -2355,6 +2544,9 @@ func metricsUnchecked(h *MetricsHealth) []string {
 	}
 	if h.ClientMeasured && !h.ClientCounted {
 		out = append(out, why("Browser report outcomes", h.ClientRead))
+	}
+	if h.ScriptErrorsRead.Failed {
+		out = append(out, "Script errors could not be read.")
 	}
 	return out
 }

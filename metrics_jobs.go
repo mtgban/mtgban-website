@@ -51,6 +51,7 @@ func utcDay(t time.Time) time.Time {
 // How long each table keeps its rows, and how many finished days every fold redoes.
 const (
 	minuteRetentionDays = 14
+	errorRetentionDays  = 90
 	eventsRetentionDays = 400
 	foldCatchUpDays     = 3
 )
@@ -115,6 +116,7 @@ type foldStore interface {
 	MinuteDaysBefore(ctx context.Context, before time.Time) ([]time.Time, error)
 	FoldDay(ctx context.Context, day time.Time) (int64, error)
 	PruneMinutes(ctx context.Context, before time.Time) (int64, error)
+	PruneErrors(ctx context.Context, before time.Time) (int64, error)
 }
 
 // foldPrune is one table the fold job trims once the days are folded.
@@ -129,8 +131,16 @@ func pruneMinutes(ctx context.Context, store foldStore, before time.Time) (int64
 	return store.PruneMinutes(ctx, before)
 }
 
+// pruneErrors deletes the script error rows before the cutoff.
+func pruneErrors(ctx context.Context, store foldStore, before time.Time) (int64, error) {
+	return store.PruneErrors(ctx, before)
+}
+
 // foldPrunes run in order after every fold; written once here, only read after.
-var foldPrunes = []foldPrune{{what: "minutes", days: minuteRetentionDays, run: pruneMinutes}}
+var foldPrunes = []foldPrune{
+	{what: "minutes", days: minuteRetentionDays, run: pruneMinutes},
+	{what: "errors", days: errorRetentionDays, run: pruneErrors},
+}
 
 // foldDays is every finished day with minutes, the catch-up days and, by hand, today, ascending and each once.
 func foldDays(withMinutes []time.Time, today time.Time, throughToday bool) []time.Time {

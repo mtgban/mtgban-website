@@ -585,6 +585,9 @@ func (s *site) openDBs() (err error) {
 			counter := observability.NewCounter(obsDB, observabilityInstance, time.Now)
 			FeatureCounter = counter
 			go tracked(jobFeatureCounter, func() { counter.Run(ServerContext, time.Minute) })()
+			errs := observability.NewErrorBuffer(obsDB, observabilityInstance, time.Now, rejectChecked)
+			FeatureErrors = errs
+			go tracked(jobFeatureErrors, func() { errs.Run(ServerContext, time.Minute) })()
 		} else {
 			ServerNotify("init", "feature counts off: the feature table is not ready")
 		}
@@ -907,6 +910,9 @@ var discordCleanup = cleanupDiscord
 // telemetryCloseBudget bounds the counter's and the recorder's close, after Discord's.
 const telemetryCloseBudget = 4 * time.Second
 
+// errorsCloseBudget bounds the error buffer's close, before the counter's.
+const errorsCloseBudget = time.Second
+
 // shutdownTelemetry closes Discord within ctx, then the stores that record it within their own budget.
 func (s *site) shutdownTelemetry(ctx context.Context) {
 	cleaned := make(chan struct{})
@@ -920,6 +926,13 @@ func (s *site) shutdownTelemetry(ctx context.Context) {
 	case <-ctx.Done():
 		log.Println("discord cleanup:", ctx.Err())
 	}
+
+	// Error rows first: a refused row is a reject the counter's last flush must carry.
+	errCtx, errCancel := context.WithTimeout(context.Background(), errorsCloseBudget)
+	if err := FeatureErrors.Close(errCtx); err != nil {
+		log.Println("feature errors close:", err)
+	}
+	errCancel()
 
 	// The counter and the recorder share ctx: a recorder still busy at the deadline is left on purpose.
 	ctx, cancel := context.WithTimeout(context.Background(), telemetryCloseBudget)

@@ -52,15 +52,21 @@ type fakeMetricsStore struct {
 	jobs         []observability.JobRun
 	through      time.Time
 	folded       bool
-	err          error // every method
-	totalsErr    error // DayTotals only
-	reviewErr    error // Reviews only
-	throughErr   error // FoldedThrough only
-	healthErr    error // CounterHealth only
-	hoursErr     error // HourTotals only
-	visitsErr    error // PageVisits only
-	tiersErr     error // ByTier DayTotals only
-	stockLastErr error // the stale stored-state look-back only
+	err          error                    // every method
+	totalsErr    error                    // DayTotals only
+	reviewErr    error                    // Reviews only
+	throughErr   error                    // FoldedThrough only
+	healthErr    error                    // CounterHealth only
+	hoursErr     error                    // HourTotals only
+	visitsErr    error                    // PageVisits only
+	tiersErr     error                    // ByTier DayTotals only
+	stockLastErr error                    // the stale stored-state look-back only
+	errTop       []observability.ErrorTop // TopErrors, cut to its limit
+	errFirst     []observability.ErrorTop // ErrorFirstSeen
+	errBuild     string                   // NewestErrorBuild
+	errRows      int                      // CountErrorRows
+	errErr       error                    // the four error reads only
+	errCalls     []string                 // each error read, in order
 
 	queries      []observability.DayQuery
 	visitCalls   [][2]time.Time
@@ -196,6 +202,46 @@ func (f *fakeMetricsStore) DeleteReview(ctx context.Context, instance, name, sco
 	defer f.mu.Unlock()
 	f.deleted = append(f.deleted, strings.Join([]string{instance, name, scope, value}, "|"))
 	return f.err
+}
+
+func (f *fakeMetricsStore) TopErrors(_ context.Context, instance, build string, limit int) ([]observability.ErrorTop, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.errCalls = append(f.errCalls, fmt.Sprintf("top %s %s %d", instance, build, limit))
+	if f.errErr != nil {
+		return nil, f.errErr
+	}
+	return f.errTop[:min(limit, len(f.errTop))], f.err
+}
+
+func (f *fakeMetricsStore) NewestErrorBuild(_ context.Context, instance string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.errCalls = append(f.errCalls, "newest "+instance)
+	if f.errErr != nil {
+		return "", f.errErr
+	}
+	return f.errBuild, f.err
+}
+
+func (f *fakeMetricsStore) CountErrorRows(_ context.Context, instance string, day time.Time) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.errCalls = append(f.errCalls, "count "+instance+" "+day.Format(time.DateOnly))
+	if f.errErr != nil {
+		return 0, f.errErr
+	}
+	return f.errRows, f.err
+}
+
+func (f *fakeMetricsStore) ErrorFirstSeen(_ context.Context, instance string, limit int) ([]observability.ErrorTop, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.errCalls = append(f.errCalls, fmt.Sprintf("first %s %d", instance, limit))
+	if f.errErr != nil {
+		return nil, f.errErr
+	}
+	return f.errFirst, f.err
 }
 
 // dayTotalCount is how many DayTotals calls the fake has seen.
@@ -720,7 +766,7 @@ func TestRemoveViewWithTheRealRegistry(t *testing.T) {
 
 func TestInvestViewAlwaysHasItsSixSections(t *testing.T) {
 	withMetricsInstance(t, "magic")
-	view := buildMetricsInvest(observability.All(), nil, nil, true, nil, true, metricsParams{Instance: "magic", Days: 90})
+	view := buildMetricsInvest(observability.All(), nil, nil, true, nil, true, metricsErrorRows{}, metricsParams{Instance: "magic", Days: 90})
 	var titles []string
 	for _, s := range view.Sections {
 		titles = append(titles, s.Title)
@@ -742,15 +788,6 @@ func TestInvestViewAlwaysHasItsSixSections(t *testing.T) {
 	}
 }
 
-func TestInvestViewMarksScriptErrorsNotMeasured(t *testing.T) {
-	withMetricsInstance(t, "magic")
-	view := buildMetricsInvest(observability.All(), nil, nil, true, nil, true, metricsParams{Instance: "magic", Days: 90})
-	rows := view.Sections[1].Rows
-	if len(rows) == 0 || rows[len(rows)-1].Label != "Script errors" || !rows[len(rows)-1].NotMeasured || rows[len(rows)-1].RateText != "" {
-		t.Errorf("failures = %+v", rows)
-	}
-}
-
 func TestInvestWallsTrendAndTiers(t *testing.T) {
 	withMetricsInstance(t, "magic")
 	p := metricsParams{Instance: "magic", Days: 30}
@@ -762,7 +799,7 @@ func TestInvestWallsTrendAndTiers(t *testing.T) {
 		{Name: "auth.refuse", Scope: "search", Value: "no_access", Tier: "Any", N: 25},
 		{Name: "auth.refuse", Scope: "search", Value: "no_access", Tier: "Pioneer", N: 5},
 	}
-	unmeasuredBefore := buildMetricsInvest(metricsTestRegistry(), append(fullRows("metrics.flush", "", "", 1, 1), walls...), byTier, true, nil, true, p)
+	unmeasuredBefore := buildMetricsInvest(metricsTestRegistry(), append(fullRows("metrics.flush", "", "", 1, 1), walls...), byTier, true, nil, true, metricsErrorRows{}, p)
 	row := unmeasuredBefore.Sections[0].Rows[0]
 	if row.Label != "Page refused for the tier: search" || row.Trend != "" || row.Tiers != "Any 25, Pioneer 5" || row.URL != "?page=metrics&view=feature&days=30&name=auth.refuse" ||
 		row.PrevText != "the earlier period was not counted, so no trend" {
@@ -770,11 +807,11 @@ func TestInvestWallsTrendAndTiers(t *testing.T) {
 	}
 	// a full window against a 13-day one: no trend, and the cell says why
 	partial := append(fullRows("metrics.flush", "", "", 1, 1), observability.DayTotal{Period: 1, Name: "metrics.flush", N: 1, Days: 13})
-	row = buildMetricsInvest(metricsTestRegistry(), append(partial, walls...), byTier, true, nil, true, p).Sections[0].Rows[0]
+	row = buildMetricsInvest(metricsTestRegistry(), append(partial, walls...), byTier, true, nil, true, metricsErrorRows{}, p).Sections[0].Rows[0]
 	if row.Trend != "" || row.PrevText != "10 in 13 counted days; the earlier period was not fully counted, so no trend" {
 		t.Errorf("a 13-day earlier window: trend %q, %q", row.Trend, row.PrevText)
 	}
-	measured := buildMetricsInvest(metricsTestRegistry(), append(fullRows("metrics.flush", "", "", 1, 2), walls...), byTier, true, nil, true, p)
+	measured := buildMetricsInvest(metricsTestRegistry(), append(fullRows("metrics.flush", "", "", 1, 2), walls...), byTier, true, nil, true, metricsErrorRows{}, p)
 	if got := measured.Sections[0].Rows[0]; got.Trend != "up" || got.PrevText != "10 in 30 counted days, up" {
 		t.Errorf("trend = %q, %q, want up", got.Trend, got.PrevText)
 	}
@@ -787,7 +824,7 @@ func TestMobileRowsUsePageHasMobile(t *testing.T) {
 		{Path: "search", Views: 9000, MobileViews: 4000, Visitors: 100},
 		{Path: "other", Views: 500, MobileViews: 500, Visitors: 5},
 	}
-	view := buildMetricsInvest(metricsTestRegistry(), nil, nil, true, metricsreport.PageDepths(visits, []string{"arbit", "search", "sets"}, pageHasMobile), true, metricsParams{Instance: "magic", Days: 90})
+	view := buildMetricsInvest(metricsTestRegistry(), nil, nil, true, metricsreport.PageDepths(visits, []string{"arbit", "search", "sets"}, pageHasMobile), true, metricsErrorRows{}, metricsParams{Instance: "magic", Days: 90})
 	mobile := view.Sections[2]
 	if mobile.Key != metricsreport.SectionMobile || len(mobile.Rows) != 1 || mobile.Rows[0].Label != "arbit" || mobile.Rows[0].RateText != "25.0%" {
 		t.Errorf("mobile = %+v", mobile.Rows)
@@ -3326,5 +3363,307 @@ func TestReviewOfASettingIsSaved(t *testing.T) {
 	// a mark left on a setting no longer listed is filed under the setting's area
 	if row := metricsGoneRow(observability.Review{Name: "state.set", Scope: "UploadMinVal", Verdict: "keep"}); row.Area != "upload" || row.Key != "state.set|UploadMinVal|" {
 		t.Errorf("gone row %+v", row)
+	}
+}
+
+// withBuildCommit sets BuildCommit for one test.
+func withBuildCommit(t *testing.T, commit string) {
+	t.Helper()
+	saved := BuildCommit
+	BuildCommit = commit
+	t.Cleanup(func() { BuildCommit = saved })
+}
+
+// errorsRegistry is metricsTestRegistry with the script error name.
+func errorsRegistry(t *testing.T) []observability.Name {
+	t.Helper()
+	n, ok := observability.Lookup(metricsErrorName)
+	if !ok {
+		t.Fatalf("%s is not registered", metricsErrorName)
+	}
+	return append(metricsTestRegistry(), n)
+}
+
+var (
+	testErrorBuild  = strings.Repeat("ab", 20)
+	otherErrorBuild = strings.Repeat("cd", 20)
+)
+
+// errorStore is a fake store with two error rows of testErrorBuild and 12 rows today.
+func errorStore() *fakeMetricsStore {
+	store := newFakeMetrics()
+	store.errBuild = testErrorBuild
+	store.errRows = 12
+	store.errTop = []observability.ErrorTop{
+		{Script: "navbar.js", Line: 42, Class: "TypeError", N: 31, Desktop: 27, Mobile: 4, FirstDay: loaderTestDay.AddDate(0, 0, -3), LastDay: loaderTestDay},
+		{Script: "other", Line: 0, Class: "ScriptError", N: 9, Desktop: 9, FirstDay: loaderTestDay, LastDay: loaderTestDay},
+	}
+	return store
+}
+
+func TestErrorBuild(t *testing.T) {
+	withMetricsInstance(t, "magic")
+	sha, newest := strings.Repeat("0f", 20), strings.Repeat("bb", 20)
+	withBuildCommit(t, sha)
+	if got := errorBuild("magic", newest); got != sha {
+		t.Errorf("this site: %q, want its own commit", got)
+	}
+	if got := errorBuild("pokemon", newest); got != newest {
+		t.Errorf("another site: %q, want the newest build", got)
+	}
+	if unstampedHere("magic") || unstampedHere("pokemon") {
+		t.Error("a stamped build reads as unstamped")
+	}
+	BuildCommit = ""
+	if got := errorBuild("magic", newest); got != newest {
+		t.Errorf("no commit: %q, want the newest build", got)
+	}
+	if got := errorBuild("magic", ""); got != "" {
+		t.Errorf("no commit and no rows: %q, want none", got)
+	}
+	if !unstampedHere("magic") || unstampedHere("pokemon") {
+		t.Error("only this site's build is known to be unstamped")
+	}
+}
+
+func TestErrorLabelsKeepTheSnapshotsWeek(t *testing.T) {
+	to := loaderTestDay
+	rows := []observability.ErrorTop{
+		{Script: "navbar.js", Line: 0, Class: "TypeError", FirstDay: to},
+		{Script: "utils.js", Line: 7, Class: "RangeError", FirstDay: to.AddDate(0, 0, -6)},
+		{Script: "cookies.js", Class: "Error", FirstDay: to.AddDate(0, 0, -7)},
+		{Script: "scope.js", Class: "Error", FirstDay: to.AddDate(0, 0, 1)},
+	}
+	if got := errorLabels(rows, to); !slices.Equal(got, []string{"navbar.js TypeError", "utils.js:7 RangeError"}) {
+		t.Errorf("labels = %v", got)
+	}
+	if got := errorLabels(nil, to); got != nil {
+		t.Errorf("no rows gave %v", got)
+	}
+}
+
+func TestHealthViewFillsScriptErrors(t *testing.T) {
+	withMetricsInstance(t, "magic")
+	withBuildCommit(t, "")
+	store := errorStore()
+	v := loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "health", Instance: "magic", Days: 90})
+	e := v.Health.ScriptErrors
+	if e == nil || v.Health.ScriptErrorsRead.Failed {
+		t.Fatalf("script errors = %+v, read %+v", e, v.Health.ScriptErrorsRead)
+	}
+	// An unstamped site keeps no rows, so another build's are not shown as its own.
+	if e.Build != "" || e.RowsToday != 12 || e.Cap != observability.ErrorRowsPerDay || len(e.Rows) != 0 || !e.Unstamped {
+		t.Errorf("block = %+v", e)
+	}
+	if want := []string{"count magic 2026-11-11"}; !slices.Equal(store.errCalls, want) {
+		t.Errorf("calls = %v, want %v", store.errCalls, want)
+	}
+
+	// Another site's rows are its newest build's.
+	store = errorStore()
+	v = loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "health", Instance: "pokemon", Days: 90})
+	e = v.Health.ScriptErrors
+	if e == nil || e.Build != testErrorBuild || len(e.Rows) != 2 || e.Unstamped {
+		t.Fatalf("another site: block = %+v", e)
+	}
+	top := store.errTop[0]
+	if r := e.Rows[0]; r.Script != top.Script || r.Line != top.Line || r.Class != top.Class || r.N != top.N ||
+		r.Desktop != top.Desktop || r.Mobile != top.Mobile || !r.FirstSeen.Equal(top.FirstDay) || !r.LastSeen.Equal(top.LastDay) {
+		t.Errorf("first row = %+v, want %+v", r, top)
+	}
+	want := []string{"newest pokemon", "count pokemon 2026-11-11", fmt.Sprintf("top pokemon %s %d", testErrorBuild, metricsHealthErrors)}
+	if !slices.Equal(store.errCalls, want) {
+		t.Errorf("calls = %v, want %v", store.errCalls, want)
+	}
+
+	// This site's own commit is read with no newest-build query.
+	withBuildCommit(t, otherErrorBuild)
+	store = errorStore()
+	v = loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "health", Instance: "magic", Days: 90})
+	if e := v.Health.ScriptErrors; e == nil || e.Build != otherErrorBuild || e.Unstamped || slices.Contains(store.errCalls, "newest magic") {
+		t.Errorf("block %+v, calls %v", e, store.errCalls)
+	}
+
+	// A full day is a problem; one row below the cap is not.
+	capProblem := fmt.Sprintf(metricsErrorCapProblem, observability.ErrorRowsPerDay)
+	for _, c := range []struct {
+		rows int
+		want bool
+	}{{observability.ErrorRowsPerDay, true}, {observability.ErrorRowsPerDay - 1, false}} {
+		store = errorStore()
+		store.errRows = c.rows
+		v = loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "health", Instance: "magic", Days: 90})
+		if slices.Contains(v.Health.Problems, capProblem) != c.want || !v.Health.Checked {
+			t.Errorf("%d rows: problems %v, checked %v", c.rows, v.Health.Problems, v.Health.Checked)
+		}
+	}
+
+	store = errorStore()
+	store.errErr = errors.New("down")
+	v = loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "health", Instance: "magic", Days: 90})
+	if v.Health == nil || v.Health.ScriptErrors != nil || !v.Health.ScriptErrorsRead.Failed || v.Health.Checked || !v.Failed ||
+		!slices.Contains(v.Health.Unchecked, "Script errors could not be read.") {
+		t.Errorf("a failed read: health %+v, failed %v", v.Health, v.Failed)
+	}
+
+	// A registry with no error name reads not measured, and asks nothing.
+	store = errorStore()
+	v = loadTestView(t, store, testCache(store), metricsTestRegistry(), metricsParams{View: "health", Instance: "magic", Days: 90})
+	if v.Health.ScriptErrors != nil || v.Health.ScriptErrorsRead.Failed || len(store.errCalls) != 0 {
+		t.Errorf("unregistered: %+v, calls %v", v.Health.ScriptErrors, store.errCalls)
+	}
+}
+
+// failuresOf is the Invest view's script error rows in Failures, the not-measured one included.
+func failuresOf(t *testing.T, v *MetricsView) []MetricsSignalRow {
+	t.Helper()
+	for _, s := range v.Invest.Sections {
+		if s.Key != metricsreport.SectionFailures {
+			continue
+		}
+		var out []MetricsSignalRow
+		for _, r := range s.Rows {
+			if r.Name == metricsErrorName || r.Label == metricsScriptErrorsLabel {
+				out = append(out, r)
+			}
+		}
+		return out
+	}
+	t.Fatal("no failures section")
+	return nil
+}
+
+func TestInvestViewListsScriptErrors(t *testing.T) {
+	withMetricsInstance(t, "magic")
+	withBuildCommit(t, testErrorBuild)
+	store := errorStore()
+	v := loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "invest", Instance: "magic", Days: 90})
+	rows := failuresOf(t, v)
+	var labels []string
+	for _, r := range rows {
+		labels = append(labels, r.Label)
+		if r.NotMeasured {
+			t.Errorf("a not-measured row with the errors read: %+v", r)
+		}
+		if r.Name == metricsErrorName && (r.PrevText != "" || r.Trend != "" || r.RateText != "") {
+			t.Errorf("an error row has a trend or rate: %+v", r)
+		}
+	}
+	if !slices.Equal(labels, []string{"navbar.js:42 TypeError", "other ScriptError"}) {
+		t.Errorf("failures = %v", labels)
+	}
+	if want := fmt.Sprintf("top magic %s %d", testErrorBuild, metricsInvestErrors); !slices.Equal(store.errCalls, []string{want}) {
+		t.Errorf("calls = %v", store.errCalls)
+	}
+}
+
+// A failed error read leaves the not-measured row, saying it could not be read.
+func TestInvestViewMarksScriptErrorsNotMeasured(t *testing.T) {
+	withMetricsInstance(t, "magic")
+	withBuildCommit(t, testErrorBuild)
+	store := errorStore()
+	store.errErr = errors.New("down")
+	v := loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "invest", Instance: "magic", Days: 90})
+	rows := failuresOf(t, v)
+	if len(rows) == 0 || rows[len(rows)-1].Label != "Script errors" || !rows[len(rows)-1].NotMeasured || rows[len(rows)-1].RateText != "" ||
+		rows[len(rows)-1].Help != metricsErrorsUnreadHelp || !v.Failed {
+		t.Errorf("failures = %+v", rows)
+	}
+
+	// This site's build has no stamp and nothing has sent any: not measured, saying why.
+	withBuildCommit(t, "")
+	store = newFakeMetrics()
+	v = loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "invest", Instance: "magic", Days: 90})
+	rows = failuresOf(t, v)
+	if len(rows) == 0 || !rows[len(rows)-1].NotMeasured || rows[len(rows)-1].Help != metricsUnstampedHelp {
+		t.Errorf("unstamped failures = %+v", rows)
+	}
+
+	// Another site with no rows at all: measured, and nothing to list.
+	v = loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "invest", Instance: "lorcana", Days: 90})
+	if rows := failuresOf(t, v); len(rows) != 0 {
+		t.Errorf("another site with no errors: %+v", rows)
+	}
+}
+
+// On an unstamped site, rows another build left are not shown as this site's.
+func TestUnstampedSiteShowsNoErrorRows(t *testing.T) {
+	withMetricsInstance(t, "magic")
+	withBuildCommit(t, "")
+	store := errorStore()
+	store.errFirst = []observability.ErrorTop{{Script: "navbar.js", Class: "TypeError", N: 3, FirstDay: loaderTestDay, LastDay: loaderTestDay}}
+	v := loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "invest", Instance: "magic", Days: 90})
+	rows := failuresOf(t, v)
+	if len(rows) != 1 || !rows[0].NotMeasured || rows[0].Help != metricsUnstampedHelp {
+		t.Errorf("invest failures = %+v", rows)
+	}
+
+	v = loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "overview", Instance: "magic", Days: 90})
+	for _, r := range v.Overview.Invest {
+		if r.Name == metricsErrorName || r.Label == metricsScriptErrorsLabel && r.Help != metricsUnstampedHelp {
+			t.Errorf("overview row %+v", r)
+		}
+	}
+	for _, s := range v.Overview.Changes.Sections {
+		if strings.HasPrefix(s.Title, "New errors") {
+			t.Errorf("overview new errors %v", s.Lines)
+		}
+	}
+	if len(store.errCalls) != 0 {
+		t.Errorf("calls = %v, want none", store.errCalls)
+	}
+}
+
+func TestOverviewPassesNewErrorLabels(t *testing.T) {
+	withMetricsInstance(t, "magic")
+	withBuildCommit(t, testErrorBuild)
+	newErrors := func(store *fakeMetricsStore) ([]string, *MetricsOverview) {
+		t.Helper()
+		v := loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "overview", Instance: "magic", Days: 90})
+		if !v.Overview.DigestReady {
+			t.Fatalf("digest not ready: %+v", v.Overview)
+		}
+		for _, s := range v.Overview.Changes.Sections {
+			if strings.HasPrefix(s.Title, "New errors") {
+				return s.Lines, v.Overview
+			}
+		}
+		return nil, v.Overview
+	}
+	store := errorStore()
+	store.errFirst = []observability.ErrorTop{{Script: "navbar.js", Class: "TypeError", N: 3, FirstDay: loaderTestDay, LastDay: loaderTestDay}}
+	lines, ov := newErrors(store)
+	if !slices.Equal(lines, []string{"navbar.js TypeError"}) {
+		t.Errorf("new errors = %v", lines)
+	}
+	if !slices.Contains(store.errCalls, fmt.Sprintf("first magic %d", metricsFirstSeenErrors)) {
+		t.Errorf("calls = %v", store.errCalls)
+	}
+	// The Overview's top rows take the error rows, with no trend.
+	found := false
+	for _, r := range ov.Invest {
+		if r.Name == metricsErrorName {
+			found = true
+			if r.PrevText != "" || r.Trend != "" {
+				t.Errorf("an error row has a trend: %+v", r)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("no error row among the top rows: %+v", ov.Invest)
+	}
+
+	store = errorStore()
+	store.errFirst = []observability.ErrorTop{{Script: "navbar.js", Class: "TypeError", N: 3, FirstDay: loaderTestDay.AddDate(0, 0, -10), LastDay: loaderTestDay}}
+	if lines, _ := newErrors(store); lines != nil {
+		t.Errorf("an error first seen ten days ago is new: %v", lines)
+	}
+
+	// A failed read is no digest, never an empty one.
+	store = errorStore()
+	store.errErr = errors.New("down")
+	v := loadTestView(t, store, testCache(store), errorsRegistry(t), metricsParams{View: "overview", Instance: "magic", Days: 90})
+	if v.Overview.DigestReady || !v.Failed {
+		t.Errorf("a failed error read: ready %v, failed %v", v.Overview.DigestReady, v.Failed)
 	}
 }

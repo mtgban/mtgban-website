@@ -400,6 +400,13 @@ var names = []Name{
 	{Name: "ui.offline.page", Family: FamilyUI, Area: "offline", Page: "offline", Values: ValueEnum, Enum: []string{"sort", "tab", "condition", "kind"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A control on the offline page was used."},
 	{Name: "ui.offline.failover", Family: FamilyUI, Area: "offline", Page: "offline", Report: ReportSignal, Help: "The offline shell was served in place of a page the network could not reach."},
 	{Name: "ui.offline.banner", Family: FamilyUI, Area: "offline", Page: "*", Values: ValueEnum, Enum: []string{"back_to_live", "browse_offline", "dismiss"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The offline banner's exit, or a button in the unreachable toast, was pressed."},
+	// ui: script errors (2f)
+	{Name: "ui.js.error", Family: FamilyUI, Area: "site", Page: "*", Values: ValueEnum, Enum: errorClasses, Scope: ScopeEnum, Scopes: errorScopes, Report: ReportSignal, Help: "An uncaught script error, by script and class."},
+	{Name: "ui.js.rejection", Family: FamilyUI, Area: "site", Page: "*", Values: ValueEnum, Enum: errorClasses, Scope: ScopeEnum, Scopes: errorScopes, Report: ReportSignal, Help: "An unhandled promise rejection, by script and class."},
+	// ui: page timings, one load in ten (2f)
+	{Name: "ui.perf.ttfb", Family: FamilyUI, Area: "site", Values: ValueBucket, Enum: []string{"<200ms", "<500ms", "<800ms", "<1.8s", "1.8s+"}, Scope: ScopePage, Report: ReportContext, Help: "Time to first byte, one page load in ten."},
+	{Name: "ui.perf.lcp", Family: FamilyUI, Area: "site", Values: ValueBucket, Enum: []string{"<1s", "<2.5s", "<4s", "<8s", "8s+"}, Scope: ScopePage, Report: ReportContext, Help: "Largest contentful paint, one page load in ten."},
+	{Name: "ui.perf.dom_ready", Family: FamilyUI, Area: "site", Values: ValueBucket, Enum: []string{"<500ms", "<1s", "<2s", "<4s", "<8s", "8s+"}, Scope: ScopePage, Report: ReportContext, Help: "DOMContentLoaded end, one page load in ten."},
 	{Name: "stock.rows", Family: FamilyStock, Area: "account", Report: ReportContext, Help: "Nightly standing count of user_state rows, one a reader a game."},
 	{Name: "stock.synced_7d", Family: FamilyStock, Area: "account", Report: ReportContext, Help: "Nightly standing count of user_state rows updated in the last 7 days."},
 	{Name: "stock.synced_30d", Family: FamilyStock, Area: "account", Report: ReportContext, Help: "Nightly standing count of user_state rows updated in the last 30 days."},

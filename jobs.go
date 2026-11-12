@@ -30,6 +30,7 @@ const (
 	jobUploadShares    = "Upload shares"
 	jobPatreonSessions = "Patreon sessions"
 	jobFeatureCounter  = "Feature counter"
+	jobFeatureErrors   = "Feature errors"
 	jobMetricsFold     = "Metrics fold"
 	jobMetricsStock    = "Stored state counts"
 	jobEventsRollUp    = "Events roll-up"

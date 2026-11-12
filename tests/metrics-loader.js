@@ -36,7 +36,7 @@ export function loadMetrics({ cfg = { on: true, page: 'search', build: 'abc' }, 
     const setTimeout = (fn, ms) => { timers.push({ fn, ms, live: true }); return timers.length; };
     const clearTimeout = (id) => { if (timers[id - 1]) timers[id - 1].live = false; };
     const DateStub = { now: () => page.day * DAY + 1000 };
-    const scope = { window, document, navigator, localStorage, fetch, setTimeout, clearTimeout, Date: DateStub, ...globals };
+    const scope = { window, document, navigator, localStorage, fetch, setTimeout, clearTimeout, Date: DateStub, Math: Object.assign(Object.create(Math), { random: () => 1 }), ...globals };
     new Function(...Object.keys(scope), source)(...Object.values(scope));
     page.live = () => timers.filter((t) => t.live);
     // fire runs the pending timer.

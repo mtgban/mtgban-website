@@ -77,7 +77,7 @@ func TestChangesWithNothingToSay(t *testing.T) {
 
 func TestChangesNewErrors(t *testing.T) {
 	d := Changes(counted(Snapshot{Errors: []string{"a.js:10 TypeError", "b.js:2 RangeError"}}), counted(Snapshot{Errors: []string{"a.js:10 TypeError"}}))
-	if d.Text() != "New errors\n- b.js:2 RangeError" {
+	if d.Text() != titleErrors+"\n- b.js:2 RangeError" || !strings.HasPrefix(titleErrors, "New errors: ") {
 		t.Errorf("got %q", d.Text())
 	}
 	seven := []string{"a:1", "a:2", "a:3", "a:4", "a:5", "a:6", "a:7"}

@@ -445,6 +445,16 @@ type MetricsVars struct {
 	MetricsOn bool
 	// MetricsPage is page.view's label for the request, the scope of ui.load; empty sends none.
 	MetricsPage string
+	// MetricsBuild is the build error rows carry; empty, so none are sent, when the binary has no commit.
+	MetricsBuild string
+}
+
+// metricsBuild is assetHash when the binary has a commit, else empty.
+func metricsBuild() string {
+	if BuildCommit == "" {
+		return ""
+	}
+	return assetHash()
 }
 
 func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
@@ -500,7 +510,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		ScriptSignedIn:    cookie != "",
 		ScriptOfflineMode: cookieParams.Get("SearchOfflineMode") == "true" || (DevMode && !SigCheck),
 
-		MetricsVars: MetricsVars{MetricsOn: FeatureCounter != nil},
+		MetricsVars: MetricsVars{MetricsOn: FeatureCounter != nil, MetricsBuild: metricsBuild()},
 	}
 	// An error page borrows another page's path, so it reports no load.
 	if r != nil && activeTab != "Error" {
