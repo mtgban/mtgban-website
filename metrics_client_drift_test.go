@@ -53,6 +53,39 @@ var trackValueAllowlist = []string{
 	`templates/mobile/search.html: ui.row.store: data-track-value="{{or $entry.Shorthand "other"}}" data-t`,
 	// ui.row.condition: $conditions ranges over AllConditions (search.go), the registry's enum exactly; Check refuses any other.
 	`templates/mobile/search.html: ui.row.condition: data-track-value="{{$conditions}}">{{$conditions}}</butto`,
+	// ui.settings.tab: . ranges over settingsTabs, keys of settingsTabNames, each a registered value (TestEverySettingsTabIsACountedValue).
+	`templates/settings/body.html: ui.settings.tab: data-track-value="{{.}}">`,
+	// ui.optimizer.send: the optimizer section's store shorthand, a key of .Optimized set server side, never reader text; the registry types the scope a store, so Check folds an unloaded one to other.
+	`templates/upload.html: ui.optimizer.send: data-track-scope="{{$sourceKey}}">Deck builder at {{$sour`,
+	`templates/upload.html: ui.optimizer.send: data-track-scope="{{$sourceKey}}">Mass entry at TCGplayer`,
+	`templates/upload.html: ui.optimizer.send: data-track-scope="{{$sourceKey}}">Mass entry at Mana Pool`,
+	`templates/upload.html: ui.optimizer.send: data-track-scope="{{$sourceKey}}">Load at {{$sourceKey}}<`,
+	`templates/upload.html: ui.optimizer.send: data-track-scope="{{$scraperKey}}">Load buylist at {{$scr`,
+	`templates/upload.html: ui.optimizer.send: data-track-scope="{{$scraperKey}}">Download {{$scraperKey`,
+	`templates/upload.html: ui.optimizer.send: data-track-scope="{{$scraperKey}}">Remove from TCG CSV</a`,
+	`templates/upload.html: ui.optimizer.send: data-track-scope="{{$scraperKey}}"><svg aria-hidden="true`,
+	// ui.arbit.send: the section's or the page's store shorthand (ScraperShort, an Arbitrage's Key), set server side, never reader text; the registry types the scope a store, so Check folds an unloaded one to other.
+	`templates/arbit.html: ui.arbit.send: data-track-scope="{{$sourceKey}}">Deck builder at {{$sour`,
+	`templates/arbit.html: ui.arbit.send: data-track-scope="{{$sourceKey}}">Mass entry at TCGplayer`,
+	`templates/arbit.html: ui.arbit.send: data-track-scope="{{$sourceKey}}">Mass entry at Mana Pool`,
+	`templates/arbit.html: ui.arbit.send: data-track-scope="{{$sourceKey}}">Load at {{$sourceKey}}<`,
+	`templates/arbit.html: ui.arbit.send: data-track-scope="{{$scraperKey}}">Load buylist at {{$scr`,
+	`templates/arbit.html: ui.arbit.send: data-track-scope="{{$scraperKey}}">Download {{$scraperKey`,
+	// ui.news.report: a NewspaperPage's Option from newspaperPagesInitial, options skipped, each a registered value (TestNewspaperPagesAreCountedValues).
+	`templates/news.html: ui.news.report: data-track-value="{{$page.Option}}" data-track-scope="car`,
+	`templates/news.html: ui.news.report: data-track-value="{{.Option}}" data-track-scope="tab">{{i`,
+	`templates/mobile/news.html: ui.news.report: data-track-value="{{$page.Option}}" data-track-scope="car`,
+	`templates/mobile/news.html: ui.news.report: data-track-value="{{.Option}}" data-track-scope="pill">{{`,
+	// ui.news.sort: a sortable Heading's Field in newspaperPagesInitial, each a registered value (TestNewspaperPagesAreCountedValues).
+	`templates/news.html: ui.news.sort: data-track-value="{{$head.Field}}" data-track-scope="desc`,
+	`templates/news.html: ui.news.sort: data-track-value="{{$head.Field}}" data-track-scope="asc"`,
+	// ui.cart: a cartLoad's Prefix, a cartStores prefix set server side, each a registered scope (TestCartLoadsCarryTheirPrefix).
+	`templates/upload.html: ui.cart: data-track-scope="{{$cart.Prefix}}">?</a><a class="opt-bt`,
+	`templates/arbit.html: ui.cart: data-track-scope="{{$buyCart.Prefix}}">?</a><a class="arb`,
+	`templates/arbit.html: ui.cart: data-track-scope="{{$sellCart.Prefix}}">?</a><a class="ar`,
+	// ui.screener.sort: .Field is a literal each call of the screener-sort template passes (current, prior, pct, abs), each a registered value (tests/metrics-sleepers-screener.test.js).
+	`templates/screener.html: ui.screener.sort: data-track-value="{{.Field}}" data-track-scope="desc">&#9`,
+	`templates/screener.html: ui.screener.sort: data-track-value="{{.Field}}" data-track-scope="asc">&#96`,
 }
 
 // allowKey is a mark's key in trackValueAllowlist.
@@ -160,7 +193,7 @@ func (s *trackScan) readMarks(file, text string) {
 			continue // a comparison, not a mark
 		}
 		rest := text[end:]
-		if i := strings.IndexAny(rest, "\n"); i >= 0 {
+		if i := strings.IndexAny(rest, "\r\n"); i >= 0 {
 			rest = rest[:i]
 		}
 		mark := trackMark{file: file, use: text[loc[0]:end] + rest[:min(len(rest), 40)]}

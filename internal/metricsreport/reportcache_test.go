@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mtgban/mtgban-website/observability"
 )
 
 type clock struct{ t time.Time }
@@ -627,5 +629,16 @@ func TestTheStampQueryKeepsTheCallersDeadline(t *testing.T) {
 	}
 	if left <= 0 || left > time.Second {
 		t.Errorf("the stamp had %v, want at most the caller's second", left)
+	}
+}
+
+// The cap follows the registry, with room for a full click-through, and keeps its floor.
+func TestTheCacheCapFollowsTheRegistry(t *testing.T) {
+	c := NewCache(fixedStamp, time.Now)
+	if n := len(observability.All()); c.maxEntries < 4*n {
+		t.Errorf("maxEntries %d is under four entries a name for %d names", c.maxEntries, n)
+	}
+	if c.maxEntries < minEntries {
+		t.Errorf("maxEntries %d is under the floor %d", c.maxEntries, minEntries)
 	}
 }

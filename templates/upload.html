@@ -32,7 +32,7 @@
     <script>window.BAN_BACKPACK = {canUpload: true, priced: {{if and .CardHashes (or .UploadEntries .Optimized)}}{{.CardHashes}}{{else}}null{{end}}};</script>
     {{if or .UploadEntries .Optimized}}
         <div class="page-standard upload-wide">
-            <a class="back-link" href="/upload">&larr; Back to Uploader</a>
+            <a class="back-link" href="/upload" data-track="ui.upload.result" data-track-value="back">&larr; Back to Uploader</a>
             <div class="page-header">
                 <h1>Results{{if and .UploadQuery (not (eq .UploadQuery "hashes"))}} from {{if .UploadSourceURL}}<a class="upload-source-link" href="{{.UploadSourceURL}}" target="_blank" rel="nofollow noopener">{{.UploadQuery}}</a>{{else}}{{.UploadQuery}}{{end}}{{end}}</h1>
                 <p class="page-subtitle">
@@ -47,7 +47,7 @@
                              are read off the page when the offer is taken, by the
                              same helper the exports use, so nothing is resolved or
                              carried for a reader who never asks. */}}
-                        &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="window.runUnpack && runUnpack()" title="Price the cards inside the sealed products instead">
+                        &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="window.runUnpack && runUnpack()" title="Price the cards inside the sealed products instead" data-track="ui.upload.result" data-track-value="unpack">
                             {{template "upload-icon" "package-open"}} Unpack {{.UnpackSealed}} sealed
                         </a>
                     {{end}}
@@ -89,8 +89,8 @@
                     </div>
 
                     <div class="upload-tabs" id="uploadTabs">
-                        <button type="button" class="upload-tab active" id="tab-singles" onclick="window.selectTab && selectTab('singles')">Singles</button>
-                        <button type="button" class="upload-tab" id="tab-sealed" onclick="window.selectTab && selectTab('sealed')">Sealed</button>
+                        <button type="button" class="upload-tab active" id="tab-singles" onclick="window.selectTab && selectTab('singles')" data-track="ui.upload.tab" data-track-value="singles">Singles</button>
+                        <button type="button" class="upload-tab" id="tab-sealed" onclick="window.selectTab && selectTab('sealed')" data-track="ui.upload.tab" data-track-value="sealed">Sealed</button>
                     </div>
 
                     <!-- Reference prices: one list per tab, but shared by
@@ -143,9 +143,9 @@
                             {{end}}
                             {{if .CanChangeStores}}
                             <div class="upload-store-bulk">
-                                <button type="button" class="upload-store-bulk-btn" onclick="window.setVisibleStores && setVisibleStores(true)">Select all</button>
+                                <button type="button" class="upload-store-bulk-btn" onclick="window.setVisibleStores && setVisibleStores(true)" data-track="ui.upload.stores" data-track-value="select_all">Select all</button>
                                 <span class="upload-store-bulk-sep">·</span>
-                                <button type="button" class="upload-store-bulk-btn" onclick="window.setVisibleStores && setVisibleStores(false)">Clear</button>
+                                <button type="button" class="upload-store-bulk-btn" onclick="window.setVisibleStores && setVisibleStores(false)" data-track="ui.upload.stores" data-track-value="clear">Clear</button>
                             </div>
                             {{end}}
                         </div>
@@ -174,15 +174,15 @@
                         </div>
                     {{else}}
                         <div class="upload-source-options">
-                            <div class="upload-source-btn active" id="src-btn-file" onclick="window.selectSource && selectSource('file')">
+                            <div class="upload-source-btn active" id="src-btn-file" onclick="window.selectSource && selectSource('file')" data-track="ui.upload.source_pick" data-track-value="file">
                                 <span class="upload-source-icon">&#128196;</span>
                                 Local CSV / XLS
                             </div>
-                            <div class="upload-source-btn" id="src-btn-url" onclick="window.selectSource && selectSource('url')">
+                            <div class="upload-source-btn" id="src-btn-url" onclick="window.selectSource && selectSource('url')" data-track="ui.upload.source_pick" data-track-value="url">
                                 <span class="upload-source-icon">&#128279;</span>
                                 Remote URL
                             </div>
-                            <div class="upload-source-btn" id="src-btn-text" onclick="window.selectSource && selectSource('text')">
+                            <div class="upload-source-btn" id="src-btn-text" onclick="window.selectSource && selectSource('text')" data-track="ui.upload.source_pick" data-track-value="text">
                                 <span class="upload-source-icon">&#9998;</span>
                                 Paste Text
                             </div>
@@ -193,7 +193,7 @@
                                 <input type="file" id="file" name="cardListFile" accept=".csv,text/csv,.txt,text/plain,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="window.pressed && pressed()">
                                 <span id="fileLabel">Drop file here or <span class="upload-browse-link">browse</span>
                                 <span class="upload-file-hint">CSV, TXT, XLS, XLSX - max 5MB</span></span>
-                                <span class="upload-clear-file" id="clearFileBtn" onclick="event.preventDefault();event.stopPropagation();window.clearFile && clearFile();">clear selection</span>
+                                <span class="upload-clear-file" id="clearFileBtn" onclick="event.preventDefault();event.stopPropagation();window.clearFile && clearFile();" data-track="ui.upload.file" data-track-value="clear">clear selection</span>
                             </label>
                         </div>
 
@@ -268,17 +268,17 @@
                     <input type="hidden" id="tcgplayer_csv" name="tcgplayer_csv" value="false"/>
 
                     <div class="upload-actions">
-                        <input type="submit" id="submit_default" class="upload-btn upload-btn-primary" value="Upload" onclick="submitForm('upload', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}}>
+                        <input type="submit" id="submit_default" class="upload-btn upload-btn-primary" value="Upload" onclick="submitForm('upload', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} data-track="ui.upload.submit" data-track-value="upload" data-track-scope="form">
                         {{if .CanBuylist}}
-                            <input type="submit" id="submit_download" class="upload-btn upload-btn-secondary" value="Get CSV" onclick="submitForm('download', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            <input type="submit" id="submit_download" class="upload-btn upload-btn-secondary" value="Get CSV" onclick="submitForm('download', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none" data-track="ui.upload.submit" data-track-value="download" data-track-scope="form">
                             {{/* Both send the list to a Magic-only site, so
                                  neither is offered where the cards are not
                                  Magic. */}}
                             {{if .MagicOnlyExports}}
-                            <input type="submit" id="submit_estimate" class="upload-btn upload-btn-secondary" value="CardConduit" onclick="submitForm('estimate', true); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
-                            <input type="submit" id="submit_deckbox" class="upload-btn upload-btn-secondary" value="Deckbox" onclick="submitForm('deckbox', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            <input type="submit" id="submit_estimate" class="upload-btn upload-btn-secondary" value="CardConduit" onclick="submitForm('estimate', true); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none" data-track="ui.upload.submit" data-track-value="estimate" data-track-scope="form">
+                            <input type="submit" id="submit_deckbox" class="upload-btn upload-btn-secondary" value="Deckbox" onclick="submitForm('deckbox', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none" data-track="ui.upload.submit" data-track-value="deckbox" data-track-scope="form">
                             {{end}}
-                            <input type="submit" id="submit_tcgplayer_csv" class="upload-btn upload-btn-secondary" value="TCGplayer CSV" onclick="submitForm('tcgplayer_csv', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            <input type="submit" id="submit_tcgplayer_csv" class="upload-btn upload-btn-secondary" value="TCGplayer CSV" onclick="submitForm('tcgplayer_csv', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none" data-track="ui.upload.submit" data-track-value="tcgplayer_csv" data-track-scope="form">
                         {{end}}
                         {{if .Optimized}}
                             <input type="button" class="upload-btn upload-btn-secondary" value="Optimizer" onclick="window.location.href = '#top';">
@@ -691,8 +691,8 @@
         <!-- Row 1: View tabs + Export buttons -->
         <div class="res-buttons-row">
             <div class="res-tabs">
-                <button class="res-tab on" onclick="window.showResTab && showResTab('results',this)">Results</button>
-                {{if .Optimized}}<button class="res-tab" onclick="window.showResTab && showResTab('optimizer',this)">Optimizer</button>{{end}}
+                <button class="res-tab on" onclick="window.showResTab && showResTab('results',this)" data-track="ui.upload.result_tab" data-track-value="results">Results</button>
+                {{if .Optimized}}<button class="res-tab" onclick="window.showResTab && showResTab('optimizer',this)" data-track="ui.upload.result_tab" data-track-value="optimizer">Optimizer</button>{{end}}
             </div>
             <div class="res-btn-sep"></div>
             {{if .Optimized}}
@@ -708,7 +708,7 @@
                      and the stores, index prices and optimizer settings keep
                      coming from the cookies they always came from. */}}
                 <button class="upload-btn upload-btn-secondary res-mode-btn" onclick="window.switchUploadMode && switchUploadMode()"
-                        title="Price this same list against store {{if .IsBuylist}}retail prices{{else}}buylists{{end}}">
+                        title="Price this same list against store {{if .IsBuylist}}retail prices{{else}}buylists{{end}}" data-track="ui.upload.result" data-track-value="switch_mode">
                     {{template "upload-icon" "arrow-left-right"}}Switch to {{if .IsBuylist}}Retail{{else}}Buylist{{end}}
                 </button>
             {{else}}
@@ -717,21 +717,21 @@
                 <span class="res-mode-upsell">
                     {{template "upload-icon" "lock"}}
                     See what stores would pay for this list with the Legacy tier
-                    <a class="res-mode-upsell-btn" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener">Join BAN</a>
+                    <a class="res-mode-upsell-btn" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener" data-track="ui.upload.upsell">Join BAN</a>
                 </span>
             {{end}}
             {{if .CanBuylist}}
             <div class="res-btn-sep"></div>
-            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="window.submitExport && submitExport('download', false)">Get CSV</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="window.submitExport && submitExport('download', false)" data-track="ui.upload.submit" data-track-value="download" data-track-scope="results">Get CSV</button>
             {{if .MagicOnlyExports}}
-            <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="window.submitExport && submitExport('estimate', true)">CardConduit</button>
-            <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="window.submitExport && submitExport('deckbox', false)">Deckbox</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="window.submitExport && submitExport('estimate', true)" data-track="ui.upload.submit" data-track-value="estimate" data-track-scope="results">CardConduit</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="window.submitExport && submitExport('deckbox', false)" data-track="ui.upload.submit" data-track-value="deckbox" data-track-scope="results">Deckbox</button>
             {{end}}
-            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="window.submitExport && submitExport('tcgplayer_csv', false)">TCGplayer CSV</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="window.submitExport && submitExport('tcgplayer_csv', false)" data-track="ui.upload.submit" data-track-value="tcgplayer_csv" data-track-scope="results">TCGplayer CSV</button>
             {{end}}
             {{if .CanPublishStore}}
             <div class="res-btn-sep"></div>
-            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="window.openStorePrompt && openStorePrompt()">Publish as store</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="window.openStorePrompt && openStorePrompt()" data-track="ui.upload.publish" data-track-value="open">Publish as store</button>
             {{end}}
             {{/* Shown by backpack.js while the result tab has a row, and while one of its rows is a card in the backpack */}}
             <div class="res-btn-sep"></div>
@@ -764,10 +764,10 @@
             {{end}}
         {{else if .ShowResultTabs}}
             <div class="ures-subtabs">
-                {{if .ShowAllTab}}<button class="ures-subtab{{if eq .DefaultResultView "all"}} on{{end}}" onclick="window.showUresView && showUresView('all', this)">All</button>{{end}}
-                {{if .SinglesEntries}}<button class="ures-subtab{{if eq .DefaultResultView "singles"}} on{{end}}" onclick="window.showUresView && showUresView('singles', this)">Singles</button>{{end}}
-                {{if .SealedEntries}}<button class="ures-subtab{{if eq .DefaultResultView "sealed"}} on{{end}}" onclick="window.showUresView && showUresView('sealed', this)">Sealed</button>{{end}}
-                {{if .NotFoundEntries}}<button class="ures-subtab{{if eq .DefaultResultView "notfound"}} on{{end}}" onclick="window.showUresView && showUresView('notfound', this)">Not Found</button>{{end}}
+                {{if .ShowAllTab}}<button class="ures-subtab{{if eq .DefaultResultView "all"}} on{{end}}" onclick="window.showUresView && showUresView('all', this)" data-track="ui.upload.result_tab" data-track-value="all">All</button>{{end}}
+                {{if .SinglesEntries}}<button class="ures-subtab{{if eq .DefaultResultView "singles"}} on{{end}}" onclick="window.showUresView && showUresView('singles', this)" data-track="ui.upload.result_tab" data-track-value="singles">Singles</button>{{end}}
+                {{if .SealedEntries}}<button class="ures-subtab{{if eq .DefaultResultView "sealed"}} on{{end}}" onclick="window.showUresView && showUresView('sealed', this)" data-track="ui.upload.result_tab" data-track-value="sealed">Sealed</button>{{end}}
+                {{if .NotFoundEntries}}<button class="ures-subtab{{if eq .DefaultResultView "notfound"}} on{{end}}" onclick="window.showUresView && showUresView('notfound', this)" data-track="ui.upload.result_tab" data-track-value="not_found">Not Found</button>{{end}}
             </div>
             <div class="ures-views" data-ures-view="{{.DefaultResultView}}">
                 {{if .ShowAllTab}}
@@ -873,7 +873,7 @@
                 {{$entries := index $.Optimized .}}
                 {{if $entries}}
                     {{$total := index $.OptimizedTotals .}}
-                    <a class="opt-toc-item" href="#opt-{{.}}">
+                    <a class="opt-toc-item" href="#opt-{{.}}" data-track="ui.optimizer" data-track-value="toc_jump">
                         <span class="toc-store"{{with index $.CustomTips .}} title="{{.}}"{{end}}>{{index $.StoreNames .}}</span>
                         {{$qty := index $.OptimizedQuantities .}}
                         <span class="toc-stats">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
@@ -900,12 +900,12 @@
                     <div class="opt-store-header">
                         <div class="opt-section-nav">
                             {{if gt $i 0}}
-                                <a href="#opt-{{index $.OptimizedKeys (dec $i 1)}}" title="Previous">&#9650;</a>
+                                <a href="#opt-{{index $.OptimizedKeys (dec $i 1)}}" title="Previous" data-track="ui.optimizer" data-track-value="section_nav">&#9650;</a>
                             {{else}}
                                 <span>&#9650;</span>
                             {{end}}
                             {{if lt (inc $i 1) (len $.OptimizedKeys)}}
-                                <a href="#opt-{{index $.OptimizedKeys (inc $i 1)}}" title="Next">&#9660;</a>
+                                <a href="#opt-{{index $.OptimizedKeys (inc $i 1)}}" title="Next" data-track="ui.optimizer" data-track-value="section_nav">&#9660;</a>
                             {{else}}
                                 <span>&#9660;</span>
                             {{end}}
@@ -918,7 +918,7 @@
                                 <input type="hidden" name="c" data-load-list="ck" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardID).Name}}||{{end}}"/>
                                 {{/* CK's cart has a Load at button of its own below, which the
                                      cart loader's messages name, so this one says what it opens */}}
-                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Deck builder at {{$sourceKey}}</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();' data-track="ui.optimizer.send" data-track-value="deck_builder" data-track-scope="{{$sourceKey}}">Deck builder at {{$sourceKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Deck builder at {{$sourceKey}}"/>
                                 </noscript>
@@ -930,7 +930,7 @@
                                 <input type="hidden" name="sList" data-load-list="csi" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardID).Name}}|{{end}}"/>
                                 {{/* CSI's cart has a Load at button of its own below, which the
                                      cart loader's messages name, so this one says what it opens */}}
-                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Deck builder at {{$sourceKey}}</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();' data-track="ui.optimizer.send" data-track-value="deck_builder" data-track-scope="{{$sourceKey}}">Deck builder at {{$sourceKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Deck builder at {{$sourceKey}}"/>
                                 </noscript>
@@ -942,7 +942,7 @@
                                 <input type="hidden" name="c" data-load-list="tcg" value="{{range $entries}}{{.Quantity}}-{{(index $.Metadata .CardID).TCGId}}||{{end}}"/>
                                 {{/* TCGplayer's cart has a Load at button of its own below, which
                                      the cart loader's messages name, so this one says what it opens */}}
-                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Mass entry at TCGplayer</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();' data-track="ui.optimizer.send" data-track-value="mass_entry" data-track-scope="{{$sourceKey}}">Mass entry at TCGplayer</a>
                                 <noscript>
                                     <input type="submit" value="Mass entry at TCGplayer"/>
                                 </noscript>
@@ -962,7 +962,7 @@
                             <form action="https://manapool.com/add-deck" method="get" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
                                 <input type="hidden" name="deck" data-load-list="manapool" value="{{base64enc $deck}}"/>
-                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Mass entry at Mana Pool</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();' data-track="ui.optimizer.send" data-track-value="mass_entry" data-track-scope="{{$sourceKey}}">Mass entry at Mana Pool</a>
                                 <noscript>
                                     <input type="submit" value="Mass entry at Mana Pool"/>
                                 </noscript>
@@ -977,7 +977,7 @@
                                     <input type="hidden" name="{{$sourceKey}}RetailhashesQtys" value="{{.Quantity}}"/>
                                     <input type="hidden" name="{{$sourceKey}}RetailhashesCond" value="{{.Condition}}"/>
                                 {{end}}
-                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();'>Load at {{$sourceKey}}</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();' data-track="ui.optimizer.send" data-track-value="load_at" data-track-scope="{{$sourceKey}}">Load at {{$sourceKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Load at {{$sourceKey}}"/>
                                 </noscript>
@@ -997,7 +997,7 @@
                                         {}
                                     ]}'/>
                                 <input type="hidden" name="partner" value="{{load_partner $scraperKey}}"/>
-                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}blhashes").submit();'>Load buylist at {{$scraperKey}}</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}blhashes").submit();' data-track="ui.optimizer.send" data-track-value="sellcart" data-track-scope="{{$scraperKey}}">Load buylist at {{$scraperKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Load buylist at {{$scraperKey}}"/>
                                 </noscript>
@@ -1007,7 +1007,7 @@
                         {{$cart := index $.CartLoads $scraperKey}}
                         {{if $cart.Link}}
                             <span class="cart-load">
-                                <a class="opt-btn csv cart-help" href="#" onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false" title="How Load at {{$cart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="opt-btn load" href="{{$cart.Link}}" target="_blank" rel="noopener" data-store="{{$cart.Store}}" data-buylist="{{$.IsBuylist}}" data-load-list="cart" data-load-items="{{$cart.Items}}" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">Load {{if $.IsBuylist}}buylist {{end}}at {{$cart.Store}}</a>
+                                <a class="opt-btn csv cart-help" href="#" onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false" title="How Load at {{$cart.Store}} works, and the BAN-to-Cart bookmark" data-track="ui.cart" data-track-value="help" data-track-scope="{{$cart.Prefix}}">?</a><a class="opt-btn load" href="{{$cart.Link}}" target="_blank" rel="noopener" data-store="{{$cart.Store}}" data-cart="{{$cart.Prefix}}" data-buylist="{{$.IsBuylist}}" data-load-list="cart" data-load-items="{{$cart.Items}}" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">Load {{if $.IsBuylist}}buylist {{end}}at {{$cart.Store}}</a>
                             </span>
                         {{end}}
 
@@ -1019,7 +1019,7 @@
                                     <input type="hidden" name="{{$scraperKey}}hashes" value="{{.CardID}}"/>
                                     <input type="hidden" name="{{$scraperKey}}hashesQtys" value="{{.Quantity}}"/>
                                 {{end}}
-                                <a class="opt-btn csv" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}hashes").submit();'>Download {{$scraperKey}} CSV</a>
+                                <a class="opt-btn csv" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}hashes").submit();' data-track="ui.optimizer.send" data-track-value="csv" data-track-scope="{{$scraperKey}}">Download {{$scraperKey}} CSV</a>
                                 <noscript>
                                     <input type="submit" value="Download {{$scraperKey}} CSV"/>
                                 </noscript>
@@ -1033,7 +1033,7 @@
                                 <input type="hidden" name="TCGhashesQtys" value="-{{.Quantity}}"/>
                                 <input type="hidden" name="TCGhashesCond" value="{{.Condition}}"/>
                             {{end}}
-                            <a class="opt-btn remove" href='javascript:void(0)' onclick='document.getElementById("TCG{{$scraperKey}}hashes").submit();'>Remove from TCG CSV</a>
+                            <a class="opt-btn remove" href='javascript:void(0)' onclick='document.getElementById("TCG{{$scraperKey}}hashes").submit();' data-track="ui.optimizer.send" data-track-value="tcg_csv" data-track-scope="{{$scraperKey}}">Remove from TCG CSV</a>
                             <noscript>
                                 <input type="submit" value="TCGplayer CSV"/>
                             </noscript>
@@ -1049,7 +1049,7 @@
                         {{$qty := index $.OptimizedQuantities $scraperKey}}
                         <span class="opt-count">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
                         <span class="opt-total">$ {{printf "%.2f" $total}}</span>
-                        <button type="button" class="section-fold" aria-expanded="true" title="Hide these cards"><i data-lucide="chevron-up"></i></button>
+                        <button type="button" class="section-fold" aria-expanded="true" title="Hide these cards" data-track="ui.optimizer" data-track-value="fold"><i data-lucide="chevron-up"></i></button>
                     </div>
                     </td></tr>
                         <tr>
@@ -1068,7 +1068,7 @@
                             {{$price := (index $scraperEntries $scraperKey)}}
                             <tr data-opt-id="{{.CardID}}" data-opt-cond="{{.Condition}}" data-opt-price="{{$price}}" data-share-price="{{.LoadedPrice}}" data-share-cond="{{.LoadedCondition}}" data-load-idx="{{$n}}" data-load-qty="{{.Quantity}}" data-load-name="{{$card.Name}}" data-load-ckid="{{$card.CKBuylistID}}" data-load-tcgid="{{$card.TCGId}}" data-load-set="{{$card.SetCode}}" data-load-number="{{$card.Number}}" data-opt-edition="{{$card.Edition}}" data-opt-img="{{$card.ImageURL}}" data-opt-finish-tag="{{$card.FinishTag}}" data-opt-finish-class="{{$card.FinishClass}}" data-opt-cw="{{$card.HasContentWarning}}"{{with index $.SortKeys .CardID}} data-k-name="{{.Name}}" data-k-set="{{.Set}}" data-k-release="{{.Release}}" data-k-number="{{.Number}}" data-k-finish="{{.Finish}}" data-k-color="{{.Color}}" data-k-rarity="{{.Rarity}}"{{end}} data-k-cond="{{cond_rank .Condition}}"{{if .SortLead}} data-k-lead="{{.SortLead}}"{{end}} onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});hw.toggleAttribute('data-sealed',{{$card.Sealed}});">
                                 <td class="opt-name"><div class="opt-name-cell">
-                                    <span class="emoji" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>
+                                    <span class="emoji opt-copy" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>
                                     <div class="opt-name-text"><a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}{{buylist_badge $scraperKey $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}
                                     {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}</div>
                                 </div></td>
@@ -1087,7 +1087,7 @@
                                         {{if and $.CanFilterByPrice (gt .Profitability 15.0)}}&#10071;{{end}}
                                     {{end}}
                                 </td>
-                                <td class="c">{{if $.IsBuylist}}{{with $row.Sends}}<button type="button" class="opt-send-btn" popovertarget="opt-send-{{$scraperKey}}-{{$n}}" title="Load this card at a buylist" aria-label="Load this card at a buylist"><svg aria-hidden="true"><use href="#opt-send-icon"/></svg></button><div class="opt-send-menu" id="opt-send-{{$scraperKey}}-{{$n}}" popover><div class="opt-send-title">Load this card at</div>{{range .}}<a href="{{.Link}}" target="_blank" rel="noopener" data-store="{{.Store}}" data-buylist="true" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">{{.Store}}<span>$ {{printf "%.2f" .Price}}</span></a>{{end}}</div>{{end}}{{end}}<input type="checkbox" checked autocomplete="off" class="opt-row-check" onchange="window.toggleOptRow && toggleOptRow(this)"></td>
+                                <td class="c">{{if $.IsBuylist}}{{with $row.Sends}}<button type="button" class="opt-send-btn" popovertarget="opt-send-{{$scraperKey}}-{{$n}}" title="Load this card at a buylist" aria-label="Load this card at a buylist" data-track="ui.optimizer.send" data-track-value="row_popover" data-track-scope="{{$scraperKey}}"><svg aria-hidden="true"><use href="#opt-send-icon"/></svg></button><div class="opt-send-menu" id="opt-send-{{$scraperKey}}-{{$n}}" popover><div class="opt-send-title">Load this card at</div>{{range .}}<a href="{{.Link}}" target="_blank" rel="noopener" data-store="{{.Store}}" data-cart="{{.Prefix}}" data-buylist="true" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">{{.Store}}<span>$ {{printf "%.2f" .Price}}</span></a>{{end}}</div>{{end}}{{end}}<input type="checkbox" checked autocomplete="off" class="opt-row-check" onchange="window.toggleOptRow && toggleOptRow(this)"></td>
                             </tr>
                         {{end}}
                         </tbody>
@@ -1179,7 +1179,7 @@
     <div id="reload-bar" class="ures-reload-bar" style="display:none">
         <span class="reload-stat" id="reload-fixed-wrap" style="display:none"><span class="count-fixed" id="reload-fixed-count">0</span> updated</span>
         <span class="reload-stat" id="reload-removed-wrap" style="display:none"><span class="count-removed" id="reload-removed-count">0</span> removed</span>
-        <button class="opt-btn load" onclick="window.reprocessUploadResults && reprocessUploadResults()">Reload</button>
+        <button class="opt-btn load" onclick="window.reprocessUploadResults && reprocessUploadResults()" data-track="ui.upload.result" data-track-value="reload">Reload</button>
     </div>
 
     <script>

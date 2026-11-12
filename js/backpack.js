@@ -476,6 +476,7 @@
     // searchBackpack opens the search for the open backpack once the sync
     // has saved it, or after a few seconds of waiting on that.
     function searchBackpack() {
+        if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack", "search");
         var url = "/search?q=" + encodeURIComponent(searchQuery(active()));
         var go = function () { window.location.href = url; };
         var sync = window.UserStateSync && window.UserStateSync.flush;
@@ -495,6 +496,7 @@
         setPending(emptyAfter() ? ordered().map(key) : null);
         try { sessionStorage.setItem(SENT_KEY, JSON.stringify({ pack: active(), ids: ordered().map(function (e) { return e.id; }) })); } catch (e) {}
         document.body.appendChild(form);
+        if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.upload", mode === "buylist" ? "buylist" : "retail");
         form.submit();
     }
 
@@ -583,6 +585,7 @@
             b.setAttribute("data-pack", String(t.pack));
             b.append(text("span", "nav2-backpack-pick-name", t.name), text("span", "nav2-backpack-pick-count", String(copies[t.pack] || 0)));
             b.addEventListener("click", function () {
+                if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack", "switch_menu");
                 setActive(t.pack);
                 render();
             });
@@ -752,6 +755,10 @@
             if (r.left && !full(p)) toastCeiling();
             return;
         }
+        if (window.BAN && window.BAN.track) {
+            if (btn.closest(".opt-store")) window.BAN.track("ui.optimizer", "pack_add");
+            else window.BAN.track("ui.upload.result", "pack_add");
+        }
         render();
         toast("Added " + r.copies + (r.copies === 1 ? " copy" : " copies") + " to " + packName(p) + (r.left ? "; " + r.left + " did not fit" : ""));
     };
@@ -769,6 +776,10 @@
             var p = source();
             var copies = take(picked(rows, p));
             if (!copies) return;
+            if (window.BAN && window.BAN.track) {
+                if (section) window.BAN.track("ui.optimizer", "pack_take");
+                else window.BAN.track("ui.upload.result", "pack_take");
+            }
             render();
             toast("Removed " + copies + (copies === 1 ? " copy" : " copies") + " from " + packName(p));
             var next = section ? section.querySelector(".section-fold") : btn.parentNode.querySelector(".pack-add-btn");
@@ -809,6 +820,8 @@
         return { by: s.by, dir: s.dir === "asc" ? "asc" : "desc" };
     }
     function setSortPref(s) { try { localStorage.setItem(SORT_KEY, JSON.stringify(s)); } catch (e) {} }
+    // own keeps an inherited name such as constructor out of a count.
+    function own(obj, k) { return Object.prototype.hasOwnProperty.call(obj, k); }
     function isPriceSort(by) { return by === "retail" || by === "buylist"; }
 
     // prices are each card's NM prices as /data/prices gave them, by id,
@@ -1005,7 +1018,10 @@
         emptySwitch.type = "checkbox";
         emptySwitch.setAttribute("id", "backpack-empty-after");
         emptySwitch.checked = emptyAfter();
-        emptySwitch.addEventListener("change", function () { setEmptyAfter(emptySwitch.checked); });
+        emptySwitch.addEventListener("change", function () {
+            if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack", emptySwitch.checked ? "empty_after_on" : "empty_after_off");
+            setEmptyAfter(emptySwitch.checked);
+        });
         label.append(emptySwitch, text("span", null, "Empty the backpack after sending"));
 
         // One row: the sort, Undo and Clear as icons, the sends taking the rest.
@@ -1017,7 +1033,12 @@
         undoBtn.setAttribute("title", "Undo");
         icon(undoBtn, "undo-2");
         undoBtn.setAttribute("type", "button");
-        undoBtn.addEventListener("click", function () { if (undo()) render(); });
+        undoBtn.addEventListener("click", function () {
+            if (undo()) {
+                if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack", "undo");
+                render();
+            }
+        });
         var clearBtn = text("button", "backpack-btn backpack-btn-plain backpack-btn-icon");
         clearBtn.setAttribute("id", "backpack-clear");
         clearBtn.setAttribute("aria-label", "Empty the backpack");
@@ -1027,7 +1048,11 @@
         clearBtn.addEventListener("click", function () {
             var keys = ordered().map(key);
             if (!keys.length) return;
-            var doClear = function () { clear(keys); render(); };
+            var doClear = function () {
+                if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack", "clear");
+                clear(keys);
+                render();
+            };
             // confirm-dialog.js is callback-style; anchored, it covers just the panel.
             if (typeof window.confirmDialog === "function") window.confirmDialog("Empty the backpack?", doClear, { anchor: panel, confirmLabel: "Empty" });
             else if (window.confirm("Empty the backpack?")) doClear();
@@ -1064,6 +1089,7 @@
         Object.keys(SORTS).forEach(function (by) { sortSel.appendChild(option(by, SORTS[by].label, SORTS[by].label)); });
         sortSel.addEventListener("change", function () {
             if (!SORTS[sortSel.value]) return;
+            if (own(SORTS, sortSel.value) && window.BAN && window.BAN.track) window.BAN.track("ui.backpack.sort", sortSel.value, SORTS[sortSel.value].dir);
             setSortPref({ by: sortSel.value, dir: SORTS[sortSel.value].dir });
             priceRefusal = "";
             renderPanel();
@@ -1073,7 +1099,9 @@
         sortDirBtn.setAttribute("type", "button");
         sortDirBtn.addEventListener("click", function () {
             var s = sortPref();
-            setSortPref({ by: s.by, dir: s.dir === "asc" ? "desc" : "asc" });
+            var dir = s.dir === "asc" ? "desc" : "asc";
+            if (own(SORTS, s.by) && window.BAN && window.BAN.track) window.BAN.track("ui.backpack.sort", s.by, dir);
+            setSortPref({ by: s.by, dir: dir });
             renderPanel();
         });
         sortNote = text("span", "backpack-sort-note");
@@ -1124,6 +1152,7 @@
     // moveCard moves the entry k names to backpack p and says so, reporting whether it moved.
     function moveCard(k, p) {
         if (!moveTo(k, p)) return false;
+        if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.card", "move_pack");
         render();
         toast("Moved to " + packName(p));
         return true;
@@ -1161,7 +1190,12 @@
                 return;
             }
             var adding = v.charAt(0) === "+";
-            if (adding) addCond(key(e), v.slice(1)); else setCond(key(e), v);
+            if (adding) {
+                if (addCond(key(e), v.slice(1)) && window.BAN && window.BAN.track) window.BAN.track("ui.backpack.card", "condition_add");
+            } else {
+                setCond(key(e), v);
+                if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.card", "condition");
+            }
             render();
             // The list was rebuilt; keep the keyboard on this entry's grade.
             focusCond(adding ? key(e) : key({ id: e.id, cond: v, pack: e.pack }));
@@ -1225,12 +1259,20 @@
         var minus = text("button", "backpack-minus", "−");
         minus.setAttribute("type", "button");
         minus.setAttribute("aria-label", (e.qty || 1) > 1 ? "One fewer" : "Remove");
-        minus.addEventListener("click", function () { setQty(key(e), (e.qty || 1) - 1); render(); });
+        minus.addEventListener("click", function () {
+            if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.card", (e.qty || 1) > 1 ? "qty_down" : "remove");
+            setQty(key(e), (e.qty || 1) - 1);
+            render();
+        });
         var qty = text("span", "backpack-qty", String(e.qty || 1));
         var plus = text("button", "backpack-plus", "+");
         plus.setAttribute("type", "button");
         plus.setAttribute("aria-label", "One more");
-        plus.addEventListener("click", function () { setQty(key(e), (e.qty || 1) + 1); render(); });
+        plus.addEventListener("click", function () {
+            if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.card", "qty_up");
+            setQty(key(e), (e.qty || 1) + 1);
+            render();
+        });
         ctl.append(condSelect(e, held, others), minus, qty, plus);
 
         r.append(art, body, ctl);
@@ -1260,6 +1302,7 @@
             if (list.length > 1) reorderBy(b, t.pack, i, list);
             b.addEventListener("click", function () {
                 if (on) { rename(b, t); return; }
+                if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.tab", "switch");
                 setActive(t.pack);
                 render();
                 focusTab(t.pack);
@@ -1303,7 +1346,13 @@
             add.setAttribute("type", "button");
             add.setAttribute("id", "backpack-tab-add");
             add.setAttribute("aria-label", "Add a backpack");
-            add.addEventListener("click", function () { if (addTab()) { render(); focusTab(active()); } });
+            add.addEventListener("click", function () {
+                if (addTab()) {
+                    if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.tab", "new");
+                    render();
+                    focusTab(active());
+                }
+            });
             stripEl.appendChild(add);
         }
     }
@@ -1388,6 +1437,8 @@
         var finish = function (save) {
             if (done) return;
             done = true;
+            var name = String(field.value || "").trim().slice(0, NAME_MAX);
+            if (save && name && name !== t.name && window.BAN && window.BAN.track) window.BAN.track("ui.backpack.tab", "rename");
             if (save) renameTab(t.pack, field.value);
             render();
             focusTab(t.pack);
@@ -1406,7 +1457,12 @@
     }
 
     function askDelete(t) {
-        var doDelete = function () { deleteTab(t.pack); render(); focusTab(active()); };
+        var doDelete = function () {
+            if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.tab", "delete");
+            deleteTab(t.pack);
+            render();
+            focusTab(active());
+        };
         var cards = inPack(t.pack).length;
         if (!cards) { doDelete(); return; }
         var ask = "Delete " + t.name + " and its " + cards + (cards === 1 ? " product?" : " products?");
@@ -1454,6 +1510,7 @@
 
     function open() {
         build();
+        if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.panel", "open");
         priceRefusal = "";
         overlay.classList.add("open");
         panel.classList.add("open");

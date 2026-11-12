@@ -200,6 +200,16 @@
         });
     }
 
+    // The packages and form fields ui.apiplans.choose and ui.apiplans count, as the registry lists them.
+    var CHOSEN = {starter: true, all_stores: true, all_data: true, history: true};
+    var FIELDS = {addons: 'addon', stores: 'stores', games: 'games', interval: 'interval'};
+    function own(table, key) {
+        return Object.prototype.hasOwnProperty.call(table, key);
+    }
+    function trackChoice(key) {
+        if (own(CHOSEN, key) && window.BAN && window.BAN.track) window.BAN.track('ui.apiplans.choose', key);
+    }
+
     // The card's button picks the package and brings the rest of the form into view.
     var ctas = form.querySelectorAll('.api-cta');
     for (var b = 0; b < ctas.length; b++) {
@@ -207,6 +217,7 @@
             ev.stopPropagation();
             var radio = form.querySelector('input[name="package"][value="' + this.getAttribute('data-package') + '"]');
             if (radio) radio.checked = true;
+            trackChoice(this.getAttribute('data-package'));
             update();
             var target = document.getElementById('api-configure');
             if (target && target.scrollIntoView) target.scrollIntoView({behavior: 'smooth', block: 'start'});
@@ -220,6 +231,7 @@
             var radio = this.querySelector('input[name="package"]');
             if (radio && !radio.checked) {
                 radio.checked = true;
+                trackChoice(radio.value);
                 update();
             }
         });
@@ -231,6 +243,8 @@
     wasExplicit = !!(initial && initial.explicit);
     form.addEventListener('change', function (ev) {
         if (ev && ev.target && ev.target.name === 'addons') mirrorAddon(ev.target);
+        if (ev && ev.target && ev.target.name === 'package') trackChoice(ev.target.value);
+        if (ev && ev.target && own(FIELDS, ev.target.name) && window.BAN && window.BAN.track) window.BAN.track('ui.apiplans', FIELDS[ev.target.name]);
         update();
     });
     update();

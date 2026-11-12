@@ -46,7 +46,7 @@ test('the gear links both sheets, then runs the scripts in order, then opens the
         '/css/settings-modal.css?hash=abc123', '/css/editions-picker.css?hash=abc123',
     ]);
     expect(p.of('link', 'preload').map(l => l.href)).toEqual([
-        '/js/editions-picker.js?hash=abc123', '/js/settings-shell.js?hash=abc123', '/js/settings.js?hash=abc123',
+        '/js/editions-picker.js?hash=abc123', '/js/settings-shell.js?hash=abc123', '/js/settings-changes.js?hash=abc123', '/js/settings.js?hash=abc123',
     ]);
     // settings.js unhides the modal's shell as it runs, so no script before the sheets
     expect(p.of('script')).toHaveLength(0);
@@ -55,7 +55,7 @@ test('the gear links both sheets, then runs the scripts in order, then opens the
     await p.settle();
     const scripts = p.of('script');
     expect(scripts.map(s => s.src)).toEqual([
-        '/js/editions-picker.js?hash=abc123', '/js/settings-shell.js?hash=abc123', '/js/settings.js?hash=abc123',
+        '/js/editions-picker.js?hash=abc123', '/js/settings-shell.js?hash=abc123', '/js/settings-changes.js?hash=abc123', '/js/settings.js?hash=abc123',
     ]);
     expect(scripts.every(s => s.async === false)).toBe(true);
 
@@ -111,7 +111,7 @@ test('a helper script that fails is reported, and settings.js opens without it',
     expect(p.listeners.keydown).toHaveLength(0);
     p.window.openSettings();
     await p.settle();
-    expect(p.of('script')).toHaveLength(3);
+    expect(p.of('script')).toHaveLength(4);
 });
 
 test('settings.js failing is reported and tried again on the next open', async () => {
@@ -119,7 +119,7 @@ test('settings.js failing is reported and tried again on the next open', async (
     p.window.openSettings();
     p.of('link', 'stylesheet').forEach(l => l.onload());
     await p.settle();
-    p.of('script')[2].onerror();
+    p.of('script')[3].onerror();
     await p.settle();
     expect(p.errors).toEqual(['settings: /js/settings.js did not load']);
     expect(p.listeners.keydown).toHaveLength(1);
@@ -127,7 +127,7 @@ test('settings.js failing is reported and tried again on the next open', async (
     p.window.openSettings();
     expect(p.of('link', 'stylesheet')).toHaveLength(2);
     await p.settle();
-    expect(p.of('script')).toHaveLength(6);
+    expect(p.of('script')).toHaveLength(8);
 });
 
 test('a sheet that fails to load is dropped and linked again on the next open', async () => {

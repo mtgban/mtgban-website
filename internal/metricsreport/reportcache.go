@@ -9,11 +9,13 @@ import (
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"github.com/mtgban/mtgban-website/observability"
 )
 
 const (
 	stampEvery      = time.Minute
-	maxEntries      = 512
+	minEntries      = 2048 // the floor of a cache's size, which otherwise follows the registry
 	defaultLoadMax  = 30 * time.Second
 	defaultStampMax = 5 * time.Second
 )
@@ -71,7 +73,7 @@ func NewCache(stamp func(context.Context) (string, error), now func() time.Time)
 	return &Cache{
 		stamp:      stamp,
 		now:        now,
-		maxEntries: maxEntries,
+		maxEntries: max(minEntries, 6*len(observability.All())),
 		loadMax:    defaultLoadMax,
 		stampMax:   defaultStampMax,
 		entries:    map[Key]*entry{},

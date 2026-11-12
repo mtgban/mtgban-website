@@ -33,6 +33,7 @@
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}" defer></script>
     {{if .OfflineModeAllowed}}
     <script type="text/javascript" src="/js/offline/offline-settings-mobile.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/settings-changes.js?hash={{.Hash}}" defer></script>
     {{end}}
     <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}" defer></script>
     {{if .PatreonLogin}}
@@ -161,7 +162,7 @@
             <button class="m-pin-btn{{if .SearchScope}} is-active{{end}}" id="nav-pin-btn" type="button" title="{{if .SearchScope}}Pinned: {{.SearchScope}}{{else}}Pinned filters{{end}}"><i data-lucide="filter"></i></button>
             {{end}}
             <button class="m-search-btn m-filter-btn" type="button" title="Filters" onclick="document.getElementById('m-filter-overlay').classList.add('open'); document.getElementById('m-filter-sheet').classList.add('open');" data-track="ui.mfilter.open"><i data-lucide="sliders-horizontal"></i></button>
-            <button class="m-search-btn m-settings-btn" type="button" title="Settings" onclick="window.openSettings && openSettings()"><i data-lucide="settings"></i></button>
+            <button class="m-search-btn m-settings-btn" type="button" title="Settings" onclick="window.openSettings && openSettings()" data-track="ui.settings.open" data-track-value="gear"><i data-lucide="settings"></i></button>
         </div>
         {{if .CanScope}}
         <div class="m-scope-row" id="nav-scope">
@@ -1377,6 +1378,7 @@ function loadSettings() {
 
 // Save all settings to cookies and show toast
 function saveSettings() {
+    var before = window.SettingsChanges ? SettingsChanges.snapshot(getCookie) : null;
     // Layout
     var layoutPill = document.querySelector('#m-set-layout .m-settings-pill.active');
     var layoutVal = layoutPill ? layoutPill.getAttribute('data-val') : 'expanded';
@@ -1431,6 +1433,7 @@ function saveSettings() {
 
     var factors = document.getElementById('m-set-store-factors');
     if (factors && window.StoreFactors) window.StoreFactors.saveEditor(factors);
+    if (before) SettingsChanges.report(before, SettingsChanges.snapshot(getCookie), 'mobile_drawer');
 
     // Show toast
     var toast = document.getElementById('m-fav-toast');

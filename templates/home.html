@@ -65,7 +65,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
         </div>
         {{if not .ModalMode}}
         {{if .PatreonLogin}}
-        <p class="landing-blurb">MTGBAN compares prices and availability for {{game_title}} singles and sealed products across major retailers. We partner with several data providers to offer the most accurate pricing information on the market, with a wide offer of trading tools.<br><br>Many of the stores we link to support the site through affiliate programs - purchases made through those links help keep MTGBAN running, at no extra cost to you. Take a look at our vast search catalog for <a href="/sets">singles</a> and <a href="/sealed">sealed</a> to find the best deals (or pick a <a href="/random">random card</a>).</p>
+        <p class="landing-blurb">MTGBAN compares prices and availability for {{game_title}} singles and sealed products across major retailers. We partner with several data providers to offer the most accurate pricing information on the market, with a wide offer of trading tools.<br><br>Many of the stores we link to support the site through affiliate programs - purchases made through those links help keep MTGBAN running, at no extra cost to you. Take a look at our vast search catalog for <a href="/sets"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="sets"{{end}}>singles</a> and <a href="/sealed"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="sealed"{{end}}>sealed</a> to find the best deals (or pick a <a href="/random"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="random"{{end}}>random card</a>).</p>
         {{else}}
         <div class="landing-tagline"><br></div>
         {{end}}
@@ -163,7 +163,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
                 {{template "patreon-login-script" .}}
                 {{if .PatreonIDs}}
                     {{range $ref, $id := .PatreonIDs}}
-                        <a class="landing-login-btn patreon" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
+                        <a class="landing-login-btn patreon" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.account" data-track-value="login"{{end}}>Log in</a>
                         <noscript>
                             <a class="landing-login-btn patreon" href="http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=;{{$ref}}">
                                 Log in
@@ -174,16 +174,16 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
                     <button class="landing-login-btn patreon" type="button" disabled title="Login is unavailable because Patreon is not configured">Log in</button>
                 {{end}}
             {{else}}
-                <a class="landing-login-btn patreon" href="/?errmsg=logout">Logout</a>
+                <a class="landing-login-btn patreon" href="/?errmsg=logout"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.account" data-track-value="logout"{{end}}>Logout</a>
             {{end}}
-            {{range .Nav}}{{if eq .Name "Account"}}<a class="landing-icon-btn" href="{{.Link}}" title="Account"><i data-lucide="user-round"></i></a>{{end}}{{end}}
+            {{range .Nav}}{{if eq .Name "Account"}}<a class="landing-icon-btn" href="{{.Link}}" title="Account"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.nav.link" data-track-value="account"{{end}}><i data-lucide="user-round"></i></a>{{end}}{{end}}
             <button class="ban-theme-toggle" type="button" title="Toggle theme">
                 <svg class="theme-icon theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffdd00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                 <svg class="theme-icon theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a5ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
                 <svg class="theme-icon theme-icon-system" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9a9a9a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             </button>
-            <a class="landing-icon-btn" href="/guide" title="Guide"><i data-lucide="circle-question-mark"></i></a>
-            <a class="landing-login-btn discord" href="/discord">Join</a>
+            <a class="landing-icon-btn" href="/guide" title="Guide"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.nav.link" data-track-value="guide"{{end}}><i data-lucide="circle-question-mark"></i></a>
+            <a class="landing-login-btn discord" href="/discord"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.nav.link" data-track-value="discord"{{end}}>Join</a>
         </div>
 
         <div class="landing-copyright">&copy; 2019&ndash;2026 MTGBAN Inc &middot; <a href="/privacy">Privacy</a></div>

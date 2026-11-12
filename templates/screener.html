@@ -15,6 +15,7 @@
         <img id="hoverImage" class="hoverImage" src="{{card_art_placeholder}}"/>
     </div>
     <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/screener.js?hash={{.Hash}}" defer></script>
 
     <div class="page-wide news-data" id="screenerPage">
         <div class="page-header news-data-header">
@@ -111,8 +112,8 @@
                 </div>
 
                 <div class="screener-actions">
-                    <a href="/screener" class="screener-reset" title="Reset filters" aria-label="Reset filters"><i data-lucide="rotate-ccw"></i></a>
-                    <input type="submit" value="Apply" class="screener-apply">
+                    <a href="/screener" class="screener-reset" title="Reset filters" aria-label="Reset filters" data-track="ui.screener.control" data-track-value="reset"><i data-lucide="rotate-ccw"></i></a>
+                    <input type="submit" value="Apply" class="screener-apply" data-track="ui.screener.control" data-track-value="apply">
                 </div>
             </div>
         </form>
@@ -223,12 +224,12 @@
 
             <div class="pagination framed">
                 {{if ne .CurrentIndex 1}}
-                    <a href="/screener?provider={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}">&lt;</a>
+                    <a href="/screener?provider={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}" data-track="ui.screener.pager" data-track-value="prev">&lt;</a>
                 {{end}}
                 <span class="cur">{{.CurrentIndex}}</span>
                 <span class="pg-info">/ {{.TotalIndex}}</span>
                 {{if ne .CurrentIndex .TotalIndex}}
-                    <a href="/screener?provider={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}">&gt;</a>
+                    <a href="/screener?provider={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}" data-track="ui.screener.pager" data-track-value="next">&gt;</a>
                 {{end}}
             </div>
 
@@ -238,7 +239,7 @@
                     {{range .CardHashes}}
                         <input type="hidden" name="hashes" value="{{.}}"/>
                     {{end}}
-                    <button type="submit" class="news-upload-btn">Load this page in the Uploader</button>
+                    <button type="submit" class="news-upload-btn" data-track="ui.screener.upload_page">Load this page in the Uploader</button>
                 </form>
             </div>
         </div>
@@ -251,7 +252,7 @@
 {{define "screener-sort"}}
     {{$s := .Vars.Screener}}
     <span class="sort-links">
-        <a href="/screener?provider={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_was={{$s.MinPriorPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=desc">&#9660;</a>
-        <a href="/screener?provider={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_was={{$s.MinPriorPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=asc">&#9650;</a>
+        <a href="/screener?provider={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_was={{$s.MinPriorPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=desc" data-track="ui.screener.sort" data-track-value="{{.Field}}" data-track-scope="desc">&#9660;</a>
+        <a href="/screener?provider={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_was={{$s.MinPriorPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=asc" data-track="ui.screener.sort" data-track-value="{{.Field}}" data-track-scope="asc">&#9650;</a>
     </span>
 {{end}}

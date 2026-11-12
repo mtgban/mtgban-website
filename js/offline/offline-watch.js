@@ -51,11 +51,15 @@
         link = document.createElement('a');
         link.href = '/offline';
         link.textContent = 'Browse offline';
+        link.setAttribute('data-track', 'ui.offline.banner');
+        link.setAttribute('data-track-value', 'browse_offline');
 
         var close = document.createElement('button');
         close.type = 'button';
         close.setAttribute('aria-label', 'Dismiss');
         close.textContent = '×';
+        close.setAttribute('data-track', 'ui.offline.banner');
+        close.setAttribute('data-track-value', 'dismiss');
         close.addEventListener('click', function () {
             dismissed = true;
             hideToast();

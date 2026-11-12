@@ -154,6 +154,7 @@ func TestAreaNotUseMatchesTheRegistry(t *testing.T) {
 		"apiplans.handoff",      // steps of a reader's handoff to the API gateway
 		"ui.search.sort_locked", // a reader pressed the tier-locked sort
 		"ui.row.locked",         // a reader pressed Join or Log in on a locked row, or the velocity upsell
+		"ui.upload.upsell",      // a reader pressed Join BAN beside the locked upload mode switch
 	}
 	for name := range notUse {
 		n, ok := observability.Lookup(name)

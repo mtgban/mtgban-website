@@ -55,6 +55,7 @@
             hidden.value = name;
             if (clearBtn) clearBtn.hidden = !name;
             const form = combobox.closest('form');
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.news.edition', 'pick');
             if (form) form.requestSubmit ? form.requestSubmit() : form.submit();
         }
 
@@ -63,6 +64,7 @@
             hidden.value = '';
             if (clearBtn) clearBtn.hidden = true;
             const form = combobox.closest('form');
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.news.edition', 'clear');
             if (form) form.requestSubmit ? form.requestSubmit() : form.submit();
         }
 

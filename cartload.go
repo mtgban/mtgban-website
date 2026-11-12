@@ -265,6 +265,7 @@ func (cs cartStore) page(buylist bool) string {
 // other than the page's.
 type cartLoad struct {
 	Store      string
+	Prefix     string // the cart store's prefix, what ui.cart counts it by
 	Link       string
 	Items      string
 	Quantities string
@@ -301,7 +302,7 @@ func cartLoadFor(p *prices, key string, buylist bool, entries []OptimizedUploadE
 		if skipped > 0 {
 			page += "&skip=" + strconv.Itoa(skipped)
 		}
-		return cartLoad{Store: cs.name, Link: affiliated(cs.prefix, page), Items: strings.Join(items, ",")}
+		return cartLoad{Store: cs.name, Prefix: cs.prefix, Link: affiliated(cs.prefix, page), Items: strings.Join(items, ",")}
 	}
 	return cartLoad{}
 }
@@ -310,9 +311,10 @@ func cartLoadFor(p *prices, key string, buylist bool, entries []OptimizedUploadE
 // its buylist cart page with the row's card alone in the fragment, and what
 // the split it was found under offers for the card.
 type cartSend struct {
-	Store string
-	Link  string
-	Price float64
+	Store  string
+	Prefix string
+	Link   string
+	Price  float64
 }
 
 // cartSendsFor is an optimizer row's send menu: one entry per store among
@@ -328,7 +330,7 @@ func cartSendsFor(p *prices, keys []string, prices map[string]float64, entry Opt
 			continue
 		}
 		seen[load.Store] = true
-		sends = append(sends, cartSend{Store: load.Store, Link: load.Link, Price: prices[key]})
+		sends = append(sends, cartSend{Store: load.Store, Prefix: load.Prefix, Link: load.Link, Price: prices[key]})
 	}
 	return sends
 }

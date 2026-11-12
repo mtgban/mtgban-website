@@ -62,6 +62,7 @@ document.addEventListener('click', function(e) {
     if (!target || target.disabled) return;
 
     var isExclude = only.dataset.mode === 'exclude';
+    if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.stores', isExclude ? 'exclude' : 'only');
     box.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
         if (cb.disabled) return;
         // only: this on, rest off.  exclude: this off, rest on.
@@ -272,6 +273,13 @@ window.selectTab = function(tab) {
         pressed();
     });
 })();
+
+// A file chosen with the picker; a drop sets files from script, which fires no change.
+document.addEventListener('change', function(e) {
+    var t = e.target;
+    if (!t || t.id !== 'file' || !t.value) return;
+    if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.file', 'pick');
+});
 
 window.autoGrowTextArea = function(el) {
     el.style.height = 'auto';

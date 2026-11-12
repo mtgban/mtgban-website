@@ -978,6 +978,7 @@
                         document.body.classList.toggle('light-theme', next === 'light');
                         localStorage.setItem('theme', next);
                     }
+                    if (window.BAN && window.BAN.track) window.BAN.track('ui.theme', next, 'palette');
                     closePalette();
                     showToast('Theme: ' + next);
                 }

@@ -15,7 +15,21 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
+	"github.com/mtgban/mtgban-website/observability"
 )
+
+// Every rail tab is a value ui.settings.tab accepts, so a new tab cannot ship uncounted.
+func TestEverySettingsTabIsACountedValue(t *testing.T) {
+	n, ok := observability.Lookup("ui.settings.tab")
+	if !ok {
+		t.Fatal("ui.settings.tab is not registered")
+	}
+	for tab := range settingsTabNames {
+		if !slices.Contains(n.Enum, tab) {
+			t.Errorf("settings tab %q is not a ui.settings.tab value", tab)
+		}
+	}
+}
 
 // The index prices and the custom-buylist gate do not need a loaded store
 // list, so they pin the parts of the Upload tab's data a fixture run can see.

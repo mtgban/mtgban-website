@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -100,4 +101,22 @@ func TestSleepersIndexIsCounted(t *testing.T) {
 	t.Run("fetch", func(t *testing.T) {
 		wantNoRow(t, serve(t, "/sleepers", "empty"), "sleepers.page")
 	})
+}
+
+// A content-warning card's click only reveals it, so its link carries no count.
+func TestSleepersContentWarningCardIsNotCounted(t *testing.T) {
+	pv := PageVars{Title: "Sleepers", Subtitle: "Reprint", UserNav: &NavElem{}, Metadata: cardMetadata{
+		"plain":  {Name: "Plain", SearchURL: "/search?q=plain"},
+		"warned": {Name: "Warned", SearchURL: "/search?q=warned", HasContentWarning: true},
+	}}
+	pv.Sleepers = map[string][]string{"S": {"plain", "warned"}}
+	pv.SleepersKeys = []string{"S"}
+	pv.SleepersColors = []string{"#fff"}
+	out := renderPage(t, "sleep.html", false, pv)
+	if !strings.Contains(out, `<a href="/search?q=plain" data-track="ui.sleepers.card">`) {
+		t.Error("a plain card's link is not counted")
+	}
+	if !strings.Contains(out, `<a href="/search?q=warned">`) {
+		t.Error("a content-warning card's link carries a count")
+	}
 }

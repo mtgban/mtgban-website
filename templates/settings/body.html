@@ -8,7 +8,7 @@
     <nav class="settings-rail" role="tablist" aria-label="Settings sections">
         {{range .Tabs}}
         {{if eq . "offline"}}<div class="settings-rail-gap"></div>{{end}}
-        <button type="button" class="settings-rail-tab" role="tab" data-tab="{{.}}" aria-selected="false">
+        <button type="button" class="settings-rail-tab" role="tab" data-tab="{{.}}" aria-selected="false" data-track="ui.settings.tab" data-track-value="{{.}}">
             <span class="settings-rail-label">{{index $.TabNames .}}</span>
             <span class="settings-rail-count" hidden></span>
         </button>

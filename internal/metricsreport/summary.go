@@ -121,15 +121,18 @@ type AreaCount struct {
 // notUse are the Signal names that count refusals, errors or the system's own work, not
 // a reader using an area: Areas leaves them out, with page.view, which counts every page.
 var notUse = map[string]bool{
-	"auth.refuse":        true, // requests refused at the door, unauthenticated ones included
-	"api.refuse":         true, // API calls refused, by reason
-	"ratelimit.reject":   true, // requests a rate limiter refused
-	"upload.parse_error": true, // uploads that could not be read
-	"alerts.delivered":   true, // the alert job's deliveries, deferred retries counted again
-	"alerts.mail_event":  true, // the mail provider's bounce and complaint webhooks
-	"userstate.conflict": true, // sync writes lost to a newer version
-	"favshare.view_gone": true, // share links opened after they ended
-	pageView:             true, // every page's traffic, a candidate in area site
+	"auth.refuse":         true, // requests refused at the door, unauthenticated ones included
+	"api.refuse":          true, // API calls refused, by reason
+	"ratelimit.reject":    true, // requests a rate limiter refused
+	"upload.parse_error":  true, // uploads that could not be read
+	"alerts.delivered":    true, // the alert job's deliveries, deferred retries counted again
+	"alerts.mail_event":   true, // the mail provider's bounce and complaint webhooks
+	"userstate.conflict":  true, // sync writes lost to a newer version
+	"favshare.view_gone":  true, // share links opened after they ended
+	"ui.offline.sync":     true, // offline syncs, most run at a page load
+	"ui.offline.sw":       true, // the service worker's registration when offline mode is switched on
+	"ui.offline.failover": true, // the offline shell served for a page the network could not reach
+	pageView:              true, // every page's traffic, a candidate in area site
 }
 
 // Areas lists the registry's areas by counted events in the window, most first, ties by area,

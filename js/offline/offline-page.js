@@ -37,6 +37,8 @@
         // rows and can be overtaken.
         var latestDraw = 0;
         var lastQuery = '';
+        // The last query counted as a search, so a reload or a sync of it is not another.
+        var countedQuery = '';
         // Whether the box is ahead of the last answer that settled.
         var typing = false;
         var pauseTimer = null;
@@ -44,6 +46,12 @@
         var shownTop = null;
         // The rows on screen, in order, whether they settled, and their notices.
         var shown = null;
+
+        function countSearch(q) {
+            if (!q || q === countedQuery) return;
+            countedQuery = q;
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.search');
+        }
 
         function live() {
             return root.OfflineLive.on(hooks.surface);
@@ -256,6 +264,7 @@
             typing = false;
             history.replaceState(null, '', buildUrl(q));
             queryChanged(q);
+            countSearch(q);
             return runQuery(q, keep);
         }
 
@@ -289,6 +298,8 @@
         }
 
         document.addEventListener('DOMContentLoaded', function () {
+            // The shell served at another path stands in for a page the network could not reach.
+            if (location.pathname !== '/offline' && window.BAN && window.BAN.track) window.BAN.track('ui.offline.failover');
             call('ready');
             queryChanged(urlQuery());
             var box = document.getElementById(hooks.boxId);
@@ -342,11 +353,13 @@
                         if (live() && q === lastQuery) return;
                         history.pushState(null, '', buildUrl(q));
                         queryChanged(q);
+                        countSearch(q);
                         runQuery(q).catch(showErrorNotice);
                     }
                 });
                 var q = urlQuery();
                 if (box) box.value = q;
+                countSearch(q.trim());
                 return runQuery(q);
             }).catch(showErrorNotice);
         });

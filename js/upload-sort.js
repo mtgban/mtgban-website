@@ -49,7 +49,8 @@ function uresSortedRows(rows, col, numeric, descending, ties) {
 // header asks (data-sort-descending, bare or "true"), each one after turns
 // it round. A row marked data-sort-method="none", the totals, keeps the end
 // of the table.
-function uresSortBy(th) {
+function uresSortBy(th, repeated) {
+    if (!repeated && window.BAN && window.BAN.track) window.BAN.track('ui.upload.result', 'sort');
     var table = th.closest('table');
     var numeric = th.getAttribute('data-sort-method') === 'number';
     var was = th.getAttribute('aria-sort');
@@ -335,6 +336,9 @@ function uresMenuAct(area, key, act, table) {
     uresChainChanged(area, table);
 }
 
+// The count each menu control sends, closed: up and down are one move.
+var uresMenuCounts = {toggle: 'sort_key', dir: 'sort_dir', up: 'sort_move', down: 'sort_move', clear: 'sort_clear'};
+
 // The area's menu, made on first use: one popover the area's buttons share,
 // opened under the button pressed.
 function uresMenu(area) {
@@ -351,6 +355,7 @@ function uresMenu(area) {
         var row = el.closest('[data-key]');
         var key = row ? row.getAttribute('data-key') : '';
         var act = el.getAttribute('data-act');
+        if (Object.prototype.hasOwnProperty.call(uresMenuCounts, act) && window.BAN && window.BAN.track) window.BAN.track('ui.upload.result', uresMenuCounts[act]);
         var table = uresButtonTable(uresMenuButton);
         uresMenuAct(area, key, act, table);
         uresRenderMenu(menu, area, table);
@@ -384,6 +389,7 @@ function uresPlaceMenu(menu) {
 document.addEventListener('beforetoggle', function(e) {
     var menu = e.target;
     if (!menu.classList || !menu.classList.contains('sort-ties-menu') || e.newState !== 'open' || !uresMenuButton) return;
+    if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.result', 'sort_menu');
     uresRenderMenu(menu, uresMenuButton.getAttribute('data-sort-area'), uresButtonTable(uresMenuButton));
     uresPlaceMenu(menu);
 }, true);
@@ -402,7 +408,7 @@ document.addEventListener('DOMContentLoaded', function() {
         th.addEventListener('keydown', function(e) {
             if (e.key !== 'Enter' && e.key !== ' ') return;
             e.preventDefault();
-            uresSortBy(th);
+            uresSortBy(th, e.repeat);
         });
     });
 });

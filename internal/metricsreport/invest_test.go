@@ -514,10 +514,6 @@ var expectedLater = []struct {
 	{"ui.row.locked", "2b", func(n observability.Name) bool {
 		return n.Family == observability.FamilyUI && n.Values != observability.ValueNone
 	}},
-	{"ui.upload.upsell", "2d", func(n observability.Name) bool { return n.Family == observability.FamilyUI }},
-	{"ui.offline.sync", "2d", func(n observability.Name) bool {
-		return n.Family == observability.FamilyUI && n.Scope != observability.ScopeNone && slices.Contains(n.Enum, "fail")
-	}},
 }
 
 // Every name the rules read is pinned: registered now with the shape read, or listed as expected later.
@@ -537,6 +533,14 @@ func TestEveryNameReadIsPinned(t *testing.T) {
 	reader, ok := observability.Lookup(stateReader)
 	if !ok || reader.Family != observability.FamilyState || reader.Scope != observability.ScopeEnum || reader.Values != observability.ValueNone || !slices.Equal(reader.Scopes, observability.SettingPaths) {
 		t.Errorf("%s = %+v: Coverage reads its days by path scope; Remove reads its rows as readers", stateReader, reader)
+	}
+	upsell, ok := observability.Lookup("ui.upload.upsell")
+	if !ok || upsell.Family != observability.FamilyUI || upsell.Report != observability.ReportSignal || upsell.Values != observability.ValueNone {
+		t.Errorf("ui.upload.upsell = %+v: Walls reads it per name as a Signal", upsell)
+	}
+	offlineSync, ok := observability.Lookup("ui.offline.sync")
+	if !ok || offlineSync.Family != observability.FamilyUI || offlineSync.Scope == observability.ScopeNone || !slices.Contains(offlineSync.Enum, "fail") {
+		t.Errorf("ui.offline.sync = %+v: Failures reads fail over every sync, per scope", offlineSync)
 	}
 	later := map[string]bool{}
 	for _, e := range expectedLater {

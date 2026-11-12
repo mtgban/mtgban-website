@@ -174,7 +174,11 @@
         return saved.toString();
     }
 
+    // The sorts the template's links name, the values ui.arbit.sort takes
+    var SORTS = ['alpha', 'edition', 'available', 'sell_price', 'buy_price', 'profitability', 'diff', 'spread'];
+
     window.sortBy = function (sort, name) {
+        if (SORTS.indexOf(sort) >= 0 && window.BAN && window.BAN.track) window.BAN.track('ui.arbit.sort', sort);
         save(savedWithSort(sort));
         window.location.href = sortURL(sort, name);
     };
@@ -190,12 +194,16 @@
     var toggle = document.getElementById('arbFilterToggle');
     var panel = document.getElementById('arbFilterPanel');
     if (toggle && panel) {
-        toggle.addEventListener('click', function () { setOpen(toggle, panel, panel.hidden); });
+        toggle.addEventListener('click', function () {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.arbit.filters', panel.hidden ? 'open' : 'close');
+            setOpen(toggle, panel, panel.hidden);
+        });
     }
 
     var form = document.getElementById('arbFilters');
     if (form) {
         form.addEventListener('submit', function () {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.arbit.filters', 'apply');
             dropEmpty(form);
             save(formQuery(form));
         });

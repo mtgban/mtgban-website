@@ -31,7 +31,7 @@
 
     {{/* Tool cards */}}
     <div class="m-sleep-tools">
-        <a class="m-sleep-tool" href="?page=reprint">
+        <a class="m-sleep-tool" href="?page=reprint" data-track="ui.sleepers.tool" data-track-value="reprint">
             <span class="m-sleep-tool-icon" style="color:var(--tier-a, #ffbf7f);">&#128197;</span>
             <div class="m-sleep-tool-text">
                 <span class="m-sleep-tool-title">Long Time No Reprint</span>
@@ -39,7 +39,7 @@
             </div>
             <span class="m-sleep-tool-arrow">&rsaquo;</span>
         </a>
-        <a class="m-sleep-tool" href="?page=mismatch">
+        <a class="m-sleep-tool" href="?page=mismatch" data-track="ui.sleepers.tool" data-track-value="mismatch">
             <span class="m-sleep-tool-icon" style="color:var(--tier-c, #7fff7f);">&#128200;</span>
             <div class="m-sleep-tool-text">
                 <span class="m-sleep-tool-title">Market Mismatch</span>
@@ -47,7 +47,7 @@
             </div>
             <span class="m-sleep-tool-arrow">&rsaquo;</span>
         </a>
-        <a class="m-sleep-tool" href="?page=hotlist">
+        <a class="m-sleep-tool" href="?page=hotlist" data-track="ui.sleepers.tool" data-track-value="hotlist">
             <span class="m-sleep-tool-icon" style="color:var(--tier-b, #ffff7f);">&#128293;</span>
             <div class="m-sleep-tool-text">
                 <span class="m-sleep-tool-title">Hotlist</span>
@@ -56,7 +56,7 @@
             <span class="m-sleep-tool-arrow">&rsaquo;</span>
         </a>
         {{if .HasVelocity}}
-        <a class="m-sleep-tool" href="?page=velocity">
+        <a class="m-sleep-tool" href="?page=velocity" data-track="ui.sleepers.tool" data-track-value="velocity">
             <span class="m-sleep-tool-icon" style="color:var(--tier-d, #7fbfff);">&#9889;</span>
             <div class="m-sleep-tool-text">
                 <span class="m-sleep-tool-title">Sales Velocity <span class="m-sleep-tool-beta">Beta</span></span>
@@ -73,19 +73,19 @@
         <p class="m-sleep-gap-desc">Compare two sellers. Find where one has cheaper cards.</p>
 
         <div class="m-sleep-gap-presets">
-            <a class="m-sleep-gap-preset" href="?page=gap&ref=TCGLow&target=MKMLow">
+            <a class="m-sleep-gap-preset" href="?page=gap&ref=TCGLow&target=MKMLow" data-track="ui.sleepers.gap" data-track-value="preset">
                 <span>TCGLow</span><span class="m-sleep-vs">vs</span><span>MKMLow</span>
             </a>
-            <a class="m-sleep-gap-preset" href="?page=gap&ref=TCGLow&target=MKMTrend">
+            <a class="m-sleep-gap-preset" href="?page=gap&ref=TCGLow&target=MKMTrend" data-track="ui.sleepers.gap" data-track-value="preset">
                 <span>TCGLow</span><span class="m-sleep-vs">vs</span><span>MKMTrend</span>
             </a>
-            <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=CK">
+            <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=CK" data-track="ui.sleepers.gap" data-track-value="preset">
                 <span>MKMTrend</span><span class="m-sleep-vs">vs</span><span>Card Kingdom</span>
             </a>
-            <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=SCG">
+            <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=SCG" data-track="ui.sleepers.gap" data-track-value="preset">
                 <span>MKMTrend</span><span class="m-sleep-vs">vs</span><span>SCG</span>
             </a>
-            <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=MP">
+            <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=MP" data-track="ui.sleepers.gap" data-track-value="preset">
                 <span>MKMTrend</span><span class="m-sleep-vs">vs</span><span>Manapool</span>
             </a>
         </div>
@@ -108,7 +108,7 @@
                         <option value="{{.}}">{{index $.StoreNames .}}</option>
                     {{end}}
                 </select>
-                <button type="submit" class="m-sleep-gap-go" id="sleepers-comp-go" disabled>Compare</button>
+                <button type="submit" class="m-sleep-gap-go" id="sleepers-comp-go" disabled data-track="ui.sleepers.gap" data-track-value="compare">Compare</button>
             </form>
         </div>
         <script>
@@ -153,7 +153,7 @@
             <div class="m-sleep-tier-cards">
                 {{range $cardIds}}
                     {{$card := index $.Metadata .}}
-                    <a class="m-sleep-card" href="{{$card.SearchURL}}">
+                    <a class="m-sleep-card" href="{{$card.SearchURL}}" data-track="ui.sleepers.card">
                         <div class="foil-wrap" data-foil="{{$card.Foil}}" data-etched="{{$card.Etched}}">
                             <img class="card-art" loading="lazy" src="{{$card.ImageURL}}" width="110" height="154" alt="{{$card.Name}}" title="{{$card.Name}}" style="border-radius: 8px; display: block;">
                         </div>

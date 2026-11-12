@@ -2,7 +2,7 @@
 <nav class="navbar-v2"{{if .UserTier}} data-tier="{{.UserTier}}"{{end}}>
   <div class="nav2-inner">
 
-    <a class="nav2-brand" href="/">
+    <a class="nav2-brand" href="/" data-track="ui.nav.link" data-track-value="brand">
         <img src="/img/logo/ban-stroop.png" alt="BAN">
         <span class="nav2-brand-lockup">
             <span class="nav2-brand-text">MTG<span class="ban">BAN</span></span>
@@ -46,7 +46,7 @@
 
     <div class="tools-dropdown" id="tools-dropdown" role="group" aria-labelledby="tools-btn" inert>
         <div class="tools-grid" id="tools-grid">
-            <button class="tools-tile-hint" id="nav-hint" type="button" title="Got it - hide this tip" hidden>
+            <button class="tools-tile-hint" id="nav-hint" type="button" title="Got it - hide this tip" hidden data-track="ui.nav.hint" data-track-value="dismiss">
                 <span class="tools-tile-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
                 </span>
@@ -70,10 +70,10 @@
         </div>
 
         <div class="tools-quick">
-            <a class="tools-quick-btn" href="https://www.patreon.com/mtgban" target="_blank" rel="noopener" title="Patreon">
+            <a class="tools-quick-btn" href="https://www.patreon.com/mtgban" target="_blank" rel="noopener" title="Patreon" data-track="ui.nav.link" data-track-value="patreon">
                 <img src="/img/misc/patreon.png" alt="Patreon">Patreon
             </a>
-            <a class="tools-quick-btn" href="/discord" title="Discord">
+            <a class="tools-quick-btn" href="/discord" title="Discord" data-track="ui.nav.link" data-track-value="discord">
                 <img src="/img/misc/discord.png" alt="Discord">Discord
             </a>
             {{/* The bar's icons land here when dragged off it; navbar.js
@@ -103,11 +103,11 @@
         </div>
         {{end}}
         {{range .Nav}}{{if eq .Name "Account"}}
-        <a class="nav2-icon-btn" href="{{.Link}}" title="Account" data-util="account" draggable="true">
+        <a class="nav2-icon-btn" href="{{.Link}}" title="Account" data-util="account" draggable="true" data-track="ui.nav.link" data-track-value="account">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
         </a>
         {{end}}{{end}}
-        <a class="nav2-icon-btn" href="/guide" title="Guide" data-util="guide" draggable="true">
+        <a class="nav2-icon-btn" href="/guide" title="Guide" data-util="guide" draggable="true" data-track="ui.nav.link" data-track-value="guide">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         </a>
         {{/* Hidden until the inline script below finds offline mode on, so
@@ -115,10 +115,10 @@
         <button type="button" class="nav2-icon-btn ban-offline-toggle" id="nav-offline-toggle" title="Switch to offline mode" aria-pressed="false"{{if .OfflineShell}} data-shell="true"{{end}} hidden>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/></svg>
         </button>
-        <a class="nav2-icon-btn ban-settings-btn" id="nav-settings-btn" href="?settings=1" title="Settings (Ctrl+,)" data-util="settings" draggable="true" onclick="if(window.openSettings){event.preventDefault();window.openSettings();return false;}return false;">
+        <a class="nav2-icon-btn ban-settings-btn" id="nav-settings-btn" href="?settings=1" title="Settings (Ctrl+,)" data-util="settings" draggable="true" onclick="if(window.openSettings){event.preventDefault();window.openSettings();return false;}return false;" data-track="ui.settings.open" data-track-value="gear">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </a>
-        <button class="ban-nav-hamburger" onclick="document.getElementById('mobile-menu').classList.add('open'); document.getElementById('mobile-overlay').classList.add('open');">&#9776;</button>
+        <button class="ban-nav-hamburger" onclick="document.getElementById('mobile-menu').classList.add('open'); document.getElementById('mobile-overlay').classList.add('open');" data-track="ui.nav.menu" data-track-value="open">&#9776;</button>
     </div>
 
   </div>
@@ -164,7 +164,7 @@
     <ul class="ban-nav-mobile-links">
         {{range .Nav}}
         <li>
-            <a class="{{.Class}}" href="{{.Link}}">
+            <a class="{{.Class}}" href="{{.Link}}" data-track="ui.nav.link" data-track-value="menu_link">
                 <span class="nav-icon">{{.Short}}</span> {{.Name}}
             </a>
         </li>
@@ -172,8 +172,8 @@
     </ul>
     <hr class="ban-nav-mobile-divider">
     <div class="ban-nav-mobile-ext">
-        <a href="https://www.patreon.com/mtgban"><img src="/img/misc/patreon.png" alt="Patreon"></a>
-        <a {{if .PatreonLogin}}style="display:none"{{end}} href="/discord"><img src="/img/misc/discord.png" alt="Discord"></a>
+        <a href="https://www.patreon.com/mtgban" data-track="ui.nav.link" data-track-value="patreon"><img src="/img/misc/patreon.png" alt="Patreon"></a>
+        <a {{if .PatreonLogin}}style="display:none"{{end}} href="/discord" data-track="ui.nav.link" data-track-value="discord"><img src="/img/misc/discord.png" alt="Discord"></a>
     </div>
     <hr class="ban-nav-mobile-divider">
     <a style="padding: 8px 12px; font-size: 0.85rem; color: var(--greytext); text-decoration: none;" href="#" onclick="window.location='/toggle-mobile?redirect='+encodeURIComponent(window.location.pathname+window.location.search); return false;">Switch to Mobile View</a>

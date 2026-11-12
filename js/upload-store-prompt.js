@@ -46,5 +46,6 @@ function runPublishStore() {
     form.target = '';
     closeStorePrompt();
     if (window.showUploadProcessing) showUploadProcessing();
+    if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.publish', 'submit');
     form.submit();
 }

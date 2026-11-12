@@ -31,7 +31,7 @@
         <span id="offline-banner-auth" class="offline-banner-auth" hidden>
             Subscription lapsed: saved prices stay browsable, syncing is paused.
         </span>
-        <a id="offline-banner-back" class="offline-banner-back" href="/search" hidden>
+        <a id="offline-banner-back" class="offline-banner-back" href="/search" hidden data-track="ui.offline.banner" data-track-value="back_to_live">
             Exit offline mode
         </a>
     </div>
@@ -42,8 +42,8 @@
             {{/* No inline search box here - the navbar input is the single search surface. */}}
         </div>
         <div class="m-offline-mode-pills" id="m-offline-mode-pills">
-            <a class="m-cond-pill" id="offline-pill-singles" href="/offline">Singles</a>
-            <a class="m-cond-pill" id="offline-pill-sealed" href="/offline?sealed=1">Sealed</a>
+            <a class="m-cond-pill" id="offline-pill-singles" href="/offline" data-track="ui.offline.page" data-track-value="kind">Singles</a>
+            <a class="m-cond-pill" id="offline-pill-sealed" href="/offline?sealed=1" data-track="ui.offline.page" data-track-value="kind">Sealed</a>
         </div>
     </div>
 

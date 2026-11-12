@@ -204,11 +204,11 @@ func TestArbitSpellsTheCustomBuylistRule(t *testing.T) {
 	testSite.Arbit(rec, req)
 	page := rec.Body.String()
 
-	const want = `<a class="arb-section-name" href="#top" title="50% of ZZA if ≥ $2.00">Custom Buylist</a>`
+	const want = `<a class="arb-section-name" href="#top" title="50% of ZZA if ≥ $2.00" data-track="ui.arbit.row" data-track-value="section_nav">Custom Buylist</a>`
 	if !strings.Contains(page, want) {
 		t.Errorf("no rule on the custom buylist's section in the %d byte page", len(page))
 	}
-	if !strings.Contains(page, `<a class="arb-section-name" href="#top">Session ZZV</a>`) {
+	if !strings.Contains(page, `<a class="arb-section-name" href="#top" data-track="ui.arbit.row" data-track-value="section_nav">Session ZZV</a>`) {
 		t.Error("another store's section has lost its plain name")
 	}
 }

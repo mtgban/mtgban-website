@@ -187,7 +187,7 @@ func TestArbitStoreViewIsCounted(t *testing.T) {
 
 	// The page's reset link carries the marker; no store link does.
 	body := rec.Body.String()
-	if !strings.Contains(body, `href="?source=REVBUY&f=1&reset=1">Restore defaults`) {
+	if !strings.Contains(body, `href="?source=REVBUY&f=1&reset=1" data-track="ui.arbit.filters" data-track-value="reset">Restore defaults`) {
 		t.Error("the Restore defaults link carries no reset marker")
 	}
 	if strings.Count(body, "reset=1") != 1 {

@@ -13,6 +13,7 @@
 
     function set(value) {
         try { localStorage.setItem(KEY, value ? 'true' : 'false'); } catch (e) {}
+        if (root.BAN && root.BAN.track) root.BAN.track('ui.offline.live', value ? 'on' : 'off');
     }
 
     root.OfflineLive = {on: on, set: set};

@@ -53,7 +53,7 @@
     function load() {
         if (loading) return loading;
         // settings.js wires the picker and the shell as the body lands, so it goes last
-        var scripts = ['/js/editions-picker.js', '/js/settings-shell.js', '/js/settings.js'];
+        var scripts = ['/js/editions-picker.js', '/js/settings-shell.js', '/js/settings-changes.js', '/js/settings.js'];
         scripts.forEach(preload);
         // Sheets first: settings.js unhides the modal's shell as it runs
         loading = Promise.all([stylesheet('/css/settings-modal.css'), stylesheet('/css/editions-picker.css')])
@@ -87,6 +87,7 @@
         var tag = (document.activeElement && document.activeElement.tagName) || '';
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
         if (window.BAN && window.BAN.track) window.BAN.track('ui.key', 'settings_hotkey');
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.settings.open', 'hotkey');
         e.preventDefault();
         open();
     }

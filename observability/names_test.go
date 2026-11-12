@@ -420,3 +420,120 @@ func TestServerSettingNamesAreContext(t *testing.T) {
 		}
 	}
 }
+
+// pageClickLabels are the page labels the remaining pages' clicks are rated against.
+var pageClickLabels = []string{
+	"*", "upload", "arbit", "reverse", "global", "alerts", "search", "sealed", "sets", "screener", "user", "home", "offline",
+	"newspaper/index", "newspaper/syp", "newspaper/combined_spike_score", "newspaper/spike_score",
+	"newspaper/greatest_increase_listings", "newspaper/greatest_decrease_listings",
+	"newspaper/greatest_increase_buylist", "newspaper/greatest_decrease_buylist",
+	"sleepers/reprint", "sleepers/mismatch", "sleepers/gap", "sleepers/hotlist", "sleepers/velocity",
+	"sleepers/index", "api-plans", "guide", "changelog",
+}
+
+// Each case is one (name, scope, value) a control on the remaining pages sends, and whether it is kept.
+func TestPageClickNames(t *testing.T) {
+	v := Validators{Store: func(s string) bool { return s == "CK" }, Setting: IsSetting}
+	cases := []struct {
+		name, scope, value string
+		ok                 bool
+	}{
+		{"ui.nav.link", "", "menu_link", true},
+		{"ui.nav.link", "", "admin", false},
+		{"ui.theme", "toggle", "system", true},
+		{"ui.theme", "", "dark", false},
+		{"ui.nav.offline", "", "on", true},
+		{"ui.upload.submit", "form", "estimate", true},
+		{"ui.upload.submit", "", "upload", false},
+		{"ui.upload.preset", "", "save_as", true},
+		{"ui.settings.open", "", "link", true},
+		{"ui.settings.tab", "", "sleep", true},
+		{"ui.settings.tab", "", "sleepers", false},
+		{"ui.settings.change", "SearchMiscOpts.noSussy", "on", true},
+		{"ui.settings.change", "UploadSorting", "highprice", true},
+		{"ui.settings.change", "UploadSorting", "My Preset", false},
+		{"ui.settings.change", "SearchBrandNew", "set", false},
+		{"ui.settings.change", "", "on", false},
+		{"ui.settings.save", "", "modal", true},
+		{"ui.backpack.sort", "asc", "retail", true},
+		{"ui.backpack.sort", "", "retail", false},
+		{"ui.backpack.card", "", "add", false},
+		{"ui.backpack", "", "switch_menu", true},
+		{"ui.optimizer.send", "CK", "sellcart", true},
+		{"ui.optimizer.send", "Bob's Cards", "csv", true},
+		{"ui.optimizer.send", "", "csv", false},
+		{"ui.upload.result_tab", "", "notfound", false},
+		{"ui.upload.submit", "results", "download", true},
+		{"ui.upload.upsell", "", "", true},
+		{"ui.upload.upsell", "", "upsell", false},
+		{"ui.upload.result", "", "upsell", false},
+		{"ui.cart", "MMC", "open", true},
+		{"ui.cart", "MTG Mint Card", "open", false},
+		{"ui.cart", "", "help", false},
+		{"ui.arbit.sort", "", "spread", true},
+		{"ui.arbit.sort", "", "ratio", false},
+		{"ui.arbit.jump", "", "", true},
+		{"ui.arbit.quick_link", "CK", "buy_reference", true},
+		{"ui.arbit.quick_link", "", "buy", false},
+		{"ui.arbit.preset", "", "unpin", false},
+		{"ui.arbit.preset", "", "pinned_auto", false},
+		{"ui.arbit.pin_auto", "", "", true},
+		{"ui.news.report", "tab", "spike_score", true},
+		{"ui.news.report", "tab", "options", false},
+		{"ui.news.sort", "desc", "pct_gain_7d", true},
+		{"ui.news.sort", "", "ranking", false},
+		{"ui.news.card", "", "", true},
+		{"ui.news.card", "", "Black Lotus", false},
+		{"ui.sleepers.tool", "", "gap", false},
+		{"ui.screener.sort", "asc", "pct", true},
+		{"ui.screener.control", "", "editions", true},
+		{"ui.alerts.modal", "search", "open", true},
+		{"ui.alerts.modal", "result", "open", false},
+		{"ui.alerts.sort", "desc", "fired", true},
+		{"ui.alerts.row", "", "delete_all", true},
+		{"ui.apiplans.choose", "", "history", true},
+		{"ui.apiplans.choose", "", "enterprise", false},
+		{"ui.guide.tab", "", "faq", true},
+		{"ui.account", "", "logout_everywhere", true},
+		{"ui.offline.sync", "images", "fail", true},
+		{"ui.offline.sync", "manifest", "fail", false},
+		{"ui.offline.sync", "", "ok", false},
+		{"ui.offline.failover", "", "", true},
+		{"ui.offline.page", "", "kind", true},
+	}
+	for _, c := range cases {
+		n, found := Lookup(c.name)
+		if !found {
+			t.Errorf("%s is not registered", c.name)
+			continue
+		}
+		if n.Family != FamilyUI || n.Area == "" {
+			t.Errorf("%s: family and area must be set: %+v", c.name, n)
+		}
+		if _, _, ok := n.Check(c.scope, c.value, v); ok != c.ok {
+			t.Errorf("%s (%q, %q): ok %v, want %v", c.name, c.scope, c.value, ok, c.ok)
+		}
+	}
+	for _, c := range cases {
+		n, _ := Lookup(c.name)
+		for _, p := range strings.Split(n.Page, ",") {
+			if !slices.Contains(pageClickLabels, p) {
+				t.Errorf("%s: page %q is not a label these pages use", c.name, p)
+			}
+		}
+	}
+	// The alert modal renders on the alerts page and wherever search.html does.
+	if n, _ := Lookup("ui.alerts.modal"); n.Page != "alerts,search,sealed,sets" {
+		t.Errorf("ui.alerts.modal is rated on %q, want the alerts and search.html labels", n.Page)
+	}
+	send, _ := Lookup("ui.optimizer.send")
+	if scope, _, ok := send.Check("Bob's Cards", "csv", v); !ok || scope != "other" {
+		t.Errorf("ui.optimizer.send: an unloaded store's scope is %q, %v; want other", scope, ok)
+	}
+	if n, _ := Lookup("ui.upload.upsell"); n.Report != ReportSignal {
+		t.Errorf("ui.upload.upsell is report kind %d; the Walls read it as a Signal", n.Report)
+	}
+	if n, _ := Lookup("ui.upload.result"); n.Report != ReportCandidate {
+		t.Errorf("ui.upload.result is report kind %d, want a Candidate", n.Report)
+	}
+}

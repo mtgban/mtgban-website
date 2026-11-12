@@ -661,21 +661,50 @@ func TestHomeTracks(t *testing.T) {
 		track("ui.home", "popular_card", ""):                                      4, // the strip is drawn twice for its loop
 		track("ui.home", "random", ""):                                            1,
 		`data-track="ui.home"`:                                                    6,
+		track("ui.nav.link", "account", ""):                                       1,
+		track("ui.nav.link", "guide", ""):                                         1,
+		track("ui.nav.link", "discord", ""):                                       1,
+		track("ui.account", "logout", ""):                                         1,
 		`BAN.track('ui.home', collapsed ? 'popular_collapse' : 'popular_expand')`: 1,
 	})
 	closedTrackSet(t, "desktop", desktop)
 	noTrackText(t, "desktop", desktop, "zzlabel", "zzone", "zza.jpg", "Zztool", "Zs", "zzlink")
+	// Signed out: the blurb's links and the footer's log in; the noscript twin cannot count.
+	out := home
+	out.PatreonLogin = true
+	out.PatreonIDs = map[string]string{"zzref": "zzid"}
+	signedOut := renderPage(t, "home.html", false, out)
+	wantTracks(t, "signed out", signedOut, map[string]int{
+		track("ui.home", "random", ""):    2, // the action button and the blurb's link
+		track("ui.home", "sets", ""):      1,
+		track("ui.home", "sealed", ""):    1,
+		track("ui.account", "login", ""):  1,
+		track("ui.account", "logout", ""): 0,
+	})
+	closedTrackSet(t, "signed out", signedOut)
+	noTrackText(t, "signed out", signedOut, "zzref", "zzid")
+	signedOutMobile := renderPage(t, "home.html", true, mobileOf(out))
+	wantTracks(t, "signed out, mobile", signedOutMobile, map[string]int{
+		track("ui.account", "login", ""): 1,
+		`data-track-value="sets"`:        0,
+	})
 	wantTracks(t, "modal", renderPage(t, "home.html", false, modalOf(home)), map[string]int{
 		track("ui.home", "tool_tile", ""):    0,
 		track("ui.home", "popular_card", ""): 0,
 		track("ui.home", "random", ""):       0,
 		`data-track="ui.home"`:               0,
+		`data-track="ui.nav.link"`:           0,
+		`data-track="ui.account"`:            0,
 	})
 	mobile := renderPage(t, "home.html", true, mobileOf(home))
 	wantTracks(t, "mobile", mobile, map[string]int{
-		track("ui.home", "tool_tile", ""):    1,
-		track("ui.home", "popular_card", ""): 0,
-		`data-track-value="random"`:          0,
+		track("ui.home", "tool_tile", ""):                                                        1,
+		track("ui.home", "popular_card", ""):                                                     0,
+		`data-track-value="random"`:                                                              0,
+		track("ui.account", "logout", ""):                                                        1,
+		`title="Account" data-track="ui.nav.link" data-track-value="account"`:                    1,
+		`title="Guide" data-track="ui.nav.link" data-track-value="guide"`:                        1,
+		`login-btn discord" href="/discord" data-track="ui.nav.link" data-track-value="discord"`: 1,
 	})
 	closedTrackSet(t, "mobile", mobile)
 	// A refusal borrows the template with no page label; a home error sends no load either.
@@ -688,8 +717,12 @@ func TestHomeTracks(t *testing.T) {
 		pv   PageVars
 	}{{"refusal", refused}, {"refusal, mobile", mobileOf(refused)}, {"home error", withError}, {"home error, mobile", mobileOf(withError)}} {
 		wantTracks(t, c.name, renderPage(t, "home.html", c.pv.IsMobile, c.pv), map[string]int{
-			`data-track="ui.home"`: 0,
-			`BAN.track('ui.home'`:  0,
+			`data-track="ui.home"`:                          0,
+			`BAN.track('ui.home'`:                           0,
+			`data-track="ui.account"`:                       0,
+			`title="Account" data-track`:                    0,
+			`title="Guide" data-track`:                      0,
+			`login-btn discord" href="/discord" data-track`: 0,
 		})
 	}
 }

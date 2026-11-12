@@ -36,7 +36,7 @@ function load() {
         getElementById: (id) => ({ 'tools-btn': btn, 'tools-dropdown': dd }[id]),
         addEventListener: (type, fn) => { doc.listeners[type] = fn; },
     });
-    new Function('document', toggle)(doc);
+    new Function('document', 'window', toggle)(doc, {});
     return { btn, dd, link };
 }
 

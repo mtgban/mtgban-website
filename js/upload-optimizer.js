@@ -66,6 +66,12 @@ document.addEventListener('change', function(e) {
     var section = e.target.closest && e.target.closest('.opt-store');
     if (section) {
         updateOptTotals(section);
+        var t = e.target;
+        if (t.classList && t.classList.contains('opt-row-check')) {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.optimizer', 'row_check');
+        } else if (t.type === 'checkbox' && t.closest('.opt-store thead')) {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.optimizer', 'check_all');
+        }
     }
 });
 
@@ -93,6 +99,9 @@ document.addEventListener('beforetoggle', function(e) {
 document.addEventListener('click', function(e) {
     var menu = e.target.closest && e.target.closest('.opt-send-menu');
     if (menu && e.target.closest('a')) menu.hidePopover();
+    if (e.target.closest && e.target.closest('.opt-copy')) {
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.optimizer', 'copy_name');
+    }
 });
 
 // Captured, so a scroll inside any container closes it too

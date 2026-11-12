@@ -388,3 +388,21 @@ func TestGlobalSealedDropsVolatile(t *testing.T) {
 		t.Error("the volatile product carries no warning")
 	}
 }
+
+// The section carries its store for the row links, and the send buttons name theirs.
+func TestArbitSectionsNameTheirStore(t *testing.T) {
+	page := renderArbit(t, PageVars{
+		ScraperShort: "TCGLow",
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CK", Arbit: []mtgban.ArbitEntry{{CardID: "card-a", Quantity: 1}}}},
+	})
+	for _, want := range []string{
+		`class="arb-section" data-fold data-store="CK"`,
+		`data-track="ui.arbit.send" data-track-value="sellcart" data-track-scope="CK"`,
+		`data-track="ui.arbit.send" data-track-value="csv" data-track-scope="CK"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("no %s", want)
+		}
+	}
+}

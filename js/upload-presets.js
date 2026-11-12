@@ -445,6 +445,7 @@
             var res;
             applying = true;
             try { res = apply(hit, doc); } finally { applying = false; }
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.preset', 'apply');
             var msg = '';
             if (res.storesSkipped) {
                 msg = 'Store selection not applied for your tier';
@@ -507,6 +508,7 @@
             var opts = d.action === 'update' ? forUpdate(cur, d.preset.opts || {}, ctx) : cur;
             var r = store.save({ id: d.action === 'update' ? d.preset.id : undefined, name: nameInput.value.trim(), opts: opts });
             if (!r.ok) { text(note, r.reason === 'cap' ? 'You can keep 10 presets; delete one first' : 'Could not save: browser storage is unavailable'); return; }
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.preset', d.action === 'update' ? 'save' : 'save_as');
             setSelected(r.preset.id);
             closeSaveRow();
             text(note, d.action === 'update' ? 'Updated ' + r.preset.name : 'Saved ' + r.preset.name);
@@ -533,6 +535,7 @@
             var r = store.rename(sel.id, name);
             if (r === 'missing') { gone(); return; }
             if (!r) { text(note, 'Could not rename: browser storage is unavailable'); return; }
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.preset', 'rename');
             render();
         });
         if (deleteBtn) deleteBtn.addEventListener('click', function () {
@@ -543,6 +546,7 @@
             var r = store.remove(sel.id);
             if (r === 'missing') { gone(); return; }
             if (!r) { text(note, 'Could not delete: browser storage is unavailable'); return; }
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.preset', 'delete');
             setSelected(null);
             render();
         });

@@ -25,7 +25,7 @@
         </div>
         {{if .Arb}}
             <div class="arb-load-btns">
-                <a class="arb-load-btn csv" href="?page=syp&format=csv">Download CSV</a>
+                <a class="arb-load-btn csv" href="?page=syp&format=csv" data-track="ui.news.syp" data-track-value="csv">Download CSV</a>
             </div>
         {{end}}
     </div>
@@ -42,10 +42,10 @@
             <table class="table-data arb-table" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
                 <thead>
                     <tr>
-                        <th><a href="?page=syp&sort=alpha">Card</a> / <a href="?page=syp&sort=edition">Edition</a></th>
+                        <th><a href="?page=syp&sort=alpha" data-track="ui.news.syp" data-track-value="sort">Card</a> / <a href="?page=syp&sort=edition" data-track="ui.news.syp" data-track-value="sort">Edition</a></th>
                         <th class="c">Cond</th>
-                        <th class="c"><a href="?page=syp&sort=available">Qty</a></th>
-                        <th class="c"><a href="?page=syp&sort=sell_price">Sell Price</a></th>
+                        <th class="c"><a href="?page=syp&sort=available" data-track="ui.news.syp" data-track-value="sort">Qty</a></th>
+                        <th class="c"><a href="?page=syp&sort=sell_price" data-track="ui.news.syp" data-track-value="sort">Sell Price</a></th>
                         <th class="c">Links</th>
                     </tr>
                 </thead>
@@ -70,7 +70,7 @@
                             <td>
                                 <div class="arb-quick-links">
                                     {{if ne .InventoryEntry.URL ""}}
-                                        <a class="arb-qlink buy" href="{{.InventoryEntry.URL}}" target="_blank" rel="nofollow">Buy</a>
+                                        <a class="arb-qlink buy" href="{{.InventoryEntry.URL}}" target="_blank" rel="nofollow" data-track="ui.news.syp" data-track-value="buy_link">Buy</a>
                                     {{end}}
                                 </div>
                             </td>
@@ -82,14 +82,14 @@
                             <td colspan="5">
                                 <div class="pagination">
                                     {{if ne $.CurrentIndex 1}}
-                                        <a href="?page=syp&p=1">&lt;</a>
-                                        <a href="?page=syp&p={{$.PrevIndex}}"><i class="arrow left"></i></a>
+                                        <a href="?page=syp&p=1" data-track="ui.news.syp" data-track-value="page">&lt;</a>
+                                        <a href="?page=syp&p={{$.PrevIndex}}" data-track="ui.news.syp" data-track-value="page"><i class="arrow left"></i></a>
                                     {{end}}
                                     <span class="cur">{{$.CurrentIndex}}</span>
                                     <span class="pg-info">/ {{$.TotalIndex}}</span>
                                     {{if ne $.CurrentIndex $.TotalIndex}}
-                                        <a href="?page=syp&p={{$.NextIndex}}"><i class="arrow right"></i></a>
-                                        <a href="?page=syp&p={{$.TotalIndex}}">&gt;</a>
+                                        <a href="?page=syp&p={{$.NextIndex}}" data-track="ui.news.syp" data-track-value="page"><i class="arrow right"></i></a>
+                                        <a href="?page=syp&p={{$.TotalIndex}}" data-track="ui.news.syp" data-track-value="page">&gt;</a>
                                     {{end}}
                                 </div>
                             </td>

@@ -952,3 +952,19 @@ func TestUnpackSealedStopsAtTheRowCap(t *testing.T) {
 		t.Error("one product said it was cut")
 	}
 }
+
+// The send buttons name the section's store in a form the registry accepts.
+func TestOptimizerSendButtonsNameTheirStore(t *testing.T) {
+	out := renderUpload(t, PageVars{UploadVars: UploadVars{
+		IsBuylist:       true,
+		Optimized:       map[string][]OptimizedUploadEntry{"CK": {{CardID: "card-a", Quantity: 2}}},
+		OptimizedKeys:   []string{"CK"},
+		OptimizedTotals: map[string]float64{"CK": 1},
+	}})
+	for _, value := range []string{"sellcart", "csv", "tcg_csv"} {
+		want := `data-track="ui.optimizer.send" data-track-value="` + value + `" data-track-scope="CK"`
+		if !strings.Contains(out, want) {
+			t.Errorf("no send button with %s", want)
+		}
+	}
+}

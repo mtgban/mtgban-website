@@ -39,7 +39,7 @@
             <div class="arb-store-grid">
                 {{range .ExtraNav}}
                     {{if not (contains .Name "Sealed")}}
-                        <a class="card arb-store-card" href="{{.Link}}">
+                        <a class="card arb-store-card" href="{{.Link}}" data-track="ui.arbit.store_select" data-track-value="landing_card">
                             <span class="store-name">{{.Name}}</span>
                             <span class="arb-store-arrow">&rarr;</span>
                         </a>
@@ -60,7 +60,7 @@
                 <div class="arb-store-grid">
                     {{range .ExtraNav}}
                         {{if contains .Name "Sealed"}}
-                            <a class="card arb-store-card" href="{{.Link}}">
+                            <a class="card arb-store-card" href="{{.Link}}" data-track="ui.arbit.store_select" data-track-value="landing_card">
                                 <span class="store-name">{{.Name}}</span>
                                 <span class="arb-store-arrow">&rarr;</span>
                             </a>
@@ -121,7 +121,7 @@
         <div class="arb-selector-bar">
             <div class="arb-current-store">
                 <span class="store-type">{{if .GlobalMode}}Index{{else if .ReverseMode}}Selling to{{else}}Buying from{{end}}</span>
-                <select class="arb-store-select" onchange="goToStore(this.value)">
+                <select class="arb-store-select" onchange="goToStore(this.value)" data-pick="store">
                     {{range .ExtraNav}}
                         {{if not (contains .Name "Sealed")}}
                             {{if .Active}}
@@ -152,7 +152,7 @@
             {{if .Arb}}
             <div class="arb-current-store">
                 <span class="store-type">{{if .ReverseMode}}Buying from{{else}}Selling to{{end}}</span>
-                <select class="arb-store-select" onchange="if(this.value) location.hash = this.value">
+                <select class="arb-store-select" onchange="if(this.value) location.hash = this.value" data-pick="jump">
                     <option value="" disabled selected>Jump to…</option>
                     {{range .Arb}}
                         <option value="{{.Name}}">{{.Name}} ({{len .Arbit}})</option>
@@ -221,7 +221,7 @@
         <div class="arb-filter-actions">
             <div class="arb-filter-buttons">
                 <button type="submit" form="arbFilters" class="arb-filter-apply">Apply</button>
-                <a class="arb-filter-reset" id="arbFilterReset" href="?source={{$.ScraperShort}}&f=1&reset=1">Restore defaults</a>
+                <a class="arb-filter-reset" id="arbFilterReset" href="?source={{$.ScraperShort}}&f=1&reset=1" data-track="ui.arbit.filters" data-track-value="reset">Restore defaults</a>
                 <span class="arb-preset-controls" id="arbPresetControls" hidden>
                     <button type="button" class="arb-filter-reset" id="arbPresetSaveToggle" aria-expanded="false">Save as preset</button>
                     <span class="arb-preset-save" id="arbPresetSaveRow" hidden>
@@ -250,26 +250,26 @@
 
         {{$hasCart := false}}
         {{range $i, $arb := .Arb}}
-            <div class="arb-section" data-fold>
+            <div class="arb-section" data-fold data-store="{{$arb.Key}}">
             <span class="anchor" id="{{.Name}}"></span>
             <div class="arb-section-header">
                 <div class="arb-section-nav">
                     {{if gt $i 0}}
                         {{$prevIndex := dec $i 1}}
                         {{$prev := index $.Arb $prevIndex}}
-                        <a href="#{{$prev.Name}}" title="Previous">&#9650;</a>
+                        <a href="#{{$prev.Name}}" title="Previous" data-track="ui.arbit.row" data-track-value="section_nav">&#9650;</a>
                     {{else}}
                         <span>&#9650;</span>
                     {{end}}
                     {{if lt (inc $i 1) (len $.Arb)}}
                         {{$nextIndex := inc $i 1}}
                         {{$next := index $.Arb $nextIndex}}
-                        <a href="#{{$next.Name}}" title="Next">&#9660;</a>
+                        <a href="#{{$next.Name}}" title="Next" data-track="ui.arbit.row" data-track-value="section_nav">&#9660;</a>
                     {{else}}
                         <span>&#9660;</span>
                     {{end}}
                 </div>
-                <a class="arb-section-name" href="#top"{{with .RuleTip}} title="{{.}}"{{end}}>{{.Name}}</a>
+                <a class="arb-section-name" href="#top"{{with .RuleTip}} title="{{.}}"{{end}} data-track="ui.arbit.row" data-track-value="section_nav">{{.Name}}</a>
 
                 <div class="arb-load-btns">
                     {{$scraperKey := $arb.Key}}
@@ -288,7 +288,7 @@
                             <input type="hidden" name="c" data-load-list="ck" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}} {{(index $.Metadata .CardID).Name}}||{{end}}"/>
                             {{/* CK's cart has a Load at button of its own below, which the
                                  cart loader's messages name, so this one says what it opens */}}
-                            <a class="arb-load-btn builder" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Deck builder at {{$sourceKey}}</a>
+                            <a class="arb-load-btn builder" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();' data-track="ui.arbit.send" data-track-value="deck_builder" data-track-scope="{{$sourceKey}}">Deck builder at {{$sourceKey}}</a>
                             <noscript>
                                 <input type="submit" value="Deck builder at {{$sourceKey}}"/>
                             </noscript>
@@ -299,7 +299,7 @@
                             <input type="hidden" name="sList" data-load-list="csi" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}} {{(index $.Metadata .CardID).Name}}|{{end}}"/>
                             {{/* CSI's cart has a Load at button of its own below, which the
                                  cart loader's messages name, so this one says what it opens */}}
-                            <a class="arb-load-btn builder" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Deck builder at {{$sourceKey}}</a>
+                            <a class="arb-load-btn builder" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();' data-track="ui.arbit.send" data-track-value="deck_builder" data-track-scope="{{$sourceKey}}">Deck builder at {{$sourceKey}}</a>
                             <noscript>
                                 <input type="submit" value="Deck builder at {{$sourceKey}}"/>
                             </noscript>
@@ -310,7 +310,7 @@
                             <input type="hidden" name="c" data-load-list="tcg" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}-{{(index $.Metadata .CardID).TCGId}}||{{end}}"/>
                             {{/* TCGplayer's cart has a Load at button of its own below, which
                                  the cart loader's messages name, so this one says what it opens */}}
-                            <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Mass entry at TCGplayer</a>
+                            <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();' data-track="ui.arbit.send" data-track-value="mass_entry" data-track-scope="{{$sourceKey}}">Mass entry at TCGplayer</a>
                             <noscript>
                                 <input type="submit" value="Mass entry at TCGplayer"/>
                             </noscript>
@@ -336,7 +336,7 @@
                             <input type="hidden" name="deck" data-load-list="manapool" value="{{base64enc $deck}}"/>
                             {{/* Mana Pool's cart has a Load at button of its own below, which
                                  the cart loader's messages name, so this one says what it opens */}}
-                            <a class="arb-load-btn builder" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Mass entry at Mana Pool</a>
+                            <a class="arb-load-btn builder" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();' data-track="ui.arbit.send" data-track-value="mass_entry" data-track-scope="{{$sourceKey}}">Mass entry at Mana Pool</a>
                             <noscript>
                                 <input type="submit" value="Mass entry at Mana Pool"/>
                             </noscript>
@@ -351,7 +351,7 @@
                                 <input type="hidden" name="{{$sourceKey}}RetailhashesQtys" value="{{.Quantity}}"/>
                                 <input type="hidden" name="{{$sourceKey}}RetailhashesCond" value="{{.InventoryEntry.Conditions}}"/>
                             {{end}}
-                            <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();'>Load at {{$sourceKey}}</a>
+                            <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();' data-track="ui.arbit.send" data-track-value="load_at" data-track-scope="{{$sourceKey}}">Load at {{$sourceKey}}</a>
                             <noscript>
                                 <input type="submit" value="Load at {{$sourceKey}}"/>
                             </noscript>
@@ -363,7 +363,7 @@
                     {{if $buyCart.Link}}
                         {{$hasCart = true}}
                         <span class="cart-load">
-                            <a class="arb-load-btn csv cart-help" href="#" onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false" title="How Load at {{$buyCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn buy" href="{{$buyCart.Link}}" target="_blank" rel="noopener" data-store="{{$buyCart.Store}}" data-buylist="false" data-load-list="cart" data-load-items="{{$buyCart.Items}}"{{with $buyCart.Quantities}} data-load-qtys="{{.}}"{{end}} onclick="return window.openCartPrompt ? openCartPrompt(this) : true">Load at {{$buyCart.Store}}</a>
+                            <a class="arb-load-btn csv cart-help" href="#" onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false" title="How Load at {{$buyCart.Store}} works, and the BAN-to-Cart bookmark" data-track="ui.cart" data-track-value="help" data-track-scope="{{$buyCart.Prefix}}">?</a><a class="arb-load-btn buy" href="{{$buyCart.Link}}" target="_blank" rel="noopener" data-store="{{$buyCart.Store}}" data-cart="{{$buyCart.Prefix}}" data-buylist="false" data-load-list="cart" data-load-items="{{$buyCart.Items}}"{{with $buyCart.Quantities}} data-load-qtys="{{.}}"{{end}} onclick="return window.openCartPrompt ? openCartPrompt(this) : true">Load at {{$buyCart.Store}}</a>
                         </span>
                     {{end}}
 
@@ -380,7 +380,7 @@
                                     {}
                                 ]}'/>
                             <input type="hidden" name="partner" value="{{load_partner $scraperKey}}"/>
-                            <a class="arb-load-btn sell" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}blhashes").submit();'>Load buylist at {{$scraperKey}}</a>
+                            <a class="arb-load-btn sell" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}blhashes").submit();' data-track="ui.arbit.send" data-track-value="sellcart" data-track-scope="{{$scraperKey}}">Load buylist at {{$scraperKey}}</a>
                             <noscript>
                                 <input type="submit" value="Download {{$scraperKey}} CSV"/>
                             </noscript>
@@ -393,7 +393,7 @@
                     {{if $sellCart.Link}}
                         {{$hasCart = true}}
                         <span class="cart-load">
-                            <a class="arb-load-btn csv cart-help" href="#" onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false" title="How Load buylist at {{$sellCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn sell" href="{{$sellCart.Link}}" target="_blank" rel="noopener" data-store="{{$sellCart.Store}}" data-buylist="true" data-load-list="cart" data-load-items="{{$sellCart.Items}}" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">Load buylist at {{$sellCart.Store}}</a>
+                            <a class="arb-load-btn csv cart-help" href="#" onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false" title="How Load buylist at {{$sellCart.Store}} works, and the BAN-to-Cart bookmark" data-track="ui.cart" data-track-value="help" data-track-scope="{{$sellCart.Prefix}}">?</a><a class="arb-load-btn sell" href="{{$sellCart.Link}}" target="_blank" rel="noopener" data-store="{{$sellCart.Store}}" data-cart="{{$sellCart.Prefix}}" data-buylist="true" data-load-list="cart" data-load-items="{{$sellCart.Items}}" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">Load buylist at {{$sellCart.Store}}</a>
                         </span>
                     {{end}}
                     {{end}}
@@ -406,7 +406,7 @@
                                 <input type="hidden" name="{{$scraperKey}}hashes" value="{{.CardID}}"/>
                                 <input type="hidden" name="{{$scraperKey}}hashesQtys" value="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}"/>
                             {{end}}
-                            <a class="arb-load-btn csv" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();'>Download {{$scraperKey}} CSV</a>
+                            <a class="arb-load-btn csv" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();' data-track="ui.arbit.send" data-track-value="csv" data-track-scope="{{$scraperKey}}">Download {{$scraperKey}} CSV</a>
                             <noscript>
                                 <input type="submit" value="Download {{$scraperKey}} CSV"/>
                             </noscript>
@@ -414,7 +414,7 @@
                     {{end}}
 
                 </div>
-                <button type="button" class="section-fold" aria-expanded="true" title="Hide these cards"><i data-lucide="chevron-up"></i></button>
+                <button type="button" class="section-fold" aria-expanded="true" title="Hide these cards" data-track="ui.arbit.row" data-track-value="fold"><i data-lucide="chevron-up"></i></button>
                 <hr style="width: 100%; border: none; border-top: 1px solid var(--arb-border-subtle); margin: 0;">
             </div>
 
@@ -482,7 +482,7 @@
                                 <span class="card-edition">{{$card.Edition}}{{if not $sealedSource}} · #{{$card.Number}}{{end}}{{if not $card.Sealed}}{{if $card.HasDeck}} · Decklist{{else if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}{{end}}</span>
                             </div>
                         </td>
-                        <td>{{if $card.Sealed}}<a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">🔎</span></a>{{velocity_rate $card}}{{else if not $.GlobalMode}}{{$ckTip := buylist_title "CK" (grade "NM") "" $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}<div class="bl-info"{{if $ckTip}} title="{{plain_tip $ckTip}}" data-tip="{{$ckTip}}"{{end}}>{{buylist_detail $.ScraperShort $card.HotlistStore .BuylistEntry.BuyPrice $card.GoodBuylist $card.HighestBuylist true $card.CKSignal}}<span class="bl-ck-line">{{buylist_ck $card.CKSignal}}{{velocity_rate $card}}</span></div>{{else}}{{velocity_rate $card}}{{end}}</td>
+                        <td>{{if $card.Sealed}}<a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product" class="arb-contents"><span class="emoji">🔎</span></a>{{velocity_rate $card}}{{else if not $.GlobalMode}}{{$ckTip := buylist_title "CK" (grade "NM") "" $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}<div class="bl-info"{{if $ckTip}} title="{{plain_tip $ckTip}}" data-tip="{{$ckTip}}"{{end}}>{{buylist_detail $.ScraperShort $card.HotlistStore .BuylistEntry.BuyPrice $card.GoodBuylist $card.HighestBuylist true $card.CKSignal}}<span class="bl-ck-line">{{buylist_ck $card.CKSignal}}{{velocity_rate $card}}</span></div>{{else}}{{velocity_rate $card}}{{end}}</td>
                         {{if not $save.HasNoConds}}
                             <td>
                                 {{.InventoryEntry.Conditions}}
@@ -544,7 +544,7 @@
                                 {{end}}
                                 {{if not (and $.GlobalMode $card.Sealed)}}
                                     {{if ne .ReferenceEntry.URL ""}}
-                                        <a class="arb-qlink buy" href="{{.ReferenceEntry.URL}}" target="_blank" rel="nofollow">Buy</a>
+                                        <a class="arb-qlink buy ref" href="{{.ReferenceEntry.URL}}" target="_blank" rel="nofollow">Buy</a>
                                     {{end}}
                                 {{end}}
                             </div>
@@ -568,6 +568,7 @@
 
 <script type="text/javascript" src="/js/load-lists.js?hash={{$.Hash}}" defer></script>
 <script type="text/javascript" src="/js/section-fold.js?hash={{$.Hash}}" defer></script>
+<script type="text/javascript" src="/js/arbit-rows.js?hash={{$.Hash}}" defer></script>
 <script>
 function toggleArbitRow(checkbox) {
     var row = checkbox.closest('tr');
@@ -620,7 +621,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <input type="number" step="any" name="{{.Low.Key}}" value="{{.Low.Value}}" placeholder="{{if .Low.Placeholder}}{{.Low.Placeholder}}{{else}}any{{end}}"{{if .Low.Floor}} min="{{.Low.Floor}}"{{end}} aria-label="{{.Label}} minimum">
     {{if .Low.Carry}}
         <input type="hidden" name="{{.Low.Key}}" value="{{.Low.Carry}}" data-limit>
-        <span class="arb-filter-saved" title="Saved {{.Low.Carry}}, held at {{.Low.Placeholder}} here">saved {{.Low.Carry}}<button type="button" class="arb-filter-clear" data-limit-clear="{{.Low.Key}}" aria-label="Drop the saved {{.Label}} minimum">&times;</button></span>
+        <span class="arb-filter-saved" title="Saved {{.Low.Carry}}, held at {{.Low.Placeholder}} here">saved {{.Low.Carry}}<button type="button" class="arb-filter-clear" data-limit-clear="{{.Low.Key}}" aria-label="Drop the saved {{.Label}} minimum" data-track="ui.arbit.filters" data-track-value="clear_saved">&times;</button></span>
     {{end}}
     {{if .High.Key}}
         <span class="arb-filter-dash">&ndash;</span>

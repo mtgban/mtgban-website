@@ -26,7 +26,12 @@
 
     btn.addEventListener('click', function(e) {
         e.stopPropagation();
-        isOpen() ? shut() : open();
+        if (isOpen()) {
+            shut();
+        } else {
+            open();
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.tools', 'open');
+        }
     });
     document.addEventListener('click', function(e) {
         if (isOpen() && !btn.contains(e.target) && !dd.contains(e.target)) shut();
@@ -240,6 +245,7 @@
         });
         slot.addEventListener('click', function(e) {
             if (didDrag) { e.preventDefault(); e.stopPropagation(); }
+            else if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.link', isTile(slot) ? 'tools_tile' : 'section');
         });
     }
 
@@ -524,6 +530,8 @@
         a.className = 'nav2-section-btn offline-mode-btn' + (active ? ' active' : '');
         a.setAttribute('href', href);
         if (active) a.setAttribute('aria-current', 'page');
+        a.setAttribute('data-track', 'ui.offline.page');
+        a.setAttribute('data-track-value', 'kind');
         a.textContent = label;
         return a;
     }

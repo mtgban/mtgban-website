@@ -72,12 +72,12 @@
                                 {{if .ImageURL}}
                                 <div class="changelog-embed-media">
                                     <figure class="changelog-image">
-                                        <a class="changelog-lightbox-trigger" href="#changelog-lightbox" data-lightbox-src="{{.ImageURL}}" data-lightbox-alt="{{if .Title}}{{.Title}}{{else}}Announcement image{{end}}" aria-label="Enlarge image"><img src="{{.ImageURL}}" alt="{{if .Title}}{{.Title}}{{else}}Announcement image{{end}}" loading="lazy"></a>
+                                        <a class="changelog-lightbox-trigger" href="#changelog-lightbox" data-lightbox-src="{{.ImageURL}}" data-lightbox-alt="{{if .Title}}{{.Title}}{{else}}Announcement image{{end}}" aria-label="Enlarge image" data-track="ui.changelog" data-track-value="lightbox"><img src="{{.ImageURL}}" alt="{{if .Title}}{{.Title}}{{else}}Announcement image{{end}}" loading="lazy"></a>
                                     </figure>
                                 </div>
                                 {{else if .ThumbnailURL}}
                                 <div class="changelog-embed-media">
-                                    <a class="changelog-thumbnail changelog-lightbox-trigger" href="#changelog-lightbox" data-lightbox-src="{{.ThumbnailURL}}" data-lightbox-alt="Announcement thumbnail" aria-label="Enlarge image"><img src="{{.ThumbnailURL}}" alt="" loading="lazy"></a>
+                                    <a class="changelog-thumbnail changelog-lightbox-trigger" href="#changelog-lightbox" data-lightbox-src="{{.ThumbnailURL}}" data-lightbox-alt="Announcement thumbnail" aria-label="Enlarge image" data-track="ui.changelog" data-track-value="lightbox"><img src="{{.ThumbnailURL}}" alt="" loading="lazy"></a>
                                 </div>
                                 {{end}}
                             </div>
@@ -94,7 +94,7 @@
                         {{range .Attachments}}
                         {{if .IsImage}}
                         <figure class="changelog-image">
-                            <a class="changelog-lightbox-trigger" href="#changelog-lightbox" data-lightbox-src="{{.URL}}" data-lightbox-alt="{{.Name}}" aria-label="Enlarge image"><img src="{{.URL}}" alt="{{.Name}}" loading="lazy"></a>
+                            <a class="changelog-lightbox-trigger" href="#changelog-lightbox" data-lightbox-src="{{.URL}}" data-lightbox-alt="{{.Name}}" aria-label="Enlarge image" data-track="ui.changelog" data-track-value="lightbox"><img src="{{.URL}}" alt="{{.Name}}" loading="lazy"></a>
                         </figure>
                         {{else}}
                         <a class="changelog-attachment" href="{{.URL}}" target="_blank" rel="noopener">{{.Name}}</a>
@@ -110,9 +110,9 @@
 
     {{if .CurrentIndex}}
     <nav class="changelog-pagination" aria-label="Changelog pages">
-        {{if .PrevIndex}}<a href="/changelog?page={{.PrevIndex}}">Newer updates</a>{{end}}
+        {{if .PrevIndex}}<a href="/changelog?page={{.PrevIndex}}" data-track="ui.changelog" data-track-value="page">Newer updates</a>{{end}}
         <span>Page {{.CurrentIndex}} of {{.TotalIndex}}</span>
-        {{if .NextIndex}}<a href="/changelog?page={{.NextIndex}}">Older updates</a>{{end}}
+        {{if .NextIndex}}<a href="/changelog?page={{.NextIndex}}" data-track="ui.changelog" data-track-value="page">Older updates</a>{{end}}
     </nav>
     {{end}}
     {{end}}
