@@ -14,7 +14,7 @@ import (
 type Snapshot struct {
 	Candidates []Candidate
 	Signals    []Signal
-	Errors     []string // one label a script error row first seen in the snapshot's seven days; nil until 2f fills it
+	Errors     []string // one label a script error row first seen in the snapshot's seven days
 	Problems   []string // from Problems
 	// CounterDays is how many days of the seven its Signals cover had metrics.flush rows.
 	CounterDays int

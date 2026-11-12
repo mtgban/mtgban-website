@@ -80,7 +80,7 @@ func TestRemoveClasses(t *testing.T) {
 			t.Errorf("%s %s: class %q found %v, want %q", key[0], key[1], c.Class, ok, class)
 		}
 		if c.Changes != -1 || c.Requests != -1 {
-			t.Errorf("%s %s: changes %d requests %d, want -1 and -1 until 2e counts them", key[0], key[1], c.Changes, c.Requests)
+			t.Errorf("%s %s: changes %d requests %d, want -1 and -1 on a name's row", key[0], key[1], c.Changes, c.Requests)
 		}
 	}
 	alpha, _ := find(got, "search.sort", "", "alpha")

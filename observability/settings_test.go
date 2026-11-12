@@ -161,8 +161,8 @@ func TestSettingEntries(t *testing.T) {
 	}
 }
 
-// The 54 settings the modal and the mobile drawer can change (phase 2d's
-// ui.settings.change scopes) are preference entries under exactly these names.
+// The 56 settings the modal and the mobile drawer can change (the scopes
+// of ui.settings.change) are preference entries under exactly these names.
 func TestSettingsCoverTheModal(t *testing.T) {
 	names := []string{
 		"SearchSellersList", "SearchVendorsList", "SearchDefaultSort", "SearchListingPriority",

@@ -135,7 +135,7 @@ func TestRollUpEventsKeepsARowWithNoInstance(t *testing.T) {
 	}
 }
 
-// Rows from before stage 0 hold raw paths; only a listed label survives the roll-up.
+// Rows older than the bounded labels hold raw paths; only a listed label survives the roll-up.
 func TestRollUpEventsFoldsUnlistedPathsIntoOther(t *testing.T) {
 	c := rollupClient(t)
 	v := HashVisitor("x@y.com")

@@ -455,7 +455,7 @@ func newRows(names []observability.Name, rows map[string][]observability.DayTota
 	return out
 }
 
-// scriptErrors is the failures row WithErrors puts in place of rows phase 2f does not yet make.
+// scriptErrors is the failures row WithErrors puts in place of the error rows when they could not be measured.
 const scriptErrors = "Script errors"
 
 // WithErrors puts the script error rows at the end of the failures section.

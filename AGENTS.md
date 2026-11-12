@@ -151,6 +151,12 @@ output, not a claim written here.
   without regexing it out of a template, and CodeQL scans it, which it
   does not do for templates. Keep inline only what has to run before
   anything loads (the theme guard in `base.html`) or a few lines of glue.
+- **A new control gets a `data-track` mark or a `BAN.track` call** with a
+  name registered in `observability/names.go`, and a new cookie or
+  localStorage key goes in the settings registry
+  (`observability/settings.go`). The drift tests fail on a mark or call
+  whose name is not registered and on a stored key the registry lacks;
+  `docs/feature-metrics.md` lists them.
 - **No fixed waits in tests.** A test doesn't sleep or wait out a window to
   prove something happened: on a slow machine the wait ends early and the
   check passes without testing anything. Wait on the event itself:
@@ -200,13 +206,16 @@ output, not a claim written here.
 | `common.go`, `access_notify.go`, `buckets.go` | The access table, grants and affiliates shared across deployments and the Postgres NOTIFY that reloads them (a changed table or grant list, saved or reloaded, stamps or pokes the readers it makes stale); per-bucket B2 keys |
 | `overrides.go`, `session_store.go` | Admin fixes: per-store uuid remaps, and stores published from an upload |
 | `jobs.go`, `staleness.go`, `recover.go`, `telemetry.go` | Background-job registry and health, the cron schedule (`startCrons`), the stale-data alarm, panic recovery and reporting, page-visit recording |
+| `metrics.go`, `metrics_http.go`, `api_metrics.go` | Anonymous feature counts: a request's dimensions and `count`, the one door to the counter; route labels and the status and duration wrapper; the `js/metrics.js` beacon (`POST /api/metrics`) and the settings list its snapshot reads (`docs/feature-metrics.md`) |
+| `*_metrics.go` (`search_`, `upload_`, `arbit_`, `news_`, `sleep_`, `screener_`, `endpoint_`, `api_call_`) | Each page's or endpoint's own facts, built beside it and counted through `metrics.go` |
 | `metrics_jobs.go`, `metrics_stock.go` | The nightly metrics jobs: the fold of feature minutes into days, the stored-state counts, the `events` roll-up, each behind `metrics_jobs` and an advisory lock |
+| `admin_metrics.go` | The admin Metrics section (`?page=metrics`): Overview, Remove, Invest, Feature, Health and Explore, its rules in `internal/metricsreport` |
 | `upload_handoff.go`, `tcgcsv_service.go` | The page other sites hand a card list to; the tcgcsv ingest wired into the site |
 | `api_plans.go`, `api_handoff.go` | The public API pricing page and configurator (`/api-plans`, renders `apiproductlist`), and the Patreon handoff redirects to the gateway (`/api-trial`, `/api-login`) |
 | `utils.go`, `redirect.go`, `mobile.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle |
 | `errors/` | The 413, 500 and 502 pages: deploy.sh copies them for the droplets' nginx `error_page`s (deploy/README.md), and a recovered panic serves 500.html to a browser (`writeInternalError`, auth.go) |
 | `timeseries/` | PostgreSQL price-history client (charts) |
-| `userstate/`, `observability/` | Postgres stores for per-user favorites, recents, preferences and the search backpack, and for shared upload links (upload_shares, seven days), and for page visits (the admin usage tab) and search votes (the popular-searches ranking) |
+| `userstate/`, `observability/` | Postgres stores for per-user favorites, recents, preferences and the search backpack, and for shared upload links (upload_shares, seven days), and for page visits (the admin usage tab) and search votes (the popular-searches ranking); `observability/` also holds the metrics registry (`names.go`, `settings.go`), the minute counter, the script error buffer and the feature tables (`docs/feature-metrics.md`) |
 | `banprice/` | The price API's wire types |
 | `tcgcsv/` | tcgcsv.com client that `tcgcsvd/` ingests through |
 | `tcgcsvd/` | Non-Magic price/catalog ingest from tcgcsv.com — see its own README |

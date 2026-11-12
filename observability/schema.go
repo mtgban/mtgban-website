@@ -112,7 +112,7 @@ END $$`,
     END IF;
 END $$`,
 	// A role that cannot create events_days loses the feature counter and every metrics job.
-	// The gateway runs this DDL too until phase 3 gives it SkipSchema(); the site deploys first.
+	// The gateway runs this DDL too until it opens its client with SkipSchema(); the site deploys first.
 	`CREATE TABLE IF NOT EXISTS events_days (
     day      date    NOT NULL,
     instance text    NOT NULL DEFAULT '',

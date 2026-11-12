@@ -50,7 +50,7 @@ type DigestInput struct {
 	HasMobile       func(page string) bool   // whether a page has a mobile template
 	Reviews         []Review
 	Problems        []string // now's Health lines
-	NowErrors       []string // each week's script error labels; nil until 2f fills them
+	NowErrors       []string // each week's script error labels
 	PrevErrors      []string
 	Foreign         bool // another site's instance: see Candidates
 }

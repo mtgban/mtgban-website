@@ -149,8 +149,8 @@ func dateOf(s string) time.Time {
 	return d
 }
 
-// Phase 2f extends this test when it adds its foldPrunes entry: each want list
-// that reaches the prunes gains its prune, and each result its count.
+// A new foldPrunes entry extends this test: each want list that reaches the
+// prunes gains its prune, and each result its count.
 func TestFoldFeatureDays(t *testing.T) {
 	now := time.Date(2026, 11, 11, 0, 40, 0, 0, time.UTC)
 
