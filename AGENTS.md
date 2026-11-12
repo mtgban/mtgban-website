@@ -81,6 +81,10 @@ output, not a claim written here.
   default config path.
   `BAN_CLIENT_IP_HEADER`, set to `DO-Connecting-IP` on the App Platform
   apps only, names the header the API rate limit reads the client from.
+- `metrics_jobs`, set on one instance only, turns on the nightly metrics
+  jobs. The crons read it once, when they are scheduled at start-up; the
+  admin fold reads it live. Neither runs without `instance_name` set and
+  the feature tables ready.
 - Config schema is `ConfigType` in `main.go` (`grep -n "type ConfigType" main.go`
   for the current line, it moves): scraper config (`icons`, `name_override`
   and `stores`), the `stores` section (which stores show where, by
@@ -196,6 +200,7 @@ output, not a claim written here.
 | `common.go`, `access_notify.go`, `buckets.go` | The access table, grants and affiliates shared across deployments and the Postgres NOTIFY that reloads them (a changed table or grant list, saved or reloaded, stamps or pokes the readers it makes stale); per-bucket B2 keys |
 | `overrides.go`, `session_store.go` | Admin fixes: per-store uuid remaps, and stores published from an upload |
 | `jobs.go`, `staleness.go`, `recover.go`, `telemetry.go` | Background-job registry and health, the cron schedule (`startCrons`), the stale-data alarm, panic recovery and reporting, page-visit recording |
+| `metrics_jobs.go`, `metrics_stock.go` | The nightly metrics jobs: the fold of feature minutes into days, the stored-state counts, the `events` roll-up, each behind `metrics_jobs` and an advisory lock |
 | `upload_handoff.go`, `tcgcsv_service.go` | The page other sites hand a card list to; the tcgcsv ingest wired into the site |
 | `api_plans.go`, `api_handoff.go` | The public API pricing page and configurator (`/api-plans`, renders `apiproductlist`), and the Patreon handoff redirects to the gateway (`/api-trial`, `/api-login`) |
 | `utils.go`, `redirect.go`, `mobile.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle |

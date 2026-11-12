@@ -88,6 +88,13 @@ func (t *Tracker) Report(name, result, problem string) {
 	r.result, r.problem = result, problem
 }
 
+// Note records what name's latest run found and keeps what an earlier report found wrong.
+func (t *Tracker) Note(name, result string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.get(name).result = result
+}
+
 // Row is one job as of a moment.
 type Row struct {
 	Name    string

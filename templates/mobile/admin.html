@@ -68,6 +68,10 @@
                 <span class="m-act-title">Take Snapshot</span>
                 {{if .DisableChart}}<span class="m-act-warn">⚠️</span>{{end}}
             </button>
+            <button type="submit" class="m-admin-action" name="tool" value="metricsfold" onclick="return confirm('Fold metrics through today?')">
+                <span class="m-act-icon">📊</span>
+                <span class="m-act-title">Fold metrics</span>
+            </button>
             <button type="submit" class="m-admin-action" name="tool" value="tcgcsv" onclick="return confirm('Ingest the latest TCGCSV prices?')">
                 <span class="m-act-icon">🃏</span>
                 <span class="m-act-title">Ingest TCGCSV Prices</span>

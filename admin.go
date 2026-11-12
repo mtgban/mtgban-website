@@ -438,6 +438,11 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, p *prices, pag
 			go tracked(jobStash, s.stashInTimeseries)()
 		}
 
+	case "metricsfold":
+		v = url.Values{}
+		v.Set("msg", foldMetricsNow())
+		redirect = true
+
 	case "tcgcsv":
 		v = url.Values{}
 		v.Set("msg", "Ingesting latest TCGCSV prices in the background...")

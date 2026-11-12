@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -29,6 +30,9 @@ const (
 	jobUploadShares    = "Upload shares"
 	jobPatreonSessions = "Patreon sessions"
 	jobFeatureCounter  = "Feature counter"
+	jobMetricsFold     = "Metrics fold"
+	jobMetricsStock    = "Stored state counts"
+	jobEventsRollUp    = "Events roll-up"
 )
 
 // backgroundJobs records every run of the jobs above.
@@ -166,6 +170,29 @@ func (s *site) scheduleCrons() *cron.Cron {
 		addJob("10 5 * * *", jobUploadShares, pruneUploadShares)
 		// Reclaim the rows of sessions past their cap.
 		addJob("15 5 * * *", jobPatreonSessions, prunePatreonSessions)
+	}
+
+	// Metrics jobs touch tables every site shares; one flagged instance runs them.
+	if metricsJobsEnabled() {
+		lock := ObservabilityDB.WithJobLock
+		addJob("40 0 * * *", jobMetricsFold, metricsFoldJob(lock, ObservabilityDB, time.Now, false))
+		if UserStateDB != nil {
+			addJob("50 0 * * *", jobMetricsStock, func() {
+				runMetricsJob(lock, jobMetricsStock, "stock", func(ctx context.Context) (string, error) {
+					return countStoredState(ctx, s.stockSources(), time.Now())
+				})
+			})
+		} else {
+			log.Println("metrics jobs: stored state counts not scheduled: no user-state database")
+		}
+		addJob("30 4 * * *", jobEventsRollUp, func() {
+			runMetricsJob(lock, jobEventsRollUp, "events_rollup", func(ctx context.Context) (string, error) {
+				return rollUpOldEvents(ctx, ObservabilityDB, time.Now())
+			})
+		})
+	} else if problem := metricsJobsProblem(); problem != "" {
+		// The flag is set but nothing folds or prunes: say so rather than stay silent.
+		ServerNotify("init", "metrics jobs not scheduled: "+problem)
 	}
 
 	// Alarm on a store whose retail or buylist data has gone stale (see

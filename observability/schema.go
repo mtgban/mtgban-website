@@ -39,8 +39,17 @@ var schemaStatements = []string{
         ALTER TABLE events ADD COLUMN instance text;
     END IF;
 END $$`,
-	`CREATE INDEX IF NOT EXISTS idx_events_ts ON events (ts)`,
-	`CREATE INDEX IF NOT EXISTS idx_events_path_ts ON events (path, ts)`,
+	// Indexes are checked first: CREATE INDEX takes SHARE even when the index exists, and waits behind the roll-up.
+	`DO $$ BEGIN
+    IF to_regclass(format('%I.idx_events_ts', current_schema())) IS NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_events_ts ON events (ts);
+    END IF;
+END $$`,
+	`DO $$ BEGIN
+    IF to_regclass(format('%I.idx_events_path_ts', current_schema())) IS NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_events_path_ts ON events (path, ts);
+    END IF;
+END $$`,
 	`CREATE TABLE IF NOT EXISTS search_votes (
     instance  text        NOT NULL,
     key       text        NOT NULL,
@@ -50,8 +59,16 @@ END $$`,
     ts        timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (instance, key, user_hash, day)
 )`,
-	`CREATE INDEX IF NOT EXISTS idx_search_votes_instance_day ON search_votes (instance, day)`,
-	`CREATE INDEX IF NOT EXISTS idx_search_votes_user_day ON search_votes (instance, user_hash, day)`,
+	`DO $$ BEGIN
+    IF to_regclass(format('%I.idx_search_votes_instance_day', current_schema())) IS NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_search_votes_instance_day ON search_votes (instance, day);
+    END IF;
+END $$`,
+	`DO $$ BEGIN
+    IF to_regclass(format('%I.idx_search_votes_user_day', current_schema())) IS NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_search_votes_user_day ON search_votes (instance, user_hash, day);
+    END IF;
+END $$`,
 }
 
 // featureStatements create the feature tables; a failure here leaves the base schema applied.
@@ -69,7 +86,44 @@ var featureStatements = []string{
     n        bigint      NOT NULL DEFAULT 1,
     PRIMARY KEY (ts, instance, tier, device, signed, is_bot, scope, name, value)
 )`,
-	`CREATE INDEX IF NOT EXISTS idx_feature_events_name_ts ON feature_events (name, ts)`,
+	// Indexes are checked first: CREATE INDEX takes SHARE even when the index exists, and waits behind a fold or prune.
+	`DO $$ BEGIN
+    IF to_regclass(format('%I.idx_feature_events_name_ts', current_schema())) IS NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_feature_events_name_ts ON feature_events (name, ts);
+    END IF;
+END $$`,
+	// A role that cannot create feature_days loses the feature counter and the jobs, as for feature_events.
+	`CREATE TABLE IF NOT EXISTS feature_days (
+    day      date    NOT NULL,
+    instance text    NOT NULL,
+    tier     text    NOT NULL,
+    device   text    NOT NULL,
+    signed   boolean NOT NULL,
+    is_bot   boolean NOT NULL DEFAULT false,
+    scope    text    NOT NULL DEFAULT '',
+    name     text    NOT NULL,
+    value    text    NOT NULL DEFAULT '',
+    n        bigint  NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, instance, tier, device, signed, is_bot, scope, name, value)
+)`,
+	`DO $$ BEGIN
+    IF to_regclass(format('%I.idx_feature_days_name_day', current_schema())) IS NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_feature_days_name_day ON feature_days (name, day);
+    END IF;
+END $$`,
+	// A role that cannot create events_days loses the feature counter and every metrics job.
+	// The gateway runs this DDL too until phase 3 gives it SkipSchema(); the site deploys first.
+	`CREATE TABLE IF NOT EXISTS events_days (
+    day      date    NOT NULL,
+    instance text    NOT NULL DEFAULT '',
+    path     text    NOT NULL,
+    tier     text    NOT NULL,
+    device   text    NOT NULL,
+    is_bot   boolean NOT NULL DEFAULT false,
+    hits     bigint  NOT NULL,
+    uniques  bigint  NOT NULL,
+    PRIMARY KEY (day, instance, path, tier, device, is_bot)
+)`,
 }
 
 // ensureSchema applies both lists in one transaction under the schema lock. Idempotent (IF NOT EXISTS).

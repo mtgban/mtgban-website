@@ -104,6 +104,9 @@ type ConfigType struct {
 
 	Game         matcher.Game `json:"game"`
 	InstanceName string       `json:"instance_name"`
+	// MetricsJobs runs the nightly metrics jobs here. The crons read it once at scheduling
+	// and the by-hand fold reads it live; the job lock makes a disagreement harmless.
+	MetricsJobs bool `json:"metrics_jobs"`
 
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
@@ -566,8 +569,9 @@ func (s *site) openDBs() (err error) {
 
 	if infra.ObservabilityConfig == nil {
 		log.Println("no observability configuration set, telemetry won't be recorded")
-	} else if observabilityInstance == "" {
-		log.Println("observability disabled: instance_name not set in config")
+	} else if problem := instanceProblem(observabilityInstance); problem != "" {
+		log.Println("observability disabled: " + problem)
+		observabilityInstance = ""
 	} else if obsDB, oerr := observability.NewClient(*infra.ObservabilityConfig); oerr != nil {
 		// Page hits, popular votes and feature counts are lost: tell the server channel.
 		ServerNotify("init", "observability disabled, init failed: "+oerr.Error())

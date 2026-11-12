@@ -32,6 +32,28 @@ func TestFeatureStatementsCreateTheTable(t *testing.T) {
 	}
 }
 
+func TestFeatureStatementsCreateTheDayTable(t *testing.T) {
+	joined := strings.Join(featureStatements, "\n")
+	for _, want := range []string{
+		"CREATE TABLE IF NOT EXISTS feature_days",
+		"PRIMARY KEY (day, instance, tier, device, signed, is_bot, scope, name, value)",
+		"CREATE INDEX IF NOT EXISTS idx_feature_days_name_day",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("feature schema lacks %q", want)
+		}
+	}
+}
+
+// An existing index is checked first, so start-up takes no SHARE lock behind a long fold, prune or roll-up.
+func TestIndexesAreCheckedFirst(t *testing.T) {
+	for _, stmt := range slices.Concat(schemaStatements, featureStatements) {
+		if strings.Contains(stmt, "CREATE INDEX") && !strings.Contains(stmt, "to_regclass(") {
+			t.Errorf("index statement is not guarded by to_regclass: %s", stmt)
+		}
+	}
+}
+
 func TestSkipSchemaOption(t *testing.T) {
 	var o clientOptions
 	SkipSchema()(&o)
@@ -244,6 +266,68 @@ func TestSchemaDoesNotWaitBehindAReader(t *testing.T) {
 	}
 }
 
+// Holds write locks on the feature tables: not safe beside another process using this database.
+func TestSchemaDoesNotWaitBehindAFeatureWriter(t *testing.T) {
+	ensureSchemaBesideWriter(t, "feature_days", "feature_events")
+}
+
+// The roll-up holds ROW EXCLUSIVE on events: not safe beside another process using this database.
+func TestSchemaDoesNotWaitBehindAnEventsWriter(t *testing.T) {
+	ensureSchemaBesideWriter(t, "events", "search_votes")
+}
+
+// ensureSchemaBesideWriter fails the test when ensureSchema waits behind ROW EXCLUSIVE on tables.
+func ensureSchemaBesideWriter(t *testing.T, tables ...string) {
+	t.Helper()
+	c := testClient(t) // the tables and indexes exist from here on
+	writer, err := c.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = writer.Rollback() }()
+	for _, table := range tables {
+		if _, err := writer.Exec(`LOCK TABLE ` + table + ` IN ROW EXCLUSIVE MODE`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var pid int
+	if err := writer.QueryRow(`SELECT pg_backend_pid()`).Scan(&pid); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	type result struct {
+		ready bool
+		err   error
+	}
+	done := make(chan result, 1)
+	go func() {
+		ready, err := ensureSchema(ctx, c.db)
+		done <- result{ready, err}
+	}()
+	for {
+		select {
+		case r := <-done:
+			if !r.ready || r.err != nil {
+				t.Fatalf("ensureSchema = %v, %v; want true, nil", r.ready, r.err)
+			}
+			return
+		default:
+		}
+		var waiting int
+		if err := c.db.QueryRow(`SELECT count(*) FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))`, pid).Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			_ = writer.Rollback()
+			<-done
+			t.Fatalf("ensureSchema waited behind a writer of %v", tables)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 // Holds a lock on events: not safe beside another process using this database.
 func TestSchemaStatementFailsAtTheLockTimeout(t *testing.T) {
 	c := testClient(t)
@@ -255,9 +339,11 @@ func TestSchemaStatementFailsAtTheLockTimeout(t *testing.T) {
 	if _, err := holder.Exec(`LOCK TABLE events IN ACCESS EXCLUSIVE MODE`); err != nil {
 		t.Fatal(err)
 	}
-	saved := schemaLockTimeout
+	saved, savedBase := schemaLockTimeout, schemaStatements
 	schemaLockTimeout = 100 * time.Millisecond
-	t.Cleanup(func() { schemaLockTimeout = saved })
+	// The index statements are guarded now; an unguarded one still waits on the lock.
+	schemaStatements = append(slices.Clone(savedBase), `CREATE INDEX IF NOT EXISTS idx_events_ts ON events (ts)`)
+	t.Cleanup(func() { schemaLockTimeout, schemaStatements = saved, savedBase })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

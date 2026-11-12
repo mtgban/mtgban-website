@@ -256,6 +256,7 @@ func TestAdminActionsRunOnlyFromASameSitePost(t *testing.T) {
 		{url.Values{"tool": {"config"}}, "msg", "Failed to reload config"},
 		{url.Values{"tool": {"checkpoints"}}, "msg", "checkpoints"},
 		{url.Values{"tool": {"snapshot"}}, "msg", "Stashing is already in progress"},
+		{url.Values{"tool": {"metricsfold"}}, "msg", "Metrics jobs are not enabled"},
 		{url.Values{"tool": {"tcgcsv"}}, "msg", "Ingesting latest TCGCSV prices"},
 		{url.Values{"tool": {"server"}}, "msg", "Restarting the server"},
 		{url.Values{"tool": {"newKey"}, "user": {"ops@example.com"}, "duration": {"30"}}, "", "New key: "},
@@ -405,7 +406,7 @@ func TestAdminServerActionsPost(t *testing.T) {
 		if strings.Contains(out, `href="?tool=`) {
 			t.Errorf("mobile %v: a server action is still a link", mobile)
 		}
-		for _, tool := range []string{"datastore", "config", "checkpoints", "snapshot", "tcgcsv", "server", "newKey", "demokey"} {
+		for _, tool := range []string{"datastore", "config", "checkpoints", "snapshot", "metricsfold", "tcgcsv", "server", "newKey", "demokey"} {
 			if !strings.Contains(out, `name="tool" value="`+tool+`"`) {
 				t.Errorf("mobile %v: no %s button or field", mobile, tool)
 			}
