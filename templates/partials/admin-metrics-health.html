@@ -1,0 +1,159 @@
+{{define "admin-metrics-health"}}
+{{with .Metrics.Health}}
+<p class="admin-metrics-dim admin-metrics-scope">Health always covers every reader and bot, and the window, reader and bot settings do not change it. Job runs reach back {{.MinuteDays}} days, missing counts the last 30 complete days, and browser report outcomes the last 7 complete days. All times are UTC.</p>
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Problems for {{$.Metrics.Instance}}</h2>
+        <span class="count">{{if .Problems}}{{len .Problems}} found{{else if .Checked}}none found{{else}}not fully checked{{end}}</span>
+    </div>
+    {{if .Problems}}
+    <ul class="admin-metrics-problems">{{range .Problems}}<li>{{.}}</li>{{end}}</ul>
+    {{else if .Checked}}
+    <p>No problems found.</p>
+    {{end}}
+    {{if not .Checked}}
+    <p class="admin-metrics-dim">Health could not be fully checked{{if .Problems}}, so there may be more{{end}}:</p>
+    <ul class="admin-metrics-more">{{range .Unchecked}}<li>{{.}}</li>{{end}}</ul>
+    {{end}}
+</div>
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Counters</h2>
+        <span class="count">every site</span>
+    </div>
+    {{if .CountersRead.Failed}}
+    <p class="admin-metrics-dim">{{.CountersRead.Message}}</p>
+    {{else}}
+    <p class="admin-metrics-dim">Rows are yesterday's only. Last saved is the newest save seen since the start of yesterday; dropped, saves failed and rejected count from the start of yesterday until now.</p>
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table{{if $.IsMobile}} admin-metrics-stack{{end}}">
+        <thead><tr><th>Site</th><th>State</th><th>Last saved</th><th class="num">Rows yesterday</th><th class="num">Dropped</th><th class="num">Saves failed</th><th class="num">Rejected</th></tr></thead>
+        <tbody>
+        {{range .Counters}}
+            <tr>
+                <td class="admin-metrics-name">{{.Instance}}{{if .Current}} <span class="admin-metrics-dim">(this view)</span>{{end}}</td>
+                {{if .NoRows}}
+                <td colspan="6" class="admin-metrics-wrap">{{.Reason}}</td>
+                {{else}}
+                <td{{if $.IsMobile}} data-label="State"{{end}}>{{if .Live}}live{{else}}not saving{{end}}</td>
+                <td class="admin-mono"{{if $.IsMobile}} data-label="Last saved"{{end}}>{{if .LastFlush.IsZero}}none since yesterday{{else}}{{.LastFlush.UTC.Format "Jan 2 15:04"}}{{end}}</td>
+                <td class="num admin-mono"{{if $.IsMobile}} data-label="Rows yesterday"{{end}}>{{if .RowsNote}}<span class="admin-metrics-dim">{{.RowsNote}}</span>{{else}}{{.Rows}}{{end}}</td>
+                <td class="num admin-mono"{{if $.IsMobile}} data-label="Dropped"{{end}}>{{.Dropped}}</td>
+                <td class="num admin-mono"{{if $.IsMobile}} data-label="Saves failed"{{end}}>{{.FlushFailed}}</td>
+                <td class="num admin-mono"{{if $.IsMobile}} data-label="Rejected"{{end}}>{{.Rejected}}</td>
+                {{end}}
+            </tr>
+        {{else}}
+            <tr><td colspan="7" class="admin-usage-empty">No site wrote counts since the start of yesterday.</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{if or .DroppedHelp .RejectedHelp}}<ul class="admin-metrics-more">
+        {{with .DroppedHelp}}<li>Dropped: {{.}}</li>{{end}}
+        {{with .RejectedHelp}}<li>Rejected: {{.}}</li>{{end}}
+    </ul>{{end}}
+    {{end}}
+</div>
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Nightly jobs</h2>
+        <span class="count">last {{.MinuteDays}} days, on any site</span>
+    </div>
+    {{if .CountersRead.Failed}}
+    <p class="admin-metrics-dim">{{.CountersRead.Message}}</p>
+    {{else if .Jobs}}
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table{{if $.IsMobile}} admin-metrics-stack{{end}}">
+        <thead><tr><th>Job</th><th>State</th><th>Last run</th><th>Last success</th><th>Ran on</th><th>Notes</th></tr></thead>
+        <tbody>
+        {{range .Jobs}}
+            <tr>
+                <td class="admin-mono">{{.Job}}</td>
+                <td class="admin-metrics-wrap"{{if $.IsMobile}} data-label="State"{{end}}>{{.StatusText}}</td>
+                <td class="admin-metrics-wrap"{{if $.IsMobile}} data-label="Last run"{{end}}>{{.LastRunText}}</td>
+                <td class="admin-metrics-wrap"{{if $.IsMobile}} data-label="Last success"{{end}}>{{.LastOKText}}</td>
+                <td class="admin-metrics-wrap"{{if $.IsMobile}} data-label="Ran on"{{end}}>{{range $i, $r := .Runners}}{{if $i}}, {{end}}{{$r}}{{else}}<span class="admin-metrics-dim">no site</span>{{end}}</td>
+                <td class="admin-metrics-wrap"{{if $.IsMobile}} data-label="Notes"{{end}}>{{with .Note}}<span class="admin-metrics-dim">{{.}}</span>{{end}}</td>
+            </tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    <p class="admin-metrics-dim">A job is overdue when its last success is more than a day and a half old. Several successful runs a night are normal.</p>
+    {{else}}
+    <p class="admin-metrics-dim">This build has no metrics jobs.</p>
+    {{end}}
+</div>
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Missing counts</h2>
+        <span class="count">last 30 complete days</span>
+    </div>
+    <p class="admin-metrics-dim">These counts are written on every view of their pages, so a page with views and no count means the counting is broken.</p>
+    {{if .SilentCounted}}
+    {{if or .Broken .Quiet}}
+    {{template "admin-metrics-name-links" (dict "Title" "Missing although their pages had views" "Rows" .Broken)}}
+    {{template "admin-metrics-name-links" (dict "Title" "Missing, and their pages had no views" "Rows" .Quiet)}}
+    {{else}}
+    <p>Every count checked has rows in the last 30 days.</p>
+    {{end}}
+    {{else}}
+    <p class="admin-metrics-dim">{{template "admin-metrics-uncounted" .SilentRead}}</p>
+    {{end}}
+</div>
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Client</h2>
+        <span class="count">how the browser's reports were received, last 7 complete days</span>
+    </div>
+    {{if not .ClientMeasured}}
+    <p class="admin-metrics-dim">Client: not measured. This build does not count how the browser's reports were received.</p>
+    {{else if not .ClientCounted}}
+    <p class="admin-metrics-dim">{{template "admin-metrics-uncounted" .ClientRead}}</p>
+    {{else if .Client}}
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Name</th><th>Outcome</th><th class="num">Count</th><th class="num">Share</th></tr></thead>
+        <tbody>
+        {{range .Client}}
+            <tr title="{{.Help}}"><td class="admin-metrics-name"><span class="admin-mono">{{.Name}}</span>{{if .Help}}<span class="admin-metrics-help">{{.Help}}</span>{{end}}</td><td class="admin-metrics-wrap">{{.Reason}}</td><td class="num admin-mono">{{.N}}</td><td class="num admin-mono">{{printf "%.1f%%" (mulf .Share 100.0)}}</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    <p class="admin-metrics-dim">A share is of that name's own total.</p>
+    {{else}}
+    <p>No reports in the last 7 complete days.</p>
+    {{end}}
+</div>
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Script errors</h2>
+    </div>
+    {{with .ScriptErrors}}{{/* phase 2f puts its table here */}}{{else}}
+    <p class="admin-metrics-dim">Script errors: not measured.</p>
+    {{end}}
+</div>
+{{end}}
+{{end}}
+
+{{define "admin-metrics-name-links"}}{{if .Rows}}
+<h3 class="admin-metrics-kind">{{.Title}} <span class="admin-metrics-dim">{{len .Rows}}</span></h3>
+<div class="admin-table-wrap">
+<table class="table-data admin-table">
+    <thead><tr><th>Name</th><th>What it counts</th></tr></thead>
+    <tbody>
+    {{range .Rows}}
+        <tr><td class="admin-metrics-name"><a href="{{.URL}}" class="admin-mono">{{.Name}}</a></td><td class="admin-metrics-wrap">{{.Help}}</td></tr>
+    {{end}}
+    </tbody>
+</table>
+</div>
+{{end}}{{end}}

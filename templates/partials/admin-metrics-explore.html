@@ -1,0 +1,92 @@
+{{define "admin-metrics-explore"}}
+{{with .Metrics.Explore}}
+<form method="GET" action="/admin" class="admin-metrics-picker">
+    {{range .Hidden}}<input type="hidden" name="{{.Key}}" value="{{.Value}}">
+    {{end}}
+    <label for="metrics-explore-name">Metric</label>
+    <select id="metrics-explore-name" name="name">
+        {{range .Groups}}<optgroup label="{{.Label}}">
+            {{range .Names}}<option value="{{.Label}}"{{if .Active}} selected{{end}}>{{.Label}}</option>
+            {{end}}
+        </optgroup>
+        {{end}}
+    </select>
+    <button type="submit">Show</button>
+</form>
+
+{{if .NoSuchName}}
+<div class="admin-msg">No such metric: the name asked for is not in this site's list of metrics.</div>
+{{else if .Name}}
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2 class="admin-mono">{{.Name}}</h2>
+        <span class="count">{{if .Standing}}{{if .StockDay.IsZero}}stored state{{else}}standing count on {{.StockDay.Format "Jan 2, 2006"}}{{end}}{{else if .Hourly}}by hour since {{.HoursFrom.UTC.Format "Jan 2 15:04"}} UTC{{else}}last {{$.Metrics.Days}} days{{if $.Metrics.Folded}} through {{$.Metrics.Through.Format "Jan 2, 2006"}}{{end}}{{end}}</span>
+    </div>
+    {{if .Help}}<p class="admin-metrics-lead">{{.Help}}</p>{{end}}
+    <p class="admin-metrics-links"><a href="{{.FeatureURL}}">Feature page</a>{{if .HourlyLink.URL}} &middot; {{if .HourlyLink.Active}}showing by hour, last {{.MinuteDays}} days; <a href="{{.HourlyLink.URL}}">show by day</a>{{else}}<a href="{{.HourlyLink.URL}}">{{.HourlyLink.Label}}</a>{{end}}{{end}}</p>
+    {{if .Standing}}<p class="admin-metrics-dim">A stored-state metric is a standing count for one night across every site, not a sum over the window; the reader and bot choices above do not apply to it.</p>
+    {{else if .Hourly}}<p class="admin-metrics-dim">By hour reads the last {{.MinuteDays}} days of raw counts, so it does not wait for the nightly summary and does not follow the window above.</p>{{end}}
+    {{if .Read.Failed}}
+    <p class="admin-metrics-dim">{{.Read.Message}}</p>
+    {{else if not .Counted}}
+    <p class="admin-metrics-dim">{{template "admin-metrics-uncounted" .Read}}</p>
+    {{else if .Rows}}
+    <p class="admin-metrics-total">Total: <span class="admin-mono">{{.Total}}</span></p>
+    <details class="admin-metrics-rows" open>
+        <summary>By scope and value ({{len .Rows}})</summary>
+        <div class="admin-table-wrap">
+        <table class="table-data admin-table">
+            {{$shares := not .Several}}
+            <thead><tr><th>Scope</th><th>Value</th>{{if $shares}}<th class="num">Count</th><th class="num">Share</th>{{else}}<th class="num">Rows</th>{{end}}</tr></thead>
+            <tbody>
+            {{range .Rows}}
+                <tr><td class="admin-metrics-wrap">{{if .Scope}}{{.Scope}}{{else}}<span class="admin-metrics-dim">no scope</span>{{end}}</td><td class="admin-metrics-wrap">{{if .Value}}{{.Value}}{{else}}<span class="admin-metrics-dim">no value</span>{{end}}</td><td class="num admin-mono">{{.N}}</td>{{if $shares}}<td class="num admin-mono">{{printf "%.1f%%" (mulf .Share 100.0)}}</td>{{end}}</tr>
+            {{end}}
+            </tbody>
+        </table>
+        </div>
+    </details>
+    {{else if .Standing}}
+    <p class="admin-metrics-dim">No row of this metric on the newest stored-state day.</p>
+    {{else if .Hourly}}
+    <p class="admin-metrics-dim">No rows for this metric in the last {{.MinuteDays}} days.</p>
+    {{else}}
+    <p class="admin-metrics-dim">No rows for this metric in the last {{$.Metrics.Days}} days.</p>
+    {{end}}
+</div>
+
+{{if .LineID}}
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>{{if .Hourly}}By hour{{else}}By day{{end}}</h2>
+        <span class="count">{{if .Standing}}standing count each night{{else}}sum each {{if .Hourly}}hour{{else}}day{{end}}{{end}}</span>
+    </div>
+    {{if not $.IsMobile}}<div class="admin-metrics-chart"><canvas id="{{.LineID}}" aria-label="{{.Name}} {{if .Hourly}}by hour{{else}}by day{{end}}" role="img"></canvas></div>{{end}}
+    {{$unit := "Day"}}{{if .Hourly}}{{$unit = "Hour"}}{{end}}
+    {{with $.Metrics.ChartPoints .LineID}}
+    <details class="admin-metrics-days">
+        <summary>The numbers {{if eq $unit "Hour"}}by hour ({{len .}} hours, UTC){{else}}by day ({{len .}} days){{end}}</summary>
+        {{template "admin-metrics-points" (dict "Unit" $unit "Points" .)}}
+    </details>
+    {{end}}
+</div>
+{{end}}
+{{end}}
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Every metric</h2>
+        <span class="count">by family and area</span>
+    </div>
+    {{range .Groups}}
+    <details class="admin-metrics-group">
+        <summary>{{.Label}} <span class="admin-metrics-dim">{{len .Names}}</span></summary>
+        <ul class="admin-metrics-names-list">
+            {{range .Names}}<li><a href="{{.URL}}" class="admin-mono"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a></li>
+            {{end}}
+        </ul>
+    </details>
+    {{end}}
+</div>
+{{end}}
+{{end}}

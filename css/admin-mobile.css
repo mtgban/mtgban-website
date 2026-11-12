@@ -303,3 +303,433 @@
     font-size: 0.75rem;
     color: var(--greytext);
 }
+
+/* Metrics: the desktop partials on a phone; admin.css is not loaded here */
+.m-admin .admin-metrics {
+    min-width: 0;
+    font-size: 0.85rem;
+}
+
+.m-admin .admin-metrics span {
+    line-height: 1.35;
+}
+
+.m-admin .admin-metrics h2 {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--normal);
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.m-admin .admin-usage-bar,
+.m-admin .admin-metrics-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    margin-bottom: 0.6em;
+}
+
+.m-admin .admin-usage-range {
+    color: var(--text-dim);
+    font-size: 0.9em;
+}
+
+/* Wrapping rows of thumb-sized links, never a strip wider than the page */
+.m-admin .admin-usage-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35em;
+}
+
+.m-admin .admin-usage-toggle a {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: 2.75rem;
+    padding: 0.3em 0.8em;
+    border: 1px solid var(--border-moderate);
+    border-radius: 6px;
+    color: var(--normal);
+    font-size: 0.9em;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+}
+
+.m-admin .admin-usage-toggle a.active {
+    background: var(--dodgerblue-fill);
+    border-color: var(--dodgerblue-fill);
+    color: white;
+}
+
+.m-admin .admin-metrics-views {
+    margin: 0 0 0.9em;
+}
+
+.m-admin .admin-msg {
+    margin-bottom: 0.75em;
+    padding: 0.6em 0.75em;
+    border: 1px solid var(--dodgerblue);
+    border-radius: 6px;
+    color: var(--dodgerblue);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.m-admin .admin-msg-error {
+    border-color: var(--red);
+    color: var(--red);
+}
+
+.m-admin .admin-section {
+    margin-bottom: 1.25em;
+}
+
+.m-admin .admin-section-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.2em 0.6em;
+    margin-bottom: 0.4em;
+}
+
+.m-admin .admin-section-header .count {
+    color: var(--text-dim);
+    font-size: 0.85em;
+}
+
+.m-admin .admin-usage-grid {
+    display: block;
+}
+
+.m-admin .admin-metrics p {
+    margin: 0 0 0.6em;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.m-admin .admin-metrics-dim {
+    color: var(--text-dim);
+}
+
+.m-admin .admin-metrics-health,
+.m-admin .admin-metrics-lead {
+    font-size: 1.05em;
+}
+
+.m-admin .admin-metrics-links,
+.m-admin .admin-metrics-total,
+.m-admin .admin-metrics-scope {
+    line-height: 1.6;
+}
+
+.m-admin .admin-metrics-help {
+    display: block;
+    margin-top: 0.2em;
+    color: var(--text-dim);
+    font-size: 0.9em;
+    font-weight: normal;
+    line-height: 1.35;
+    white-space: normal;
+}
+
+.m-admin .admin-metrics-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.m-admin .admin-mono {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.95em;
+}
+
+.m-admin .admin-metrics-counts {
+    display: inline-block;
+    padding: 0.3em 0;
+    font-size: 0.9em;
+}
+
+.m-admin .admin-metrics-kind,
+.m-admin .admin-metrics-digest h3 {
+    margin: 0.9em 0 0.4em;
+    font-size: 1em;
+    font-weight: 600;
+}
+
+.m-admin .admin-metrics-digest ul,
+.m-admin .admin-metrics-more,
+.m-admin .admin-metrics-problems {
+    margin: 0.3em 0 0.6em;
+    padding-left: 1.2em;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.m-admin .admin-metrics-more {
+    color: var(--text-dim);
+    font-size: 0.9em;
+}
+
+/* Narrow tables scroll inside their own box, never the page */
+.m-admin .admin-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+}
+
+.m-admin .admin-table {
+    width: 100%;
+    font-size: 0.95em;
+}
+
+.m-admin .admin-table th,
+.m-admin .admin-table td {
+    padding: 0.45em 0.6em;
+    font-size: 1em;
+}
+
+.m-admin .admin-table th {
+    font-size: 0.8em;
+}
+
+.m-admin .admin-table td.num {
+    text-align: right;
+}
+
+/* Break inside a word only when it cannot fit; a table too wide scrolls in its box */
+.m-admin .admin-metrics-name,
+.m-admin .admin-metrics-wrap,
+.m-admin .admin-usage-empty {
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* Class words and the rate, out of and measured texts: wrap only between words when they can */
+.m-admin .admin-metrics-class,
+.m-admin .admin-metrics-words {
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+.m-admin .admin-usage-empty {
+    color: var(--text-dim);
+    font-style: italic;
+    text-align: center;
+}
+
+/* Wide tables become one card a row, each value labelled with its column */
+.m-admin .admin-metrics-stack,
+.m-admin .admin-metrics-stack tbody,
+.m-admin .admin-metrics-stack tr,
+.m-admin .admin-metrics-stack td {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.m-admin .admin-metrics-stack thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+.m-admin .admin-metrics-stack tr {
+    padding: 0.4em 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.m-admin .admin-metrics-stack tr:last-child {
+    border-bottom: none;
+}
+
+.m-admin .admin-metrics-stack td {
+    padding: 0.2em 0.75em;
+    border-bottom: none;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.m-admin .admin-metrics-stack td.admin-metrics-name {
+    font-weight: 600;
+}
+
+.m-admin .admin-metrics-stack td[data-label] {
+    position: relative;
+    padding-left: calc(40% + 0.75em);
+}
+
+.m-admin .admin-metrics-stack td[data-label]::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 0.75em;
+    width: 38%;
+    color: var(--text-dim);
+    font-size: 0.9em;
+    font-weight: 600;
+}
+
+/* Every card line reads label then value, numbers included */
+.m-admin .admin-metrics-stack td.num,
+.m-admin .admin-metrics-stack td[data-label] {
+    text-align: left;
+}
+
+.m-admin .admin-metrics-stack td[data-label]:empty {
+    display: none;
+}
+
+/* Disclosure groups: the whole summary line is the tap target */
+.m-admin .admin-metrics details > summary {
+    box-sizing: border-box;
+    min-height: 2.75rem;
+    padding: 0.6em 0;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+.m-admin .admin-metrics-area > summary {
+    list-style: none;
+}
+
+.m-admin .admin-metrics-area > summary::-webkit-details-marker {
+    display: none;
+}
+
+.m-admin .admin-metrics-area > summary::before {
+    content: "\25B8";
+    color: var(--text-dim);
+}
+
+.m-admin .admin-metrics-area[open] > summary::before {
+    content: "\25BE";
+}
+
+/* closed areas sit as a compact list; an open one keeps the section's spacing */
+.m-admin .admin-metrics-area:not([open]) {
+    margin-bottom: 0.3em;
+}
+
+.m-admin .admin-metrics-area:not([open]) > summary {
+    min-height: 2em;
+    margin-bottom: 0;
+    padding-top: 0.15em;
+    padding-bottom: 0.15em;
+    align-items: center;
+}
+
+.m-admin .admin-metrics-area:not([open]) > summary h2 {
+    line-height: 1.3;
+}
+
+.m-admin .admin-metrics-more-rows > summary {
+    font-size: 1.05em;
+    font-weight: 600;
+}
+
+.m-admin .admin-metrics-stock details,
+.m-admin .admin-metrics-days,
+.m-admin .admin-metrics-group {
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.m-admin .admin-metrics-stock details[open],
+.m-admin .admin-metrics-days[open] {
+    padding-bottom: 0.6em;
+}
+
+.m-admin .admin-metrics-days .admin-table-wrap {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.m-admin .admin-metrics-names-list {
+    margin: 0.2em 0 0.6em;
+    padding-left: 1.2em;
+    overflow-wrap: anywhere;
+}
+
+.m-admin .admin-metrics-names-list a {
+    display: inline-block;
+    padding: 0.35em 0;
+}
+
+.m-admin .admin-metrics-names-list a[aria-current] {
+    font-weight: 600;
+}
+
+/* Explore's picker and the review marks: full-width controls, labels shown */
+.m-admin .admin-metrics-picker,
+.m-admin .admin-metrics-review {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4em;
+    margin: 0 0 0.9em;
+}
+
+.m-admin .admin-metrics-review {
+    margin: 0.4em 0 0.2em;
+}
+
+/* A row's review form stays folded under a one-word summary until tapped */
+.m-admin .admin-metrics-review-cell {
+    padding-top: 0;
+}
+
+.m-admin .admin-metrics-review-box > summary {
+    color: var(--dodgerblue);
+    font-weight: 600;
+}
+
+.m-admin .admin-metrics-picker label,
+.m-admin .admin-metrics-review label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    color: var(--text-dim);
+    font-size: 0.9em;
+    font-weight: 600;
+}
+
+.m-admin .admin-metrics-picker select,
+.m-admin .admin-metrics-review select,
+.m-admin .admin-metrics-review input[type="text"] {
+    width: 100%;
+    min-height: 2.75rem;
+    box-sizing: border-box;
+    padding: 0.45em 0.5em;
+    border: 1px solid var(--border-moderate);
+    border-radius: 6px;
+    background: var(--background);
+    color: var(--normal);
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: normal;
+}
+
+.m-admin .admin-metrics-picker button,
+.m-admin .admin-metrics-review button {
+    width: 100%;
+    min-height: 2.75rem;
+    box-sizing: border-box;
+    padding: 0.5em;
+    border: none;
+    border-radius: 6px;
+    background: var(--dodgerblue-fill);
+    color: white;
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+}

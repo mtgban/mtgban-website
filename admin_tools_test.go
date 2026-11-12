@@ -247,7 +247,12 @@ func withInertAdminTools(t *testing.T) (*site, *atomic.Int32) {
 // a link an admin is sent to cannot start one.
 func TestAdminActionsRunOnlyFromASameSitePost(t *testing.T) {
 	s, restarts := withInertAdminTools(t)
+	withMetricsInstance(t, "lorcana")
+	resetMetricsCache(t)
+	metrics := newFakeMetrics()
+	withMetricsStore(t, metrics)
 
+	// key "#" is a 303 back to the Remove view at the row the want ends with
 	actions := []struct {
 		form      url.Values
 		key, want string
@@ -263,6 +268,8 @@ func TestAdminActionsRunOnlyFromASameSitePost(t *testing.T) {
 		{url.Values{"tool": {"demokey"}}, "", "New key: "},
 		{url.Values{"refresh": {"zz-unknown"}}, "msg", "zz-unknown not found"},
 		{url.Values{"reload": {"zz-unknown"}, "table": {"retail"}, "tag": {"ZZ"}}, "msg", "reload of zz-unknown error"},
+		{url.Values{"page": {"metrics"}, "view": {"remove"}, "reviewName": {"sets.sort"}, "reviewValue": {"name"}, "reviewVerdict": {"keep"}, "reviewNote": {"a note"}}, "#", "?page=metrics&view=remove&area=search&saved=1#rm-sets.sort----name"},
+		{url.Values{"page": {"metrics"}, "view": {"remove"}, "reviewName": {"sets.sort"}, "reviewValue": {"name"}, "reviewVerdict": {"clear"}}, "#", "?page=metrics&view=remove&area=search&cleared=1#rm-sets.sort----name"},
 	}
 
 	for _, action := range actions {
@@ -294,12 +301,21 @@ func TestAdminActionsRunOnlyFromASameSitePost(t *testing.T) {
 	if restarts.Load() != 0 || !s.reloads.Status().StartedAt.IsZero() {
 		t.Fatalf("a link restarted the server %d times or reloaded the datastore: %+v", restarts.Load(), s.reloads.Status())
 	}
+	if len(metrics.saved)+len(metrics.deleted) != 0 {
+		t.Fatalf("a link or another site's form wrote %d review marks and cleared %d", len(metrics.saved), len(metrics.deleted))
+	}
 
 	for _, action := range actions {
 		req := adminRequest(http.MethodPost, action.form)
 		req.Header.Set("Origin", "https://mtgban.com")
 		rec := httptest.NewRecorder()
 		s.Admin(rec, req)
+		if action.key == "#" {
+			if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/admin"+action.want {
+				t.Errorf("%s: a same-site POST answered %d to %q, want a 303 to the row", action.form.Encode(), rec.Code, rec.Header().Get("Location"))
+			}
+			continue
+		}
 		// No key: the result is on the page the POST answers
 		if action.key == "" {
 			if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), action.want) {
@@ -315,6 +331,9 @@ func TestAdminActionsRunOnlyFromASameSitePost(t *testing.T) {
 		if !strings.Contains(loc.Query().Get(action.key), action.want) {
 			t.Errorf("%s: redirected to %q, want %s to say %q", action.form.Encode(), loc, action.key, action.want)
 		}
+	}
+	if len(metrics.saved) != 1 || metrics.saved[0].Note != "a note" || len(metrics.deleted) != 1 {
+		t.Errorf("same-site POSTs saved %+v and cleared %q, want one each", metrics.saved, metrics.deleted)
 	}
 	for deadline := time.Now().Add(5 * time.Second); restarts.Load() == 0 && time.Now().Before(deadline); {
 		time.Sleep(10 * time.Millisecond)

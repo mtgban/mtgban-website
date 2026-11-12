@@ -1,0 +1,55 @@
+{{define "admin-metrics"}}
+{{with .Metrics}}
+<div class="admin-metrics">
+{{$here := ""}}{{range .Views}}{{if .Active}}{{$here = .URL}}{{end}}{{end}}
+<div class="admin-usage-bar admin-metrics-bar">
+    <span class="admin-usage-range">{{.Instance}}{{if not .Health}} &middot; last {{.Days}} days{{end}} &middot; {{if .Folded}}counts complete through {{.Through.Format "Jan 2, 2006"}}{{else if .FoldedKnown}}no complete day yet{{end}}</span>
+    <div class="admin-usage-toggle" role="group" aria-label="Site">
+        {{range .Instances}}<a href="{{.URL}}"{{if .Active}} class="active"{{end}}>{{.Label}}</a>{{end}}
+    </div>
+    {{if not .Health}}
+    <div class="admin-usage-toggle" role="group" aria-label="Window">
+        {{range .Windows}}<a href="{{.URL}}"{{if .Active}} class="active"{{end}}>{{.Label}}</a>{{end}}
+    </div>
+    <div class="admin-usage-toggle" role="group" aria-label="Readers">
+        <a href="{{if .AnonLink.Active}}{{.AnonLink.URL}}{{else}}{{$here}}{{end}}"{{if not .AnonLink.Active}} class="active"{{end}}>Signed in</a><a href="{{if .AnonLink.Active}}{{$here}}{{else}}{{.AnonLink.URL}}{{end}}"{{if .AnonLink.Active}} class="active"{{end}}>Include anonymous</a>
+    </div>
+    <div class="admin-usage-toggle" role="group" aria-label="Bots">
+        <a href="{{if .BotsLink.Active}}{{.BotsLink.URL}}{{else}}{{$here}}{{end}}"{{if not .BotsLink.Active}} class="active"{{end}}>Humans</a><a href="{{if .BotsLink.Active}}{{$here}}{{else}}{{.BotsLink.URL}}{{end}}"{{if .BotsLink.Active}} class="active"{{end}}>Include bots</a>
+    </div>
+    {{end}}
+</div>
+<nav class="admin-usage-toggle admin-metrics-views" aria-label="Views">
+    {{range .Views}}<a href="{{.URL}}"{{if .Active}} class="active" aria-current="page"{{end}}>{{.Label}}</a>{{end}}
+</nav>
+{{if .NoInstance}}<div class="admin-msg">{{.NoInstance}}</div>
+{{else if not .FoldedKnown}}<div class="admin-msg">The newest complete day could not be read, so the counts that need it are empty.</div>
+{{else if not .Folded}}<div class="admin-msg">No complete day yet: the first nightly summary has not run.</div>{{end}}
+{{if .Failed}}<div class="admin-msg">A query did not answer; what is below may be missing a part.</div>{{end}}
+{{with .Confirm}}<div class="admin-msg" role="status">{{.}}</div>{{end}}
+{{if and $.IsMobile .Message}}<div class="admin-msg admin-msg-error">{{.Message}}</div>{{end}}
+{{range .Notes}}<div class="admin-msg">{{.}}</div>
+{{end}}
+{{if .Overview}}{{template "admin-metrics-overview" $}}
+{{else if .Remove}}{{template "admin-metrics-remove" $}}
+{{else if .Invest}}{{template "admin-metrics-invest" $}}
+{{else if .Feature}}{{template "admin-metrics-feature" $}}
+{{else if .Health}}{{template "admin-metrics-health" $}}
+{{else if .Explore}}{{template "admin-metrics-explore" $}}
+{{end}}
+</div>
+{{else}}
+<div class="admin-msg">Feature metrics are not enabled: the observability database or its feature tables are missing.</div>
+{{end}}
+{{end}}
+
+{{/* The chart scripts, desktop only, on a view that built a chart; html/template writes Charts as JSON. */}}
+{{define "admin-metrics-scripts"}}
+{{if .Metrics.Charts}}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+<script>
+    window.BAN_ADMIN_METRICS = { charts: {{.Metrics.Charts}} };
+</script>
+<script type="text/javascript" src="/js/admin-metrics.js?hash={{.Hash}}" defer></script>
+{{end}}
+{{end}}

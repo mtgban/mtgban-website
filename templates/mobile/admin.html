@@ -45,6 +45,16 @@
         </div>
     </div>
 
+    {{/* Metrics: the desktop partials, without charts; their numbers are in the tables */}}
+    <div class="m-admin-section">
+        <h2>Metrics</h2>
+        {{if eq .Page "metrics"}}
+            {{template "admin-metrics" .}}
+        {{else}}
+            <a class="m-admin-tool-btn" href="?page=metrics">Open metrics</a>
+        {{end}}
+    </div>
+
     {{/* Server Actions */}}
     <div class="m-admin-section">
         <h2>Server Actions</h2>

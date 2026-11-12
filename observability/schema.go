@@ -124,6 +124,17 @@ END $$`,
     uniques  bigint  NOT NULL,
     PRIMARY KEY (day, instance, path, tier, device, is_bot)
 )`,
+	// Review marks an admin sets on a metric; no author is stored.
+	`CREATE TABLE IF NOT EXISTS feature_reviews (
+    instance   text        NOT NULL,
+    name       text        NOT NULL,
+    value      text        NOT NULL DEFAULT '',
+    scope      text        NOT NULL DEFAULT '',
+    verdict    text        NOT NULL,   -- keep | remove | watch
+    note       text        NOT NULL DEFAULT '',
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (instance, name, value, scope)
+)`,
 }
 
 // ensureSchema applies both lists in one transaction under the schema lock. Idempotent (IF NOT EXISTS).

@@ -688,6 +688,18 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 			files = append(files, "templates/partials/admin-usage.html", "templates/partials/admin-searches.html", "templates/partials/admin-alerts.html")
 		}
 	}
+	// The metrics section's partials, desktop and mobile alike
+	if name == "admin.html" {
+		files = append(files,
+			"templates/partials/admin-metrics.html",
+			"templates/partials/admin-metrics-overview.html",
+			"templates/partials/admin-metrics-remove.html",
+			"templates/partials/admin-metrics-invest.html",
+			"templates/partials/admin-metrics-feature.html",
+			"templates/partials/admin-metrics-health.html",
+			"templates/partials/admin-metrics-explore.html",
+		)
+	}
 
 	// Add other partials as needed
 	if name == "search.html" {

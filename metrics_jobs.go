@@ -105,6 +105,8 @@ func runMetricsJob(lock jobLocker, job, scope string, fn func(context.Context) (
 	default:
 		backgroundJobs.Report(job, result, "")
 		observeJob("job", scope, "job.run", "ok")
+		// Other processes see the new rows when the fold stamp moves.
+		dropMetricsCache()
 	}
 }
 

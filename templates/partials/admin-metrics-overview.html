@@ -1,0 +1,144 @@
+{{define "admin-metrics-overview"}}
+{{with .Metrics.Overview}}
+{{if .ReviewsFailed}}<div class="admin-msg">Review marks could not be read, so rows already reviewed may appear again.</div>{{end}}
+<p class="admin-metrics-health">{{if not .LiveKnown}}Counter health could not be read{{else if .Live}}Counters live{{else}}Counters not saving{{if .LastFlush.IsZero}}, nothing saved since yesterday{{else}}, last saved {{.LastFlush.UTC.Format "Jan 2 15:04"}} UTC{{end}}{{end}}{{if .Counted}} &middot; {{.DaysData}} days of data{{end}}</p>
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>What changed</h2>
+        <span class="count">last 7 days against the 7 before, signed-in</span>
+    </div>
+    {{if .DigestReady}}
+    {{if .Changes.Empty}}
+    <p class="admin-metrics-dim">{{.NothingChanged}}</p>
+    {{else}}
+    <div class="admin-metrics-digest">
+    {{range .Changes.Sections}}
+        <h3>{{.Title}}</h3>
+        <ul>{{range .Lines}}<li>{{.}}</li>{{end}}</ul>
+    {{end}}
+    </div>
+    {{end}}
+    {{else if or $.Metrics.Folded (not $.Metrics.FoldedKnown)}}
+    <p class="admin-metrics-dim">The digest could not be built: {{if .ReviewsFailed}}the review marks could not be read{{else}}a query it needs did not answer{{end}}.</p>
+    {{else}}
+    <p class="admin-metrics-dim">No digest yet: no day is complete.</p>
+    {{end}}
+</div>
+
+<div class="admin-usage-grid">
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Consider removing</h2>
+        <span class="count">{{len .Remove}} shown</span>
+    </div>
+    {{with $.Metrics.PagesNote}}<p class="admin-metrics-dim">{{.}}</p>{{end}}
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Name</th><th>Class</th><th>Rate</th></tr></thead>
+        <tbody>
+        {{range .Remove}}
+            <tr title="{{.Help}}"><td class="admin-metrics-name">{{template "admin-metrics-key" .}} <a class="admin-metrics-counts" href="{{.RemoveURL}}">what this counts</a></td><td class="admin-metrics-class">{{template "admin-metrics-class" .}}</td><td class="admin-metrics-wrap admin-metrics-words">{{template "admin-metrics-rate" .}}</td></tr>
+        {{else}}
+            <tr><td colspan="3" class="admin-usage-empty">{{if $.Metrics.Overview.Counted}}{{$.Metrics.Overview.RemoveEmpty}}{{else}}{{template "admin-metrics-uncounted" $.Metrics.Overview.Read}}{{end}}</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{if .MoreRows}}
+    <ul class="admin-metrics-more">
+        {{range .MoreRows}}<li>and {{.Rows}} more in {{if .Area}}{{.Area}}{{else}}no area{{end}}</li>{{end}}
+    </ul>
+    {{end}}
+</div>
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Consider investing</h2>
+        <span class="count">{{len .Invest}} shown</span>
+    </div>
+    {{if and .Counted .VisitsRead.Failed}}<p class="admin-metrics-dim">The page hits could not be read just now, so the phone and depth rows are left out.</p>{{else if .Counted}}{{with .PhonesNote}}<p class="admin-metrics-dim">{{.}}</p>{{end}}{{end}}
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Signal</th><th>Rate</th>{{if .InvestEvidence}}<th>Evidence</th>{{end}}</tr></thead>
+        <tbody>
+        {{range .Invest}}
+            <tr title="{{.Help}}"><td class="admin-metrics-name">{{if .URL}}<a href="{{.URL}}">{{.Label}}</a>{{else}}{{.Label}}{{end}}</td><td class="admin-metrics-wrap admin-metrics-words">{{template "admin-metrics-signal-rate" .}}</td>{{if $.Metrics.Overview.InvestEvidence}}<td class="admin-metrics-wrap">{{.Evidence}}</td>{{end}}</tr>
+        {{else}}
+            <tr><td colspan="{{if $.Metrics.Overview.InvestEvidence}}3{{else}}2{{end}}" class="admin-usage-empty">{{if $.Metrics.Overview.Counted}}Nothing to report in this window{{else}}{{template "admin-metrics-uncounted" $.Metrics.Overview.Read}}{{end}}</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+</div>
+</div>
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Areas</h2>
+        <span class="count">events counted in the window</span>
+    </div>
+    {{template "admin-metrics-areas-note"}}
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Area</th><th class="num">Counted events</th></tr></thead>
+        <tbody>
+        {{range .Areas}}
+            <tr><td><a href="{{.URL}}">{{if .Area}}{{.Area}}{{else}}no area{{end}}</a></td><td class="num admin-mono">{{.Events}}</td></tr>
+        {{else}}
+            <tr><td colspan="2" class="admin-usage-empty">{{if $.Metrics.Overview.Counted}}No area has rows in this window{{else}}{{template "admin-metrics-uncounted" $.Metrics.Overview.Read}}{{end}}</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Stored state, all sites</h2>
+        <span class="count">{{if .StockRead.Failed}}could not be read{{else if .StockStale}}no recent count{{else if .StockDay.IsZero}}not measured{{else}}counts from {{.StockDay.Format "Jan 2, 2006"}}{{end}}</span>
+    </div>
+    {{if .StockRead.Failed}}
+    <p class="admin-metrics-dim">{{.StockRead.Message}}</p>
+    {{else if .Stock}}
+    <div class="admin-metrics-stock">
+    {{range .Stock}}{{$shares := not .Several}}
+        <details>
+            <summary title="{{.Help}}"><span class="admin-mono">{{.Name}}</span> <span class="admin-metrics-dim">{{.Total}}</span></summary>
+            {{if .Help}}<p class="admin-metrics-help">{{.Help}}</p>{{end}}
+            {{if .Rows}}
+            <div class="admin-table-wrap">
+            <table class="table-data admin-table">
+                <thead><tr><th>Part</th>{{if $shares}}<th class="num">Count</th><th class="num">Share</th>{{else}}<th class="num">Rows</th>{{end}}</tr></thead>
+                <tbody>
+                {{range .Rows}}
+                    <tr><td class="admin-metrics-name">{{.Label}}</td><td class="num admin-mono">{{.N}}</td>{{if $shares}}<td class="num admin-mono">{{printf "%.1f%%" (mulf .Share 100.0)}}</td>{{end}}</tr>
+                {{end}}
+                </tbody>
+            </table>
+            </div>
+            {{end}}
+        </details>
+    {{end}}
+    </div>
+    {{else if .StockStale}}
+    <p class="admin-metrics-dim">Stored state: {{.StockStale}}.</p>
+    {{else}}
+    <p class="admin-metrics-dim">Stored state: not measured.</p>
+    {{end}}
+</div>
+{{end}}
+{{end}}
+
+{{define "admin-metrics-key"}}{{if .URL}}<a href="{{.URL}}" class="admin-mono">{{.Name}}</a>{{else}}<span class="admin-mono">{{.Name}}</span>{{end}}{{with .Scope}} on {{.}}{{end}}{{with .Value}}: {{.}}{{end}}{{end}}
+
+{{define "admin-metrics-class"}}{{if eq .Class "unused_so_far"}}unused so far, {{.DaysMeasured}} days{{else if eq .Class "not_measured"}}not measured{{else if eq .Class "reviewed"}}reviewed{{else if .Class}}{{.Class}}{{else}}in use{{end}}{{end}}
+
+{{define "admin-metrics-rate"}}{{if .RateText}}{{.RateText}}{{else}}<span class="admin-metrics-dim">{{with .NoRate}}{{.}}{{else}}no rate{{end}}</span>{{end}}{{end}}
+
+{{define "admin-metrics-signal-rate"}}{{if .NotMeasured}}<span class="admin-metrics-dim">not measured</span>{{else if .RateText}}{{.RateText}}{{else if .Denom}}<span class="admin-metrics-dim">too few to say</span>{{end}}{{end}}
+
+{{/* What the Areas number is, on the Overview and the Feature index. */}}
+{{define "admin-metrics-areas-note"}}<p class="admin-metrics-dim">Each number is a sum of everything counted in the area. Some areas count several events on each view and others few, so areas are not comparable by this number; it shows where the counting is, not which area is used more.</p>{{end}}
+
+{{define "admin-metrics-uncounted"}}{{if .Failed}}{{.Message}}{{else}}No complete day yet: the first nightly summary has not run.{{end}}{{end}}

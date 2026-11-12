@@ -85,6 +85,7 @@ type AdminVars struct {
 	UsageStats  *UsageDashboard
 	SearchStats *SearchesDashboard
 	AlertStats  *AlertsAdminDashboard
+	Metrics     *MetricsView
 
 	CheckpointsText    string
 	ACLText            string
@@ -244,6 +245,24 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	if page == "alerts" {
 		if store := s.alerts.Store(); store != nil {
 			pageVars.AlertStats = loadAlertsDashboard(r.Context(), store, string(Config().Game))
+		}
+	}
+	// The Metrics section reads the feature tables the same way.
+	if page == "metrics" {
+		if store := metricsStoreFn(); store != nil {
+			ctx, cancel := metricsContext(r)
+			defer cancel()
+			cache := metricsCache(store)
+			params := readMetricsParams(r.FormValue, metricsInstances(ctx, store, cache, now))
+			lists := metricsListsFor(s, p, params.Instance)
+			warned := pageVars.WarningMessage
+			if adminMetricsReview(ctx, w, r, store, lists, params, &pageVars) {
+				return
+			}
+			pageVars.Metrics = loadMetricsView(ctx, store, cache, lists, params, now)
+			if pageVars.WarningMessage != warned {
+				pageVars.Metrics.Message = pageVars.WarningMessage
+			}
 		}
 	}
 

@@ -1,0 +1,203 @@
+{{define "admin-metrics-feature"}}
+{{with .Metrics.Feature}}
+{{if .NoSuchName}}
+<div class="admin-msg">No such metric: the name asked for is not in this site's list of metrics.</div>
+{{else if .Name}}{{template "admin-metrics-feature-name" $}}
+{{else if .Area}}{{template "admin-metrics-feature-area" $}}
+{{else}}{{template "admin-metrics-feature-index" $}}
+{{end}}
+{{end}}
+{{end}}
+
+{{define "admin-metrics-feature-index"}}
+{{with .Metrics.Feature}}
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Areas</h2>
+        <span class="count">{{if .Counted}}events counted in the window{{else}}{{len .Areas}} areas{{end}}</span>
+    </div>
+    {{if not .Counted}}<p class="admin-metrics-dim">{{template "admin-metrics-uncounted" .Read}}</p>{{else}}{{template "admin-metrics-areas-note"}}{{end}}
+    {{if .Areas}}
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Area</th>{{if .Counted}}<th class="num">Counted events</th>{{end}}</tr></thead>
+        <tbody>
+        {{range .Areas}}
+            <tr><td><a href="{{.URL}}">{{.Area}}</a></td>{{if $.Metrics.Feature.Counted}}<td class="num admin-mono">{{.Events}}</td>{{end}}</tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{else}}
+    <p class="admin-metrics-dim">No area has a metric counted here.</p>
+    {{end}}
+</div>
+{{if .OtherAreas}}
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Other areas</h2>
+        <span class="count">{{len .OtherAreas}} areas</span>
+    </div>
+    <p class="admin-metrics-dim">Their metrics describe context, the site itself or stored state, so they are not summed here.</p>
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Area</th></tr></thead>
+        <tbody>
+        {{range .OtherAreas}}
+            <tr><td><a href="{{.URL}}">{{.Area}}</a></td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+</div>
+{{end}}
+{{end}}
+{{end}}
+
+{{define "admin-metrics-feature-area"}}
+{{with .Metrics.Feature}}
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>{{.Area}}</h2>
+        <span class="count">{{len .Names}} metrics</span>
+    </div>
+    {{if .Read.Failed}}<p class="admin-metrics-dim">{{.Read.Message}}</p>
+    {{else if not .Counted}}<p class="admin-metrics-dim">{{template "admin-metrics-uncounted" .Read}}</p>{{end}}
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table admin-metrics-names">
+        <thead><tr><th>Name</th><th>Family and kind</th><th class="num">Count</th><th>Rate</th>{{if not $.IsMobile}}<th>Last {{$.Metrics.Days}} days</th>{{end}}</tr></thead>
+        <tbody>
+        {{range .Names}}
+            <tr>
+                <td class="admin-metrics-name"><a href="{{.URL}}" class="admin-mono">{{.Name}}</a>{{if .Help}}<span class="admin-metrics-help">{{.Help}}</span>{{end}}</td>
+                <td class="admin-metrics-wrap">{{.Family}}{{with .Kind}}, {{.}}{{end}}</td>
+                {{if .Standing}}
+                <td class="num admin-mono">{{if and .Counted (not .Day.IsZero)}}{{.Count}}{{end}}</td>
+                <td class="admin-metrics-wrap">{{if not .Counted}}<span class="admin-metrics-dim">{{if $.Metrics.Feature.Read.Failed}}could not be read{{else}}no complete day yet{{end}}</span>{{else if .Day.IsZero}}<span class="admin-metrics-dim">no row on the newest stored-state day</span>{{else}}standing count on {{.Day.Format "Jan 2, 2006"}}, not a sum{{end}}</td>
+                {{else}}
+                <td class="num admin-mono">{{if .Counted}}{{.Count}}{{end}}</td>
+                <td class="admin-metrics-wrap">{{if not .Counted}}<span class="admin-metrics-dim">{{if $.Metrics.Feature.Read.Failed}}could not be read{{else}}no complete day yet{{end}}</span>{{else if .RateText}}{{.RateText}}{{else}}<span class="admin-metrics-dim">{{.NoRate}}</span>{{end}}</td>
+                {{end}}
+                {{if not $.IsMobile}}<td>{{if .SparkID}}<div class="admin-metrics-spark"><canvas id="{{.SparkID}}" aria-label="{{.Name}} by day" role="img"></canvas></div>{{end}}</td>{{end}}
+            </tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+</div>
+{{$sparks := false}}{{range .Names}}{{if .SparkID}}{{$sparks = true}}{{end}}{{end}}
+{{if $sparks}}
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>By day</h2>
+        <span class="count">the numbers behind each line</span>
+    </div>
+    {{range .Names}}{{$name := .Name}}{{if .SparkID}}{{with $.Metrics.ChartPoints .SparkID}}
+    <details class="admin-metrics-days">
+        <summary><span class="admin-mono">{{$name}}</span> <span class="admin-metrics-dim">by day, {{len .}} days</span></summary>
+        {{template "admin-metrics-points" (dict "Unit" "Day" "Points" .)}}
+    </details>
+    {{end}}{{end}}{{end}}
+</div>
+{{end}}
+{{end}}
+{{end}}
+
+{{define "admin-metrics-feature-name"}}
+{{with .Metrics.Feature}}
+<div class="admin-section admin-metrics-feature">
+    <div class="admin-section-header">
+        <h2 class="admin-mono">{{.Name.Name}}</h2>
+        <span class="count">{{.Family}}{{with .Name.Kind}}, {{.}}{{end}}</span>
+    </div>
+    {{if .Name.Help}}<p class="admin-metrics-lead">{{.Name.Help}}</p>{{end}}
+    <p class="admin-metrics-links">{{if .AreaURL}}<a href="{{.AreaURL}}">Area: {{.Name.Area}}</a> &middot; {{end}}<a href="{{.ExploreURL}}">Explore every scope and value</a></p>
+    {{if .Read.Failed}}
+    <p class="admin-metrics-dim">{{.Read.Message}}</p>
+    {{else if not .Counted}}
+    <p class="admin-metrics-dim">{{template "admin-metrics-uncounted" .Read}}</p>
+    {{else if .Standing}}
+    {{if .HasRows}}
+    <p class="admin-metrics-total">Standing count on {{.StockDay.Format "Jan 2, 2006"}}: <span class="admin-mono">{{.Total}}</span></p>
+    <p class="admin-metrics-dim">This is how many there were that night, across every site. It is not a sum over the window, and the reader and bot choices above do not apply to it.</p>
+    {{else}}
+    <p class="admin-metrics-dim">No row of this metric on the newest stored-state day.</p>
+    {{end}}
+    {{else if .HasRows}}
+    <p class="admin-metrics-total">Total in the last {{$.Metrics.Days}} days{{if $.Metrics.Folded}} through {{$.Metrics.Through.Format "Jan 2, 2006"}}{{end}}: <span class="admin-mono">{{.Total}}</span></p>
+    {{else}}
+    <p class="admin-metrics-dim">No rows for this metric in the last {{$.Metrics.Days}} days.</p>
+    {{end}}
+</div>
+
+{{if .DaysID}}
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>By day</h2>
+        <span class="count">{{if .Standing}}standing count each night{{else}}sum each day{{end}}</span>
+    </div>
+    {{if not $.IsMobile}}<div class="admin-metrics-chart"><canvas id="{{.DaysID}}" aria-label="{{.Name.Name}} by day" role="img"></canvas></div>{{end}}
+    {{with $.Metrics.ChartPoints .DaysID}}
+    <details class="admin-metrics-days">
+        <summary>The numbers by day ({{len .}} days)</summary>
+        {{template "admin-metrics-points" (dict "Unit" "Day" "Points" .)}}
+    </details>
+    {{end}}
+</div>
+{{end}}
+
+{{if and .Counted .HasRows}}
+<div class="admin-usage-grid admin-metrics-splits">
+    {{template "admin-metrics-shares" (dict "Title" "By value" "Part" "Value" "Rows" .Values "Several" .Several)}}
+    {{template "admin-metrics-shares" (dict "Title" "By scope" "Part" "Scope" "Rows" .Scopes "Several" .Several)}}
+    {{if .Standing}}
+    <div class="admin-section"><p class="admin-metrics-dim">Stored-state counts are not split by reader tier or device.</p></div>
+    {{else if .TiersRead.Failed}}
+    <div class="admin-section"><p class="admin-metrics-dim">By tier: {{.TiersRead.Message}}</p></div>
+    {{else if .DevicesRead.Failed}}
+    <div class="admin-section"><p class="admin-metrics-dim">By device: {{.DevicesRead.Message}}</p></div>
+    {{else}}
+    {{template "admin-metrics-shares" (dict "Title" "By reader tier" "Part" "Tier" "Rows" .Tiers)}}
+    {{template "admin-metrics-shares" (dict "Title" "By device" "Part" "Device" "Rows" .Devices)}}
+    {{end}}
+</div>
+{{end}}
+{{end}}
+{{end}}
+
+{{define "admin-metrics-shares"}}{{if .Rows}}
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>{{.Title}}</h2>
+        <span class="count">{{len .Rows}} parts</span>
+    </div>
+    {{template "admin-metrics-share-table" .}}
+</div>
+{{end}}{{end}}
+
+{{define "admin-metrics-share-table"}}
+<div class="admin-table-wrap">
+<table class="table-data admin-table">
+    {{$several := .Several}}
+    <thead><tr><th>{{.Part}}</th>{{if $several}}<th class="num">Rows</th>{{else}}<th class="num">Count</th><th class="num">Share</th>{{end}}</tr></thead>
+    <tbody>
+    {{range .Rows}}
+        <tr><td class="admin-metrics-name">{{.Label}}</td><td class="num admin-mono">{{.N}}</td>{{if not $several}}<td class="num admin-mono">{{printf "%.1f%%" (mulf .Share 100.0)}}</td>{{end}}</tr>
+    {{end}}
+    </tbody>
+</table>
+</div>
+{{end}}
+
+{{define "admin-metrics-points"}}
+<div class="admin-table-wrap">
+<table class="table-data admin-table">
+    <thead><tr><th>{{.Unit}}</th><th class="num">Count</th></tr></thead>
+    <tbody>
+    {{range .Points}}
+        <tr><td class="admin-mono">{{.Label}}</td><td class="num admin-mono">{{.N}}</td></tr>
+    {{end}}
+    </tbody>
+</table>
+</div>
+{{end}}
