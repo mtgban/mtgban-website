@@ -658,6 +658,10 @@ func (ref signingRefusal) write(w http.ResponseWriter, r *http.Request, s *site,
 	if ref.login {
 		pageVars.PatreonLogin = true
 	}
+	// Not on a throttled request: the preview costs a userstate read.
+	if r.URL.Path == "/upload" && ref.status != http.StatusTooManyRequests {
+		pageVars.SharePreview = uploadSharePreview(r, s.backend())
+	}
 	render(w, "home.html", pageVars)
 }
 
