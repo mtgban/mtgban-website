@@ -5,6 +5,14 @@
     var groups = document.querySelectorAll('.result-quick-icons');
     if (!groups.length) return;
 
+    // setIconScope says whether a group's counted icons are clicked inline or from the open menu.
+    function setIconScope(group, scope) {
+        group.querySelectorAll('[data-track="ui.result.icon"]').forEach(function (el) {
+            if (scope === 'menu') el.setAttribute('data-track-scope', 'menu');
+            else el.setAttribute('data-track-scope', 'header');
+        });
+    }
+
     groups.forEach(function (group) {
         var toggle = group.querySelector('.qi-toggle');
         var actions = group.querySelector('.qi-actions');
@@ -22,6 +30,7 @@
         function close() {
             group.classList.remove('qi-open');
             toggle.setAttribute('aria-expanded', 'false');
+            setIconScope(group, 'header');
         }
 
         toggle.addEventListener('click', function (e) {
@@ -29,6 +38,7 @@
             var open = !group.classList.contains('qi-open');
             // Only one menu open at a time.
             groups.forEach(function (g) {
+                if (g.classList.contains('qi-open')) setIconScope(g, 'header');
                 g.classList.remove('qi-open');
                 var t = g.querySelector('.qi-toggle');
                 if (t) t.setAttribute('aria-expanded', 'false');
@@ -36,6 +46,7 @@
             if (open) {
                 group.classList.add('qi-open');
                 toggle.setAttribute('aria-expanded', 'true');
+                setIconScope(group, 'menu');
             }
         });
 
@@ -46,6 +57,7 @@
     // Click anywhere else closes any open menu.
     document.addEventListener('click', function () {
         groups.forEach(function (g) {
+            if (g.classList.contains('qi-open')) setIconScope(g, 'header');
             g.classList.remove('qi-open');
             var t = g.querySelector('.qi-toggle');
             if (t) t.setAttribute('aria-expanded', 'false');

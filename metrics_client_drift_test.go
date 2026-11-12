@@ -45,9 +45,20 @@ var (
 	scriptLiteral = regexp.MustCompile(`^\s*(["'])([^"'\\]*)(["'])\s*(?:[;,)}\r\n]|$)`)
 )
 
-// Value and scope marks this test lets through though templated or built, as "file: use".
+// Value and scope marks this test lets through though templated or built, as "file: name: use".
 // Each entry needs a comment saying why its value is bounded and never reader text.
-var trackValueAllowlist = []string{}
+var trackValueAllowlist = []string{
+	// ui.row.store: a row's scraper shorthand set server side, never reader text; the registry types it a store, so Check folds an unloaded one to other.
+	`templates/search.html: ui.row.store: data-track-value="{{or .Shorthand "other"}}" data-track-s`,
+	`templates/mobile/search.html: ui.row.store: data-track-value="{{or $entry.Shorthand "other"}}" data-t`,
+	// ui.row.condition: $conditions ranges over AllConditions (search.go), the registry's enum exactly; Check refuses any other.
+	`templates/mobile/search.html: ui.row.condition: data-track-value="{{$conditions}}">{{$conditions}}</butto`,
+}
+
+// allowKey is a mark's key in trackValueAllowlist.
+func (m trackMark) allowKey() string {
+	return m.file + ": " + m.name + ": " + m.use
+}
 
 // trackScan is what the files hold: names with the files sending them, uses it
 // could not read, and every value and scope mark.
@@ -215,7 +226,7 @@ func (s *trackScan) problems() []string {
 	}
 	for _, m := range s.marks {
 		if !m.literal {
-			if !slices.Contains(trackValueAllowlist, m.file+": "+m.use) {
+			if !slices.Contains(trackValueAllowlist, m.allowKey()) {
 				out = append(out, fmt.Sprintf("%s: %s is templated or built (%s): a templated value could send text a reader typed; write a literal, or allowlist it saying why it is bounded", m.file, m.attr, m.use))
 			}
 			continue
@@ -381,5 +392,17 @@ func TestTrackValuesAreLiterals(t *testing.T) {
 	_, problems := scanFixture("templates/a.html", `<b data-track="export.search" data-track-value="retail" data-track-scope="singles">`)
 	if hasProblem(problems, "data-track-") {
 		t.Errorf("a literal in its name's sets is flagged: %q", problems)
+	}
+}
+
+// An allowlist entry covers its own name only, not the same text under another.
+func TestTrackValueAllowlistIsKeyedOnTheName(t *testing.T) {
+	const use = ` data-track-value="{{or .Shorthand "other"}}" data-track-scope="seller">`
+	if _, problems := scanFixture("templates/search.html", `<a data-track="ui.row.store"`+use); len(problems) != 0 {
+		t.Errorf("the allowlisted mark is flagged: %q", problems)
+	}
+	_, problems := scanFixture("templates/search.html", `<a data-track="ui.result.image"`+use)
+	if !hasProblem(problems, "templates/search.html", "data-track-value", "text a reader typed") {
+		t.Errorf("the allowlisted text under another name is not flagged: %q", problems)
 	}
 }

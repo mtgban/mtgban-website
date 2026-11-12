@@ -12,7 +12,7 @@
             <span class="landing-pane-title">Shared favorites{{if .SharedCount}} ({{.SharedCount}}){{end}}</span>
             {{if .SharedRows}}
             <span class="landing-pane-actions">
-                <button class="landing-pane-btn landing-pane-merge" id="shared-merge" type="button" title="Add these cards to your favorites">Merge into my favorites</button>
+                <button class="landing-pane-btn landing-pane-merge" id="shared-merge" type="button" title="Add these cards to your favorites" data-track="ui.fav.merge">Merge into my favorites</button>
             </span>
             {{end}}
         </div>
@@ -23,7 +23,7 @@
         {{else}}
         <div class="landing-pane-body">
             {{range .SharedRows}}
-            <a class="landing-item landing-item-fav landing-item-shared" href="/search?q={{.Query}}" data-fav-id="{{.ID}}">
+            <a class="landing-item landing-item-fav landing-item-shared" href="/search?q={{.Query}}" data-fav-id="{{.ID}}" data-track="ui.fav.shared_open">
                 <div class="landing-item-thumb"><span class="landing-item-thumb-placeholder">&#9733;</span></div>
                 <div class="landing-item-info">
                     <div class="landing-item-line1">

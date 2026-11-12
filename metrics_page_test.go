@@ -102,7 +102,8 @@ func TestMetricsPageIsEmptyWhereNoPageWasShown(t *testing.T) {
 	}{
 		{"an error on base.html", "search.html", false, withError, empty},
 		{"an error on the phone base", "search.html", true, withError, empty},
-		{"an error on the landing page, which still shows its content", "home.html", false, withError, home},
+		{"an error on the landing page", "home.html", false, withError, empty},
+		{"the landing page", "home.html", false, base, home},
 		{"the iframe on base.html", "search.html", false, inModal, empty},
 		{"the iframe on the landing page", "home.html", false, inModal, empty},
 	} {

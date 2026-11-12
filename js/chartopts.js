@@ -302,6 +302,7 @@ function renderChartLegend(chart, containerId, storageKey) {
         btn.addEventListener('click', function() {
             var idx = parseInt(this.getAttribute('data-index'));
             var visible = chart.isDatasetVisible(idx);
+            typeof BAN !== 'undefined' && BAN.track('ui.chart.legend', visible ? 'hide' : 'show');
             chart.setDatasetVisibility(idx, !visible);
             chart.update();
             this.classList.toggle('hidden');
@@ -1050,6 +1051,7 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
 // changes and grow the canvas continuously until the next idle moment.
 var pendingCheckpointUpdate = false;
 function toggleCheckpointType(type, on) {
+    typeof BAN !== 'undefined' && BAN.track('ui.chart.checkpoint', type, on ? 'on' : 'off');
     if (on) visibleCheckpointTypes.add(type);
     else visibleCheckpointTypes.delete(type);
     if (type === 'release' && isLongChartRange(currentRangeDays)) {

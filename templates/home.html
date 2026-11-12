@@ -72,7 +72,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
         {{end}}
 
         <div class="landing-search-wrap">
-            <form class="autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
+            <form class="autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform" data-track="ui.searchbar.submit" {{if .ModalMode}}data-track-value="modal"{{else}}data-track-value="home"{{end}}>
                 <input id="searchbox" class="landing-search" type="text" name="q"
                        placeholder="Search for a card or product..."
                        maxlength="1000" autofocus autocapitalize="none" autocorrect="off"
@@ -83,7 +83,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
             </form>
             <div class="landing-actions">
                 <button class="landing-action-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
-                <a class="landing-action-btn" href="/random{{if .ModalMode}}?chart={{.ChartIDsCSV}}&modal=1{{end}}" title="Random Card"><i data-lucide="dice-5"></i></a>
+                <a class="landing-action-btn" href="/random{{if .ModalMode}}?chart={{.ChartIDsCSV}}&modal=1{{end}}" title="Random Card"{{if and .MetricsPage (not (or .ModalMode .ErrorMessage))}} data-track="ui.home" data-track-value="random"{{end}}><i data-lucide="dice-5"></i></a>
             </div>
         </div>
 
@@ -91,7 +91,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
         <div class="landing-tools">
             {{range .Nav}}
                 {{if and (ne .Name "Home") (ne .Name "Changelog") (ne .Name "Account")}}
-                    <a class="landing-tool" href="{{.Link}}">
+                    <a class="landing-tool" href="{{.Link}}"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="tool_tile"{{end}}>
                         <span class="t-icon">{{.Short}}</span> {{.Name}}
                     </a>
                 {{end}}
@@ -117,13 +117,13 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
             <div class="landing-popular-viewport" id="landing-popular-viewport">
                 <div class="landing-popular-track" style="animation-duration: calc({{len .PopularSearches}} * 4s)">
                     {{range .PopularSearches}}
-                    <a class="landing-popular-card" href="{{.URL}}" title="{{.Label}}">
+                    <a class="landing-popular-card" href="{{.URL}}" title="{{.Label}}"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="popular_card"{{end}}>
                         <img class="landing-popular-img" src="{{.ImageURL}}" alt="{{.Label}}" loading="lazy">
                         <span class="landing-popular-label">{{.Label}}</span>
                     </a>
                     {{end}}
                     {{range .PopularSearches}}
-                    <a class="landing-popular-card" href="{{.URL}}" title="{{.Label}}" aria-hidden="true" tabindex="-1">
+                    <a class="landing-popular-card" href="{{.URL}}" title="{{.Label}}" aria-hidden="true" tabindex="-1"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="popular_card"{{end}}>
                         <img class="landing-popular-img" src="{{.ImageURL}}" alt="" loading="lazy">
                         <span class="landing-popular-label">{{.Label}}</span>
                     </a>
@@ -146,6 +146,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
             try { apply(localStorage.getItem(KEY) === '1'); } catch (e) {}
             btn.addEventListener('click', function() {
                 var collapsed = !box.classList.contains('collapsed');
+                {{if and .MetricsPage (not (or .ModalMode .ErrorMessage))}}if (window.BAN && window.BAN.track) window.BAN.track('ui.home', collapsed ? 'popular_collapse' : 'popular_expand');{{end}}
                 apply(collapsed);
                 try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (e) {}
             });

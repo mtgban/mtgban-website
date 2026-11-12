@@ -41,8 +41,8 @@ function storage(saved = {}) {
 
 // openCard loads the scripts into a fresh page and draws a card's chart the way
 // the single-card branch of js/search-chart.js does: the window it rendered,
-// the saved stores hidden, then the legend.
-function openCard(localStorage, stores) {
+// the saved stores hidden, then the legend. BAN, when given, records counts.
+function openCard(localStorage, stores, BAN) {
     // The legend's buttons are read back out of its html, so a test can click
     // one by the store it names.
     const legend = {
@@ -58,8 +58,8 @@ function openCard(localStorage, stores) {
         },
     };
     const document = { getElementById: (id) => (id === 'chartLegend' ? legend : null) };
-    const page = new Function('Chart', 'document', 'localStorage', scripts +
-        '; return { applySavedLegendState, renderChartLegend, chartDatasetConfig };')(Chart, document, localStorage);
+    const page = new Function('Chart', 'document', 'localStorage', 'BAN', 'requestAnimationFrame', scripts +
+        '; return { applySavedLegendState, renderChartLegend, chartDatasetConfig, toggleCheckpointType };')(Chart, document, localStorage, BAN, () => {});
 
     const chart = new Chart(stores.map((s) => ({ label: s.name, data: [1], borderColor: s.color, fill: 'origin' })));
     page.applySavedLegendState(chart, KEY);
@@ -68,6 +68,7 @@ function openCard(localStorage, stores) {
     return {
         chart,
         legend,
+        toggleCheckpointType: page.toggleCheckpointType,
         click(store) {
             legend.buttons.find((b) => b.name === store.name).click();
         },
@@ -194,4 +195,38 @@ test('a tooltip row shows its line as text', () => {
 
     expect(tags(el.innerHTML)).toEqual(['div', 'span', 'span']);
     expect(unescape(el.innerHTML.match(/<span>([^<]*)<\/span>/)[1])).toBe(line);
+});
+
+// What the chart counts: which way a legend entry went, and a checkpoint type
+// by its fixed name. A store's name is never counted.
+test('a legend click counts the way it went', () => {
+    const calls = [];
+    const card = openCard(storage(), [LOW, MARKET], { track: (...a) => calls.push(a) });
+
+    card.click(LOW);
+    card.click(LOW);
+
+    expect(calls).toEqual([['ui.chart.legend', 'hide'], ['ui.chart.legend', 'show']]);
+    expect(lines(card)).toEqual(['TCGplayer Low', 'TCGplayer Market']);
+});
+
+test('a checkpoint toggle counts its type and direction', () => {
+    const calls = [];
+    const card = openCard(storage(), [LOW], { track: (...a) => calls.push(a) });
+
+    card.toggleCheckpointType('ban', false);
+    card.toggleCheckpointType('release', true);
+
+    expect(calls).toEqual([['ui.chart.checkpoint', 'ban', 'off'], ['ui.chart.checkpoint', 'release', 'on']]);
+});
+
+test('with no metrics script the legend and the toggles still work', () => {
+    const viewer = storage();
+    const card = openCard(viewer, [LOW, MARKET]);
+
+    card.click(MARKET);
+    card.toggleCheckpointType('ban', false);
+
+    expect(lines(card)).toEqual(['TCGplayer Low', 'TCGplayer Market (hidden)']);
+    expect(JSON.parse(viewer.getItem('chartCheckpointTypes'))).not.toContain('ban');
 });

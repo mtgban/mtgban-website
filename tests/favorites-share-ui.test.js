@@ -98,3 +98,50 @@ test('a second click while the share opens sends nothing new', async () => {
     await first;
     expect(calls).toEqual(['GET', 'POST']);
 });
+
+// The share panel counts what it showed: an existing link, or one it made.
+test('opening the share counts open or create, and closing counts nothing', async () => {
+    let existing = { id: 'LINKLINKLINKLINKLINKLI' };
+    const fetch = (url, opts) => {
+        if (opts.method === 'POST') existing = { id: 'NEWNEWNEWNEWNEWNEWNEWN' };
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(existing) });
+    };
+    const inserted = [];
+    const header = { insertAdjacentHTML: (where, html) => inserted.push(html) };
+    const pane = { querySelector: () => header };
+    const btn = { closest: () => pane };
+    const byId = {};
+    const document = {
+        readyState: 'complete', documentElement: { dataset: { signedIn: 'true' } },
+        addEventListener: () => {},
+        getElementById: id => byId[id] || null,
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        createElement: () => ({ style: {}, classList: { add: () => {}, remove: () => {} } }),
+    };
+    const calls = [];
+    const localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+    const window = { location: { origin: 'https://ban.test' }, addEventListener: () => {}, BAN: { track: (...a) => calls.push(a) } };
+    new Function('window', 'document', 'localStorage', 'fetch', 'navigator', 'location', 'ListStorage', 'escapeAttr', 'escapeHtml',
+        source)(window, document, localStorage, fetch, {}, window.location, { read: () => [], save: () => {}, isLive: () => true, pinnedFirst: l => l, tombstones: () => [] }, s => String(s), s => String(s));
+
+    await window.openFavoritesShare(btn);
+    expect(calls).toEqual([['ui.fav.share', 'open']]);
+    expect(inserted[0]).toContain('data-track="ui.fav.share" data-track-value="copy"');
+    expect(inserted[0]).toContain('data-track="ui.fav.share" data-track-value="stop"');
+    expect(inserted[0]).not.toMatch(/data-track-value="[^"]*LINK/);
+
+    byId['fav-share-panel'] = { remove: () => { byId['fav-share-panel'] = null; } };
+    await window.openFavoritesShare(btn);
+    expect(calls.length).toBe(1);
+    expect(byId['fav-share-panel']).toBeNull();
+
+    existing = {};
+    await window.openFavoritesShare(btn);
+    expect(calls).toEqual([['ui.fav.share', 'open'], ['ui.fav.share', 'create']]);
+
+    byId['fav-share-panel'] = null;
+    pane.querySelector = () => null;
+    await window.openFavoritesShare(btn);
+    expect(calls.length).toBe(2);   // no header, no panel, no count
+});

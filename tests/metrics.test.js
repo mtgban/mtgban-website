@@ -81,16 +81,50 @@ test('a middle click counts on a link and nowhere else', () => {
     expect(p.beacons[0].body).toEqual([LOAD, { n: 'ui.a', c: 1 }]);
 });
 
-test('a middle click counts the marked element only when it is or sits inside a link', () => {
+test("a middle click counts the nearest link's own mark and nothing else", () => {
     const p = load(NO_LOAD);
     const row = el({ 'data-track': 'ui.row' }, null, 'div');
     dispatch(p, 'auxclick', el({ href: '/go/x' }, row, 'a'), { button: 1 });   // untracked link in a tracked row
     const link = el({ 'data-track': 'ui.link', href: '/go/y' }, null, 'a');
     dispatch(p, 'auxclick', el({}, link, 'img'), { button: 1 });              // a child of a tracked link
     const outer = el({ href: '/go/z' }, null, 'a');
-    dispatch(p, 'auxclick', el({ 'data-track': 'ui.inner' }, outer, 'span'), { button: 1 });  // tracked inside a link
+    dispatch(p, 'auxclick', el({ 'data-track': 'ui.inner' }, outer, 'span'), { button: 1 });  // tracked inside an untracked link
     p.hide();
-    expect(p.sent()).toEqual([{ n: 'ui.link', c: 1 }, { n: 'ui.inner', c: 1 }]);
+    expect(p.sent()).toEqual([{ n: 'ui.link', c: 1 }]);
+});
+
+test('a middle click on a marked control inside a marked link counts the link', () => {
+    const p = load(NO_LOAD);
+    const entry = el({ 'data-track': 'ui.fav', 'data-track-value': 'open', href: '?q=x' }, null, 'a');
+    const del = el({ 'data-track': 'ui.fav', 'data-track-value': 'delete' }, entry, 'button');
+    dispatch(p, 'auxclick', del, { button: 1 });
+    dispatch(p, 'auxclick', el({}, del, 'svg'), { button: 1 });
+    p.hide();
+    expect(p.sent()).toEqual([{ n: 'ui.fav', v: 'open', c: 2 }]);
+});
+
+test('a middle click on a javascript: link counts nothing', () => {
+    const p = load(NO_LOAD);
+    for (const href of ['javascript:void(0)', '  JavaScript:go()', '\tjavascript:;']) {
+        dispatch(p, 'auxclick', el({ 'data-track': 'ui.chart.download', href }, null, 'a'), { button: 1 });
+    }
+    dispatch(p, 'auxclick', el({ 'data-track': 'ui.ok', href: '/javascript:x' }, null, 'a'), { button: 1 });
+    p.hide();
+    expect(p.sent()).toEqual([{ n: 'ui.ok', c: 1 }]);
+});
+
+test('left clicks still count the nearest mark wherever the link is', () => {
+    const p = load(NO_LOAD);
+    const entry = el({ 'data-track': 'ui.fav', 'data-track-value': 'open', href: '?q=x' }, null, 'a');
+    dispatch(p, 'click', el({ 'data-track': 'ui.fav', 'data-track-value': 'delete' }, entry, 'button'));
+    dispatch(p, 'click', el({ 'data-track': 'ui.chart.download', href: 'javascript:void(0)' }, null, 'a'));
+    dispatch(p, 'click', el({ 'data-track': 'ui.inner' }, el({ href: '/go/z' }, null, 'a'), 'span'));
+    dispatch(p, 'click', el({ href: '/go/x' }, el({ 'data-track': 'ui.row' }, null, 'div'), 'a'));
+    p.hide();
+    expect(p.sent()).toEqual([
+        { n: 'ui.fav', v: 'delete', c: 1 }, { n: 'ui.chart.download', c: 1 },
+        { n: 'ui.inner', c: 1 }, { n: 'ui.row', c: 1 },
+    ]);
 });
 
 test('a form counts when it submits, once, and not when it is clicked', () => {

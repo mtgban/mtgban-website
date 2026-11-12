@@ -126,7 +126,7 @@ func TestCardPrintingsDrawTheSetSymbol(t *testing.T) {
 			name: "keyrune set",
 			set:  matcher.Set{Code: "PM10", Name: "Magic 2010 Promos", KeyruneCode: "M10"},
 			want: []string{
-				`href="/search?q=Bolt+s%3APM10"><i class="ss ss-m10 ss-2x ss-fw`,
+				`href="/search?q=Bolt+s%3APM10" data-track="ui.sidebar.printing" data-track-value="row"><i class="ss ss-m10 ss-2x ss-fw`,
 				`data-mark="★"`,
 			},
 			absent: []string{`<img`, `<svg`},
@@ -139,6 +139,7 @@ func TestCardPrintingsDrawTheSetSymbol(t *testing.T) {
 				`<img class="set-symbol-art " src="https://example.com/ma.png" alt="MA" title="EX Team Magma vs Team Aqua"`,
 				`<span hidden> <svg`,
 				`>MA</text>`,
+				`data-track="ui.sidebar.printing" data-track-value="row">`,
 			},
 			absent: []string{`title="MA"`, `class="ss `},
 		},

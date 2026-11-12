@@ -120,6 +120,7 @@
     btn.addEventListener('click', function() {
         var open = !isOpen();
         setOpen(open);
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.scope.toggle', open ? 'open' : 'close');
         if (open) {
             box.focus();
             box.setSelectionRange(0, box.value.length);
@@ -141,6 +142,7 @@
     // all until the keyboard is up.
     if (go) {
         go.addEventListener('click', function() {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.scope.apply', 'go');
             apply(box.value.trim());
         });
     }
@@ -163,6 +165,7 @@
             // Enter picks it, and the next one runs the search.
             var list = document.getElementById(box.id + 'autocomplete-list');
             if (list && list.querySelector('.autocomplete-active')) return;
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.scope.apply', 'enter');
             apply(box.value.trim());
         } else if (e.key === 'Escape') {
             // Dismiss, in the usual sense: put the row away and leave what

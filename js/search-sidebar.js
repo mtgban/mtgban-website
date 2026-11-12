@@ -1,4 +1,6 @@
 const PRINTINGS_THRESHOLD = 6;
+// The overflow filter is counted once a page: the panel is rebuilt on every hover.
+var printingsFilterCounted = false;
 // The panel needs at least this many editions to hold: a "+1"
 // button would open a whole panel to show one symbol.
 const PRINTINGS_MIN_OVERFLOW = 2;
@@ -100,7 +102,11 @@ document.addEventListener('click', function(e) {
     if (!card) return;
     const toggle = document.getElementById('productsToggle');
     if (toggle && toggle.contains(e.target)) {
-        if (productsIsCollapsible()) setProductsExpanded(!productsListOpen());
+        if (productsIsCollapsible()) {
+            var open = !productsListOpen();
+            setProductsExpanded(open);
+            if (open && window.BAN && window.BAN.track) window.BAN.track('ui.sidebar.products', 'expand');
+        }
         return;
     }
     // Clicked away. Only worth acting on while it is holding
@@ -205,6 +211,7 @@ function collapsePrintings() {
     overflow.forEach(a => {
         const clone = a.cloneNode(true);
         clone.classList.remove('sidebar-printings-hidden');
+        clone.setAttribute('data-track-value', 'overflow');
         list.appendChild(clone);
     });
     dropdown.appendChild(list);
@@ -236,6 +243,7 @@ function collapsePrintings() {
         positionPrintings(container, dropdown);
         dropdown.classList.add('open');
         setTriggerState(trigger, true);
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.sidebar.printings_more', 'open');
         // The filter is the reason the panel opened: take the
         // caret there so a set can be typed without reaching
         // for it. preventScroll because the panel hangs below
@@ -247,6 +255,10 @@ function collapsePrintings() {
 
     filter.addEventListener('input', function() {
         const q = this.value.trim().toLowerCase();
+        if (this.value && !printingsFilterCounted) {
+            printingsFilterCounted = true;
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.sidebar.printings_more', 'filter_used');
+        }
         list.querySelectorAll('a.printing-symbol').forEach(function(a) {
             const title = (a.getAttribute('title') || a.getAttribute('data-ban-title') || '').toLowerCase();
             const href = (a.getAttribute('href') || '').toLowerCase();
@@ -340,10 +352,18 @@ function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasW
         wrapper.setAttribute('data-set', setCode);
         wrapper.setAttribute('data-date', releaseDate || '');
         wrapper.setAttribute('data-name', cardName || '');
-        if (hasWarning) {
+        // A revealed warning stays revealed, and a click on it does nothing, so it counts nothing.
+        if (hasWarning && wrapper.classList.contains('cw-revealed')) {
             wrapper.classList.add('content-warning');
+            wrapper.removeAttribute('data-track');
+        } else if (hasWarning) {
+            wrapper.classList.add('content-warning');
+            wrapper.setAttribute('data-track', 'ui.result.image');
+            wrapper.setAttribute('data-track-value', 'reveal_warning');
         } else {
             wrapper.classList.remove('content-warning');
+            wrapper.setAttribute('data-track', 'ui.result.image');
+            wrapper.setAttribute('data-track-value', 'focus_search');
         }
     }
     // printings/products are DOM nodes cloned from the result's own

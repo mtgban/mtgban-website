@@ -148,10 +148,12 @@ func TestStock(t *testing.T) {
 // classed as use or not, so a new one cannot rank its refusals as use unnoticed.
 func TestAreaNotUseMatchesTheRegistry(t *testing.T) {
 	isUse := []string{
-		"search.result",     // results page views
-		"upload_share.open", // share links opened
-		"auth.login",        // Patreon login callbacks
-		"apiplans.handoff",  // steps of a reader's handoff to the API gateway
+		"search.result",         // results page views
+		"upload_share.open",     // share links opened
+		"auth.login",            // Patreon login callbacks
+		"apiplans.handoff",      // steps of a reader's handoff to the API gateway
+		"ui.search.sort_locked", // a reader pressed the tier-locked sort
+		"ui.row.locked",         // a reader pressed Join or Log in on a locked row, or the velocity upsell
 	}
 	for name := range notUse {
 		n, ok := observability.Lookup(name)

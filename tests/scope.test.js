@@ -24,8 +24,9 @@ function element(extra = {}) {
 }
 
 // Runs scope.js over a bar holding `pinned`, and hands back the pieces plus
-// wherever the page was sent. autocomplete stands in for the shared one.
-function loadBar(pinned, extra = {}, autocomplete = undefined, query = 'bolt') {
+// wherever the page was sent. autocomplete stands in for the shared one, and
+// BAN, when given, records what the bar counts.
+function loadBar(pinned, extra = {}, autocomplete = undefined, query = 'bolt', BAN = undefined) {
     const nodes = {
         'nav-pin-btn': element(),
         'nav-scope': element(),
@@ -36,9 +37,10 @@ function loadBar(pinned, extra = {}, autocomplete = undefined, query = 'bolt') {
         ...extra,
     };
     const navigated = [];
+    let open = false;
     const document = {
         getElementById: id => nodes[id] || null,
-        body: { classList: { contains: () => false, toggle: () => {}, add: () => {}, remove: () => {} } },
+        body: { classList: { contains: () => open, toggle: (name, on) => { open = on; }, add: () => {}, remove: () => {} } },
         addEventListener: () => {},
         set cookie(value) { throw new Error('the bar stored a cookie: ' + value); },
     };
@@ -50,6 +52,7 @@ function loadBar(pinned, extra = {}, autocomplete = undefined, query = 'bolt') {
             assign: url => navigated.push(url),
         },
     };
+    if (BAN) window.BAN = BAN;
     const pending = [];
     window.notePendingSearch = q => pending.push(q);
     new Function('window', 'document', 'URL', 'autocomplete', 'location', source)(
@@ -231,4 +234,58 @@ test('typing an ignored scope away drops its warning and the tooltip copy', () =
     box.value = 's:LEA';
     box.handlers.input();
     expect(removed).toEqual(['title', 'data-ban-title']);
+});
+
+// What the bar counts: each press of the pin button as what it did, and a run
+// by how it was asked for. The query and the filter text are never counted.
+function recorder() {
+    const calls = [];
+    return { calls, BAN: { track: (...a) => calls.push(a) } };
+}
+
+test('the pin button counts open and close', () => {
+    const { calls, BAN } = recorder();
+    const { nodes } = loadBar('', {}, undefined, 'bolt', BAN);
+
+    nodes['nav-pin-btn'].handlers.click();
+    nodes['nav-pin-btn'].handlers.click();
+
+    expect(calls).toEqual([['ui.scope.toggle', 'open'], ['ui.scope.toggle', 'close']]);
+});
+
+test('GO and Enter count as themselves', () => {
+    const { calls, BAN } = recorder();
+    const { nodes, navigated } = loadBar('s:LEA', {}, undefined, 'bolt', BAN);
+
+    nodes['nav-scope-go'].handlers.click();
+    expect(calls).toEqual([['ui.scope.apply', 'go']]);
+
+    nodes['nav-scopebox'].handlers.keydown({ key: 'Enter', preventDefault: () => {} });
+    expect(calls).toEqual([['ui.scope.apply', 'go'], ['ui.scope.apply', 'enter']]);
+    expect(navigated).toHaveLength(2);
+});
+
+test('Enter that picks a suggestion is not a run', () => {
+    const { calls, BAN } = recorder();
+    const { nodes } = loadBar('r:myt', {
+        'nav-scopeboxautocomplete-list': element({
+            querySelector: selector => (selector === '.autocomplete-active' ? {} : null),
+        }),
+    }, undefined, 'bolt', BAN);
+
+    nodes['nav-scopebox'].handlers.keydown({ key: 'Enter', preventDefault: () => {} });
+
+    expect(calls).toEqual([]);
+});
+
+test('CLEAR and the chips count nothing from the script; their marks do', () => {
+    const { calls, BAN } = recorder();
+    const chip = element({ getAttribute: () => 'f:foil' });
+    const { nodes } = loadBar('s:LEA', { 'nav-scope': element({ querySelectorAll: () => [chip] }) }, undefined, 'bolt', BAN);
+
+    nodes['nav-scope-clear'].handlers.click();
+    chip.handlers.click.call(chip);
+
+    expect(calls).toEqual([]);
+    expect(nodes['nav-scopebox'].value).toBe('f:foil');
 });

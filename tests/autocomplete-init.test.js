@@ -250,3 +250,114 @@ test('no template calls autocomplete() inline any more', () => {
     const nav = readFileSync(join(import.meta.dir, '..', 'templates', 'mobile', 'partials', 'navbar.html'), 'utf8');
     expect(nav).toContain('data-autocomplete=');
 });
+
+/* Enough of a DOM for the dropdown: elements that hold children, take
+ * listeners and answer getElementsByTagName, getElementById and
+ * getElementsByClassName the way autocomplete.js asks. */
+function dropdownDom() {
+    const roots = [];
+    function walk(n, fn) { for (const c of n.children) { fn(c); walk(c, fn); } }
+    function find(fn) {
+        let hit = null;
+        for (const r of roots) { if (fn(r)) return r; walk(r, (c) => { if (!hit && fn(c)) hit = c; }); }
+        return hit;
+    }
+    function node(tag) {
+        const n = {
+            tagName: tag.toUpperCase(), children: [], parentNode: null, attrs: {}, handlers: {}, style: {},
+            value: '', textContent: '', innerHTML: '',
+            classList: { add() {}, remove() {}, contains: () => false },
+            addEventListener(type, fn) { (n.handlers[type] = n.handlers[type] || []).push(fn); },
+            appendChild(c) { c.parentNode = n; n.children.push(c); return c; },
+            removeChild(c) { n.children = n.children.filter((x) => x !== c); c.parentNode = null; },
+            remove() { if (n.parentNode) n.parentNode.removeChild(n); },
+            setAttribute(k, v) { n.attrs[k] = v; },
+            getAttribute(k) { return k in n.attrs ? n.attrs[k] : null; },
+            hasChildNodes() { return n.children.length > 0; },
+            getElementsByTagName(t) { const out = []; walk(n, (c) => { if (c.tagName === t.toUpperCase()) out.push(c); }); return out; },
+            fire(type, ev) { for (const fn of n.handlers[type] || []) fn.call(n, ev || {}); },
+            click() { n.fire('click'); },
+            focus() {},
+            setSelectionRange() {},
+        };
+        return n;
+    }
+    const form = node('form');
+    roots.push(form);
+    const inp = form.appendChild(node('input'));
+    inp.id = 'searchbox';
+    const document = {
+        activeElement: null,
+        body: { contains: () => false },
+        createElement: node,
+        createTextNode: (text) => ({ tagName: '#text', children: [], textContent: text }),
+        addEventListener() {},
+        getElementById: (id) => find((n) => n.attrs && n.attrs.id === id),
+        getElementsByClassName: (cls) => {
+            const out = [];
+            for (const r of roots) walk(r, (c) => { if (c.attrs && String(c.attrs.class || '').split(' ').includes(cls)) out.push(c); });
+            return out;
+        },
+    };
+    return { form, inp, document };
+}
+
+/* Runs autocomplete over that DOM with a name list already loaded; window
+ * carries BAN to record counts, and providers when a test needs them. */
+async function openDropdown(names, providers) {
+    const calls = [];
+    const dom = dropdownDom();
+    const window = { BAN: { track: (...a) => calls.push(a) }, addEventListener() {}, removeEventListener() {}, __palette_providers: providers };
+    const fn = new Function('fetchNames', 'document', 'window', 'self', 'escapeHtml',
+        autocomplete + '\n;return autocomplete;');
+    fn(() => Promise.resolve(names), dom.document, window, {}, (x) => String(x))(dom.form, dom.inp, 'false');
+    dom.inp.fire('input');
+    await flushMicrotasks();
+    return { calls, ...dom };
+}
+
+function rows(dom) {
+    const list = dom.document.getElementById('searchboxautocomplete-list');
+    return list ? list.children : [];
+}
+
+test('picking a name counts a name, never the name picked', async () => {
+    const dom = await openDropdown(['Animate Wall']);
+    dom.inp.value = 'anim';
+    dom.inp.fire('input');
+    expect(rows(dom)).toHaveLength(1);
+
+    rows(dom)[0].click();
+
+    expect(dom.calls).toEqual([['ui.autocomplete.pick', 'name', 'name']]);
+    expect(dom.inp.value).toBe('Animate Wall');
+});
+
+test('Tab on a name completes it', async () => {
+    const dom = await openDropdown(['Animate Wall']);
+    dom.inp.value = 'anim';
+    dom.inp.fire('input');
+
+    dom.inp.fire('keydown', { keyCode: 40, preventDefault() {} });
+    dom.inp.fire('keydown', { keyCode: 9, preventDefault() {} });
+
+    expect(dom.calls).toEqual([['ui.autocomplete.pick', 'complete', 'name']]);
+    expect(dom.inp.value).toBe('Animate Wall');
+});
+
+test('picking a filter value counts its prefix without the minus', async () => {
+    const providers = {
+        detectPrefix: (token) => (token === '-s:m' ? { prefix: '-s:', query: 'm' } : null),
+        getProvider: () => ({ getCandidates: () => [{ value: 'MOM', label: 'March of the Machine' }] }),
+    };
+    const dom = await openDropdown([], providers);
+    dom.inp.value = '-s:m';
+    dom.inp.selectionStart = 4;
+    dom.inp.fire('input');
+    expect(rows(dom)).toHaveLength(1);
+
+    rows(dom)[0].click();
+
+    expect(dom.calls).toEqual([['ui.autocomplete.pick', 'token', 's:']]);
+    expect(dom.inp.value).toBe('-s:MOM');
+});

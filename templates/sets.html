@@ -64,7 +64,7 @@
                             <td>
                                 <div class="sets-name-cell">
                                     {{template "set-symbol" dict "Keyrune" .Keyrune "Edition" .Name "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" "set-icon"}}
-                                    <a href="/search?q=s:{{.Code}}">{{.Name}}</a>
+                                    <a href="/search?q=s:{{.Code}}" data-track="ui.sets" data-track-value="set">{{.Name}}</a>
                                     <span class="set-code">{{.Code}}</span>
                                 </div>
                             </td>
@@ -72,7 +72,7 @@
                             <td>
                                 <div class="sets-finish">
                                     {{range .Finishes}}
-                                        <a class="sets-finish-tag" href="/search?q=s:{{$edition.Code}}%20f:{{.Query}}">{{.Label}}</a>
+                                        <a class="sets-finish-tag" href="/search?q=s:{{$edition.Code}}%20f:{{.Query}}" data-track="ui.sets" data-track-value="finish_tag">{{.Label}}</a>
                                     {{end}}
                                 </div>
                             </td>
@@ -80,7 +80,7 @@
                             <td class="col-extra">
                                 <div class="sets-colors">
                                     {{range .ColorHex}}
-                                        <a class="sets-color-orb" href="/search?q=s:{{$edition.Code}}%20c:{{.Name}}" title="{{.Name}}">
+                                        <a class="sets-color-orb" href="/search?q=s:{{$edition.Code}}%20c:{{.Name}}" title="{{.Name}}" data-track="ui.sets" data-track-value="color_tag">
                                             <svg height="18" width="18" xmlns="http://www.w3.org/2000/svg">
                                                 <defs>
                                                     <linearGradient id="gradient-{{$edition.Code}}-{{.Name}}" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -98,7 +98,7 @@
                             <td class="col-extra">
                                 <div class="sets-rarities">
                                     {{range .Rarities}}
-                                        <a class="sets-rarity-tag" href="/search?q=s:{{$edition.Code}}%20r:{{.}}">{{.}}</a>
+                                        <a class="sets-rarity-tag" href="/search?q=s:{{$edition.Code}}%20r:{{.}}" data-track="ui.sets" data-track-value="rarity_tag">{{.}}</a>
                                     {{end}}
                                 </div>
                             </td>
@@ -135,6 +135,7 @@ function toggleExpanded() {
     const expanded = !table.classList.contains('expanded');
     setExpanded(expanded);
     try { localStorage.setItem('setsExpanded', expanded ? '1' : '0'); } catch(e) {}
+    if (expanded && window.BAN && window.BAN.track) window.BAN.track('ui.sets', 'expand');
 }
 
 // Restore preference on load
@@ -143,5 +144,13 @@ try {
         setExpanded(true);
     }
 } catch(e) {}
+
+// Count the first time the filter is typed in.
+(function() {
+    var box = document.getElementById('filterInput');
+    if (box) box.addEventListener('input', function() {
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.sets', 'filter_used');
+    }, {once: true});
+})();
 </script>
 {{end}}

@@ -377,6 +377,14 @@
         }
     }
 
+    // newTabLink returns the nearest link above t when it is marked and its href is not javascript:.
+    function newTabLink(t) {
+        var link = t.closest('a[href]');
+        if (!link || link.getAttribute('data-track') === null) return null;
+        if (/^\s*javascript:/i.test(attr(link, 'href'))) return null;
+        return link;
+    }
+
     // onAction counts a click, middle click or submit on the nearest marked element.
     function onAction(event) {
         try {
@@ -387,9 +395,9 @@
                 node = t.closest('form[data-track]');
             } else {
                 node = t.closest('[data-track]');
+                // A middle click opens the nearest link, so it counts that link's own mark or nothing.
+                if (event.type === 'auxclick') node = event.button === 1 ? newTabLink(t) : null;
                 if (!node || String(node.tagName).toUpperCase() === 'FORM') return;
-                // A middle click counts only on a marked element that is, or sits inside, a link.
-                if (event.type === 'auxclick' && (event.button !== 1 || !node.closest('a[href]'))) return;
                 // A label's click is counted on its control's click that follows.
                 if (event.type === 'click' && relayed(t, node)) return;
             }

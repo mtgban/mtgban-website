@@ -73,6 +73,14 @@
         return window.CardRow && window.CardRow.read ? window.CardRow.read(btn) : null;
     }
 
+    // setStar marks a star and, when it is counted, says what its next click does.
+    function setStar(btn, active) {
+        btn.classList.toggle('active', active);
+        if (!btn.getAttribute('data-track')) return;
+        if (active) btn.setAttribute('data-track-value', 'star_remove');
+        else btn.setAttribute('data-track-value', 'star_add');
+    }
+
     // Toggle favorite on star click
     window.toggleFavorite = function(btn) {
         var cardId = btn.getAttribute('data-card-id') || btn.getAttribute('data-card');
@@ -98,12 +106,13 @@
         }
 
         saveFavorites(favs);
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.fav', active ? 'add' : 'remove');
 
         // Keep every star for this card in sync — the inline header button and
         // its copy inside the mobile actions menu point at the same card.
         document.querySelectorAll('.fav-btn').forEach(function(b) {
             var id = b.getAttribute('data-card-id') || b.getAttribute('data-card');
-            if (id === cardId) b.classList.toggle('active', active);
+            if (id === cardId) setStar(b, active);
         });
     };
 
@@ -118,7 +127,7 @@
         document.querySelectorAll('.fav-btn').forEach(function(btn) {
             var id = btn.getAttribute('data-card-id') || btn.getAttribute('data-card');
             if (id && favIds[id]) {
-                btn.classList.add('active');
+                setStar(btn, true);
             }
         });
     }
@@ -164,14 +173,14 @@
             html += '<span class="m-fav-actions">';
             html += '<span class="m-fav-sort">' + sortPillsHtml() + '</span>';
             html += shareButtonHtml('mobile');
-            html += '<button class="m-fav-refresh" onclick="window.manualRefreshFavorites()" title="Refresh prices"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg></button>';
+            html += '<button class="m-fav-refresh" onclick="window.manualRefreshFavorites()" title="Refresh prices" data-track="ui.fav" data-track-value="refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg></button>';
             html += '<button class="m-fav-clear" onclick="window.clearFavorites(this)">Clear</button>';
             html += '</span>';
             html += '</div>';
             html += '<div class="m-fav-list">';
 
             favs.forEach(function(f) {
-                html += '<a class="m-fav-item" href="?q=' + encodeURIComponent(f.query) + '">';
+                html += '<a class="m-fav-item" href="?q=' + encodeURIComponent(f.query) + '" data-track="ui.fav" data-track-value="open">';
                 if (f.img) {
                     html += '<div class="m-fav-thumb">' + thumbHtml(f.img, f.foil, f.cw) + '</div>';
                 }
@@ -183,7 +192,7 @@
                 if (f.finishTag) html += '<span class="m-badge ' + escapeAttr(f.finishClass || 'foil') + '">' + escapeHtml(f.finishTag) + '</span>';
                 if (f.treatments) f.treatments.forEach(function(tag) { html += '<span class="m-badge treatment">' + escapeHtml(tag) + '</span>'; });
                 html += '</span>';
-                html += '<button class="m-fav-pin' + (f.pinned ? ' pinned' : '') + '" data-id="' + escapeAttr(f.id) + '" onclick="event.preventDefault(); event.stopPropagation(); window.toggleFavoritePin(this.dataset.id, event)" title="' + (f.pinned ? 'Unpin' : 'Pin to top') + '"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="' + (f.pinned ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>';
+                html += '<button class="m-fav-pin' + (f.pinned ? ' pinned' : '') + '" data-id="' + escapeAttr(f.id) + '" onclick="event.preventDefault(); event.stopPropagation(); window.toggleFavoritePin(this.dataset.id, event)" title="' + (f.pinned ? 'Unpin' : 'Pin to top') + '"' + (f.pinned ? ' data-track="ui.fav" data-track-value="unpin"' : ' data-track="ui.fav" data-track-value="pin"') + '><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="' + (f.pinned ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>';
                 html += '</div>';
                 html += '<div class="m-fav-item-prices">';
                 if (f.sellPrice !== null && f.sellPrice !== undefined) {
@@ -212,27 +221,27 @@
             // Retail/Buylist follow the search sidebar's colour coding.
             html += '<span class="landing-pane-export">';
             html += '<span class="landing-pane-export-pair">';
-            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.downloadFavoritesCSV()" title="Download favorites as CSV" aria-label="Download favorites as CSV"><i data-lucide="download"></i></button>';
-            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.importFavoritesCSV()" title="Import favorites from CSV" aria-label="Import favorites from CSV"><i data-lucide="file-up"></i></button>';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.downloadFavoritesCSV()" title="Download favorites as CSV" aria-label="Download favorites as CSV" data-track="ui.fav.csv" data-track-value="download"><i data-lucide="download"></i></button>';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.importFavoritesCSV()" title="Import favorites from CSV" aria-label="Import favorites from CSV" data-track="ui.fav.csv" data-track-value="import"><i data-lucide="file-up"></i></button>';
             html += '</span>';
             html += '<span class="landing-pane-export-pair">';
-            html += '<button class="landing-pane-btn landing-pane-btn-icon landing-pane-btn-retail" onclick="window.sendFavoritesToUploader(\'retail\')" title="Send to uploader (retail)" aria-label="Send to uploader (retail)"><i data-lucide="upload"></i></button>';
-            html += '<button class="landing-pane-btn landing-pane-btn-icon landing-pane-btn-buylist" onclick="window.sendFavoritesToUploader(\'buylist\')" title="Send to uploader (buylist)" aria-label="Send to uploader (buylist)"><i data-lucide="upload"></i></button>';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon landing-pane-btn-retail" onclick="window.sendFavoritesToUploader(\'retail\')" title="Send to uploader (retail)" aria-label="Send to uploader (retail)" data-track="ui.fav.upload" data-track-value="retail"><i data-lucide="upload"></i></button>';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon landing-pane-btn-buylist" onclick="window.sendFavoritesToUploader(\'buylist\')" title="Send to uploader (buylist)" aria-label="Send to uploader (buylist)" data-track="ui.fav.upload" data-track-value="buylist"><i data-lucide="upload"></i></button>';
             html += '</span>';
             html += '</span>';
             html += shareButtonHtml('desktop');
             // Charts are login-gated server-side, so only offer the button
             // where the page that rendered the pane could chart at all.
             if (favs.length > 1 && container.dataset.chartsEnabled === 'true') {
-                html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.chartFavorites()" title="Chart favorites" aria-label="Chart favorites"><i data-lucide="chart-line"></i></button>';
+                html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.chartFavorites()" title="Chart favorites" aria-label="Chart favorites" data-track="ui.fav.chart"><i data-lucide="chart-line"></i></button>';
             }
-            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.manualRefreshFavorites()" title="Update prices" aria-label="Update prices"><i data-lucide="refresh-cw"></i></button>';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.manualRefreshFavorites()" title="Update prices" aria-label="Update prices" data-track="ui.fav" data-track-value="refresh"><i data-lucide="refresh-cw"></i></button>';
             html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.clearFavorites(this)" title="Clear favorites" aria-label="Clear favorites"><i data-lucide="trash-2"></i></button>';
             html += '</span>';
             html += '</div>';
             html += '<div class="landing-pane-body">';
             slice.forEach(function(f) {
-                html += '<a class="landing-item landing-item-fav" href="?q=' + encodeURIComponent(f.query) + '"' + (f.pinned ? '' : ' draggable="true"') + ' data-fav-id="' + escapeAttr(f.id) + '">';
+                html += '<a class="landing-item landing-item-fav" href="?q=' + encodeURIComponent(f.query) + '"' + (f.pinned ? '' : ' draggable="true"') + ' data-fav-id="' + escapeAttr(f.id) + '" data-track="ui.fav" data-track-value="open">';
                 html += '<div class="landing-item-thumb">';
                 if (f.img) {
                     html += thumbHtml(f.img, f.foil, f.cw);
@@ -262,10 +271,10 @@
                 }
                 html += '</div>';
                 html += '<div class="landing-item-actions">';
-                html += '<button class="landing-item-pin' + (f.pinned ? ' pinned' : '') + '" data-id="' + escapeAttr(f.id) + '" onclick="window.toggleFavoritePin(this.dataset.id, event)" title="' + (f.pinned ? 'Unpin' : 'Pin to top') + '">';
+                html += '<button class="landing-item-pin' + (f.pinned ? ' pinned' : '') + '" data-id="' + escapeAttr(f.id) + '" onclick="window.toggleFavoritePin(this.dataset.id, event)" title="' + (f.pinned ? 'Unpin' : 'Pin to top') + '"' + (f.pinned ? ' data-track="ui.fav" data-track-value="unpin"' : ' data-track="ui.fav" data-track-value="pin"') + '>';
                 html += '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="' + (f.pinned ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
                 html += '</button>';
-                html += '<button class="landing-item-delete" data-id="' + escapeAttr(f.id) + '" onclick="window.deleteFavorite(this.dataset.id, event)" title="Remove from favorites">';
+                html += '<button class="landing-item-delete" data-id="' + escapeAttr(f.id) + '" onclick="window.deleteFavorite(this.dataset.id, event)" title="Remove from favorites" data-track="ui.fav" data-track-value="delete">';
                 html += '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
                 html += '</button>';
                 html += '</div>';
@@ -274,9 +283,9 @@
             html += '</div>';
             if (totalPages > 1) {
                 html += '<div class="landing-pane-footer">';
-                html += '<button class="landing-page-btn" onclick="window.favPage(\'' + containerId + '\', -1)" ' + (page === 0 ? 'disabled' : '') + '>&lsaquo;</button>';
+                html += '<button class="landing-page-btn" onclick="window.favPage(\'' + containerId + '\', -1)" ' + (page === 0 ? 'disabled ' : '') + 'data-track="ui.fav" data-track-value="page">&lsaquo;</button>';
                 html += '<span class="landing-page-label">' + (page + 1) + ' / ' + totalPages + '</span>';
-                html += '<button class="landing-page-btn" onclick="window.favPage(\'' + containerId + '\', 1)" ' + (page === totalPages - 1 ? 'disabled' : '') + '>&rsaquo;</button>';
+                html += '<button class="landing-page-btn" onclick="window.favPage(\'' + containerId + '\', 1)" ' + (page === totalPages - 1 ? 'disabled ' : '') + 'data-track="ui.fav" data-track-value="page">&rsaquo;</button>';
                 html += '</div>';
             }
         }
@@ -335,6 +344,7 @@
         var item = favs.splice(fromIdx, 1)[0];
         favs.splice(toIdx, 0, item);
         saveFavorites(favs);
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.fav', 'reorder');
         setSort('manual', 'desc');
         renderFavorites();
     }
@@ -344,7 +354,7 @@
             '<div class="landing-pane-header">' +
                 '<span class="landing-pane-title">Favorites</span>' +
                 '<span class="landing-pane-actions">' +
-                    '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.importFavoritesCSV()" title="Import favorites from CSV" aria-label="Import favorites from CSV"><i data-lucide="file-up"></i></button>' +
+                    '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.importFavoritesCSV()" title="Import favorites from CSV" aria-label="Import favorites from CSV" data-track="ui.fav.csv" data-track-value="import"><i data-lucide="file-up"></i></button>' +
                 '</span>' +
             '</div>' +
             '<div class="landing-empty-fav">' +
@@ -417,7 +427,7 @@
         renderFavorites();
         // Clear active state on any star buttons for this card on the same page.
         document.querySelectorAll('.fav-btn[data-card-id="' + cardId + '"]').forEach(function(btn) {
-            btn.classList.remove('active');
+            setStar(btn, false);
         });
     };
 
@@ -452,12 +462,14 @@
         } else {
             dir = 'desc';
         }
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.fav.sort', val, dir);
         setSort(val, dir);
         renderFavorites();
     };
 
     window.clearFavorites = function(trigger) {
         var doClear = function() {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.fav', 'clear');
             var now = Date.now();
             var favs = getFavorites();
             favs.forEach(function(f) {
@@ -566,8 +578,8 @@
         var link = location.origin + '/search/shared?id=' + encodeURIComponent(id);
         return '<div class="fav-share-panel" id="fav-share-panel">' +
             '<input class="fav-share-link" type="text" readonly value="' + escapeAttr(link) + '" onclick="this.select()" aria-label="Share link">' +
-            '<button class="landing-pane-btn fav-share-copy" type="button" onclick="window.copyFavoritesShare()">Copy</button>' +
-            '<button class="landing-pane-btn fav-share-stop" type="button" onclick="window.stopFavoritesShare()">Stop sharing</button>' +
+            '<button class="landing-pane-btn fav-share-copy" type="button" onclick="window.copyFavoritesShare()" data-track="ui.fav.share" data-track-value="copy">Copy</button>' +
+            '<button class="landing-pane-btn fav-share-stop" type="button" onclick="window.stopFavoritesShare()" data-track="ui.fav.share" data-track-value="stop">Stop sharing</button>' +
             '</div>';
     }
 
@@ -588,11 +600,17 @@
         var open = document.getElementById('fav-share-panel');
         if (open) { open.remove(); return Promise.resolve(); }
         var pane = btn.closest('.landing-pane, #m-favorites');
+        var made = false;
         var pending = shareRequest('GET').then(function(res) {
-            return res.id ? res : shareRequest('POST');
+            if (res.id) return res;
+            made = true;
+            return shareRequest('POST');
         }).then(function(res) {
             var header = pane && pane.querySelector('.landing-pane-header, .m-fav-header');
-            if (header) header.insertAdjacentHTML('afterend', sharePanelHtml(res.id));
+            if (header) {
+                header.insertAdjacentHTML('afterend', sharePanelHtml(res.id));
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.fav.share', made ? 'create' : 'open');
+            }
         }).catch(function(status) {
             showToast(status === 503 ? 'Sharing is unavailable right now' : 'Could not share the list');
         });

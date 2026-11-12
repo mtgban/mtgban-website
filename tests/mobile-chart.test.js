@@ -12,8 +12,9 @@ const utils = readFileSync(join(import.meta.dir, '..', 'js', 'utils.js'), 'utf8'
 // drawer on one card, and reports every url it fetched, every chart it drew and
 // every error it logged. answer(range, url) is what /data/chart sends back for
 // that range, or a promise of it, with a status of its own when it is not a
-// 200. cookie is the page's cookie as the drawer opens.
-async function openDrawer(answer, cookie = '') {
+// 200. cookie is the page's cookie as the drawer opens. tracked, when given,
+// collects what the drawer counts.
+async function openDrawer(answer, cookie = '', tracked = undefined) {
     const calls = [];
     const charts = [];
     const errors = [];
@@ -47,6 +48,7 @@ async function openDrawer(answer, cookie = '') {
         }),
     };
     const window = { getComputedStyle: () => ({ getPropertyValue: () => '' }) };
+    if (tracked) window.BAN = { track: (...a) => tracked.push(a) };
     function Chart(ctx, config) {
         this.data = config.data;
         this.options = config.options;
@@ -64,7 +66,11 @@ async function openDrawer(answer, cookie = '') {
         shown.set(this.data.datasets[i], visible);
     };
     Chart.prototype.update = () => {};
-    Chart.prototype.resetZoom = () => {};
+    // The zoom plugin reports its own resetZoom as a finished zoom, when given a callback.
+    Chart.prototype.resetZoom = function() {
+        const done = this.options.plugins.zoom.zoom.onZoomComplete;
+        if (typeof done === 'function') done({ chart: this });
+    };
     const fetch = (url) => {
         calls.push(url);
         return Promise.resolve(answer(Number(url.split('?range=')[1]), url)).then((reply) => {
@@ -430,4 +436,57 @@ test('a store name is written into the legend as text', async () => {
 
     expect(legend.innerHTML).not.toContain('<img');
     expect(legend.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;</button>');
+});
+
+// What the drawer counts: its opening, a range picked from the list, and a
+// pinch or drag the reader finished; never a zoom the script reset itself.
+const gestures = (tracked) => tracked.filter((c) => c[0] === 'ui.mchart.gesture');
+
+test('opening the drawer counts once', async () => {
+    const tracked = [];
+    await openDrawer(priced, '', tracked);
+
+    expect(tracked.filter((c) => c[0] === 'ui.mchart.open')).toEqual([['ui.mchart.open']]);
+});
+
+test('a finished drag and a finished pinch count', async () => {
+    const tracked = [];
+    const { charts } = await openDrawer(priced, '', tracked);
+    const zoom = charts[0].options.plugins.zoom;
+
+    zoom.pan.onPanComplete({ chart: charts[0] });
+    zoom.zoom.onZoomComplete({ chart: charts[0] });
+
+    expect(gestures(tracked)).toEqual([['ui.mchart.gesture', 'pan'], ['ui.mchart.gesture', 'zoom']]);
+});
+
+test('resetting the zoom is not a gesture', async () => {
+    const tracked = [];
+    const { window } = await openDrawer(priced, '', tracked);
+
+    window.resetChartZoom();
+    window.changeChartRange(30);
+
+    expect(gestures(tracked)).toEqual([]);
+    expect(tracked.filter((c) => c[0] === 'ui.chart.range')).toEqual([['ui.chart.range', '30']]);
+});
+
+test('a range outside the list is not counted', async () => {
+    const tracked = [];
+    const { window } = await openDrawer(priced, '', tracked);
+
+    window.changeChartRange(45);
+    window.changeChartRange(NaN);
+
+    expect(tracked.filter((c) => c[0] === 'ui.chart.range')).toEqual([]);
+});
+
+test('a legend tap counts the way it went, not the store', async () => {
+    const tracked = [];
+    const { legend } = await openDrawer(priced, '', tracked);
+
+    legend.buttons[0].tap();
+    legend.buttons[0].tap();
+
+    expect(tracked.filter((c) => c[0] === 'ui.chart.legend')).toEqual([['ui.chart.legend', 'hide'], ['ui.chart.legend', 'show']]);
 });

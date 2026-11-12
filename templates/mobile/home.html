@@ -22,7 +22,7 @@
     </div>
 
     <div class="m-home-search-wrap">
-        <form class="autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
+        <form class="autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform" data-track="ui.searchbar.submit" data-track-value="home">
             <input id="searchbox" class="m-search-input" type="text" name="q"
                    placeholder="Search for a card or product..."
                    maxlength="1000" autofocus autocapitalize="none" autocorrect="off" spellcheck="false"
@@ -35,7 +35,7 @@
     <div class="m-home-tools">
         {{range .Nav}}
             {{if and (ne .Name "Home") (ne .Name "Changelog") (ne .Name "Account")}}
-                <a class="m-home-tool" href="{{.Link}}">
+                <a class="m-home-tool" href="{{.Link}}"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="tool_tile"{{end}}>
                     <span class="m-home-tool-icon">{{.Short}}</span> {{.Name}}
                 </a>
             {{end}}

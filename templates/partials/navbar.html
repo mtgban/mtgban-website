@@ -14,7 +14,7 @@
         <span class="nav2-search-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         </span>
-        <form id="nav-searchform" action="{{if .IsSealed}}/sealed{{else}}/search{{end}}" autocomplete="off" spellcheck="false">
+        <form id="nav-searchform" action="{{if .IsSealed}}/sealed{{else}}/search{{end}}" autocomplete="off" spellcheck="false" data-track="ui.searchbar.submit" data-track-value="nav">
             <input id="nav-searchbox" type="text" name="q" placeholder="Search cards, sets, products…" value="{{if not .IsMultiChart}}{{.SearchQuery}}{{end}}" maxlength="1000" autocapitalize="none" autocorrect="off" autofocus onFocus="this.setSelectionRange(0, this.value.length)">
             {{/* The pinned bar rides along as a hidden field rather than as a
                  second text input of its own. A form carrying two fields that
@@ -143,15 +143,15 @@
              box is not in the search form (see above), so nothing about it
              says a keypress is what runs it. */}}
         <button class="nav2-scope-go" id="nav-scope-go" type="button" title="Search with these pinned filters" aria-label="Search with these pinned filters">GO</button>
-        <button class="nav2-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters" aria-label="Clear pinned filters">CLEAR</button>
+        <button class="nav2-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters" aria-label="Clear pinned filters" data-track="ui.scope.clear">CLEAR</button>
         {{/* The row runs the width of the page whatever is in it, so the slack
              to the right of the box earns its place by showing the syntax the
              box takes. Clicking one writes it in; CLEAR takes it out. */}}
         <span class="nav2-scope-examples" id="nav-scope-examples">
             <span class="nav2-scope-label">Fill</span>
-            <button class="nav2-scope-chip" type="button" data-scope="f:nonfoil" title="Pin non-foil printings">f:nonfoil</button>
-            <button class="nav2-scope-chip" type="button" data-scope="f:foil" title="Pin foil printings">f:foil</button>
-            <button class="nav2-scope-chip" type="button" data-scope="is:altfoil" title="Pin the alternative foiling treatments">is:altfoil</button>
+            <button class="nav2-scope-chip" type="button" data-scope="f:nonfoil" title="Pin non-foil printings" data-track="ui.scope.chip" data-track-value="nonfoil">f:nonfoil</button>
+            <button class="nav2-scope-chip" type="button" data-scope="f:foil" title="Pin foil printings" data-track="ui.scope.chip" data-track-value="foil">f:foil</button>
+            <button class="nav2-scope-chip" type="button" data-scope="is:altfoil" title="Pin the alternative foiling treatments" data-track="ui.scope.chip" data-track-value="altfoil">is:altfoil</button>
         </span>
     </div>
   </div>

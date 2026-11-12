@@ -704,3 +704,16 @@ func TestEveryRegistryPageIsAPageLabel(t *testing.T) {
 		}
 	}
 }
+
+// The shorthands a row can carry are the ones the validator accepts.
+func TestStoreValidatorKnowsLoadedShorthands(t *testing.T) {
+	withPrices(t,
+		[]mtgban.Seller{mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "CK"})},
+		[]mtgban.Vendor{mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "SCGBL"})})
+	store := metricValidators(currentPrices()).Store
+	for sh, want := range map[string]bool{"CK": true, "SCGBL": true, "": false, "other": false, "CUSTOM": false, "AvgCopies": false, "Card Kingdom": false} {
+		if got := store(sh); got != want {
+			t.Errorf("Store(%q) = %v, want %v", sh, got, want)
+		}
+	}
+}
