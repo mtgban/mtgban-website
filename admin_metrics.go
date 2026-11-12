@@ -480,6 +480,8 @@ type MetricsCandidateRow struct {
 	// LastSeenText is the newest day with a row, or that there was none in the days loaded.
 	LastSeenText string
 	Gone         bool // a review mark whose unit is no longer a candidate: shown by its stored key, clear only
+	// Numbers is a setting row's three numbers in words: off default, changed, ran in; nil on a name's row.
+	Numbers []string
 }
 
 // MetricsSignalRow is an Invest row with its rate text, trend and link.
@@ -548,17 +550,18 @@ type MetricsMoreArea struct {
 
 // MetricsRemove is the Remove view.
 type MetricsRemove struct {
-	ReviewsFailed bool                  // the reviews read failed: reviewed rows may show as candidates
-	Areas         []MetricsRemoveArea   // unused, rare, unused so far
-	NotMeasured   []MetricsCandidateRow // collapsed
-	Reviewed      []MetricsCandidateRow // collapsed
-	Counted       bool                  // the window's counts were read on a complete day; an empty list is then a finding
-	Read          MetricsRead           // the counts' read; Failed too when the newest complete day could not be read
-	ReviewURL     string                // where the review forms post: this Remove view's link
-	Total         string                // "12 candidates: 9 unused, 3 rare", or "" with no area
-	ReviewedOpen  bool                  // a review was just saved, so the Reviewed group starts open
-	Empty         string                // what no area says once counted: metricsRemoveEmpty
-	ReviewsCap    string                // says the reviews read hit observability.ReviewsMax, so later marks are not shown; "" when it did not
+	ReviewsFailed       bool                  // the reviews read failed: reviewed rows may show as candidates
+	Areas               []MetricsRemoveArea   // unused, rare, unused so far
+	NotMeasured         []MetricsCandidateRow // collapsed; name rows first, then setting rows
+	Reviewed            []MetricsCandidateRow // collapsed
+	NotMeasuredSettings int                   // how many of NotMeasured are setting rows
+	Counted             bool                  // the window's counts were read on a complete day; an empty list is then a finding
+	Read                MetricsRead           // the counts' read; Failed too when the newest complete day could not be read
+	ReviewURL           string                // where the review forms post: this Remove view's link
+	Total               string                // "12 candidates: 9 unused, 3 rare", or "" with no area
+	ReviewedOpen        bool                  // a review was just saved, so the Reviewed group starts open
+	Empty               string                // what no area says once counted: metricsRemoveEmpty
+	ReviewsCap          string                // says the reviews read hit observability.ReviewsMax, so later marks are not shown; "" when it did not
 }
 
 // MetricsRemoveArea is one area's removal rows, by kind.
@@ -1047,8 +1050,31 @@ func metricsCandidateRow(c metricsreport.Candidate, tiers []observability.DayTot
 		OutOf:        metricsOutOf(c),
 		Anchor:       anchor,
 		RemoveURL:    metricsRemoveLink(p, c.Area) + "#" + anchor,
+		Numbers:      metricsSettingNumbers(c),
 	}
 }
+
+// metricsSettingNumbers is a setting row's reader-days off default, changes and requests; -1 reads not counted.
+func metricsSettingNumbers(c metricsreport.Candidate) []string {
+	if c.Name != metricsSettingName {
+		return nil
+	}
+	first := fmt.Sprintf("off default %d of %d reader-days", c.Count, c.Denom)
+	if c.Class == metricsreport.ClassNotMeasured {
+		first = fmt.Sprintf("%d days measured", c.DaysMeasured)
+	}
+	changed, ran := "changes not counted", "requests not counted"
+	if c.Changes >= 0 {
+		changed = fmt.Sprintf("changed %d", c.Changes)
+	}
+	if c.Requests >= 0 {
+		ran = fmt.Sprintf("ran in %d requests", c.Requests)
+	}
+	return []string{first, changed, ran}
+}
+
+// metricsSettingName is the name a setting row carries, its setting the scope.
+const metricsSettingName = "state.set"
 
 // metricsCountWords names in words the counts a Denom points at.
 var metricsCountWords = map[string]string{
@@ -1097,8 +1123,18 @@ func metricsBasisWords(on metricsreport.CountedOn) string {
 		return on.Name
 	case metricsreport.OnNoRows:
 		return "no rows for this metric on this site in the window"
+	case metricsreport.OnReaders:
+		return "browsers that reported their settings that day, " + metricsSettingWhere(on.Pages)
 	}
 	return "nothing named"
+}
+
+// metricsSettingWhere is where a setting's path reads: "on any page" for root, "on the upload page" otherwise.
+func metricsSettingWhere(path string) string {
+	if path == "root" {
+		return "on any page"
+	}
+	return "on the " + path + " page"
 }
 
 // metricsPagesWords is "search page" or "search and alerts pages" for a comma list.
@@ -1194,6 +1230,8 @@ func metricsReason(c metricsreport.Candidate) string {
 		return ""
 	case c.On.Kind == metricsreport.OnNoRows:
 		return "No rows for this metric on this site in the window."
+	case c.On.Kind == metricsreport.OnReaders && c.DaysMeasured == 0:
+		return "Not measured yet: no browser has reported its settings " + metricsSettingWhere(c.On.Pages) + "."
 	}
 	return fmt.Sprintf("%d days measured, %d needed; counted on %s", c.DaysMeasured, metricsreport.MinDaysMeasured, metricsBasisWords(c.On))
 }
@@ -1254,6 +1292,13 @@ func buildMetricsRemove(names []observability.Name, lists metricsreport.Lists, t
 			byArea[c.Area][c.Kind] = append(byArea[c.Area][c.Kind], row)
 		}
 	}
+	// a setting row per setting would bury the names that are not measured for a reason
+	slices.SortStableFunc(out.NotMeasured, func(a, b MetricsCandidateRow) int {
+		return metricsSettingRank(a) - metricsSettingRank(b)
+	})
+	for _, r := range out.NotMeasured {
+		out.NotMeasuredSettings += metricsSettingRank(r)
+	}
 	// areas in the registry's order of first appearance
 	var seen []string
 	for _, n := range names {
@@ -1280,6 +1325,14 @@ func buildMetricsRemove(names []observability.Name, lists metricsreport.Lists, t
 	return out
 }
 
+// metricsSettingRank is 1 for a setting row and 0 for a name row.
+func metricsSettingRank(r MetricsCandidateRow) int {
+	if r.Name == metricsSettingName {
+		return 1
+	}
+	return 0
+}
+
 // metricsGoneRow is a review mark whose unit is no longer listed: its stored key as text, with
 // its area and help while the name is registered.
 func metricsGoneRow(r observability.Review) MetricsCandidateRow {
@@ -1291,6 +1344,9 @@ func metricsGoneRow(r observability.Review) MetricsCandidateRow {
 	}
 	if n, ok := observability.Lookup(r.Name); ok {
 		row.Area, row.Help = n.Area, n.Help
+	}
+	if s, ok := observability.LookupSetting(r.Scope); ok && r.Name == metricsSettingName {
+		row.Area = s.Area
 	}
 	return row
 }
@@ -2409,14 +2465,20 @@ func adminMetricsReview(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		pv.WarningMessage = metricsReviewStoreFailed
 		return false
 	}
-	n, _ := observability.Lookup(name)
+	area := ""
+	if n, ok := observability.Lookup(name); ok {
+		area = n.Area
+	}
+	if s, ok := observability.LookupSetting(scope); ok && name == metricsSettingName {
+		area = s.Area
+	}
 	confirm := "saved"
 	if verdict == "clear" {
 		confirm = "cleared"
 	}
 	extra := []string{confirm, "1"}
-	if n.Area != "" {
-		extra = append(extra, "area", n.Area)
+	if area != "" {
+		extra = append(extra, "area", area)
 	}
 	http.Redirect(w, r, "/admin"+params.link("remove", extra...)+"#"+url.PathEscape(metricsAnchor(name, scope, value)), http.StatusSeeOther)
 	return true
@@ -2432,8 +2494,11 @@ func metricsStoredReview(ctx context.Context, store metricsStore, instance strin
 	return slices.ContainsFunc(reviews, func(r observability.Review) bool { return r.Name == u.Name && r.Scope == u.Scope && r.Value == u.Value })
 }
 
-// metricsReviewUnit reports whether u is one of its registered name's candidate units.
+// metricsReviewUnit reports whether u is one of its registered name's candidate units, or a setting's row.
 func metricsReviewUnit(lists metricsreport.Lists, u metricsreport.Unit) bool {
+	if u.Name == metricsSettingName {
+		return u.Value == "" && observability.IsSetting(u.Scope)
+	}
 	n, ok := observability.Lookup(u.Name)
 	if !ok {
 		return false

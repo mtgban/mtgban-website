@@ -560,3 +560,16 @@ func TestRemoveAndOverviewSayWhyARateIsMissing(t *testing.T) {
 		t.Errorf("feature rows = %+v", area.Feature.Names)
 	}
 }
+
+// The snapshot's names and the server setting names, now context, still open a Feature page on both layouts.
+func TestFeatureRendersTheSettingNames(t *testing.T) {
+	withMetricsInstance(t, "magic")
+	for _, name := range []string{"state.set", "state.reader", "search.view", "search.misc", "search.store_factors", "search.custom_buylist", "upload.value_set", "sleepers.lists"} {
+		v := renderView(t, newFakeMetrics(), observability.All(), metricsParams{View: "feature", Name: name})
+		if v.Feature == nil {
+			t.Fatalf("%s: no feature view", name)
+		}
+		wantAll(t, metricsPage(t, v), name+" on desktop", `<h2 class="admin-mono">`+name+`</h2>`)
+		wantAll(t, metricsSection(t, v, true), name+" on mobile", `<h2 class="admin-mono">`+name+`</h2>`)
+	}
+}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,12 +16,25 @@ import (
 )
 
 func TestClientMaySend(t *testing.T) {
-	for f, want := range map[observability.Family]bool{
-		observability.FamilyUI: true, observability.FamilyState: true,
-		observability.FamilyServer: false, observability.FamilyStock: false,
+	for _, c := range []struct {
+		n    observability.Name
+		want bool
+	}{
+		{observability.Name{Name: "ui.x", Family: observability.FamilyUI}, true},
+		{observability.Name{Name: "state.set", Family: observability.FamilyState}, true},
+		{observability.Name{Name: "state.reader", Family: observability.FamilyState}, true},
+		{observability.Name{Name: "state.other", Family: observability.FamilyState}, false}, // a state name the snapshot does not send
+		{observability.Name{Name: "state.set", Family: observability.FamilyServer}, false},
+		{observability.Name{Name: "page.view", Family: observability.FamilyServer}, false},
+		{observability.Name{Name: "stock.rows", Family: observability.FamilyStock}, false},
 	} {
-		if got := clientMaySend(f); got != want {
-			t.Errorf("clientMaySend(%v) = %v, want %v", f, got, want)
+		if got := clientMaySend(c.n); got != c.want {
+			t.Errorf("clientMaySend(%s, family %v) = %v, want %v", c.n.Name, c.n.Family, got, c.want)
+		}
+	}
+	for _, n := range observability.All() {
+		if n.Family == observability.FamilyState && !clientMaySend(n) {
+			t.Errorf("%s is a state name the beacon refuses; only the snapshot's are registered", n.Name)
 		}
 	}
 }
@@ -136,7 +150,7 @@ func TestCheckEntryRefusesEveryFamilyButTheClients(t *testing.T) {
 	}
 	for _, n := range observability.All() {
 		_, _, _, reason := checkEntry(beaconEntry{N: n.Name, C: 1}, v)
-		if refused := reason == "family"; refused == clientMaySend(n.Family) {
+		if refused := reason == "family"; refused == clientMaySend(n) {
 			t.Errorf("%s: reason %q for family %v", n.Name, reason, n.Family)
 		}
 	}
@@ -432,4 +446,61 @@ func TestMetricsAPICountsAKeyOncePerPost(t *testing.T) {
 		}
 		wantRow(t, rows.rows(), "search", "ui.load", "", 4)
 	})
+}
+
+func TestMetricsSettingsIsCacheableJSON(t *testing.T) {
+	rec := httptest.NewRecorder()
+	MetricsSettings(rec, httptest.NewRequest(http.MethodGet, "/api/metrics/settings.json?hash=abc", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "public, max-age=86400" {
+		t.Errorf("Cache-Control = %q", got)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Errorf("Content-Type = %q", got)
+	}
+	if len(rec.Result().Cookies()) != 0 {
+		t.Error("a public answer sets a cookie")
+	}
+	if !bytes.Equal(rec.Body.Bytes(), observability.SettingsJSON()) {
+		t.Error("the body is not the registry")
+	}
+}
+
+func TestMetricsSettingsRefusesAPost(t *testing.T) {
+	rec := httptest.NewRecorder()
+	MetricsSettings(rec, httptest.NewRequest(http.MethodPost, "/api/metrics/settings.json", nil))
+	if rec.Code != http.StatusMethodNotAllowed || rec.Header().Get("Allow") != "GET, HEAD" {
+		t.Errorf("status %d, Allow %q", rec.Code, rec.Header().Get("Allow"))
+	}
+}
+
+// The snapshot's two names are stored; a setting value that is not the registry's is refused.
+func TestMetricsAPITakesASnapshot(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	body := `[{"n":"state.reader","s":"upload","c":1},` +
+		`{"n":"state.set","s":"UploadSorting","v":"highprice","c":1},` +
+		`{"n":"state.set","s":"gdocURL","v":"https://example.com/x","c":1},` +
+		`{"n":"state.set","s":"enabledSellers","v":"set","c":1},` +
+		`{"n":"state.set","s":"NoSuchSetting","v":"on","c":1}]`
+	if code := postBeacon(t, beacon(body)); code != http.StatusNoContent {
+		t.Fatalf("status %d, want 204", code)
+	}
+	got := rows.rows()
+	wantRow(t, got, "upload", "state.reader", "", 1)
+	wantRow(t, got, "UploadSorting", "state.set", "highprice", 1)
+	if set := find(got, "state.set"); len(set) != 1 {
+		t.Errorf("state.set rows = %+v, want only UploadSorting's", set)
+	}
+	for _, row := range got {
+		if row.Scope == "enabledSellers" {
+			t.Errorf("a cookie every upload writes was stored: %+v", row)
+		}
+	}
+	wantRow(t, got, "", "metrics.client", "accepted", 2)
+	wantRow(t, got, "", "metrics.client", "value", 3)
+	wantRow(t, got, "", "metrics.rejected", "", 3)
+	wantRow(t, got, "", "metrics.beacon", "ok", 1)
 }

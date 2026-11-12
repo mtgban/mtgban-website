@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/ratelimit"
@@ -24,9 +25,12 @@ type beaconEntry struct {
 	C int    `json:"c"`
 }
 
-// clientMaySend reports whether a browser may send names of this family.
-func clientMaySend(f observability.Family) bool {
-	return f == observability.FamilyUI || f == observability.FamilyState
+// clientStateNames are the state names a browser sends: the settings snapshot.
+var clientStateNames = []string{"state.set", "state.reader"}
+
+// clientMaySend reports whether a browser may send this name: the ui family and the snapshot's two.
+func clientMaySend(n observability.Name) bool {
+	return n.Family == observability.FamilyUI || (n.Family == observability.FamilyState && slices.Contains(clientStateNames, n.Name))
 }
 
 // clientString reports whether s is short printable ASCII, as every registry string is.
@@ -64,7 +68,7 @@ func checkEntry(e beaconEntry, v observability.Validators) (scope, value string,
 	if !ok {
 		return "", "", 0, "unknown"
 	}
-	if !clientMaySend(name.Family) {
+	if !clientMaySend(name) {
 		return "", "", 0, "family"
 	}
 	if !clientString(e.S) || !clientString(e.V) {
@@ -120,6 +124,18 @@ func (s *site) MetricsAPI(w http.ResponseWriter, r *http.Request) {
 		countEntry(r, d, v, added, e)
 	}
 	observe(r, "metrics.beacon", outcome)
+}
+
+// MetricsSettings serves the settings registry the snapshot reads; the page asks with ?hash=<build>.
+func MetricsSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(observability.SettingsJSON())
 }
 
 // beaconValidators checks a beacon against the stores loaded right now.

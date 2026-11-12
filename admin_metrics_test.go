@@ -3301,3 +3301,30 @@ func TestOverviewSaysWhatThePhoneRowsCover(t *testing.T) {
 	v := loadTestView(t, store, testCache(store), metricsTestRegistry(), metricsParams{View: "overview", Instance: "magic", Days: 180})
 	wantAll(t, metricsPage(t, v), "the overview", "Phone rows cover the last 30 complete days of page hits, whatever the window above.")
 }
+
+func TestReviewOfASettingIsSaved(t *testing.T) {
+	withMetricsInstance(t, "magic")
+	rec, store, pv := reviewPost(t, url.Values{"reviewName": {"state.set"}, "reviewScope": {"UploadMinVal"}, "reviewVerdict": {"keep"}, "reviewNote": {"used by presets"}})
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/admin?page=metrics&view=remove&area=upload&instance=lorcana&saved=1#rm-state.set--uploadminval--" {
+		t.Fatalf("status %d to %q, warning %q", rec.Code, rec.Header().Get("Location"), pv.WarningMessage)
+	}
+	if len(store.saved) != 1 || store.saved[0].Name != "state.set" || store.saved[0].Scope != "UploadMinVal" || store.saved[0].Value != "" || store.saved[0].Note != "used by presets" {
+		t.Errorf("saved %+v", store.saved)
+	}
+	for name, form := range map[string]url.Values{
+		"a transient key": {"reviewName": {"state.set"}, "reviewScope": {"uploadTab"}, "reviewVerdict": {"keep"}},
+		"no such setting": {"reviewName": {"state.set"}, "reviewScope": {"NoSuchSetting"}, "reviewVerdict": {"keep"}},
+		"a value":         {"reviewName": {"state.set"}, "reviewScope": {"UploadMinVal"}, "reviewValue": {"set"}, "reviewVerdict": {"keep"}},
+		"no setting":      {"reviewName": {"state.set"}, "reviewVerdict": {"keep"}},
+		"the reader name": {"reviewName": {"state.reader"}, "reviewScope": {"upload"}, "reviewVerdict": {"keep"}},
+	} {
+		rec, store, pv := reviewPost(t, form)
+		if len(store.saved) != 0 || pv.WarningMessage != metricsReviewNoCandidate || rec.Header().Get("Location") != "" {
+			t.Errorf("%s: saved %d, warning %q", name, len(store.saved), pv.WarningMessage)
+		}
+	}
+	// a mark left on a setting no longer listed is filed under the setting's area
+	if row := metricsGoneRow(observability.Review{Name: "state.set", Scope: "UploadMinVal", Verdict: "keep"}); row.Area != "upload" || row.Key != "state.set|UploadMinVal|" {
+		t.Errorf("gone row %+v", row)
+	}
+}

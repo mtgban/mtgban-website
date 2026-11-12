@@ -28,6 +28,7 @@
     if (off) {
         try {
             localStorage.removeItem(QUEUE_KEY);
+            localStorage.removeItem('mtgban_metrics_snap');
         } catch (e) {}
         return;
     }
@@ -420,8 +421,270 @@
         });
     }
 
+    // The settings snapshot: once a UTC day per path scope, the settings off their default.
+    var SNAP = 'mtgban_metrics_snap';
+    var SNAP_PATHS = ['root', 'upload', 'arbit', 'reverse', 'global', 'sleepers', 'newspaper'];
+    var TRUE_LIKE = { '1': 1, 'true': 1, 't': 1, 'on': 1 };
+
+    function has(o, k) {
+        return Object.prototype.hasOwnProperty.call(o, k);
+    }
+
+    // scopes is root plus the page whose own cookies this path can read.
+    function scopes(pathname) {
+        var seg = str(pathname).split('/')[1] || '';
+        return SNAP_PATHS.indexOf(seg) > 0 ? ['root', seg] : ['root'];
+    }
+
+    // cookies parses a cookie string; the first copy of a name wins, as the most specific path.
+    function cookies(cookieString) {
+        var jar = {};
+        var parts = str(cookieString).split(';');
+        for (var i = 0; i < parts.length; i++) {
+            var part = parts[i];
+            var at = part.indexOf('=');
+            if (at < 0) continue;
+            var name = part.slice(0, at).trim();
+            if (!name || has(jar, name)) continue;
+            var raw = part.slice(at + 1).trim();
+            if (raw.length >= 2 && raw.charAt(0) === '"' && raw.charAt(raw.length - 1) === '"') raw = raw.slice(1, -1);
+            try {
+                raw = decodeURIComponent(raw);
+            } catch (e) {}
+            jar[name] = raw;
+        }
+        return jar;
+    }
+
+    // rawOf reads an entry's own value: the cookie first for both, the mirror never.
+    function rawOf(s, read) {
+        // uploadMode, the one flag kept in both, says buylist or retail in its local copy.
+        if (s.storage === 'cookie' || (s.storage === 'both' && s.kind === 'flag')) return str(read.cookie(s.name));
+        if (s.storage === 'local') return str(read.local(s.name));
+        return str(read.cookie(s.name)) || str(read.local(s.name));
+    }
+
+    function flagOff(on, def) {
+        if (on === (def === 'on')) return '';
+        return on ? 'on' : 'off';
+    }
+
+    // listItems reads a JSON array's strings, or a comma or bar separated list.
+    function listItems(raw) {
+        var items;
+        try {
+            var parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) items = parsed.filter(function (x) { return typeof x === 'string'; });
+        } catch (e) {}
+        if (!items) items = raw.split(/[,|]/);
+        var out = [];
+        for (var i = 0; i < items.length; i++) {
+            var it = items[i].trim();
+            if (it && out.indexOf(it) < 0) out.push(it);
+        }
+        return out.sort();
+    }
+
+    function canonical(raw) {
+        try {
+            return JSON.stringify(JSON.parse(raw));
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // blobLive reports a blob that holds something other than its default or an empty shape.
+    function blobLive(raw, def) {
+        if (!raw || raw === def) return false;
+        var parsed;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (e) {
+            return true;
+        }
+        if (def && canonical(def) !== null && canonical(raw) === canonical(def)) return false;
+        if (parsed === null) return false;
+        if (Array.isArray(parsed)) {
+            for (var i = 0; i < parsed.length; i++) {
+                if (!parsed[i] || !parsed[i].del) return true;
+            }
+            return false;
+        }
+        if (typeof parsed === 'object') {
+            for (var k in parsed) {
+                if (has(parsed, k)) return true;
+            }
+            return false;
+        }
+        return true;
+    }
+
+    function queryLive(raw) {
+        var q = new URLSearchParams(raw);
+        var live = false;
+        q.forEach(function (v, k) {
+            if (k !== 'f' && k !== 't' && v !== '') live = true;
+        });
+        return live;
+    }
+
+    // value is '' at the default, else on, off, set or a member of the entry's enum; never the stored text.
+    function value(s, read) {
+        try {
+            if (!s || typeof s.name !== 'string') return '';
+            var def = str(s.default);
+            var dot = s.name.indexOf('.');
+            if (s.kind === 'flag' && dot > 0) {
+                var packed = str(read.cookie(s.name.slice(0, dot)));
+                if (!packed) return '';
+                return flagOff(packed.split(',').indexOf(s.name.slice(dot + 1)) >= 0, def);
+            }
+            var raw = rawOf(s, read);
+            if (!raw) return '';
+            switch (s.kind) {
+                case 'flag':
+                    return flagOff(has(TRUE_LIKE, raw.toLowerCase()), def);
+                case 'enum':
+                    var list = Array.isArray(s.enum) ? s.enum : [];
+                    var at = list.indexOf(raw);
+                    return at >= 0 && list[at] !== def ? list[at] : '';
+                case 'number':
+                    var n = parseFloat(raw);
+                    return isFinite(n) && n !== parseFloat(def) ? 'set' : '';
+                case 'list':
+                    var items = listItems(raw);
+                    if (!def) return items.length ? 'set' : '';
+                    return items.join(',') !== listItems(def).join(',') ? 'set' : '';
+                case 'blob':
+                    return blobLive(raw, def) ? 'set' : '';
+                case 'query':
+                    return queryLive(raw) ? 'set' : '';
+            }
+        } catch (e) {}
+        return '';
+    }
+
+    // entries is a reader row per scope, then that scope's settings off their default, in registry order.
+    function entries(settings, read, scopeList) {
+        var out = [];
+        for (var i = 0; i < scopeList.length; i++) {
+            out.push({ n: 'state.reader', s: scopeList[i], v: '' });
+            for (var j = 0; j < settings.length; j++) {
+                var s = settings[j];
+                if (!s || s.path !== scopeList[i]) continue;
+                var v = value(s, read);
+                if (v) out.push({ n: 'state.set', s: s.name, v: v });
+            }
+        }
+        return out;
+    }
+
+    // due is the scopes the mark has not sent today.
+    function due(mark, scopeList, day) {
+        var m = mark && typeof mark === 'object' ? mark : {};
+        return scopeList.filter(function (s) { return !has(m, s) || m[s] !== day; });
+    }
+
+    // readMark returns the stored mark as a plain object; anything else reads as {}.
+    function readMark() {
+        var raw = localStorage.getItem(SNAP);
+        try {
+            var m = JSON.parse(raw);
+            if (m && typeof m === 'object' && !Array.isArray(m)) return m;
+        } catch (e) {}
+        return {};
+    }
+
+    var running = null;
+
+    // snap runs steps 1 to 3 in the call, up to the registry fetch.
+    function snap() {
+        var mark;
+        try {
+            mark = readMark();
+        } catch (e) {
+            return Promise.resolve();
+        }
+        var day = today();
+        var todo = due(mark, scopes(location.pathname), day);
+        if (!todo.length) return Promise.resolve();
+        return fetch('/api/metrics/settings.json?hash=' + encodeURIComponent(str(cfg.build)), { credentials: 'same-origin' })
+            .then(function (res) {
+                return res && res.status === 200 ? res.json() : null;
+            })
+            .then(function (body) {
+                if (!body || !Array.isArray(body.settings) || optedOut()) return;
+                var now = readMark();
+                todo = due(now, todo, day);
+                if (!todo.length) return;
+                var next = {};
+                for (var i = 0; i < SNAP_PATHS.length; i++) {
+                    var p = SNAP_PATHS[i];
+                    if (todo.indexOf(p) >= 0) next[p] = day;
+                    else if (typeof now[p] === 'number' && now[p] % 1 === 0) next[p] = now[p];
+                }
+                localStorage.setItem(SNAP, JSON.stringify(next));
+                var jar = cookies(document.cookie);
+                var read = {
+                    cookie: function (n) { return has(jar, n) ? jar[n] : ''; },
+                    local: function (n) {
+                        try {
+                            return localStorage.getItem(n);
+                        } catch (e) {
+                            return null;
+                        }
+                    }
+                };
+                var list = entries(body.settings, read, todo);
+                for (var j = 0; j < list.length; j++) {
+                    var e = list[j];
+                    if (e.n === 'state.reader') bump('state.reader', '', e.s);
+                    else bump('state.set', e.v, e.s);
+                }
+            })
+            .then(null, function () {});
+    }
+
+    // run starts one snapshot; a call while one is in flight shares it.
+    function run() {
+        if (running) return running;
+        try {
+            running = snap();
+        } catch (e) {
+            running = Promise.resolve();
+        }
+        var done = function () { running = null; };
+        running.then(done, done);
+        return running;
+    }
+
+    // startSnapshot runs it once, after the load event of a page that is shown, outside any frame.
+    function startSnapshot() {
+        if (window.top !== window.self) return;
+        var loaded = document.readyState === 'complete';
+        var shown = document.prerendering !== true;
+        var started = false;
+        var go = function () {
+            if (started || !loaded || !shown) return;
+            started = true;
+            setTimeout(run, 0);
+        };
+        window.addEventListener('load', function () {
+            loaded = true;
+            go();
+        });
+        if (!shown) {
+            document.addEventListener('prerenderingchange', function () {
+                shown = true;
+                go();
+            });
+        }
+        go();
+    }
+
     BAN.track = track;
     BAN.metrics = { bump: bump };
+    BAN.snapshot = { MARK: SNAP, scopes: scopes, cookies: cookies, value: value, entries: entries, due: due, run: run };
 
     try {
         document.addEventListener('click', onAction, true);
@@ -432,5 +695,8 @@
         window.addEventListener('online', sendQueue);
         sendQueue();
         if (cfg.page) countLoad();
+    } catch (e) {}
+    try {
+        startSnapshot();
     } catch (e) {}
 })();

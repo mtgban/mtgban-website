@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
 	"net/url"
 	"regexp"
@@ -276,7 +277,9 @@ func TestRemoveRenders(t *testing.T) {
 		"no rate, measured in days", "90 days; counted on days the counter ran",
 		`id="rm-search.sort----price"`, `id="rm-bot.cmd----help"`,
 		"<td>not in the last 60 days</td>",
-		"Not measured (1)", "9 days measured, 14 needed; counted on views of the search page",
+		// one name and every setting, none of which has sent a snapshot here
+		fmt.Sprintf("Not measured (%d, %d of them settings)", 1+preferenceSettings(), preferenceSettings()), "9 days measured, 14 needed; counted on views of the search page",
+		"Not measured yet: no browser has reported its settings on the upload page.",
 		"Reviewed (1)", `<td class="admin-metrics-class">keep</td>`, "used by the guide",
 		// each row and each reviewed row has a folded review form that posts to this view
 		`<th>Review</th>`, `<details class="admin-metrics-review-box">`+"\n"+`<summary>Review</summary>`,
@@ -296,6 +299,26 @@ func TestRemoveRenders(t *testing.T) {
 	}
 	if n := strings.Count(section, `<form method="POST" action="/admin?page=metrics&amp;view=remove"`); n != 5 {
 		t.Errorf("%d review forms, want one on each of the 4 candidate rows and the reviewed row", n)
+	}
+	// name rows that are not measured come before the setting rows, even one named after state.set
+	late := observability.Name{Name: "upload.late", Area: "search", Values: observability.ValueEnum, Enum: []string{"a"},
+		Report: observability.ReportCandidate, Kind: "control", Page: "search", Help: "Named after the settings."}
+	v := renderRemoveView(t)
+	rows := append(fullRows("metrics.flush", "", "", 1440, 3),
+		observability.DayTotal{Name: "page.view", Value: "search", N: 5, Days: 9, First: loaderTestDay.AddDate(0, 0, -8), Last: loaderTestDay})
+	v.Remove = buildMetricsRemove(append(renderRemoveRegistry(), late), metricsTestLists, rows, nil, true, nil, 60,
+		metricsParams{View: "remove", Instance: observabilityInstance, Days: 90})
+	if v.Remove.NotMeasuredSettings != preferenceSettings() {
+		t.Errorf("%d setting rows counted, want %d", v.Remove.NotMeasuredSettings, preferenceSettings())
+	}
+	for _, mobile := range []bool{false, true} {
+		html := metricsSection(t, v, mobile)
+		summary := fmt.Sprintf("Not measured (%d, %d of them settings)", len(v.Remove.NotMeasured), preferenceSettings())
+		name := strings.Index(html, "Named after the settings.")
+		setting := strings.Index(html, `id="rm-state.set--`)
+		if !strings.Contains(html, summary) || name < 0 || setting < 0 || name > setting {
+			t.Errorf("mobile %v: want %q and the name row (at %d) before the first setting row (at %d)", mobile, summary, name, setting)
+		}
 	}
 }
 
@@ -714,4 +737,124 @@ func TestEmptyColumnsAreLeftOut(t *testing.T) {
 	wantNone(t, metricsSection(t, ov, false), "no evidence", "<th>Evidence</th>")
 	ov.Overview.Invest, ov.Overview.InvestEvidence = rows[:1], true
 	wantAll(t, metricsSection(t, ov, false), "evidence", "<th>Evidence</th>", "seen twice")
+}
+
+// preferenceSettings is how many settings Remove lists a row for.
+func preferenceSettings() int {
+	n := 0
+	for _, s := range observability.Settings() {
+		if observability.IsSetting(s.Name) {
+			n++
+		}
+	}
+	return n
+}
+
+// settingRemoveView is the Remove view with one rare upload setting among name rows.
+func settingRemoveView(t *testing.T) *MetricsView {
+	t.Helper()
+	p := metricsParams{View: "remove", Instance: observabilityInstance, Days: 90}
+	names := append(renderRemoveRegistry(), observability.Name{Name: "upload.unpack", Area: "upload", Report: observability.ReportCandidate, Kind: "control", Help: "An upload opened its sealed rows."})
+	rows := fullRows("metrics.flush", "", "", 1440, 3)
+	rows = append(rows, fullRows("page.view", "", "sets", 100, 3)...)
+	rows = append(rows, fullRows("state.reader", "upload", "", 300, 3)...)
+	rows = append(rows, fullRows("upload.value_set", "", "maxqty", 31, 1)...)
+	rows = append(rows, observability.DayTotal{Name: "state.set", Scope: "UploadMaxQty", Value: "set", N: 2, Days: 2, First: loaderTestDay.AddDate(0, 0, -1), Last: loaderTestDay})
+	v := metricsShellFor("remove")
+	v.Remove = buildMetricsRemove(names, metricsTestLists, rows, nil, true, nil, 60, p)
+	v.Remove.Counted = true
+	v.Remove.ReviewURL = p.link("remove")
+	return v
+}
+
+// rowHTML is the rendered table row with that anchor.
+func rowHTML(t *testing.T, html, anchor string) string {
+	t.Helper()
+	_, after, ok := strings.Cut(html, `<tr id="`+anchor+`">`)
+	if !ok {
+		t.Fatalf("no row %s", anchor)
+	}
+	row, _, _ := strings.Cut(after, "</tr>")
+	return row
+}
+
+func TestRemoveRendersTheThreeNumbers(t *testing.T) {
+	for _, mobile := range []bool{false, true} {
+		html := metricsSection(t, settingRemoveView(t), mobile)
+		what := fmt.Sprintf("the remove view (mobile %v)", mobile)
+		maxQty := rowHTML(t, html, "rm-state.set--uploadmaxqty--")
+		wantAll(t, maxQty, what+": UploadMaxQty",
+			`state.set</a> on UploadMaxQty`, `<span class="admin-metrics-help">kept in a cookie, read on the upload page</span>`,
+			`<span class="admin-metrics-help">off default 2 of 900 reader-days; changes not counted; ran in 31 requests</span>`,
+			"0.22% of reader-days", "900 browsers that reported their settings that day, on the upload page",
+			"90 days; counted on browsers that reported their settings that day, on the upload page", ">rare<")
+		// a setting with no fact counts neither its changes nor its requests
+		alt := rowHTML(t, html, "rm-state.set--uploadaltprice--")
+		if n := strings.Count(alt, "not counted"); n != 2 {
+			t.Errorf("%s: UploadAltPrice says not counted %d times, want 2: %s", what, n, alt)
+		}
+		wantAll(t, alt, what+": UploadAltPrice", "off default 0 of 900 reader-days", ">unused<")
+		// a root setting with no snapshot yet is not measured, and says so in words
+		notMeasured := rowHTML(t, html, "rm-state.set--searchdefaultsort--")
+		wantAll(t, notMeasured, what+": SearchDefaultSort", "0 days measured; changes not counted; ran in 0 requests",
+			"Not measured yet: no browser has reported its settings on any page.")
+		// a row of another kind has none of the three
+		for _, anchor := range []string{"rm-page.view----alerts", "rm-upload.unpack----"} {
+			wantNone(t, rowHTML(t, html, anchor), what+": "+anchor, "reader-days", "not counted", "ran in", "browsers that reported")
+		}
+		if mobile {
+			wantAll(t, maxQty, what, `data-label="Out of"`, `data-label="Rate"`, `data-label="Measured"`)
+		}
+		wantNone(t, html, what, "nothing named")
+	}
+	page := metricsPage(t, settingRemoveView(t))
+	wantAll(t, page, "the remove page", `<summary class="admin-section-header"><h2>upload</h2>`)
+}
+
+func TestRemoveViewDecoratesASettingRow(t *testing.T) {
+	v := settingRemoveView(t).Remove
+	var upload *MetricsRemoveArea
+	for i := range v.Areas {
+		if v.Areas[i].Area == "upload" {
+			upload = &v.Areas[i]
+		}
+	}
+	if upload == nil || len(upload.Kinds) == 0 || upload.Kinds[0].Kind != "setting" {
+		t.Fatalf("upload area = %+v: its setting kind comes first", upload)
+	}
+	var row *MetricsCandidateRow
+	for i, r := range upload.Kinds[0].Rows {
+		if r.Scope == "UploadMaxQty" {
+			row = &upload.Kinds[0].Rows[i]
+		}
+	}
+	if row == nil {
+		t.Fatal("no UploadMaxQty row")
+	}
+	if row.RateText != "0.22% of reader-days" || row.Key != "state.set|UploadMaxQty|" || row.URL != "?page=metrics&view=feature&name=state.set" ||
+		row.Class != metricsreport.ClassRare || row.Anchor != "rm-state.set--uploadmaxqty--" || row.Reason != "" {
+		t.Errorf("row = %+v", row)
+	}
+	if !slices.Equal(row.Numbers, []string{"off default 2 of 900 reader-days", "changes not counted", "ran in 31 requests"}) {
+		t.Errorf("numbers = %q", row.Numbers)
+	}
+	for _, r := range v.NotMeasured {
+		if r.Name == "state.set" && r.Scope == "SleepersEditionList" {
+			if r.Reason != "Not measured yet: no browser has reported its settings on the sleepers page." {
+				t.Errorf("reason %q", r.Reason)
+			}
+		}
+		if r.Name != "state.set" && r.Numbers != nil {
+			t.Errorf("a name's row has numbers: %+v", r)
+		}
+	}
+	// some days measured, too few: the days and the words
+	c := metricsreport.Candidate{Name: "state.set", Scope: "SleepersEditionList", Class: metricsreport.ClassNotMeasured, DaysMeasured: 10,
+		On: metricsreport.CountedOn{Kind: metricsreport.OnReaders, Pages: "sleepers"}, Changes: 3, Requests: -1}
+	if got := metricsReason(c); got != "10 days measured, 14 needed; counted on browsers that reported their settings that day, on the sleepers page" {
+		t.Errorf("reason %q", got)
+	}
+	if got := metricsSettingNumbers(c); !slices.Equal(got, []string{"10 days measured", "changed 3", "requests not counted"}) {
+		t.Errorf("numbers %q", got)
+	}
 }

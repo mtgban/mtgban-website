@@ -49,8 +49,8 @@ type Candidate struct {
 	LastSeen     time.Time // newest day with a row of the unit in either window; zero if none
 	Verdict      string    // the review's, when Class is reviewed
 	Note         string    // the review's, when Class is reviewed
-	Changes      int64     // setting changes, -1 until phase 2e counts them
-	Requests     int64     // requests that ran with a setting, -1 until phase 2e counts them
+	Changes      int64     // a setting row's changes; -1 when not counted, as on every name's row
+	Requests     int64     // requests that ran with a setting; -1 when not counted, as on every name's row
 }
 
 // period is one key's sum over one window period.
@@ -126,13 +126,14 @@ const (
 	OnPages     = "pages"      // views of Pages, or script loads on them when Scripts
 	OnFlushDays = "flush_days" // days the counter ran, each with a script load when Scripts
 	OnNoRows    = "no_rows"    // the name has no row on this site in the window
+	OnReaders   = "readers"    // a setting's: state.reader rows for its path, Pages
 )
 
 // CountedOn is what a candidate's days are counted on, for the page to put in words.
 type CountedOn struct {
 	Kind    string
 	Scripts bool   // ui.load rows in place of page.view, or flushed days that had one
-	Pages   string // OnPages: the pages, sorted and comma-separated
+	Pages   string // OnPages: the pages, sorted and comma-separated; OnReaders: the setting's path
 	Name    string // OnDenom: the Denom
 }
 
@@ -251,7 +252,7 @@ func (d denominator) measure(idx index, k int) (int64, int) {
 // Remove lists the registry's removal candidates that are unused, rare,
 // unused so far, not measured or reviewed; units in use are left out.
 // totals are DayTotals with Step periodDays over 2*w.Days days, unsplit;
-// names have been through Expand; settings are not read before phase 2e.
+// names have been through Expand; each preference setting is one more unit, state.set on its name.
 func Remove(names []observability.Name, settings []observability.Setting,
 	totals []observability.DayTotal, reviews []Review, w Window) []Candidate {
 	k := windowPeriods(w)
@@ -311,6 +312,7 @@ func Remove(names []observability.Name, settings []observability.Setting,
 			out = append(out, ranked{c, underLine(n.Family, c.Count, denom)})
 		}
 	}
+	out = append(out, settingRows(names, settings, idx, marks, k, w)...)
 	slices.SortFunc(out, compareRanked)
 	if out == nil {
 		return nil
@@ -469,4 +471,122 @@ func Orphans(reviews []Review, candidates []Candidate) []Review {
 		}
 	}
 	return out
+}
+
+// The setting rows' names: its readers off the default, its readers, and its changes.
+const (
+	stateSet      = "state.set"
+	settingChange = "ui.settings.change"
+)
+
+// rareReaderLine is the setting rows' rare line in reader-days per 1,000, exact.
+const rareReaderLine = int64(rareReaderShare * 1000)
+
+// settingRows are the preference settings as candidates, each judged against the readers of its path.
+func settingRows(names []observability.Name, settings []observability.Setting, idx index, marks map[Unit]Review, k int, w Window) []ranked {
+	changes := slices.ContainsFunc(names, func(n observability.Name) bool { return n.Name == settingChange })
+	var out []ranked
+	for _, s := range settings {
+		if s.Class != "preference" {
+			continue
+		}
+		u := Unit{Name: stateSet, Scope: s.Name}
+		c := Candidate{
+			Name: stateSet, Scope: s.Name, Area: s.Area, Kind: "setting", Help: settingHelp(s),
+			Basis: stateReader + " on " + s.Path, On: CountedOn{Kind: OnReaders, Pages: s.Path},
+			Changes: -1, Requests: settingRequests(idx, s),
+		}
+		c.Count = windowSum(idx, u)
+		if sr := idx[u]; sr != nil {
+			c.LastSeen = sr.last
+		}
+		for _, p := range idx.window(Unit{Name: stateReader, Scope: s.Path}) {
+			c.Denom += p.n
+			c.DaysMeasured += p.days
+		}
+		if changes {
+			c.Changes = windowSum(idx, Unit{Name: settingChange, Scope: s.Name})
+		}
+		if c.Denom > 0 {
+			c.Rate = float64(c.Count) / float64(c.Denom)
+			steps := c.Count * 10000 / c.Denom // hundredths of a percent, rounded down
+			c.RateText = fmt.Sprintf("%d.%02d%% of reader-days", steps/100, steps%100)
+		} else {
+			c.NoRate = NoRateEmpty
+		}
+		c.Class = classifySetting(c, marks, w)
+		if c.Class == "" {
+			continue
+		}
+		if c.Class == ClassReviewed {
+			r := marks[u]
+			c.Verdict, c.Note = r.Verdict, r.Note
+		}
+		var under float64
+		if c.Denom > 0 {
+			under = float64(c.Count) * 1000 / (float64(rareReaderLine) * float64(c.Denom))
+		}
+		out = append(out, ranked{c, under})
+	}
+	return out
+}
+
+// classifySetting is classify for a setting row: rare is under 1% of its reader-days and under rareReaderDays of them.
+func classifySetting(c Candidate, marks map[Unit]Review, w Window) string {
+	if _, ok := marks[Unit{c.Name, c.Scope, c.Value}]; ok {
+		return ClassReviewed
+	}
+	switch {
+	case c.DaysMeasured < minDaysMeasured:
+		return ClassNotMeasured
+	case c.Count == 0 && c.DaysMeasured >= w.Days:
+		return ClassUnused
+	case c.Count == 0:
+		return ClassUnusedSoFar
+	case c.Count*1000 < rareReaderLine*c.Denom && c.Count < rareReaderDays:
+		return ClassRare
+	}
+	return ""
+}
+
+// windowSum is a key's count over the window's periods.
+func windowSum(idx index, u Unit) int64 {
+	var n int64
+	for _, p := range idx.window(u) {
+		n += p.n
+	}
+	return n
+}
+
+// settingRequests counts the requests that ran with the setting through its Fact; -1 with none.
+// A FactValue is counted alone; an enum's values but its default; otherwise every value but a bucket's "0".
+func settingRequests(idx index, s observability.Setting) int64 {
+	if s.Fact == "" {
+		return -1
+	}
+	if s.FactValue != "" {
+		return windowSum(idx, Unit{s.Fact, s.FactScope, s.FactValue})
+	}
+	if s.Kind == "enum" {
+		var n int64
+		for _, v := range s.Enum {
+			if v != s.Default {
+				n += windowSum(idx, Unit{s.Fact, s.FactScope, v})
+			}
+		}
+		return n
+	}
+	return windowSum(idx, Unit{Name: s.Fact, Scope: s.FactScope}) - windowSum(idx, Unit{s.Fact, s.FactScope, "0"})
+}
+
+// settingHelp says in words where a setting is kept and where it is read.
+func settingHelp(s observability.Setting) string {
+	kept := map[string]string{"cookie": "kept in a cookie", "local": "kept in this browser", "both": "kept in a cookie and in this browser"}[s.Storage]
+	if kept == "" {
+		kept = "kept by the browser"
+	}
+	if s.Path == "root" {
+		return kept + ", read on every page"
+	}
+	return kept + ", read on the " + s.Path + " page"
 }

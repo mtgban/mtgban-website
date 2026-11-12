@@ -174,8 +174,33 @@ func TestMetricValidatorsTakeNoSnapshot(t *testing.T) {
 	if v.Route == nil || !v.Route("search") || !v.Route("api.v2") || v.Route("other") || v.Route("wp-login.php") {
 		t.Error("Route accepts exactly the labels routeLabel returns")
 	}
-	if v.Setting != nil || v.SettingValue != nil {
-		t.Error("the settings checks arrive in 2e")
+}
+
+func TestMetricValidatorsKnowTheSettings(t *testing.T) {
+	v := metricValidators(nil)
+	if v.Setting == nil || v.SettingValue == nil {
+		t.Fatal("the settings checks are wired with or without a snapshot")
+	}
+	n := observability.Name{Name: "state.x", Family: observability.FamilyState,
+		Values: observability.ValueSetting, Scope: observability.ScopeSetting}
+	for i, c := range []struct {
+		scope, value string
+		ok           bool
+	}{
+		{"UploadSorting", "highprice", true},
+		{"SearchMiscOpts.noSussy", "on", true},
+		{"UploadOptimizerOpts.lowval", "off", true},
+		{"SearchSellersPriority", "set", true},
+		{"SearchSellersPriority", "https://example.com/sheet", false}, // free text
+		{"UploadSorting", "", false},                                  // a value is required
+		{"uploadTab", "set", false},                                   // transient: rejected, not "other"
+		{"MadeUp", "on", false},
+		{"", "on", false},
+	} {
+		s, val, ok := n.Check(c.scope, c.value, v)
+		if ok != c.ok || (ok && (s != c.scope || val != c.value)) {
+			t.Errorf("case %d: got (%q, %q, %v), want ok %v", i, s, val, ok, c.ok)
+		}
 	}
 }
 
@@ -715,5 +740,25 @@ func TestStoreValidatorKnowsLoadedShorthands(t *testing.T) {
 		if got := store(sh); got != want {
 			t.Errorf("Store(%q) = %v, want %v", sh, got, want)
 		}
+	}
+}
+
+// The snapshot's names pass the registry on the server's own path too; free text does not.
+func TestObserveAcceptsASettingSnapshot(t *testing.T) {
+	rows := withFeatureCounter(t)
+	r := httptest.NewRequest(http.MethodPost, "/api/metrics", nil)
+	observeScoped(r, "UploadSorting", "state.set", "highprice")
+	observeScoped(r, "upload", "state.reader", "")
+	observeScoped(r, "SearchSellersPriority", "state.set", "https://example.com/sheet")
+	got := rows.rows()
+	wantRow(t, got, "UploadSorting", "state.set", "highprice", 1)
+	wantRow(t, got, "upload", "state.reader", "", 1)
+	for _, row := range got {
+		if row.Scope == "SearchSellersPriority" {
+			t.Errorf("a free-text setting value was stored: %+v", row)
+		}
+	}
+	if rejected := find(got, "metrics.rejected"); len(rejected) != 1 || rejected[0].N != 1 {
+		t.Errorf("metrics.rejected rows = %+v, want one row with n 1", rejected)
 	}
 }

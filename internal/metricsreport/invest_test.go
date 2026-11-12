@@ -510,9 +510,6 @@ var expectedLater = []struct {
 	{uiLoad, "2a", func(n observability.Name) bool {
 		return n.Family == observability.FamilyUI && n.Scope == observability.ScopePage // scope read as the page
 	}},
-	{stateReader, "2e", func(n observability.Name) bool {
-		return n.Family == observability.FamilyState && n.Scope != observability.ScopeNone && n.Values == observability.ValueNone
-	}},
 	{"ui.search.sort_locked", "2b", func(n observability.Name) bool { return n.Family == observability.FamilyUI }},
 	{"ui.row.locked", "2b", func(n observability.Name) bool {
 		return n.Family == observability.FamilyUI && n.Values != observability.ValueNone
@@ -536,6 +533,10 @@ func TestEveryNameReadIsPinned(t *testing.T) {
 	job, ok := observability.Lookup("job.run")
 	if !ok || !slices.Equal(job.Scopes, []string{"fold", "stock", "events_rollup"}) || !slices.Contains(job.Enum, "ok") || !slices.Contains(job.Enum, "fail") {
 		t.Errorf("job.run = %+v: Problems judges ok and fail, JobNote names stock", job)
+	}
+	reader, ok := observability.Lookup(stateReader)
+	if !ok || reader.Family != observability.FamilyState || reader.Scope != observability.ScopeEnum || reader.Values != observability.ValueNone || !slices.Equal(reader.Scopes, observability.SettingPaths) {
+		t.Errorf("%s = %+v: Coverage reads its days by path scope; Remove reads its rows as readers", stateReader, reader)
 	}
 	later := map[string]bool{}
 	for _, e := range expectedLater {

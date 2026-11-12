@@ -220,7 +220,7 @@ func (s *trackScan) problems() []string {
 		switch {
 		case !found:
 			out = append(out, fmt.Sprintf("%s: %q is not in the registry", strings.Join(files, ", "), name))
-		case !clientMaySend(n.Family):
+		case !clientMaySend(n):
 			out = append(out, fmt.Sprintf("%s: %q is not a name a browser may send", strings.Join(files, ", "), name))
 		}
 	}
@@ -278,7 +278,7 @@ func TestEveryTrackedNameIsRegistered(t *testing.T) {
 func TestEveryClientNameIsTracked(t *testing.T) {
 	names := trackedNames(t).names
 	for _, n := range observability.All() {
-		if clientMaySend(n.Family) && names[n.Name] == nil {
+		if clientMaySend(n) && names[n.Name] == nil {
 			t.Errorf("%s is registered for the client, but no template, script or Go file sends it", n.Name)
 		}
 	}

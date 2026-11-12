@@ -29,10 +29,10 @@ test('a page with no label sends no load, and track still works on it', () => {
 });
 
 test('track is set on a BAN object that was already there', () => {
-    const ban = { snapshot: 'kept' };
+    const ban = { favorites: 'kept' };
     const p = load({ ban });
     expect(p.window.BAN).toBe(ban);
-    expect(ban.snapshot).toBe('kept');
+    expect(ban.favorites).toBe('kept');
     expect(typeof ban.track).toBe('function');
 });
 

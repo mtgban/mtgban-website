@@ -708,9 +708,10 @@ func TestRemoveDegrades(t *testing.T) {
 		t.Error("an empty registry has no candidates")
 	}
 	names := []observability.Name{option("search.sort", "search", "alpha", "chrono")}
-	got := Remove(names, []observability.Setting{{Name: "UploadSorting", Class: "preference"}}, nil, nil, w30)
-	if len(got) != 2 || got[0].Class != "not_measured" || got[1].Class != "not_measured" {
-		t.Errorf("with no rows at all every candidate is not measured, and a setting adds none yet: %+v", got)
+	got := Remove(names, []observability.Setting{{Name: "UploadSorting", Path: "upload", Class: "preference"}}, nil, nil, w30)
+	if len(got) != 3 || got[0].Class != "not_measured" || got[1].Class != "not_measured" || got[2].Class != "not_measured" ||
+		got[2].Name != "state.set" || got[2].Scope != "UploadSorting" || got[2].Value != "" {
+		t.Errorf("with no rows at all every candidate is not measured, a setting's row included: %+v", got)
 	}
 	if got := Remove(names, nil, []observability.DayTotal{tot(0, "page.view", "", "search", 10000, 30)}, nil, Window{}); len(got) != 2 || got[0].Class != "not_measured" {
 		t.Errorf("a zero window measures nothing: %+v", got)
@@ -817,5 +818,178 @@ func TestOrphans(t *testing.T) {
 	}
 	if Orphans(nil, cands) != nil {
 		t.Error("no reviews, no orphans")
+	}
+}
+
+func settingsFixture() []observability.Setting {
+	return []observability.Setting{
+		{Name: "UploadSorting", Storage: "cookie", Path: "upload", Kind: "enum", Enum: []string{"setchrono", "highprice"}, Class: "preference", Area: "upload", Fact: "upload.sorting"},
+		{Name: "UploadMaxQty", Storage: "cookie", Path: "upload", Kind: "number", Default: "0", Class: "preference", Area: "upload", Fact: "upload.value_set", FactValue: "maxqty"},
+		{Name: "UploadMargin", Storage: "cookie", Path: "upload", Kind: "number", Default: "10", Class: "preference", Area: "upload"},
+		{Name: "UploadMinVal", Storage: "cookie", Path: "upload", Kind: "number", Default: "1", Class: "preference", Area: "upload"},
+		{Name: "ArbitVendorsList", Storage: "cookie", Path: "arbit", Kind: "list", Class: "preference", Area: "arbit", Fact: "arbit.excluded_vendors", FactScope: "arbit"},
+		{Name: "SearchMiscOpts.noSussy", Storage: "cookie", Path: "root", Kind: "flag", Default: "off", Class: "preference", Area: "search", Fact: "search.misc", FactValue: "noSussy"},
+		{Name: "NewspaperList", Storage: "cookie", Path: "newspaper", Kind: "list", Class: "preference", Area: "news"},
+		{Name: "SleepersEditionList", Storage: "cookie", Path: "sleepers", Kind: "list", Class: "preference", Area: "sleepers"},
+		{Name: "uploadTab", Storage: "local", Path: "root", Kind: "blob", Class: "transient"},
+	}
+}
+
+var w90 = Window{Days: 90, Signed: true, Humans: true} // periods 0 to 2 are the window, 3 to 5 the one before
+
+func settingsTotals() []observability.DayTotal {
+	return []observability.DayTotal{
+		tot(0, "state.reader", "upload", "", 300, 30), tot(1, "state.reader", "upload", "", 300, 30),
+		tot(2, "state.reader", "upload", "", 300, 30), // 900 reader-days on 90 days
+		tot(3, "state.reader", "upload", "", 300, 30), // the window before: not in the denominator
+		tot(0, "state.reader", "root", "", 600, 30), tot(1, "state.reader", "root", "", 600, 30),
+		tot(2, "state.reader", "root", "", 600, 30),
+		tot(0, "state.reader", "arbit", "", 100, 20),              // 20 days measured
+		tot(0, "state.reader", "sleepers", "", 50, 10),            // under 14 days
+		tot(0, "state.set", "UploadSorting", "highprice", 40, 30), // 40 of 900: in use
+		tot(0, "state.set", "UploadMaxQty", "set", 1, 1),
+		tot(2, "state.set", "UploadMaxQty", "set", 1, 1),          // 2 of 900: rare
+		tot(0, "state.set", "UploadMargin", "set", 5, 5),          // 5 of 900: under 1% but 3 or more reader-days
+		tot(3, "state.set", "UploadMinVal", "set", 4, 4),          // only before the window
+		tot(0, "state.set", "SearchMiscOpts.noSussy", "on", 2, 2), // 2 of 1800: rare
+		tot(0, "ui.settings.change", "UploadMaxQty", "set", 4, 1),
+		tot(0, "upload.value_set", "", "maxqty", 31, 9),
+		tot(0, "upload.value_set", "", "minval", 7, 3),
+		tot(0, "upload.sorting", "", "highprice", 12, 5),
+		tot(0, "upload.sorting", "", "setchrono", 3, 2),
+		tot(0, "upload.sorting", "", "other", 50, 5), // a value outside the setting's Enum
+		tot(0, "arbit.excluded_vendors", "arbit", "0", 500, 20),
+		tot(0, "arbit.excluded_vendors", "arbit", "1-4", 6, 4),
+		tot(0, "arbit.excluded_vendors", "reverse", "1-4", 99, 9),
+		tot(0, "search.misc", "search", "noSussy", 8, 2), // a fact scoped by its path: every scope counts
+		tot(1, "search.misc", "sealed", "noSussy", 3, 1),
+		tot(0, "search.misc", "search", "skipEmpty", 50, 9),
+	}
+}
+
+var changeName = []observability.Name{{Name: "ui.settings.change", Family: observability.FamilyUI, Report: observability.ReportContext}}
+
+func TestRemoveClassesSettings(t *testing.T) {
+	got := Remove(changeName, settingsFixture(), settingsTotals(), nil, w90)
+	finite(t, got)
+
+	if c, ok := find(got, "state.set", "UploadMaxQty", ""); !ok || c.Class != "rare" || c.Count != 2 || c.Denom != 900 || c.DaysMeasured != 90 ||
+		c.Changes != 4 || c.Requests != 31 || c.Kind != "setting" || c.Area != "upload" || c.Help != "kept in a cookie, read on the upload page" ||
+		!c.LastSeen.Equal(tot(0, "", "", "", 0, 1).Last) || c.RateText != "0.22% of reader-days" || c.NoRate != "" ||
+		c.On != (CountedOn{Kind: OnReaders, Pages: "upload"}) || c.Basis != "state.reader on upload" {
+		t.Errorf("UploadMaxQty = %+v", c)
+	}
+	if c, ok := find(got, "state.set", "UploadMinVal", ""); !ok || c.Class != "unused" || c.Count != 0 || c.Denom != 900 || c.Changes != 0 || c.Requests != -1 ||
+		!c.LastSeen.Equal(tot(3, "", "", "", 0, 1).Last) {
+		t.Errorf("UploadMinVal = %+v", c)
+	}
+	if c, ok := find(got, "state.set", "ArbitVendorsList", ""); !ok || c.Class != "unused_so_far" || c.DaysMeasured != 20 || c.Requests != 6 {
+		t.Errorf("ArbitVendorsList = %+v", c)
+	}
+	if c, ok := find(got, "state.set", "SearchMiscOpts.noSussy", ""); !ok || c.Class != "rare" || c.Denom != 1800 || c.Requests != 11 ||
+		c.Help != "kept in a cookie, read on every page" || c.RateText != "0.11% of reader-days" {
+		t.Errorf("SearchMiscOpts.noSussy = %+v", c)
+	}
+	if c, ok := find(got, "state.set", "SleepersEditionList", ""); !ok || c.Class != "not_measured" || c.DaysMeasured != 10 {
+		t.Errorf("SleepersEditionList = %+v", c)
+	}
+	if c, ok := find(got, "state.set", "NewspaperList", ""); !ok || c.Class != "not_measured" || c.Denom != 0 || c.DaysMeasured != 0 ||
+		c.NoRate != NoRateEmpty || c.RateText != "" {
+		t.Errorf("NewspaperList = %+v", c)
+	}
+	for _, absent := range []string{"uploadTab", "UploadSorting", "UploadMargin"} { // transient; in use; in use
+		if c, ok := find(got, "state.set", absent, ""); ok {
+			t.Errorf("%s is no candidate, got class %s", absent, c.Class)
+		}
+	}
+	if len(got) != 6 {
+		t.Errorf("%d rows, want the six settings above and nothing for ui.settings.change", len(got))
+	}
+	// the rare rows rank by their rate against the 1% line: 2 of 1800 before 2 of 900
+	var rare []string
+	for _, c := range got {
+		if c.Class == ClassRare {
+			rare = append(rare, c.Scope)
+		}
+	}
+	if !slices.Equal(rare, []string{"SearchMiscOpts.noSussy", "UploadMaxQty"}) {
+		t.Errorf("rare rows in order %v", rare)
+	}
+}
+
+// The rare line is decided on integers: exactly 1% is not rare, and 3 reader-days are not rare however few.
+func TestRemoveSettingRareEdges(t *testing.T) {
+	setting := []observability.Setting{{Name: "UploadMaxQty", Storage: "cookie", Path: "upload", Kind: "number", Class: "preference", Area: "upload"}}
+	for _, c := range []struct {
+		count, denom int64
+		rare         bool
+	}{
+		{2, 200, false},    // exactly 1%
+		{2, 201, true},     // just under
+		{3, 100000, false}, // three reader-days
+		{1, 99, false},     // over 1%
+	} {
+		totals := []observability.DayTotal{
+			tot(0, "state.reader", "upload", "", c.denom, 30),
+			tot(0, "state.set", "UploadMaxQty", "set", c.count, 1),
+		}
+		row, ok := find(Remove(nil, setting, totals, nil, w30), "state.set", "UploadMaxQty", "")
+		if ok != c.rare || (ok && row.Class != ClassRare) {
+			t.Errorf("%d of %d: listed %v as %q, want rare %v", c.count, c.denom, ok, row.Class, c.rare)
+		}
+	}
+}
+
+func TestRemoveSettingRequestsForAnEnumSkipTheDefault(t *testing.T) {
+	reviews := []Review{{Name: "state.set", Scope: "UploadSorting", Verdict: "keep"}}
+	c, ok := find(Remove(nil, settingsFixture(), settingsTotals(), reviews, w90), "state.set", "UploadSorting", "")
+	if !ok || c.Requests != 15 {
+		t.Errorf("UploadSorting = %+v, want Requests 15: highprice and setchrono, not other", c)
+	}
+	withDefault := settingsFixture()[:1]
+	withDefault[0].Default = "setchrono"
+	if c, _ := find(Remove(nil, withDefault, settingsTotals(), reviews, w90), "state.set", "UploadSorting", ""); c.Requests != 12 {
+		t.Errorf("with setchrono the default: Requests %d, want 12", c.Requests)
+	}
+}
+
+func TestRemoveSettingWithoutTheChangeCounter(t *testing.T) {
+	got := Remove(nil, settingsFixture(), settingsTotals(), nil, w90)
+	if len(got) == 0 {
+		t.Fatal("no setting rows")
+	}
+	for _, c := range got {
+		if c.Changes != -1 {
+			t.Errorf("%s: Changes %d with no ui.settings.change registered", c.Scope, c.Changes)
+		}
+	}
+}
+
+func TestRemoveSettingReviewed(t *testing.T) {
+	reviews := []Review{{Name: "state.set", Scope: "UploadMinVal", Verdict: "keep", Note: "used by presets"}}
+	c, ok := find(Remove(changeName, settingsFixture(), settingsTotals(), reviews, w90), "state.set", "UploadMinVal", "")
+	if !ok || c.Class != ClassReviewed || c.Verdict != "keep" || c.Note != "used by presets" || c.Denom != 900 || c.DaysMeasured != 90 {
+		t.Errorf("UploadMinVal = %+v", c)
+	}
+}
+
+func TestRemoveWithNoSettings(t *testing.T) {
+	names := []observability.Name{option("search.sort", "search", "chrono", "alpha"), option("news.syp_sort", "newspaper/syp", "edition")}
+	totals := append(settingsTotals(), tot(0, "page.view", "", "search", 10000, 30), tot(0, "search.sort", "", "alpha", 3, 3))
+	without := Remove(names, nil, totals, nil, w90)
+	with := Remove(names, settingsFixture(), totals, nil, w90)
+	var named []Candidate
+	for _, c := range with {
+		if c.Name != "state.set" {
+			named = append(named, c)
+		}
+	}
+	if len(without) == 0 || !slices.Equal(without, named) {
+		t.Errorf("settings changed the name rows:\n%+v\n%+v", without, named)
+	}
+	for _, c := range without {
+		if c.Changes != -1 || c.Requests != -1 {
+			t.Errorf("%s: Changes %d Requests %d, want -1 on a name's row", c.Name, c.Changes, c.Requests)
+		}
 	}
 }

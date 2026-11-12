@@ -157,6 +157,9 @@ func metricValidators(p *prices) observability.Validators {
 		Page:   func(label string) bool { return pageLabelSet()[label] },
 		Route:  func(label string) bool { return routeLabelSet()[label] },
 		Origin: func(host string) bool { return handoffOriginHosts()[host] },
+
+		Setting:      observability.IsSetting,
+		SettingValue: observability.SettingValue,
 	}
 }
 

@@ -15,7 +15,7 @@
         <tbody>
         {{$kind := .}}{{range .Rows}}
             <tr id="{{.Anchor}}">
-                <td class="admin-metrics-name">{{template "admin-metrics-key" .}}{{if .Help}}<span class="admin-metrics-help">{{.Help}}</span>{{end}}</td>
+                <td class="admin-metrics-name">{{template "admin-metrics-key" .}}{{if .Help}}<span class="admin-metrics-help">{{.Help}}</span>{{end}}{{template "admin-metrics-numbers" .}}</td>
                 <td class="admin-metrics-class"{{if $.IsMobile}} data-label="Class"{{end}}>{{template "admin-metrics-class" .}}</td>
                 <td class="num admin-mono"{{if $.IsMobile}} data-label="Count"{{end}}>{{.Count}}</td>
                 {{if $kind.HasOutOf}}<td class="admin-metrics-wrap admin-metrics-words"{{if $.IsMobile}} data-label="Out of"{{end}}>{{.OutOf}}</td>{{end}}
@@ -37,14 +37,14 @@
 {{end}}
 
 <details class="admin-section admin-metrics-more-rows">
-    <summary>Not measured ({{len .NotMeasured}})</summary>
+    <summary>Not measured ({{len .NotMeasured}}{{if .NotMeasuredSettings}}, {{.NotMeasuredSettings}} of them settings{{end}})</summary>
     {{if .NotMeasured}}
     <div class="admin-table-wrap">
     <table class="table-data admin-table">
         <thead><tr><th>Name</th><th>Why</th></tr></thead>
         <tbody>
         {{range .NotMeasured}}
-            <tr id="{{.Anchor}}"><td class="admin-metrics-name">{{template "admin-metrics-key" .}}{{if .Help}}<span class="admin-metrics-help">{{.Help}}</span>{{end}}</td><td class="admin-metrics-wrap">{{.Reason}}</td></tr>
+            <tr id="{{.Anchor}}"><td class="admin-metrics-name">{{template "admin-metrics-key" .}}{{if .Help}}<span class="admin-metrics-help">{{.Help}}</span>{{end}}{{template "admin-metrics-numbers" .}}</td><td class="admin-metrics-wrap">{{.Reason}}</td></tr>
         {{end}}
         </tbody>
     </table>
@@ -79,6 +79,9 @@
 </details>
 {{end}}
 {{end}}
+
+{{/* A setting row's three numbers side by side; a name's row has none. */}}
+{{define "admin-metrics-numbers"}}{{with .Numbers}}<span class="admin-metrics-help">{{range $i, $n := .}}{{if $i}}; {{end}}{{$n}}{{end}}</span>{{end}}{{end}}
 
 {{/* One row's review form, folded: plain HTML, posted to the admin page with the Remove view's link. */}}
 {{define "admin-metrics-review-form"}}

@@ -365,3 +365,58 @@ func TestServerNamesAccept(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckSettingNames(t *testing.T) {
+	v := Validators{Setting: IsSetting, SettingValue: SettingValue}
+	set, _ := Lookup("state.set")
+	reader, _ := Lookup("state.reader")
+	for i, c := range []struct {
+		n            Name
+		scope, value string
+		wantS, wantV string
+		ok           bool
+	}{
+		{set, "UploadSorting", "highprice", "UploadSorting", "highprice", true},
+		{set, "SearchMiscOpts.noSussy", "on", "SearchMiscOpts.noSussy", "on", true},
+		{set, "UploadOptimizerOpts.lowval", "off", "UploadOptimizerOpts.lowval", "off", true},
+		{set, "SearchSellersPriority", "set", "SearchSellersPriority", "set", true},
+		{set, "SearchSellersPriority", "https://example.com/sheet", "", "", false}, // free text
+		{set, "UploadSorting", "", "", "", false},                                  // a value is required
+		{set, "uploadTab", "set", "", "", false},                                   // transient: rejected, not "other"
+		{set, "MadeUp", "on", "", "", false},
+		{set, "", "on", "", "", false},
+		{reader, "upload", "", "upload", "", true},
+		{reader, "root", "", "root", "", true},
+		{reader, "search", "", "", "", false}, // not a path scope
+		{reader, "", "", "", "", false},       // a scoped name always has a scope
+		{reader, "upload", "on", "", "", false},
+	} {
+		s, val, ok := c.n.Check(c.scope, c.value, v)
+		if ok != c.ok || s != c.wantS || val != c.wantV {
+			t.Errorf("case %d: got (%q, %q, %v), want (%q, %q, %v)", i, s, val, ok, c.wantS, c.wantV, c.ok)
+		}
+	}
+	if _, _, ok := set.Check("UploadSorting", "highprice", Validators{}); ok {
+		t.Error("with no validators a setting value is refused")
+	}
+	if set.Family != FamilyState || reader.Family != FamilyState || set.Report != ReportContext || reader.Report != ReportInternal {
+		t.Error("both are state names; state.set is context and state.reader internal")
+	}
+	if !slices.Equal(reader.Scopes, SettingPaths) {
+		t.Errorf("state.reader scopes = %v, want the setting paths %v", reader.Scopes, SettingPaths)
+	}
+}
+
+// The server names of kind setting are context: a setting is listed once in Remove, as its state.set row.
+func TestServerSettingNamesAreContext(t *testing.T) {
+	for _, name := range []string{"search.view", "search.misc", "search.store_factors", "search.custom_buylist", "upload.value_set", "sleepers.lists"} {
+		if n, ok := Lookup(name); !ok || n.Report != ReportContext {
+			t.Errorf("%s: report kind %d, want context", name, n.Report)
+		}
+	}
+	for _, n := range All() {
+		if n.Report == ReportCandidate && n.Kind == "setting" {
+			t.Errorf("%s is a candidate of kind setting: a setting is listed once, as its state.set row", n.Name)
+		}
+	}
+}

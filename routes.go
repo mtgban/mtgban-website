@@ -165,6 +165,7 @@ func (s *site) registerRoutes() {
 	http.Handle("/api/upload/share", noSigning(http.HandlerFunc(UploadShareAPI)))
 	http.Handle("/api/popular/vote", noSigning(http.HandlerFunc(s.PopularVoteAPI)))
 	http.Handle("/api/metrics", noSigning(http.HandlerFunc(s.MetricsAPI)))
+	http.Handle("/api/metrics/settings.json", noSigning(http.HandlerFunc(MetricsSettings)))
 	// Its closures read the live datastore and prices per request.
 	http.Handle("/api/alerts/", noSigning(s.alerts.API()))
 	// Resend's webhook: the Svix signature is the credential.
