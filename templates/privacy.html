@@ -8,19 +8,22 @@
 {{define "content"}}
 <div class="legal">
     <h1>Privacy Policy</h1>
-    <p class="legal-updated">Last updated: October 2026</p>
+    <p class="legal-updated">Last updated: November 2026</p>
 
     <p>MTGBAN (&ldquo;we,&rdquo; &ldquo;us&rdquo;) operates price-comparison tools for trading card games. This policy explains what we collect, how we use it, and which third parties are involved - including our use of affiliate links.</p>
 
     <h2>Information We Collect</h2>
     <ul>
         <li><strong>Account information.</strong> When you sign in through Patreon or link Discord, we receive basic profile details (such as your name, email, and membership tier) to grant access to member features. When your Patreon email is verified we also keep a hashed form of it with your membership tier and the id of the Discord account Patreon reports as linked, whether or not your tier includes price alerts, so your Account page can show the link and alerts can reach you. We never see or store your Patreon or Discord password.</li>
-        <li><strong>Usage data.</strong> Standard server logs (IP address, browser type, pages requested) used to operate and secure the service.</li>
-        <li><strong>Preferences.</strong> Settings such as theme, mobile view, and hidden stores are saved in your browser via cookies or local storage.</li>
+        <li><strong>Usage data.</strong> Standard server logs (IP address, browser type, pages requested) used to operate and secure the service. Our own logs for search, upload, arbitrage and the other tools also keep what was asked for, such as the text of a search, with the time and your account email when you are signed in, or your IP address when you are not. A copy of each entry is posted to a private staff channel on Discord. Each page you visit is also recorded with your device type and, when you are signed in, your membership tier and a hashed form of your email, so we can see how many members use each page. When a search you type while signed in finds results, it may also be recorded, with its text, against the same hash to rank the popular searches list. Page visit records are merged into daily totals that no longer carry the hash after about thirteen months, and search records are deleted after 90 days.</li>
+        <li><strong>Feature usage.</strong> We count how often site features and settings are used. These counts carry your membership tier and device type but no account identifier. They also say whether you were signed in and whether the request looked like it came from an automated crawler. In your browser, our script counts which buttons, links, forms and keyboard shortcuts you use and on which page, which settings you change, and once a day which of your settings differ from their defaults, each sent only as a fixed word such as on, off or set, never what you typed. When one of our scripts fails, it reports the script's name, the line, the kind of error and the site version, never the error message or the page address. On one page load in ten it also reports, in broad ranges, how long the page took to load. We keep these counts by the minute for two weeks and as daily totals after that, and delete script error reports after 90 days.</li>
+        <li><strong>Preferences.</strong> Settings such as theme, mobile view, and hidden stores are saved in your browser via cookies or local storage. When you are signed in, your synced preferences, favorites, recent searches and backpack contents are also stored on our servers, under a hashed form of your email, so they follow you between devices.</li>
     </ul>
 
     <h2>Cookies &amp; Tracking</h2>
     <p>We use cookies and similar browser storage to keep you signed in and remember your preferences. Third parties we link to - including Amazon - may set their own cookies when you visit their sites through our links. You can control or clear cookies in your browser settings, though some member features may not work without them.</p>
+    <p>The feature-usage counts described above set no cookie and store no identifier. To label a count with your tier, our server reads your sign-in cookie and keeps only the tier and whether you are signed in. For them your browser keeps two small entries in local storage: <code>mtgban_metrics_snap</code>, a record of the day your settings were last counted, and <code>mtgban_metrics_queue</code>, a short queue of counts that could not be sent, for example while you were offline, which is sent the next time a page loads and discarded after about a week. Neither identifies you.</p>
+    <p>Our pages load fonts, icons and scripts from Google Fonts, jsDelivr and unpkg, and card images from the sites that publish them, such as Scryfall and TCGplayer. Those hosts receive your IP address and browser type when your browser fetches the files.</p>
 
     <h2>API Accounts &amp; Billing</h2>
     <p>The BAN API has its own accounts, kept at <a href="https://api.mtgban.com">api.mtgban.com</a> and separate from your Patreon or Discord login. An API account is identified by an email address. When you sign in we email you a one-time link that expires in fifteen minutes; we store a hash of that link, never the link itself. A signed session cookie on <code>api.mtgban.com</code> keeps you signed in for up to thirty days, and signing out or suspending the account ends it. If you start an API trial or sign in to the API from a game site with Patreon, your Patreon email and display name are passed to the API host to create or find your account.</p>
@@ -33,10 +36,11 @@
     <p>We rely on services including Amazon, Patreon, Discord, Stripe, and trading-card marketplaces to provide pricing, authentication, and community features. Your interactions with those services are governed by their own privacy policies.</p>
 
     <h2>Data Sharing</h2>
-    <p>We do not sell your personal information. We share data only as needed to operate the service (for example, with the authentication providers above) or where required by law.</p>
+    <p>We do not sell your personal information. We share data only as needed to operate the service (for example, with the authentication providers above, and with Discord, which hosts the private staff channel our usage logs are posted to) or where required by law.</p>
 
     <h2>Your Choices</h2>
     <p>You can clear cookies, sign out, or stop using member features at any time. To request removal of account data tied to your Patreon or Discord login, contact us through our <a href="/discord">Discord</a> or email below.</p>
+    <p>If your browser sends a Do Not Track or Global Privacy Control signal, it sends us no feature-usage counts and keeps neither of the two local storage entries above. Counts our servers make from the requests themselves continue, and as described above they carry no account identifier; the page visits and searches described above are still recorded.</p>
 
     <h2>Contact</h2>
     <p>Questions about this policy? Reach us at <a href="mailto:administrator@mtgban.com">administrator@mtgban.com</a>.</p>
