@@ -35,6 +35,7 @@ var routeLabels = map[string]string{
 	"/api/userstate/":        "api.userstate",
 	"/api/upload/share":      "api.upload_share",
 	"/api/popular/vote":      "api.popular",
+	"/api/metrics":           "api.metrics",
 	"/api/alerts/":           "api.alerts",
 	"/api/opensearch.xml":    "api.opensearch",
 	"/api/offline/":          "api.offline",

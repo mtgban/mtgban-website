@@ -329,6 +329,7 @@ type PageVars struct {
 	SharedVars
 	SleepVars
 	UploadVars
+	MetricsVars
 
 	Nav     []NavElem
 	UserNav *NavElem
@@ -438,6 +439,14 @@ type PageVars struct {
 	User *UserVars
 }
 
+// MetricsVars is what js/metrics.js reads from window.BAN_METRICS; nothing about the reader.
+type MetricsVars struct {
+	// MetricsOn says this instance counts: FeatureCounter is running.
+	MetricsOn bool
+	// MetricsPage is page.view's label for the request, the scope of ui.load; empty sends none.
+	MetricsPage string
+}
+
 func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 	// Decode the sig once; this function reads it for expiry, every nav
 	// feature, and the user email, and each GetParamFromSig call would
@@ -490,6 +499,12 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 
 		ScriptSignedIn:    cookie != "",
 		ScriptOfflineMode: cookieParams.Get("SearchOfflineMode") == "true" || (DevMode && !SigCheck),
+
+		MetricsVars: MetricsVars{MetricsOn: FeatureCounter != nil},
+	}
+	// An error page borrows another page's path, so it reports no load.
+	if r != nil && activeTab != "Error" {
+		pageVars.MetricsPage = pageLabel(r.URL.Path, r.FormValue("page"))
 	}
 
 	if Config().Game != DefaultGame {

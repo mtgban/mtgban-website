@@ -196,6 +196,44 @@ func TestRegistryStringsAreShort(t *testing.T) {
 				t.Errorf("%s: value %q is over %d characters", n.Name, v, limit)
 			}
 		}
+		// The beacon drops anything else, so such an entry could never arrive.
+		for _, s := range slices.Concat([]string{n.Name}, n.Enum, n.Scopes) {
+			if strings.ContainsFunc(s, func(r rune) bool { return r < 0x20 || r > 0x7e }) {
+				t.Errorf("%s: %q is not printable ASCII", n.Name, s)
+			}
+		}
+	}
+}
+
+func TestClientBeaconNames(t *testing.T) {
+	load, ok := Lookup("ui.load")
+	if !ok || load.Family != FamilyUI || load.Scope != ScopePage || load.Values != ValueNone || load.Report != ReportInternal {
+		t.Fatalf("ui.load = %+v, %v", load, ok)
+	}
+	v := Validators{Page: func(s string) bool { return s == "search" }}
+	if s, val, ok := load.Check("search", "", v); !ok || s != "search" || val != "" {
+		t.Errorf("ui.load for a known page = (%q, %q, %v)", s, val, ok)
+	}
+	if s, _, ok := load.Check("/wp-login.php", "", v); !ok || s != "other" {
+		t.Errorf("ui.load for an unknown page = (%q, %v), want it folded to other", s, ok)
+	}
+	if _, _, ok := load.Check("search", "x", v); ok {
+		t.Error("ui.load takes no value")
+	}
+	if _, _, ok := load.Check("", "", v); ok {
+		t.Error("ui.load with no scope is refused: a scoped name always carries one")
+	}
+}
+
+func TestBeaconReasonNames(t *testing.T) {
+	for name, values := range map[string][]string{
+		"metrics.beacon": {"ok", "bad_body", "too_many"},
+		"metrics.client": {"accepted", "unknown", "family", "value", "count"},
+	} {
+		n, ok := Lookup(name)
+		if !ok || n.Family != FamilyServer || n.Values != ValueEnum || n.Scope != ScopeNone || !slices.Equal(n.Enum, values) {
+			t.Errorf("%s = %+v, %v", name, n, ok)
+		}
 	}
 }
 
@@ -231,6 +269,9 @@ func TestRegistryIsWellFormed(t *testing.T) {
 		}
 		if strings.HasPrefix(n.Name, "ui.") != (n.Family == FamilyUI) {
 			t.Errorf("%s: the ui. prefix and the UI family go together", n.Name)
+		}
+		if strings.HasPrefix(n.Name, "state.") != (n.Family == FamilyState) {
+			t.Errorf("%s: the state. prefix and the State family go together", n.Name)
 		}
 		if n.Report == ReportCandidate && n.Kind == "" {
 			t.Errorf("%s is a candidate with no kind", n.Name)

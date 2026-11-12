@@ -176,6 +176,22 @@ func count(d observability.Dims, p *prices, scope, name, value string) {
 	FeatureCounter.Add(d, scope, name, value, 1)
 }
 
+// addChecked adds n to a fact the caller already ran through the registry's Check.
+func addChecked(d observability.Dims, scope, name, value string, n int64) {
+	if FeatureCounter == nil {
+		return
+	}
+	FeatureCounter.Add(d, scope, name, value, n)
+}
+
+// rejectChecked counts a fact the caller's registry check refused.
+func rejectChecked() {
+	if FeatureCounter == nil {
+		return
+	}
+	FeatureCounter.Reject()
+}
+
 // observe counts a fact about r for a name with no scope.
 func observe(r *http.Request, name, value string) {
 	if FeatureCounter == nil {
