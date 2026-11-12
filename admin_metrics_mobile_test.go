@@ -75,7 +75,7 @@ func TestMobileAdminLinksToMetrics(t *testing.T) {
 	if !strings.Contains(html, `<a class="m-admin-tool-btn" href="?page=metrics">Open metrics</a>`) {
 		t.Error("the mobile admin does not link to metrics")
 	}
-	wantNone(t, html, "the mobile admin off the metrics page", "Feature metrics are not enabled", `class="admin-metrics"`)
+	wantNone(t, html, "the mobile admin off the metrics page", "Feature metrics are off", `class="admin-metrics"`)
 }
 
 func TestMobileMetricsHasTablesAndNoCharts(t *testing.T) {
@@ -100,7 +100,7 @@ func TestMobileAdminRendersEveryMetricsView(t *testing.T) {
 		vars := PageVars{Page: "metrics", AdminVars: AdminVars{Metrics: v}}
 		html := renderMobileAdminPage(t, vars)
 		if v == nil {
-			wantAll(t, html, name, "Feature metrics are not enabled")
+			wantAll(t, html, name, "Feature metrics are off")
 		} else {
 			wantAll(t, html, name, `<div class="admin-metrics">`, `aria-label="Views"`)
 		}

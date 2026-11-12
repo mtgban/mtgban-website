@@ -39,7 +39,7 @@
 {{end}}
 </div>
 {{else}}
-<div class="admin-msg">Feature metrics are not enabled: the observability database or its feature tables are missing.</div>
+<div class="admin-msg">{{if .MetricsOff}}{{.MetricsOff}}{{else}}Feature metrics are off: this site has no instance_name, no observability database, or the feature tables could not be created.{{end}}</div>
 {{end}}
 {{end}}
 

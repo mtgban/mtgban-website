@@ -1081,15 +1081,27 @@ func TestMinuteLoadsExpire(t *testing.T) {
 	}
 }
 
+// With no store the section names the cause, the instance name before the database.
 func TestMetricsOffWithoutTheStore(t *testing.T) {
 	saved := metricsStoreFn
 	metricsStoreFn = func() metricsStore { return nil }
 	t.Cleanup(func() { metricsStoreFn = saved })
 	withSigMode(t, true, false)
-	rec := httptest.NewRecorder()
-	testSite.Admin(rec, httptest.NewRequest(http.MethodGet, "/admin?page=metrics", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status %d", rec.Code)
+	for _, tc := range []struct{ instance, want string }{
+		{"", "Feature metrics are off: this site has no instance_name in its config, so it counts nothing."},
+		{observability.SharedInstance, `Feature metrics are off: this site&#39;s instance_name is &#34;shared&#34;`},
+		{"magic", "Feature metrics are off: this site has no observability database, or the feature tables could not be created."},
+	} {
+		withConfigCopy(t)
+		Config().InstanceName = tc.instance
+		rec := httptest.NewRecorder()
+		testSite.Admin(rec, httptest.NewRequest(http.MethodGet, "/admin?page=metrics", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%q: status %d", tc.instance, rec.Code)
+		}
+		if !strings.Contains(rec.Body.String(), tc.want) {
+			t.Errorf("instance %q: the section does not say %q", tc.instance, tc.want)
+		}
 	}
 }
 

@@ -86,6 +86,8 @@ type AdminVars struct {
 	SearchStats *SearchesDashboard
 	AlertStats  *AlertsAdminDashboard
 	Metrics     *MetricsView
+	// MetricsOff says why the Metrics section has no store, when it has none.
+	MetricsOff string
 
 	CheckpointsText    string
 	ACLText            string
@@ -249,7 +251,9 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	}
 	// The Metrics section reads the feature tables the same way.
 	if page == "metrics" {
-		if store := metricsStoreFn(); store != nil {
+		if store := metricsStoreFn(); store == nil {
+			pageVars.MetricsOff = metricsOffText(Config().InstanceName)
+		} else {
 			ctx, cancel := metricsContext(r)
 			defer cancel()
 			cache := metricsCache(store)

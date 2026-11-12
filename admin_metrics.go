@@ -105,6 +105,17 @@ const (
 // metricsNoInstanceText is what the section says for a site with no instance name.
 const metricsNoInstanceText = "This site has no instance name configured, so it counts nothing; pick another site above."
 
+// metricsOffText says why counting is off when the section has no store: the instance name first.
+func metricsOffText(instance string) string {
+	switch instance {
+	case "":
+		return "Feature metrics are off: this site has no instance_name in its config, so it counts nothing."
+	case observability.SharedInstance:
+		return `Feature metrics are off: this site's instance_name is "shared", a name kept for stored-state counts, so it counts nothing.`
+	}
+	return "Feature metrics are off: this site has no observability database, or the feature tables could not be created."
+}
+
 // metricsTiersFailedText is a tier cell's text when the tier split could not be read.
 const metricsTiersFailedText = "tier split could not be read"
 

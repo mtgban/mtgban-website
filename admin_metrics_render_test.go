@@ -114,9 +114,9 @@ func wantNone(t *testing.T, html, what string, nots ...string) {
 func TestMetricsTabIsItsOwnPage(t *testing.T) {
 	dash := renderAdminPage(t, PageVars{Page: "dashboard"})
 	wantAll(t, dash, "the dashboard", "location.href='?page=metrics'", `id="panel-metrics"`)
-	wantNone(t, dash, "the dashboard", "Feature metrics are not enabled", `class="admin-metrics"`)
+	wantNone(t, dash, "the dashboard", "Feature metrics are off", `class="admin-metrics"`)
 	off := metricsPage(t, nil)
-	wantAll(t, off, "metrics with no store", "Feature metrics are not enabled: the observability database or its feature tables are missing.")
+	wantAll(t, off, "metrics with no store", "Feature metrics are off: this site has no instance_name, no observability database, or the feature tables could not be created.")
 }
 
 func TestMetricsShellLinksKeepWhatDiffers(t *testing.T) {
@@ -490,7 +490,7 @@ func TestMetricsPartialsRenderOnMobileAndDesktop(t *testing.T) {
 		v    *MetricsView
 		want string
 	}{
-		{nil, "Feature metrics are not enabled"},
+		{nil, "Feature metrics are off"},
 		{ov, "Consider removing"},
 		{rm, "Not measured (0)"},
 		{inv, "Depth, pages only"},
