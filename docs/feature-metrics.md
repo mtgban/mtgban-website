@@ -148,4 +148,6 @@ errors are placed as `other`. `TestScriptListMatchesTheJSDirectory` and
   error rows go after 90 days, and page visits older than 400 days are
   rolled up into `events_days`, daily hits and uniques with no visitor
   hash. Gateway rows under `/api/` are deleted at that age, not rolled.
-  Search votes are pruned after 90 days by the popular-searches job.
+  Search votes are pruned after 90 days by each site's popular-searches
+  job, and the nightly fold prunes every instance's, so a renamed or
+  retired site's votes go too.

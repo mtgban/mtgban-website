@@ -117,6 +117,7 @@ type foldStore interface {
 	FoldDay(ctx context.Context, day time.Time) (int64, error)
 	PruneMinutes(ctx context.Context, before time.Time) (int64, error)
 	PruneErrors(ctx context.Context, before time.Time) (int64, error)
+	PruneAllSearchVotes(ctx context.Context, before time.Time, limit int) (int64, error)
 }
 
 // foldPrune is one table the fold job trims once the days are folded.
@@ -136,10 +137,27 @@ func pruneErrors(ctx context.Context, store foldStore, before time.Time) (int64,
 	return store.PruneErrors(ctx, before)
 }
 
+// searchVotePruneBatch caps the votes one delete statement takes.
+const searchVotePruneBatch = 10000
+
+// pruneAllSearchVotes deletes every instance's votes before the cutoff, a batch at a time, until the deadline.
+func pruneAllSearchVotes(ctx context.Context, store foldStore, before time.Time) (int64, error) {
+	var total int64
+	for timeLeft(ctx) {
+		n, err := store.PruneAllSearchVotes(ctx, before, searchVotePruneBatch)
+		total += n
+		if err != nil || n < searchVotePruneBatch {
+			return total, err
+		}
+	}
+	return total, nil
+}
+
 // foldPrunes run in order after every fold; written once here, only read after.
 var foldPrunes = []foldPrune{
 	{what: "minutes", days: minuteRetentionDays, run: pruneMinutes},
 	{what: "errors", days: errorRetentionDays, run: pruneErrors},
+	{what: "search votes", days: popularRetentionDays, run: pruneAllSearchVotes},
 }
 
 // foldDays is every finished day with minutes, the catch-up days and, by hand, today, ascending and each once.

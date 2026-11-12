@@ -99,7 +99,8 @@ type fakeFoldStore struct {
 	cancel      func()    // called after the prune numbered cancelAfter
 	cancelAfter int
 	prunes      int
-	failErrors  bool // PruneErrors fails
+	failErrors  bool    // PruneErrors fails
+	voteBatches []int64 // what each PruneAllSearchVotes returns; 3 once they run out
 }
 
 func (f *fakeFoldStore) MinuteDaysBefore(_ context.Context, before time.Time) ([]time.Time, error) {
@@ -140,6 +141,16 @@ func (f *fakeFoldStore) PruneErrors(_ context.Context, before time.Time) (int64,
 	return 7, nil
 }
 
+func (f *fakeFoldStore) PruneAllSearchVotes(_ context.Context, before time.Time, _ int) (int64, error) {
+	f.calls = append(f.calls, "prune votes "+before.Format(time.DateOnly))
+	if len(f.voteBatches) == 0 {
+		return 3, nil
+	}
+	n := f.voteBatches[0]
+	f.voteBatches = f.voteBatches[1:]
+	return n, nil
+}
+
 // dateOf is the UTC midnight of a YYYY-MM-DD date.
 func dateOf(s string) time.Time {
 	d, err := time.Parse(time.DateOnly, s)
@@ -156,11 +167,11 @@ func TestFoldFeatureDays(t *testing.T) {
 
 	store := &fakeFoldStore{minutes: []time.Time{dateOf("2026-11-10"), dateOf("2026-11-11")}}
 	result, err := foldFeatureDays(context.Background(), store, now, false)
-	want := []string{"days 2026-11-11", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "prune 2026-10-28", "prune errors 2026-08-13"}
+	want := []string{"days 2026-11-11", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "prune 2026-10-28", "prune errors 2026-08-13", "prune votes 2026-08-13"}
 	if err != nil || !slices.Equal(store.calls, want) {
 		t.Fatalf("calls %v, err %v, want %v", store.calls, err, want)
 	}
-	if result != "folded 3 of 3 days, 30 rows; pruned 0 days, 0 minutes; swept 0 minutes; swept 7 errors" {
+	if result != "folded 3 of 3 days, 30 rows; pruned 0 days, 0 minutes; swept 0 minutes; swept 7 errors; swept 3 search votes" {
 		t.Errorf("result = %q", result)
 	}
 
@@ -168,14 +179,14 @@ func TestFoldFeatureDays(t *testing.T) {
 	store = &fakeFoldStore{minutes: []time.Time{dateOf("2026-10-20"), dateOf("2026-10-22"), dateOf("2026-11-01"), dateOf("2026-11-09"), dateOf("2026-11-11")}}
 	result, err = foldFeatureDays(context.Background(), store, now, false)
 	want = []string{"days 2026-11-11", "fold 2026-10-20", "prune 2026-10-21", "fold 2026-10-22", "prune 2026-10-23",
-		"fold 2026-11-01", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "prune 2026-10-28", "prune errors 2026-08-13"}
+		"fold 2026-11-01", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "prune 2026-10-28", "prune errors 2026-08-13", "prune votes 2026-08-13"}
 	if err != nil || !slices.Equal(store.calls, want) {
 		t.Fatalf("outage: calls %v, err %v, want %v", store.calls, err, want)
 	}
 	if left := []time.Time{dateOf("2026-11-01"), dateOf("2026-11-09"), dateOf("2026-11-11")}; !slices.Equal(store.minutes, left) {
 		t.Errorf("minutes left on %v, want %v", store.minutes, left)
 	}
-	if result != "folded 6 of 6 days, 60 rows; pruned 2 days, 2 minutes; swept 0 minutes; swept 7 errors" {
+	if result != "folded 6 of 6 days, 60 rows; pruned 2 days, 2 minutes; swept 0 minutes; swept 7 errors; swept 3 search votes" {
 		t.Errorf("outage: result = %q", result)
 	}
 
@@ -221,7 +232,7 @@ func TestFoldFeatureDays(t *testing.T) {
 	// A run by hand folds the day in progress too, and prunes no differently.
 	store = &fakeFoldStore{minutes: []time.Time{dateOf("2026-11-11")}}
 	_, err = foldFeatureDays(context.Background(), store, now, true)
-	want = []string{"days 2026-11-11", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "fold 2026-11-11", "prune 2026-10-28", "prune errors 2026-08-13"}
+	want = []string{"days 2026-11-11", "fold 2026-11-08", "fold 2026-11-09", "fold 2026-11-10", "fold 2026-11-11", "prune 2026-10-28", "prune errors 2026-08-13", "prune votes 2026-08-13"}
 	if err != nil || !slices.Equal(store.calls, want) {
 		t.Fatalf("by hand: calls %v, err %v, want %v", store.calls, err, want)
 	}
@@ -252,6 +263,31 @@ func TestFoldPrunesErrorRows(t *testing.T) {
 	}
 	if !slices.Equal(store.calls, []string{"prune errors 2026-08-13"}) {
 		t.Errorf("calls = %v", store.calls)
+	}
+}
+
+// Every instance's search votes go at the popular list's 90 days, a full batch
+// at a time until a short one, so a renamed or retired site's votes go too.
+func TestFoldPrunesEveryInstancesSearchVotes(t *testing.T) {
+	i := slices.IndexFunc(foldPrunes, func(p foldPrune) bool { return p.what == "search votes" })
+	if i < 1 || foldPrunes[i].days != popularRetentionDays || popularRetentionDays != 90 {
+		t.Fatalf("foldPrunes = %+v, want search votes at 90 days after minutes", foldPrunes)
+	}
+	store := &fakeFoldStore{voteBatches: []int64{searchVotePruneBatch, searchVotePruneBatch, 5}}
+	before := time.Date(2026, 8, 13, 0, 0, 0, 0, time.UTC)
+	if n, err := foldPrunes[i].run(context.Background(), store, before); err != nil || n != 2*searchVotePruneBatch+5 {
+		t.Fatalf("run = %d, %v", n, err)
+	}
+	if want := slices.Repeat([]string{"prune votes 2026-08-13"}, 3); !slices.Equal(store.calls, want) {
+		t.Errorf("calls = %v, want %v", store.calls, want)
+	}
+
+	// An ended context stops between batches; the rest goes next night.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	store = &fakeFoldStore{}
+	if n, err := foldPrunes[i].run(ctx, store, before); err != nil || n != 0 || len(store.calls) != 0 {
+		t.Errorf("ended: run = %d, %v, calls %v", n, err, store.calls)
 	}
 }
 

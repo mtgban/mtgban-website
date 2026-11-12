@@ -2,6 +2,7 @@ package observability
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -94,6 +95,17 @@ func (c *Client) PruneSearchVotes(ctx context.Context, instance string, before t
 	res, err := c.db.ExecContext(ctx, `DELETE FROM search_votes WHERE instance = $1 AND day < $2::date`, instance, sqlDate(before))
 	if err != nil {
 		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// PruneAllSearchVotes deletes at most limit votes of any instance from days before the cutoff.
+func (c *Client) PruneAllSearchVotes(ctx context.Context, before time.Time, limit int) (int64, error) {
+	const q = `DELETE FROM search_votes WHERE ctid = ANY(ARRAY(
+SELECT ctid FROM search_votes WHERE day < $1::date LIMIT $2))`
+	res, err := c.db.ExecContext(ctx, q, sqlDate(before), limit)
+	if err != nil {
+		return 0, fmt.Errorf("observability: prune all search votes: %w", err)
 	}
 	return res.RowsAffected()
 }
