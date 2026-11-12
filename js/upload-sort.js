@@ -193,15 +193,21 @@ function uresButtonTable(btn) {
     return btn.getAttribute('data-sort-area') === 'opt' && btn.closest ? btn.closest('table') : null;
 }
 
-// The steps that break the column's ties: the sorting setting's tie groups
-// when no column leads, then the area's chain.
+// The tables whose order the reader picked from the menu on this page
+var uresPicked = new WeakSet();
+
+// The steps that break the column's ties: the area's chain, and when no
+// column leads the sorting setting's tie groups, ahead of the chain until
+// the reader picks from the menu, behind it after.
 function uresTies(table, led) {
-    var ties = led ? [{attr: 'data-k-lead', numeric: true}] : [];
+    var ties = [];
     var own = uresArea(table) === 'opt' && uresStoreChains.get(table);
     (own || uresChains[uresArea(table)]).forEach(function(c) {
         ties.push({attr: 'data-k-' + c.key, numeric: !!uresTieKey(c.key).numeric, descending: c.descending});
     });
-    return ties;
+    if (!led) return ties;
+    var lead = {attr: 'data-k-lead', numeric: true};
+    return uresPicked.has(table) ? ties.concat(lead) : [lead].concat(ties);
 }
 
 // How two rows order under the tie-breakers, given each row's keys for
@@ -296,6 +302,7 @@ function uresShowChain(area) {
 // After a change to an order: a store's own sorts that store; the area's is
 // kept, replaces every store's own, and sorts the area's tables.
 function uresChainChanged(area, table) {
+    (table ? [table] : uresAreaTables(area)).forEach(function(t) { uresPicked.add(t); });
     if (table) {
         uresShowChain(area);
         uresResort(table);
