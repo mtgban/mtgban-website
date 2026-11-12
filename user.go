@@ -474,6 +474,7 @@ func (s *site) writeAccountAction(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.PostFormValue("action") {
 	case "refresh":
+		observe(r, "account.refresh", "")
 		where := "/user?refreshed=no"
 		if email != "" && renewalEnabled() {
 			_, outcome := s.renewSignature(w, r, values, renewalRefreshRest, "refresh")
@@ -500,6 +501,7 @@ func (s *site) writeAccountAction(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		clearLoginCookies(w, r)
+		observe(r, "auth.logout", "everywhere")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	default:
 		http.Redirect(w, r, "/user", http.StatusSeeOther)

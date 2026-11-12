@@ -45,6 +45,17 @@ func alertChannelList(v url.Values) string {
 	return strings.Join(names, ",")
 }
 
+// alertsDeepLink names what the alerts page was opened on, "" for the list.
+func alertsDeepLink(edit, card string) string {
+	switch {
+	case edit != "":
+		return "edit"
+	case card != "":
+		return "card"
+	}
+	return ""
+}
+
 // Alerts renders the list, or the create form with ?card=, or the edit
 // form with ?edit=. enforceSigning has already let the reader in; what
 // they may do follows the ACL values their signature carries.
@@ -61,6 +72,9 @@ func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	vars.SignedIn = true
+	if v := alertsDeepLink(r.FormValue("edit"), r.FormValue("card")); v != "" && isPageView(r) {
+		observe(r, "alerts.deep_link", v)
+	}
 	api := s.alerts.API()
 	vars.Allowance = alertAllowance(c.Values)
 	vars.Allowed = vars.Allowance > 0

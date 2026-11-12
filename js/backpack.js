@@ -444,7 +444,7 @@
         var entries = ordered();
         var form = document.createElement("form");
         form.setAttribute("method", "post");
-        form.setAttribute("action", "/upload");
+        form.setAttribute("action", "/upload?from=backpack");
         form.style.display = "none";
         var m = document.createElement("input");
         m.type = "hidden"; m.name = "mode"; m.value = mode === "buylist" ? "true" : "false";

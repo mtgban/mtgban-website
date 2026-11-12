@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/mtgban/mtgban-website/internal/siteorigin"
 	"github.com/mtgban/mtgban-website/observability"
 )
 
@@ -153,8 +154,9 @@ func metricValidators(p *prices) observability.Validators {
 			_, vendor := p.index.vendor[shorthand]
 			return seller || vendor
 		},
-		Page:  func(label string) bool { return pageLabelSet()[label] },
-		Route: func(label string) bool { return routeLabelSet()[label] },
+		Page:   func(label string) bool { return pageLabelSet()[label] },
+		Route:  func(label string) bool { return routeLabelSet()[label] },
+		Origin: func(host string) bool { return handoffOriginHosts()[host] },
 	}
 }
 
@@ -206,6 +208,33 @@ func observeJob(device, scope, name, value string) {
 		return
 	}
 	count(observability.Dims{Instance: observabilityInstance, Device: device}, nil, scope, name, value)
+}
+
+// requestObserver fills another package's hook that serves a request.
+func requestObserver(r *http.Request, scope, name, value string) {
+	if FeatureCounter == nil {
+		return
+	}
+	count(metricDims(r), nil, scope, name, value)
+}
+
+// jobObserver fills another package's hook with no request; device is "job" or "discord".
+func jobObserver(device string) func(scope, name, value string) {
+	return func(scope, name, value string) {
+		if FeatureCounter == nil {
+			return
+		}
+		count(observability.Dims{Instance: observabilityInstance, Device: device}, nil, scope, name, value)
+	}
+}
+
+// refererPage is the page label of r's Referer on r's own host, else "other".
+func refererPage(r *http.Request) string {
+	u, err := url.Parse(r.Referer())
+	if err != nil || !ownSiteHost(u.Host) || u.Host != siteorigin.Host(r) {
+		return "other"
+	}
+	return pageLabel(u.Path, u.Query().Get("page"))
 }
 
 // fact is one fact held as data, for a handler that emits many at once.

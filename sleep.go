@@ -113,6 +113,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	pageVars.HasVelocity = sales != nil
 
 	var tiers map[string]int
+	var ref, target string
 
 	start := time.Now()
 
@@ -127,6 +128,9 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 
 		render(w, "sleep.html", pageVars)
 
+		if countSleepers(r) {
+			observeFacts(r, p, sleepersFacts(readSleepersRun("index", "", "", skipSellersOpt, skipVendorsOpt, skipEditionsOpt, 0)))
+		}
 		return
 	case "options":
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
@@ -142,7 +146,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "gap":
 		pageVars.Subtitle = "Ocean Gap"
 
-		ref, target := r.FormValue("ref"), r.FormValue("target")
+		ref, target = r.FormValue("ref"), r.FormValue("target")
 		tiers = getGap(b, p, blocklistRetail, ref, target, skipEditions)
 	case "hotlist":
 		pageVars.Subtitle = "Highest buylist growth"
@@ -163,6 +167,10 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 
 		render(w, "sleep.html", pageVars)
 		return
+	}
+
+	if countSleepers(r) {
+		observeFacts(r, p, sleepersFacts(readSleepersRun(page, ref, target, skipSellersOpt, skipVendorsOpt, skipEditionsOpt, time.Since(start))))
 	}
 
 	miscSearchOpts := readSearchMiscOpts(r)

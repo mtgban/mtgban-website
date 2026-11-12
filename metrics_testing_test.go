@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -84,4 +85,34 @@ func find(rows []observability.Row, name string) []observability.Row {
 		}
 	}
 	return out
+}
+
+// wantRow fails unless exactly one row has that scope, name and value, with N n.
+func wantRow(t *testing.T, rows []observability.Row, scope, name, value string, n int64) {
+	t.Helper()
+	var match []observability.Row
+	for _, row := range rows {
+		if row.Scope == scope && row.Name == name && row.Value == value {
+			match = append(match, row)
+		}
+	}
+	if len(match) != 1 || match[0].N != n {
+		t.Errorf("rows %q/%q/%q = %+v, want one with N %d", scope, name, value, match, n)
+	}
+}
+
+// wantNoRow fails when any row has that name.
+func wantNoRow(t *testing.T, rows []observability.Row, name string) {
+	t.Helper()
+	if got := find(rows, name); len(got) != 0 {
+		t.Errorf("rows named %q = %+v, want none", name, got)
+	}
+}
+
+// wantFacts fails unless got is want, in order.
+func wantFacts(t *testing.T, got, want []fact) {
+	t.Helper()
+	if !slices.Equal(got, want) {
+		t.Errorf("facts =\n%v\nwant\n%v", got, want)
+	}
 }

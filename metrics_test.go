@@ -174,8 +174,8 @@ func TestMetricValidatorsTakeNoSnapshot(t *testing.T) {
 	if v.Route == nil || !v.Route("search") || !v.Route("api.v2") || v.Route("other") || v.Route("wp-login.php") {
 		t.Error("Route accepts exactly the labels routeLabel returns")
 	}
-	if v.Setting != nil || v.SettingValue != nil || v.Origin != nil {
-		t.Error("the settings and origin checks arrive in 2e and 1c")
+	if v.Setting != nil || v.SettingValue != nil {
+		t.Error("the settings checks arrive in 2e")
 	}
 }
 
@@ -209,6 +209,19 @@ func TestObserveStoreChecksTheSnapshot(t *testing.T) {
 	if rejected := find(got, "metrics.rejected"); len(rejected) != 1 || rejected[0].N != 1 {
 		t.Errorf("metrics.rejected rows = %+v, want one row with n 1", rejected)
 	}
+
+	// A loaded shorthand that is not store-shaped folds to other.
+	odd := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "Bob Cards"})
+	long := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: strings.Repeat("Z", 41)})
+	p = newPrices(nil, []mtgban.Seller{ck, odd, long}, nil, scraperIndex{})
+	rows = withFeatureCounter(t)
+	for _, shorthand := range []string{"CK", "Bob Cards", strings.Repeat("Z", 41)} {
+		observeStore(r, p, "arbit", "arbit.source", shorthand)
+	}
+	got = rows.rows()
+	wantRow(t, got, "arbit", "arbit.source", "CK", 1)
+	wantRow(t, got, "arbit", "arbit.source", "other", 2)
+	wantNoRow(t, got, "metrics.rejected")
 }
 
 func TestObserveFactsEmitsEach(t *testing.T) {
@@ -621,5 +634,73 @@ func TestShutdownGivesTheCounterItsBudgetAfterDiscord(t *testing.T) {
 	(&site{}).shutdownTelemetry(ctx)
 	if got := find(rows.store.snapshot(), "ratelimit.reject"); len(got) != 1 {
 		t.Errorf("rows written by the shutdown = %+v, want the one Discord emitted", got)
+	}
+}
+
+func TestRequestObserverCountsWithTheRequestsDims(t *testing.T) {
+	rows := withFeatureCounter(t)
+	r := withMetricDims(httptest.NewRequest(http.MethodGet, "/api/alerts/", nil),
+		observability.Dims{Instance: "test", Tier: "Legacy", Device: "mobile", Signed: true})
+	requestObserver(r, "search", "http.status", "2xx")
+	requestObserver(r, "", "no.such.name", "")
+	got := rows.rows()
+	wantRow(t, got, "search", "http.status", "2xx", 1)
+	wantRow(t, got, "", "metrics.rejected", "", 1)
+	if row := find(got, "http.status")[0]; row.Tier != "Legacy" || row.Device != "mobile" || !row.Signed {
+		t.Errorf("row dims = %+v", row.Dims)
+	}
+}
+
+func TestJobObserverCarriesItsDevice(t *testing.T) {
+	rows := withFeatureCounter(t)
+	jobObserver("discord")("search", "http.status", "2xx")
+	got := find(rows.rows(), "http.status")
+	if len(got) != 1 || got[0].Device != "discord" || got[0].Tier != "" || got[0].Signed {
+		t.Fatalf("rows = %+v", got)
+	}
+}
+
+func TestObserversWithNoCounterAreNoOps(t *testing.T) {
+	prev := FeatureCounter
+	t.Cleanup(func() { FeatureCounter = prev })
+	FeatureCounter = nil
+	requestObserver(httptest.NewRequest(http.MethodGet, "/", nil), "", "page.view", "home")
+	jobObserver("job")("", "page.view", "home")
+}
+
+func TestRefererPage(t *testing.T) {
+	for _, c := range []struct{ host, referer, want string }{
+		{"mtgban.com", "https://mtgban.com/search?q=bolt", "search"},
+		{"mtgban.com", "https://mtgban.com/newspaper?page=syp", "newspaper/syp"},
+		{"mtgban.com", "https://mtgban.com/wp-login.php", "other"},
+		{"mtgban.com", "https://evil.test/search", "other"},
+		{"mtgban.com", "https://pokemon.mtgban.com/search", "other"},
+		{"mtgban.com", "", "other"},
+		{"mtgban.com", "://bad", "other"},
+		{"evil.test", "https://evil.test/search", "other"},
+	} {
+		r := httptest.NewRequest(http.MethodPost, "/api/alerts/", nil)
+		r.Host = c.host
+		if c.referer != "" {
+			r.Header.Set("Referer", c.referer)
+		}
+		if got := refererPage(r); got != c.want {
+			t.Errorf("refererPage(%q) on %q = %q, want %q", c.referer, c.host, got, c.want)
+		}
+	}
+}
+
+// Every registry Page entry names labels pageLabel can return.
+func TestEveryRegistryPageIsAPageLabel(t *testing.T) {
+	labels := pageLabels()
+	for _, n := range observability.All() {
+		if n.Page == "" || n.Page == "*" {
+			continue
+		}
+		for _, label := range strings.Split(n.Page, ",") {
+			if !slices.Contains(labels, label) {
+				t.Errorf("%s: Page label %q is not a page label", n.Name, label)
+			}
+		}
 	}
 }

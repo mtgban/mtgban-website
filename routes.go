@@ -92,9 +92,7 @@ func (s *site) registerRoutes() {
 	http.HandleFunc("/sealed/", s.SealedRedirect)
 	http.HandleFunc("/random", s.RandomSearch)
 	http.HandleFunc("/randomsealed", s.RandomSealedSearch)
-	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, Config().Discord.InviteURL, http.StatusFound)
-	})
+	http.HandleFunc("/discord", discordRedirect)
 
 	// Public changelog sourced from the Discord announcement channel.
 	http.Handle("/changelog", publicPage(http.HandlerFunc(s.Changelog)))
@@ -190,7 +188,7 @@ func (s *site) registerRoutes() {
 	http.Handle("/api/palette/colors.json", noSigning(paletteList("colors", s.palette.Colors)))
 	http.Handle("/api/offline/", noSigning(http.HandlerFunc(s.offline.Handle)))
 
-	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))
+	http.HandleFunc("/monroecards", partnerRedirect)
 
 	http.HandleFunc("/auth", s.Auth)
 

@@ -77,11 +77,9 @@ func TestIntegrationConcurrentWritersAdd(t *testing.T) {
 	errs := make(chan error, writers)
 	var wg sync.WaitGroup
 	for range writers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			errs <- c.UpsertMinutes(context.Background(), minute, rows)
-		}()
+		})
 	}
 	wg.Wait()
 	close(errs)

@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"gopkg.in/robfig/cron.v2"
+
+	"github.com/mtgban/mtgban-website/observability"
 )
 
 // newsCron is the newspaper refresh's schedule, which jobs.go registers.
@@ -441,6 +443,12 @@ func (s *site) NewspaperAPI(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
 	sig := r.FormValue("sig")
 	if !canAccessMode(strings.Split(GetParamFromSig(sig, "APImode"), ","), "newspaper") {
+		// With SigCheck on, only a verified key carries a sig this far.
+		refusal := "plan"
+		if sig == "" {
+			refusal = "no_key"
+		}
+		observeScoped(r, observability.APIFamily(r.URL.Path), "api.refuse", refusal)
 		newsError(w, http.StatusForbidden, "plan does not include newspaper")
 		return
 	}

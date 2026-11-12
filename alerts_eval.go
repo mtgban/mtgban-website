@@ -16,6 +16,7 @@ func (s *site) alertEvalDeps() alerts.EvalDeps {
 		Allowance: alertAllowance, Log: log.Printf,
 		StoreLabel: func(shorthand string) string { return alertStoreLabel(s.prices(), shorthand) },
 		Report:     func(summary, problem string) { backgroundJobs.Report(jobAlerts, summary, problem) },
+		Observe:    jobObserver("job"),
 		PerRun: func(d alerts.EvalDeps) alerts.EvalDeps {
 			b := s.backend()
 			p := s.prices()

@@ -617,3 +617,69 @@ func TestAlertUnsubscribeURLNeedsASecret(t *testing.T) {
 		t.Fatalf("built %q without a secret", got)
 	}
 }
+
+func TestConfirmAndUnsubscribeAreCounted(t *testing.T) {
+	mailLinkSetup(t)
+	unsub := alerts.MintToken(alertTokenSecret(), alerts.Token{Kind: alerts.TokenUnsubscribe, UserHash: "u1"})
+	confirm := confirmToken("u1", "bob@example.com", time.Now().Add(time.Hour))
+	for _, c := range []struct {
+		value, path, token string
+		serve              func(http.ResponseWriter, *http.Request, alertChannelStore)
+	}{
+		{"confirm", "/alerts/confirm", confirm, testSite.alertsConfirm},
+		{"unsubscribe", "/alerts/unsubscribe", unsub, testSite.alertsUnsubscribe},
+	} {
+		post := func(token string) *http.Request {
+			r := httptest.NewRequest(http.MethodPost, c.path, strings.NewReader("token="+url.QueryEscape(token)))
+			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			return r
+		}
+		t.Run(c.value+" post", func(t *testing.T) {
+			rows := withFeatureCounter(t)
+			store := &fakeLinkStore{channels: []alerts.Channel{pendingEmail("u1", "bob@example.com")}}
+			rec := httptest.NewRecorder()
+			c.serve(rec, post(c.token), store)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("POST = %d", rec.Code)
+			}
+			wantRow(t, rows.rows(), "", "alerts.channel", c.value, 1)
+		})
+		t.Run(c.value+" get", func(t *testing.T) {
+			rows := withFeatureCounter(t)
+			store := &fakeLinkStore{channels: []alerts.Channel{pendingEmail("u1", "bob@example.com")}}
+			rec := httptest.NewRecorder()
+			c.serve(rec, httptest.NewRequest(http.MethodGet, c.path+"?token="+url.QueryEscape(c.token), nil), store)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("GET = %d", rec.Code)
+			}
+			wantNoRow(t, rows.rows(), "alerts.channel")
+		})
+		t.Run(c.value+" bad token", func(t *testing.T) {
+			rows := withFeatureCounter(t)
+			store := &fakeLinkStore{channels: []alerts.Channel{pendingEmail("u1", "bob@example.com")}}
+			rec := httptest.NewRecorder()
+			c.serve(rec, post(c.token[:len(c.token)-2]+"xx"), store)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("bad token = %d", rec.Code)
+			}
+			wantNoRow(t, rows.rows(), "alerts.channel")
+		})
+	}
+}
+
+func TestMailEventsCountUnderTheJobDevice(t *testing.T) {
+	rows := withFeatureCounter(t)
+	key := []byte("webhook-key")
+	s := newSite()
+	s.mailEventsSecret = key
+	store := &fakeLinkStore{}
+	rec := httptest.NewRecorder()
+	s.alertsMailEvents(rec, svixRequest(key, `{"type":"email.complained","data":{"to":["bob@example.com"]}}`, time.Now()), store)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("webhook = %d", rec.Code)
+	}
+	got := find(rows.rows(), "alerts.mail_event")
+	if len(got) != 1 || got[0].Value != "complaint" || got[0].Device != "job" || got[0].N != 1 {
+		t.Fatalf("rows = %+v", got)
+	}
+}

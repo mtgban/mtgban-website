@@ -450,8 +450,9 @@ func arbit(s *site, w http.ResponseWriter, r *http.Request, reverse bool) {
 	start := time.Now()
 
 	s.scraperCompare(w, r, p, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
-		AllResults:    true,
-		CustomBuylist: customRule,
+		AllResults:      true,
+		CustomBuylist:   customRule,
+		ExcludedVendors: nonEmpty(filters),
 	})
 
 	user := GetParamFromSig(sig, "UserEmail")
@@ -514,8 +515,9 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	s.scraperCompare(w, r, p, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
-		AllResults: anyEnabled,
-		AnySpread:  anySpread,
+		AllResults:      anyEnabled,
+		AnySpread:       anySpread,
+		ExcludedVendors: nonEmpty(filters),
 	})
 
 	user := GetParamFromSig(sig, "UserEmail")
@@ -535,6 +537,9 @@ type scraperCompareOpts struct {
 	// The reader's custom buylist, compared against as a vendor; none at
 	// a zero rate
 	CustomBuylist customBuylistRule
+
+	// Stores the reader's hidden-stores cookie names, for the count
+	ExcludedVendors int
 }
 
 // fillCarts gives the section its cart buttons for the page: the store
@@ -686,6 +691,7 @@ func customBuylistEntries(inventory []mtgban.InventoryEntry, rule customBuylistR
 }
 
 func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
+	start := time.Now()
 	ds := s.datastore()
 	r.ParseForm()
 	b := ds.backend
@@ -699,6 +705,9 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 	savedCookie := arbitSavedCookie(pageVars.GlobalMode)
 	state := requestArbitState(r.Form, readCookie(r, savedCookie), offer)
 	sorting := state.Sort
+	if sorting == "" {
+		sorting = DefaultSortingOption
+	}
 
 	for k, v := range r.Form {
 		switch k {
@@ -815,6 +824,9 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 			pageVars.InfoMessage = "Increase your tier to discover more cards and more markets!"
 		}
 
+		if countArbit(r) {
+			observeFacts(r, p, arbitFacts(readArbitRun(r, pageVars, cmp, state, arbitMode{}, nil, sorting, start)))
+		}
 		render(w, "arbit.html", pageVars)
 		return
 	}
@@ -1005,9 +1017,6 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 		}
 
 		// Sort as requested
-		if sorting == "" {
-			sorting = DefaultSortingOption
-		}
 		less := arbitLess(b, arbit, sorting, pageVars.GlobalMode)
 		if less != nil {
 			sort.Slice(arbit, func(i, j int) bool { return less(&arbit[i], &arbit[j]) })
@@ -1076,5 +1085,8 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 		pageVars.Title += p.scraperName(source.Info().Shorthand)
 	}
 
+	if countArbit(r) {
+		observeFacts(r, p, arbitFacts(readArbitRun(r, pageVars, cmp, state, mode, source, sorting, start)))
+	}
 	render(w, "arbit.html", pageVars)
 }

@@ -207,6 +207,8 @@ type Webhook struct {
 	Store  WebhookStore
 	Now    func() time.Time
 	Log    func(string, ...any)
+	// Observe counts the events verified; nil counts nothing.
+	Observe func(scope, name, value string)
 }
 
 func (w *Webhook) now() time.Time {
@@ -252,16 +254,26 @@ func (w *Webhook) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reason, ok := mailEventReasons[event.Type]
-	if !ok {
-		rw.WriteHeader(http.StatusOK)
-		return
-	}
-	if event.softBounce() {
+	switch {
+	case !ok:
+	case event.softBounce():
 		w.log("alerts: webhook leaves a bounce of type %q alone", event.BounceType)
-		rw.WriteHeader(http.StatusOK)
-		return
+	default:
+		err := w.handleRecipients(r.Context(), event, reason)
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
-	ctx := r.Context()
+	// Counted once accepted: an event answered 500 is delivered again.
+	if w.Observe != nil {
+		w.Observe("", "alerts.mail_event", mailEventClass(event))
+	}
+	rw.WriteHeader(http.StatusOK)
+}
+
+// handleRecipients handles each address the event names, stopping at a store error.
+func (w *Webhook) handleRecipients(ctx context.Context, event MailEvent, reason mailEventReason) error {
 	at := w.now()
 	for _, addr := range event.To {
 		addr = NormalizeAddress(addr)
@@ -271,11 +283,10 @@ func (w *Webhook) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		err := w.handleAddress(ctx, addr, event.confirmRequester(), reason, at)
 		if err != nil {
 			w.log("alerts: webhook %s for %s: %v", event.Type, addr, err)
-			rw.WriteHeader(http.StatusInternalServerError)
-			return
+			return err
 		}
 	}
-	rw.WriteHeader(http.StatusOK)
+	return nil
 }
 
 // handleAddress disables every channel row at addr, or with requester set

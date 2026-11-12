@@ -71,7 +71,7 @@
                         <p class="page-subtitle">Upload your collection and compare prices across all available stores.</p>
                     </div>
                 </div>
-                <form {{if not .CardHashes}}enctype="multipart/form-data"{{end}} action="/upload" method="post" id="upload_form" data-can-change-stores="{{.CanChangeStores}}">
+                <form {{if not .CardHashes}}enctype="multipart/form-data"{{end}} action="/upload{{if .CardHashes}}?from=upload_form{{end}}" method="post" id="upload_form" data-can-change-stores="{{.CanChangeStores}}">
 
                 <!-- Card 1: Mode & Stores -->
                 <div class="card upload-card">
@@ -1160,7 +1160,7 @@
     {{end}}
 
     <!-- Hidden form for pick-printing re-submission and exports -->
-    <form id="upload_form" action="/upload" method="post" style="display:none">
+    <form id="upload_form" action="/upload?from=results_reload" method="post" style="display:none">
         <input type="hidden" id="res_mode" name="mode" value="{{if .IsBuylist}}true{{else}}false{{end}}">
         {{if .CanPublishStore}}<input type="hidden" id="res_publishstore" name="publishstore" value="">{{end}}
         <input type="hidden" id="res_download" name="download" value="">

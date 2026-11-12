@@ -5,7 +5,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"slices"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/mtgban/mtgban-website/internal/access"
 )
@@ -128,5 +130,35 @@ func TestSearchBackpackTabsIsAnACLProperty(t *testing.T) {
 	}
 	if got := backpackTabsFromValues(aclValuesIn(table, "Legacy", nil)); got != 1 {
 		t.Errorf("legacy backpacks = %d, want 1", got)
+	}
+}
+
+// UserStateAPI hands the hook its request: the limiter's refusal is counted
+// with the reader's signed dimensions.
+func TestUserStateAPIHandsItsRequestToTheHook(t *testing.T) {
+	withSigMode(t, true, false)
+	saved := UserStateDB
+	t.Cleanup(func() { UserStateDB = saved })
+	UserStateDB = nil
+	rows := withFeatureCounter(t)
+	sig := devSig("userstate-hook-"+strconv.FormatInt(time.Now().UnixNano(), 36)+"@example.com", "Legacy")
+
+	code := 0
+	for range 100 {
+		req := httptest.NewRequest(http.MethodGet, "/api/userstate/", nil)
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
+		w := httptest.NewRecorder()
+		UserStateAPI(w, req)
+		code = w.Code
+		if code == http.StatusTooManyRequests {
+			break
+		}
+	}
+	if code != http.StatusTooManyRequests {
+		t.Fatalf("no 429 in 100 calls, last %d", code)
+	}
+	got := find(rows.rows(), "ratelimit.reject")
+	if len(got) != 1 || got[0].Value != "userstate" || !got[0].Signed || got[0].N != 1 {
+		t.Fatalf("ratelimit.reject rows %+v, want one userstate, signed", got)
 	}
 }

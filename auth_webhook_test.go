@@ -375,3 +375,66 @@ func sha256Signed(secret string, body []byte) string {
 	mac.Write(body)
 	return hex.EncodeToString(mac.Sum(nil))
 }
+
+func TestPatreonEventClass(t *testing.T) {
+	for event, want := range map[string]string{
+		"members:pledge:create": "pledge_create", "members:pledge:update": "pledge_update",
+		"members:pledge:delete": "pledge_delete", "members:create": "member_create",
+		"members:update": "member_update", "members:delete": "member_delete",
+		"": "other", "posts:publish": "other", "MEMBERS:CREATE": "other",
+	} {
+		if got := patreonEventClass(event); got != want {
+			t.Errorf("patreonEventClass(%q) = %q, want %q", event, got, want)
+		}
+	}
+}
+
+// Each delivery is one patreon.webhook row on the job device: its event once
+// handled, or why it was not; a delivery the route is off for counts nothing.
+func TestPatreonWebhookIsCounted(t *testing.T) {
+	body := webhookFixture(t, "webhook-pledge-delete.json")
+	for _, tc := range []struct {
+		name string
+		send func(*webhookRig) *httptest.ResponseRecorder
+		code int
+		want string
+	}{
+		{"handled", func(rig *webhookRig) *httptest.ResponseRecorder { return rig.deliver("members:pledge:delete", body) }, http.StatusOK, "pledge_delete"},
+		{"an event it does not name", func(rig *webhookRig) *httptest.ResponseRecorder { return rig.deliver("posts:publish", body) }, http.StatusOK, "other"},
+		{"a wrong signature", func(*webhookRig) *httptest.ResponseRecorder {
+			return serveWebhook(webhookRequest("members:pledge:delete", patreon.WebhookSignature("another-secret", body), body))
+		}, http.StatusUnauthorized, "bad_signature"},
+		{"no email", func(rig *webhookRig) *httptest.ResponseRecorder {
+			return rig.deliver("members:pledge:delete", []byte(`{}`))
+		}, http.StatusOK, "no_email"},
+		{"not a post", func(*webhookRig) *httptest.ResponseRecorder {
+			return serveWebhook(httptest.NewRequest(http.MethodGet, "/webhook/patreon", nil))
+		}, http.StatusMethodNotAllowed, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rig := newWebhookRig(t)
+			rows := withFeatureCounter(t)
+			if rec := tc.send(rig); rec.Code != tc.code {
+				t.Fatalf("status %d, want %d", rec.Code, tc.code)
+			}
+			got := find(rows.rows(), "patreon.webhook")
+			if tc.want == "" {
+				if len(got) != 0 {
+					t.Fatalf("rows %+v, want none", got)
+				}
+				return
+			}
+			if len(got) != 1 || got[0].Value != tc.want || got[0].Device != "job" || got[0].N != 1 {
+				t.Fatalf("rows %+v, want one %s on the job device", got, tc.want)
+			}
+		})
+	}
+	t.Run("no secret", func(t *testing.T) {
+		withWebhookSecret(t, "")
+		rows := withFeatureCounter(t)
+		serveWebhook(webhookRequest("members:pledge:delete", patreon.WebhookSignature("", body), body))
+		if got := find(rows.rows(), "patreon.webhook"); len(got) != 0 {
+			t.Fatalf("rows %+v, want none", got)
+		}
+	})
+}

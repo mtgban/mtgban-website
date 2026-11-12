@@ -167,6 +167,11 @@ func serveUploadShare(w http.ResponseWriter, r *http.Request, store uploadShareW
 		writeShareError(w, http.StatusServiceUnavailable, "sharing unavailable")
 		return
 	}
+	side := "retail"
+	if body.Buylist {
+		side = "buylist"
+	}
+	observe(r, "upload_share.create", side)
 	writeShareJSON(w, http.StatusCreated, map[string]string{
 		"key":     share.Key,
 		"url":     "/upload?share=" + share.Key,

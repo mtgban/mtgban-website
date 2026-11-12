@@ -529,7 +529,7 @@
         if (!favs.length) return;
         var form = document.createElement('form');
         form.method = 'post';
-        form.action = '/upload';
+        form.action = '/upload?from=favorites';
         form.style.display = 'none';
         var m = document.createElement('input');
         m.type = 'hidden';

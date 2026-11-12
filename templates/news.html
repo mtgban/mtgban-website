@@ -242,7 +242,7 @@
             </div>
 
             <div class="news-upload-row">
-                <form action="/upload" method="post">
+                <form action="/upload?from=news" method="post">
                     <input type="hidden" name="mode" value="false"/>
                     {{range .CardHashes}}
                         <input type="hidden" name="hashes" value="{{.}}"/>

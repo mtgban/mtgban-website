@@ -55,7 +55,7 @@ func TestSearchDenominators(t *testing.T) {
 
 func TestCheck(t *testing.T) {
 	v := Validators{
-		Store:   func(s string) bool { return s == "CK" },
+		Store:   func(s string) bool { return s == "CK" || s == "A B" || strings.HasPrefix(s, "TCGSI") || len(s) > 40 },
 		Page:    func(s string) bool { return s == "search" },
 		Route:   func(s string) bool { return s == "search" },
 		Setting: func(s string) bool { return s == "SearchSort" },
@@ -94,6 +94,9 @@ func TestCheck(t *testing.T) {
 		{"a flag that is neither", flag, "", "true", "", "", false},
 		{"a store value in an enum scope", store, "seller", "CK", "seller", "CK", true},
 		{"an unknown store value folds", store, "seller", "Bob's Cards", "seller", "other", true},
+		{"a known store value with a space folds", store, "seller", "A B", "seller", "other", true},
+		{"a known store value over 40 bytes folds", store, "seller", strings.Repeat("Z", 41), "seller", "other", true},
+		{"a seller inventory's shorthand", store, "seller", "TCGSI_a1b2,c3d4+direct", "seller", "TCGSI_a1b2,c3d4+direct", true},
 		{"a scope not in the scope enum", store, "elsewhere", "CK", "", "", false},
 		{"an empty scope on an enum-scoped name", store, "", "CK", "", "", false},
 		{"a known route", routed, "search", "2xx", "search", "2xx", true},
@@ -104,6 +107,8 @@ func TestCheck(t *testing.T) {
 		{"an empty scope on a paged name", paged, "", "", "", "", false},
 		{"a known store scope", byStore, "CK", "", "CK", "", true},
 		{"an unknown store scope folds", byStore, "Bob's Cards", "", "other", "", true},
+		{"a known store scope with a space folds", byStore, "A B", "", "other", "", true},
+		{"a known store scope over 40 bytes folds", byStore, strings.Repeat("Z", 41), "", "other", "", true},
 		{"an empty scope on a store-scoped name", byStore, "", "", "", "", false},
 		{"a known page value", pageValue, "", "search", "", "search", true},
 		{"an unknown page value folds", pageValue, "", "wp-login.php", "", "other", true},
@@ -244,6 +249,78 @@ func TestRegistryIsWellFormed(t *testing.T) {
 		}
 		if n.Values == ValueSetting && n.Scope != ScopeSetting {
 			t.Errorf("%s: a setting value needs the setting as its scope", n.Name)
+		}
+	}
+}
+
+// Each case is one (name, scope, value) a server emitter sends.
+func TestServerNamesAccept(t *testing.T) {
+	v := Validators{
+		Store:  func(s string) bool { return s == "CK" },
+		Page:   func(s string) bool { return s == "search" },
+		Route:  func(s string) bool { return s == "api.v2" },
+		Origin: func(s string) bool { return s == "www.cardmarket.com" },
+	}
+	for _, c := range []struct{ name, scope, value string }{
+		{"upload.source", "", "handoff"}, {"upload.url_host", "", "gdocs"},
+		{"upload.handoff_origin", "", "www.cardmarket.com"}, {"upload.from", "", "unknown"},
+		{"upload.mode", "", "buylist"}, {"upload.rows", "", "1000+"}, {"upload.sealed", "", "some"},
+		{"upload.option", "", "customperc"}, {"upload.value_set", "", "maxqty"},
+		{"upload.sorting", "", "setchrono"}, {"upload.price_source", "", "marketCredit"},
+		{"upload.custom_buylist", "", ""}, {"upload.stores", "", "20+"}, {"upload.index_pref", "", ""},
+		{"upload.unpack", "", ""}, {"upload.publish", "", ""},
+		{"upload.parse_error", "file_xls", "load_error"}, {"upload.duration", "", "5s+"},
+		{"upload_share.open", "", "gone"},
+		{"upload.export", "singles", "download"}, {"upload.tag", "TCG", "tcg_remove"},
+		{"upload.handoff_page", "", "locked"}, {"upload_share.create", "", "retail"},
+		{"arbit.view", "global", "landing"}, {"arbit.source", "global", "CK"}, {"arbit.apply", "global", "reset"},
+		{"arbit.bound", "global", "minprof"}, {"arbit.pick", "global", "rarity"}, {"arbit.toggle", "global", "legit"},
+		{"arbit.sort", "global", "sell_price"}, {"arbit.excluded_vendors", "global", "10+"},
+		{"arbit.sections", "global", "20+"}, {"arbit.duration", "global", "<50ms"},
+		{"news.report", "", "index"}, {"news.three_day", "", "on"}, {"news.sort", "desc", "sellers_d30"},
+		{"news.filter", "", "edition"}, {"news.page", "", "6+"}, {"news.syp_csv", "", ""},
+		{"news.syp_sort", "", "sell_price"}, {"news.editions_hidden", "", "20+"},
+		{"sleepers.page", "", "velocity"}, {"sleepers.gap", "", "custom"}, {"sleepers.ref", "", "CK"},
+		{"sleepers.target", "", "CK"}, {"sleepers.lists", "", "editions"}, {"sleepers.duration", "", "5s+"},
+		{"screener.provider", "", "SealedEV"}, {"screener.window", "", "365"}, {"screener.kind", "", "both"},
+		{"screener.move", "", "either"}, {"screener.filter", "", "edition"}, {"screener.size", "", "100"},
+		{"screener.sort", "asc", "abs"}, {"screener.page", "", "6+"},
+		{"alerts.create", "search", "retail"}, {"alerts.create_delivery", "", "email"},
+		{"alerts.create_condition", "", "PO"}, {"alerts.create_threshold", "", "below_pct"},
+		{"alerts.create_stores", "", "10+"}, {"alerts.edit", "", ""}, {"alerts.pause", "", ""},
+		{"alerts.resume", "", ""}, {"alerts.delete", "", ""}, {"alerts.delete_all", "", ""},
+		{"alerts.channel", "", "unsubscribe"}, {"alerts.fired", "", "buylist"},
+		{"alerts.delivered", "email", "deferred"}, {"alerts.delivered", "discord", "refused"},
+		{"alerts.mail_event", "", "hard_bounce"}, {"alerts.deep_link", "", "edit"},
+		{"ratelimit.reject", "", "alerts"}, {"ratelimit.reject", "", "alerts_confirm"},
+		{"auth.login", "", "fail_tier"}, {"auth.renew", "", "session_gone"}, {"auth.logout", "", "everywhere"},
+		{"account.refresh", "", ""}, {"apiplans.view", "", "prefilled"},
+		{"apiplans.handoff", "start", "trial"}, {"apiplans.handoff", "refused", "unknown"},
+		{"userstate.get", "", ""}, {"userstate.put", "", ""}, {"userstate.patch", "", "backpack"},
+		{"userstate.conflict", "", ""}, {"ratelimit.reject", "", "userstate"},
+		{"favshare.create", "", ""}, {"favshare.stop", "", ""},
+		{"favshare.view", "", ""}, {"favshare.view_gone", "", ""},
+		{"patreon.webhook", "", "pledge_delete"}, {"patreon.webhook", "", "bad_signature"},
+		{"patreon.webhook", "", "no_email"},
+		{"go.click", "CK", "b"}, {"go.click", "Some Store Name", "r"}, {"go.click", "CK", "i"},
+		{"redirect.random", "", "chart_modal"}, {"redirect.card", "", ""}, {"redirect.sealed", "", ""},
+		{"redirect.discord", "", ""}, {"redirect.partner", "", ""}, {"view.toggle", "", "to_desktop"},
+		{"api.call", "api.v2", "csv"}, {"api.option", "", "conditions"}, {"api.refuse", "api.v2", "plan"},
+		{"offlineapi.fetch", "", "bucket_auth"},
+		{"discord.message", "", "gatherer_link"}, {"discord.store_link", "", "amzn"}, {"discord.guild_join", "", ""},
+	} {
+		n, ok := Lookup(c.name)
+		if !ok {
+			t.Errorf("%s is not registered", c.name)
+			continue
+		}
+		if _, _, ok := n.Check(c.scope, c.value, v); !ok {
+			t.Errorf("%s refuses scope %q value %q", c.name, c.scope, c.value)
+		}
+	}
+	if n, ok := Lookup("go.click"); ok {
+		if scope, _, _ := n.Check("Some Store Name", "r", v); scope != "other" {
+			t.Errorf("go.click stores an unknown store as %q, want other", scope)
 		}
 	}
 }

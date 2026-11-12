@@ -34,6 +34,7 @@ func (s *site) Home(w http.ResponseWriter, r *http.Request) {
 		}
 		clearLoginCookies(w, r)
 
+		observe(r, "auth.logout", "here")
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}

@@ -522,9 +522,9 @@ func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 	pageIndex, _ := strconv.Atoi(r.FormValue("index"))
 
 	// Fresh load with no filter params: apply the landing defaults.
-	if r.FormValue("provider") == "" && r.FormValue("min_price") == "" && r.FormValue("min_pct") == "" {
-		minPrice = 5
-		minPct = 20
+	if screenerLanding(r) {
+		minPrice = screenerLandingMinPrice
+		minPct = screenerLandingMinPct
 	}
 
 	preferFlavor := readSearchMiscOpts(r).has("preferFlavor")
@@ -546,6 +546,10 @@ func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 		SelSize:       size,
 	}
 	pageVars.Screener = sv
+	filter := screenerFilter{
+		Metric: metric, Window: window, Kind: kind, Move: move,
+		MinPrice: minPrice, MinPriorPrice: minWas, MinPct: minPct, MaxPct: maxPct,
+	}
 
 	// Building the rows is an archive read plus a resolve pass over tens of
 	// thousands of them, and the page used to spend that wait as a blank tab.
@@ -569,10 +573,7 @@ func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results := filterScreenerRows(rows, screenerFilter{
-		Metric: metric, Window: window, Kind: kind, Move: move,
-		MinPrice: minPrice, MinPriorPrice: minWas, MinPct: minPct, MaxPct: maxPct,
-	})
+	results := filterScreenerRows(rows, filter)
 
 	// Facet the edition list before narrowing, then apply the edition filter.
 	sv.Editions = screenerEditions(results)
@@ -592,6 +593,9 @@ func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 	var paged []ScreenerResult
 	paged, pageVars.Pagination = Paginate(results, pageIndex, size, len(results))
 	sv.Rows = paged
+	if countScreener(r) {
+		observeFacts(r, p, screenerFacts(readScreenerRun(r, filter, len(selEditions), size, pageVars.Pagination.CurrentIndex, sorting, dir)))
+	}
 
 	for _, res := range paged {
 		// DB uuid is finish-agnostic; resolve the priced foil/etched variant.

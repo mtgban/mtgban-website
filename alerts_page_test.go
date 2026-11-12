@@ -2,6 +2,8 @@ package main
 
 import (
 	"html/template"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -157,4 +159,37 @@ func TestAlertsPageRowsCarryTheHoverImage(t *testing.T) {
 			t.Errorf("the missing card's row does not clear the image:\n%s", page)
 		}
 	}
+}
+
+func TestAlertsDeepLink(t *testing.T) {
+	for _, c := range []struct{ edit, card, want string }{
+		{"12", "", "edit"}, {"", "abc", "card"}, {"12", "abc", "edit"}, {"", "", ""},
+	} {
+		if got := alertsDeepLink(c.edit, c.card); got != c.want {
+			t.Errorf("alertsDeepLink(%q, %q) = %q, want %q", c.edit, c.card, got, c.want)
+		}
+	}
+}
+
+func TestAlertsPageCountsADeepLink(t *testing.T) {
+	withSigMode(t, true, false)
+	t.Run("page view", func(t *testing.T) {
+		rows := withFeatureCounter(t)
+		r := alertsRequest(http.MethodGet, "/alerts?card=abc", devSig("a@b.com", "Legacy"))
+		r.Header.Set("Sec-Fetch-Dest", "document")
+		testSite.Alerts(httptest.NewRecorder(), r)
+		wantRow(t, rows.rows(), "", "alerts.deep_link", "card", 1)
+	})
+	t.Run("not a page view", func(t *testing.T) {
+		rows := withFeatureCounter(t)
+		r := alertsRequest(http.MethodGet, "/alerts?edit=12", devSig("a@b.com", "Legacy"))
+		r.Header.Set("Sec-Fetch-Dest", "empty")
+		testSite.Alerts(httptest.NewRecorder(), r)
+		wantNoRow(t, rows.rows(), "alerts.deep_link")
+	})
+	t.Run("signed out", func(t *testing.T) {
+		rows := withFeatureCounter(t)
+		testSite.Alerts(httptest.NewRecorder(), alertsRequest(http.MethodGet, "/alerts?card=abc", ""))
+		wantNoRow(t, rows.rows(), "alerts.deep_link")
+	})
 }

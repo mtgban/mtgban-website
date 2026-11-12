@@ -105,6 +105,14 @@ func (s *site) APIPlans(w http.ResponseWriter, r *http.Request) {
 	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "API", sig)
 	pageVars.API = apiPlansVars(s.prices(), r, sig)
+	if isPageView(r) {
+		view := "plain"
+		pkg := r.FormValue("package")
+		if r.FormValue("invite") != "" || r.FormValue("change") == "1" || (pkg != "" && pkg == pageVars.API.DefaultPackage) {
+			view = "prefilled"
+		}
+		observe(r, "apiplans.view", view)
+	}
 	render(w, "api-plans.html", pageVars)
 }
 

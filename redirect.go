@@ -55,6 +55,7 @@ func (s *site) Redirect(w http.ResponseWriter, r *http.Request) {
 
 			entries := inv[co.UUID]
 			for _, entry := range entries {
+				observeStore(r, p, store, "go.click", kind)
 				http.Redirect(w, r, entry.URL, http.StatusFound)
 				return
 			}
@@ -70,6 +71,7 @@ func (s *site) Redirect(w http.ResponseWriter, r *http.Request) {
 
 			entries := bl[co.UUID]
 			for _, entry := range entries {
+				observeStore(r, p, store, "go.click", "b")
 				http.Redirect(w, r, entry.URL, http.StatusFound)
 				return
 			}
@@ -203,6 +205,7 @@ func (s *site) CardRedirect(w http.ResponseWriter, r *http.Request) {
 	if query != "" {
 		v.Set("q", query)
 	}
+	observe(r, "redirect.card", "")
 	localRedirect(w, r, "/search", v)
 }
 
@@ -265,12 +268,18 @@ func (s *site) SealedRedirect(w http.ResponseWriter, r *http.Request) {
 	if query != "" {
 		v.Set("q", query)
 	}
+	observe(r, "redirect.sealed", "")
 	localRedirect(w, r, "/sealed", v)
 }
 
 func (s *site) RandomSearch(w http.ResponseWriter, r *http.Request) {
 	uuid := randomUUID(s.backend(), false)
 
+	if r.FormValue("modal") == "1" {
+		observe(r, "redirect.random", "chart_modal")
+	} else {
+		observe(r, "redirect.random", "card")
+	}
 	v := r.URL.Query()
 	v.Set("q", uuid)
 	localRedirect(w, r, "/search", v)
@@ -279,7 +288,24 @@ func (s *site) RandomSearch(w http.ResponseWriter, r *http.Request) {
 func (s *site) RandomSealedSearch(w http.ResponseWriter, r *http.Request) {
 	uuid := randomUUID(s.backend(), true)
 
+	if r.FormValue("modal") == "1" {
+		observe(r, "redirect.random", "chart_modal")
+	} else {
+		observe(r, "redirect.random", "sealed")
+	}
 	v := r.URL.Query()
 	v.Set("q", uuid)
 	localRedirect(w, r, "/sealed", v)
+}
+
+// discordRedirect sends the reader to the Discord invite.
+func discordRedirect(w http.ResponseWriter, r *http.Request) {
+	observe(r, "redirect.discord", "")
+	http.Redirect(w, r, Config().Discord.InviteURL, http.StatusFound)
+}
+
+// partnerRedirect sends the partner link to the screener.
+func partnerRedirect(w http.ResponseWriter, r *http.Request) {
+	observe(r, "redirect.partner", "")
+	http.Redirect(w, r, "/screener", http.StatusFound)
 }

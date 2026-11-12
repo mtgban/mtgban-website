@@ -284,7 +284,7 @@
                             </div>
                             <div class="sidebar-compact-row">
                                 <span class="sidebar-compact-label">Upload</span>
-                                <form action="/upload" method="post" style="display:contents">
+                                <form action="/upload?from=search_sidebar" method="post" style="display:contents">
                                     <input id="mode" type="hidden" name="mode" value="false"/>
                                     {{range .CardHashes}}
                                         <input type="hidden" name="hashes" value="{{.}}"/>

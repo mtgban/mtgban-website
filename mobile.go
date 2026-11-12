@@ -38,6 +38,11 @@ func toggleMobileView(w http.ResponseWriter, r *http.Request) {
 	if current {
 		val = "false"
 	}
+	if val == "true" {
+		observe(r, "view.toggle", "to_mobile")
+	} else {
+		observe(r, "view.toggle", "to_desktop")
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "MobileView",

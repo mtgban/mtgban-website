@@ -126,6 +126,7 @@ func guildCreate(s *discordgo.Session, gc *discordgo.GuildCreate) {
 	}
 	msg := fmt.Sprintf("New bot install at %s (%s)", gc.Guild.Name, gc.Guild.ID)
 	UserNotify("bot", msg, true)
+	observeJob("discord", "", "discord.guild_join", "")
 }
 
 // joinedRecently reports whether the bot joined the guild just now, rather
@@ -593,9 +594,15 @@ func onStore(u *url.URL, trigger string) bool {
 // nothing all end the same way, and there is nothing a caller could do
 // differently about any of them.
 func checkForLinks(b *matcher.Backend, mGuildID, mContent string) *discordgo.MessageEmbed {
+	reply, _ := matchStoreLink(b, mGuildID, mContent)
+	return reply
+}
+
+// matchStoreLink is checkForLinks, also naming the store the reply is for.
+func matchStoreLink(b *matcher.Backend, mGuildID, mContent string) (*discordgo.MessageEmbed, string) {
 	// Only for the main discord and only for the main game
 	if mGuildID != discordGuildID() || b.Game != DefaultGame {
-		return nil
+		return nil, ""
 	}
 
 	for _, store := range AffiliateStores {
@@ -673,10 +680,51 @@ func checkForLinks(b *matcher.Backend, mGuildID, mContent string) *discordgo.Mes
 				Title:       title,
 				URL:         u.String(),
 				Description: storeLinkDescription(co, mGuildID),
-			}
+			}, store.Name
 		}
 	}
-	return nil
+	return nil, ""
+}
+
+// discordStore is the registry value of an AffiliateStores name, else "".
+func discordStore(name string) string {
+	switch name {
+	case "Card Kingdom":
+		return "ck"
+	case "Cool Stuff Inc":
+		return "csi"
+	case "TCGplayer":
+		return "tcg"
+	case "Star City Games":
+		return "scg"
+	case "Manapool":
+		return "mp"
+	case "CardTrader":
+		return "ct"
+	case "Amazon":
+		return "amzn"
+	}
+	return ""
+}
+
+// discordForm names the form of a message the bot acts on, in the order
+// messageCreate tests them, or "" for one it does not.
+func discordForm(content string, bracketChannel bool) string {
+	switch {
+	case strings.HasPrefix(content, "!"):
+		return "card"
+	case strings.HasPrefix(content, "?"):
+		return "sealed"
+	case strings.HasPrefix(content, "$$"):
+		return "last_sold"
+	case bracketChannel && strings.Contains(content, "[["):
+		return "brackets"
+	case strings.Contains(content, "{{"):
+		return "pricefall"
+	case strings.Contains(content, "gatherer.wizards.com"):
+		return "gatherer_link"
+	}
+	return ""
 }
 
 // This function will be called (due to AddHandler above) every time a new
@@ -716,26 +764,41 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 	}
 
 	// Parse message, look for bot command
+	form := discordForm(m.Content, m.ChannelID == Config().Discord.DevelopmentChannelID || m.ChannelID == Config().Discord.RecapChannelID || m.ChannelID == Config().Discord.ChatChannelID)
+	switch form {
+	case "card":
+		observeJob("discord", "", "discord.message", "card")
+	case "sealed":
+		observeJob("discord", "", "discord.message", "sealed")
+	case "last_sold":
+		observeJob("discord", "", "discord.message", "last_sold")
+	case "brackets":
+		observeJob("discord", "", "discord.message", "brackets")
+	case "pricefall":
+		observeJob("discord", "", "discord.message", "pricefall")
+	case "gatherer_link":
+		observeJob("discord", "", "discord.message", "gatherer_link")
+	}
 	if !strings.HasPrefix(m.Content, "!") &&
 		!strings.HasPrefix(m.Content, "?") &&
 		!strings.HasPrefix(m.Content, "$$") {
-		switch {
+		switch form {
 		// Check if selected channels can replace scryfall searches
-		case (m.ChannelID == Config().Discord.DevelopmentChannelID || m.ChannelID == Config().Discord.RecapChannelID || m.ChannelID == Config().Discord.ChatChannelID) && strings.Contains(m.Content, "[["):
+		case "brackets":
 			fields := squareBracketsRE.FindAllString(m.Content, -1)
 			for _, field := range fields {
 				m.Content = "!" + strings.Trim(field, "[]")
-				s.messageCreate(session, m)
+				s.discordLookup(session, m, ds, p)
 			}
 		// Check if the message uses the Pricefall syntax
-		case strings.Contains(m.Content, "{{"):
+		case "pricefall":
 			fields := curlyBracketsRE.FindAllString(m.Content, -1)
 			for _, field := range fields {
 				m.Content = "!" + strings.Trim(field, "{}")
-				s.messageCreate(session, m)
+				s.discordLookup(session, m, ds, p)
 			}
 		// Check if we can intercept Gatherer requests
-		case strings.Contains(m.Content, "gatherer.wizards.com"):
+		case "gatherer_link":
 			fields := strings.Fields(m.Content)
 			for _, field := range fields {
 				if !strings.Contains(field, "gatherer.wizards.com") {
@@ -751,14 +814,14 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 					co, _ := b.GetUUID(uuid)
 					if co.Identifiers["multiverseId"] == mid {
 						m.Content = fmt.Sprintf("!%s|%s|%s", co.Name, co.SetCode, co.Number)
-						s.messageCreate(session, m)
+						s.discordLookup(session, m, ds, p)
 						return
 					}
 				}
 			}
 		// Check if the message contains potential links
 		default:
-			reply := checkForLinks(b, m.GuildID, m.Content)
+			reply, store := matchStoreLink(b, m.GuildID, m.Content)
 			if reply == nil {
 				break
 			}
@@ -767,10 +830,28 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 			_, err := session.ChannelMessageSendEmbed(m.ChannelID, reply)
 			if err != nil {
 				log.Println(err)
+				break
 			}
+			observeJob("discord", "", "discord.store_link", discordStore(store))
 		}
 		return
 	}
+
+	s.discordCommand(session, m, ds, p)
+}
+
+// discordLookup is one lookup of a message, recovered alone so the next still answers.
+func (s *site) discordLookup(session *discordgo.Session, m *discordgo.MessageCreate, ds *datastore, p *prices) {
+	defer recoverJob("discord messageCreate")
+	s.discordCommand(session, m, ds, p)
+}
+
+// discordCommand answers a prefixed lookup: a card, a sealed product or last sold.
+func (s *site) discordCommand(session *discordgo.Session, m *discordgo.MessageCreate, ds *datastore, p *prices) {
+	if len(m.Content) < 2 {
+		return
+	}
+	b := ds.backend
 
 	allBls := strings.HasPrefix(m.Content, "!") || strings.HasPrefix(m.Content, "?")
 	sealed := strings.HasPrefix(m.Content, "?")

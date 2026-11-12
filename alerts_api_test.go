@@ -79,3 +79,28 @@ func TestAlertsNavHiddenWithoutStore(t *testing.T) {
 		t.Fatal("Alerts hidden with a store")
 	}
 }
+
+func TestAlertsIdentityNamesThePage(t *testing.T) {
+	withSigMode(t, true, false)
+	for referer, want := range map[string]string{
+		"https://mtgban.com/search?q=bolt": "search",
+		"https://evil.example/search":      "other",
+		"":                                 "other",
+	} {
+		r := alertsRequest(http.MethodPost, "/api/alerts/", devSig("a@b.com", "Legacy"))
+		r.Host = "mtgban.com"
+		if referer != "" {
+			r.Header.Set("Referer", referer)
+		}
+		c, status, _ := alertsIdentity(r)
+		if status != http.StatusOK || c.Page != want {
+			t.Errorf("referer %q: caller page = %q (status %d), want %q", referer, c.Page, status, want)
+		}
+	}
+}
+
+func TestTheSiteFillsTheAlertHooks(t *testing.T) {
+	if testSite.alertAPIDeps().Observe == nil || testSite.alertEvalDeps().Observe == nil {
+		t.Fatal("an alerts hook is not wired")
+	}
+}

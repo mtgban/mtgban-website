@@ -110,7 +110,9 @@ func TestFailedCountsEventsInFailedBatches(t *testing.T) {
 	r.Record(Event{})
 	r.Record(Event{})
 	waitFor(t, 2, func() int { return int(r.Failed()) })
-	r.Close()
+	if err := r.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
 }
 
 type panickingStore struct{}

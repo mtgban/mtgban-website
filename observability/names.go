@@ -141,7 +141,112 @@ var names = []Name{
 	{Name: "settings.modal_fetch", Area: "settings", Report: ReportContext, Help: "The settings modal body was fetched."},
 	{Name: "settings.values_fetch", Area: "settings", Scope: ScopePage, Report: ReportContext, Help: "Another page's cookies fetched for the modal."},
 	{Name: "opensearch.fetch", Area: "search", Report: ReportContext, Help: "A browser fetched the search engine descriptor."},
+	{Name: "upload.source", Area: "upload", Values: ValueEnum, Enum: append(slices.Clone(uploadSources), "url_prefix"), Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "Where an upload's list came from; a URL prefix upload also counts url at the upload."},
+	{Name: "upload.url_host", Area: "upload", Values: ValueEnum, Enum: []string{"tcgplayer", "moxfield", "manabox", "archidekt", "cubecobra", "mythictools", "collectr", "gdocs", "other"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "The site a remote URL upload pointed at."},
+	{Name: "upload.handoff_origin", Area: "upload", Page: "upload", Values: ValueOrigin, Report: ReportContext, Help: "The site that handed a list over; an unconfigured host is other."},
+	{Name: "upload.from", Area: "upload", Values: ValueEnum, Enum: []string{"search_sidebar", "favorites", "backpack", "news", "screener", "palette", "results_reload", "upload_form", "unknown"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Denom: "upload.mode", Help: "The control that posted a list of card ids."},
+	{Name: "upload.mode", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Report: ReportContext, Help: "The side an upload was priced on, once per priced results view; a reload from the results counts again, as upload.from:results_reload shows."},
+	{Name: "upload.rows", Area: "upload", Page: "upload", Values: ValueBucket, Enum: []string{"0", "1-9", "10-99", "100-999", "1000+"}, Report: ReportContext, Help: "Rows in an upload after merging."},
+	{Name: "upload.sealed", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"none", "some", "all"}, Report: ReportContext, Help: "How much of an upload was sealed product."},
+	{Name: "upload.option", Area: "upload", Values: ValueEnum, Enum: []string{"lowval", "lowvalabs", "highval", "highvalabs", "minmargin", "nocond", "noprice", "customperc"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "A buylist option set away from the page's default in the reader's saved settings and in force; a default-on option counts when turned off. Counted on buylist runs only, while upload.mode counts retail too."},
+	{Name: "upload.value_set", Area: "upload", Values: ValueEnum, Enum: []string{"percspread", "percspreadmax", "minval", "maxval", "margin", "custompercmax", "multiplier", "maxqty"}, Report: ReportCandidate, Unit: UnitValue, Kind: "setting", Denom: "upload.mode", Help: "A numeric upload setting off its default; margin only when the option is on and the margin is not the page's 10."},
+	{Name: "upload.sorting", Area: "upload", Values: ValueEnum, Enum: []string{"highprice", "alphabetical", "setalpha", "setchrono", "highspread", "profitability"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "The sort an upload's results ran with."},
+	{Name: "upload.price_source", Area: "upload", Values: ValueEnum, Enum: []string{"default", "credit", "marketCredit"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "The price a buylist upload compared in. Counted on buylist runs only, while upload.mode counts retail too."},
+	{Name: "upload.custom_buylist", Area: "upload", Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "An upload priced a custom buylist."},
+	{Name: "upload.stores", Area: "upload", Page: "upload", Values: ValueBucket, Enum: []string{"0", "1-4", "5-9", "10-19", "20+"}, Report: ReportContext, Help: "Stores an upload was priced against, singles and sealed."},
+	{Name: "upload.index_pref", Area: "upload", Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "An upload ran with a changed index selection."},
+	{Name: "upload.unpack", Area: "upload", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Denom: "upload.mode", Help: "An upload opened its sealed rows."},
+	{Name: "upload.publish", Area: "upload", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Denom: "upload.mode", Help: "An upload was published as a store."},
+	{Name: "upload.parse_error", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"no_list", "load_error"}, Scope: ScopeEnum, Scopes: append([]string{"none"}, uploadSources...), Report: ReportSignal, Help: "An upload that could not be read, scoped by where its list came from."},
+	{Name: "upload.duration", Area: "upload", Page: "upload", Values: ValueBucket, Enum: []string{"<50ms", "<200ms", "<1s", "<5s", "5s+"}, Report: ReportContext, Help: "Time to price an upload."},
+	{Name: "upload_share.open", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"ok", "gone"}, Report: ReportSignal, Help: "A share link was opened."},
+	{Name: "upload.export", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"download", "estimate", "deckbox", "tcgplayer_csv"}, Scope: ScopeEnum, Scopes: []string{"all", "singles", "sealed"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "An export run from upload results, scoped by the rows a download kept."},
+	{Name: "upload.tag", Area: "upload", Page: "upload,arbit,reverse,global", Values: ValueEnum, Enum: []string{"load_at", "csv", "tcg_remove"}, Scope: ScopeEnum, Scopes: []string{"CK", "SCG", "TCG"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A per-store transfer from the upload results or the arbitrage tables."},
+	{Name: "upload.handoff_page", Area: "upload", Page: "upload/handoff", Values: ValueEnum, Enum: []string{"shown", "locked"}, Report: ReportContext, Help: "The handoff page was opened; locked when the reader lacks the Upload grant."},
+	{Name: "upload_share.create", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A share link was made for upload results, by their side."},
+	{Name: "arbit.view", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"landing", "store"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportContext, Help: "An arbitrage page was shown, with or without a store picked."},
+	{Name: "arbit.source", Area: "arbit", Page: "arbit,reverse,global", Values: ValueStore, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportContext, Help: "The store an arbitrage view compared from."},
+	{Name: "arbit.apply", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"apply", "reset"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The filter form was submitted, or Restore defaults was followed."},
+	{Name: "arbit.bound", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"minsell", "maxsell", "minbuy", "maxbuy", "minspread", "maxspread", "mindiff", "minqty", "minprof"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A numeric limit the view ran with."},
+	{Name: "arbit.pick", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"cond", "finish", "rarity"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A picker narrowed from its full list."},
+	{Name: "arbit.toggle", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"rl", "abu4h", "nocollector", "nooversize", "notoken", "decklists", "syp", "stocks", "legit", "stable", "tradable"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "An on/off option set away from the page's default, chosen by the reader, defaults not counted."},
+	{Name: "arbit.sort", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"profitability", "spread", "diff", "available", "sell_price", "buy_price", "edition", "alpha"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The sort the tables ran with."},
+	{Name: "arbit.excluded_vendors", Area: "arbit", Page: "arbit,reverse,global", Values: ValueBucket, Enum: []string{"0", "1-4", "5-9", "10+"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportContext, Help: "Stores the reader hides from the page."},
+	{Name: "arbit.sections", Area: "arbit", Page: "arbit,reverse,global", Values: ValueBucket, Enum: []string{"0", "1-4", "5-9", "10-19", "20+"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportContext, Help: "Store tables a view returned."},
+	{Name: "arbit.duration", Area: "arbit", Page: "arbit,reverse,global", Values: ValueBucket, Enum: []string{"<50ms", "<200ms", "<1s", "<5s", "5s+"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportContext, Help: "Time to build a view."},
+	{Name: "news.report", Area: "news", Page: "newspaper/index,newspaper/syp,newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"combined_spike_score", "spike_score", "greatest_increase_listings", "greatest_decrease_listings", "greatest_increase_buylist", "greatest_decrease_buylist", "syp", "index"}, Report: ReportContext, Help: "A newspaper page was served to a reader with the tier."},
+	{Name: "news.three_day", Area: "news", Page: "newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"on", "off"}, Report: ReportContext, Help: "A report ran on the delayed edition."},
+	{Name: "news.sort", Area: "news", Page: "newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"ranking", "product_name", "set_name", "product_number", "variant", "bucket_name", "bucket_rank", "ck_buy_price", "ck_buy_1d", "ck_buy_7d", "ck_buy_30d", "ck_retail_price", "current_price", "tcg_market_price", "pct_decrease_7d", "pct_drop_7d", "pct_gain_7d", "pct_increase_7d", "sellers_Today", "sellers_d7", "sellers_d30"}, Scope: ScopeEnum, Scopes: []string{"asc", "desc"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A report was sorted by a column."},
+	{Name: "news.filter", Area: "news", Page: "newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"rarity", "bucket", "finish", "min_price", "max_price", "min_change", "max_change", "edition"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A report filter in force."},
+	{Name: "news.page", Area: "news", Page: "newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueBucket, Enum: []string{"1", "2", "3-5", "6+"}, Report: ReportContext, Help: "The page of a report that was read."},
+	{Name: "news.syp_csv", Area: "news", Page: "newspaper/syp", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The SYP list was downloaded as CSV."},
+	{Name: "news.syp_sort", Area: "news", Page: "newspaper/syp", Values: ValueEnum, Enum: []string{"alpha", "edition", "available", "sell_price"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The sort the SYP list ran with."},
+	{Name: "news.editions_hidden", Area: "news", Page: "newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueBucket, Enum: []string{"0", "1-4", "5-19", "20+"}, Report: ReportContext, Help: "Editions the reader hides from reports."},
+	{Name: "sleepers.page", Area: "sleepers", Page: "sleepers/index,sleepers/reprint,sleepers/mismatch,sleepers/gap,sleepers/hotlist,sleepers/velocity", Values: ValueEnum, Enum: []string{"reprint", "mismatch", "gap", "hotlist", "velocity", "index"}, Report: ReportContext, Help: "A sleepers page was built."},
+	{Name: "sleepers.gap", Area: "sleepers", Page: "sleepers/gap", Values: ValueEnum, Enum: []string{"preset", "custom"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An Ocean Gap comparison came from a preset link or a custom pair."},
+	{Name: "sleepers.ref", Area: "sleepers", Page: "sleepers/gap", Values: ValueStore, Report: ReportContext, Help: "The reference store of a gap comparison."},
+	{Name: "sleepers.target", Area: "sleepers", Page: "sleepers/gap", Values: ValueStore, Report: ReportContext, Help: "The target store of a gap comparison."},
+	{Name: "sleepers.lists", Area: "sleepers", Values: ValueEnum, Enum: []string{"sellers", "vendors", "editions"}, Report: ReportCandidate, Unit: UnitValue, Kind: "setting", Denom: "sleepers.page", Help: "A sleepers hide list the reader keeps."},
+	{Name: "sleepers.duration", Area: "sleepers", Page: "sleepers/index,sleepers/reprint,sleepers/mismatch,sleepers/gap,sleepers/hotlist,sleepers/velocity", Values: ValueBucket, Enum: []string{"<50ms", "<200ms", "<1s", "<5s", "5s+"}, Report: ReportContext, Help: "Time to build a sleepers page."},
+	{Name: "screener.provider", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"CKRetail", "CKBuylist", "TCGLow", "TCGMarket", "TCGMid", "TCGHigh", "TCGDirectLow", "MKMLow", "MKMTrend", "SCGBuylist", "ABUBuylist", "CSIBuylist", "SealedEV"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The price the screener compared."},
+	{Name: "screener.window", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"1", "7", "14", "30", "60", "90", "180", "365"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The screener's window in days."},
+	{Name: "screener.kind", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"singles", "sealed", "both"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "What the screener listed."},
+	{Name: "screener.move", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"up", "down", "either"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The direction the screener kept."},
+	{Name: "screener.filter", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"min_price", "min_was", "min_pct", "max_pct", "edition"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A screener filter the reader set away from the landing's."},
+	{Name: "screener.size", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"25", "50", "100"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The screener's page size."},
+	{Name: "screener.sort", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"current", "prior", "pct", "abs"}, Scope: ScopeEnum, Scopes: []string{"asc", "desc"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The column the screener sorted by."},
+	{Name: "screener.page", Area: "screener", Page: "screener", Values: ValueBucket, Enum: []string{"1", "2", "3-5", "6+"}, Report: ReportContext, Help: "The page of screener rows read."},
+	{Name: "alerts.create", Area: "alerts", Page: "search,alerts", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Scope: ScopePage, Report: ReportCandidate, Unit: UnitScope, Kind: "control", Help: "An alert was created, by the page it was created from."},
+	{Name: "alerts.create_delivery", Area: "alerts", Denom: "alerts.create", Values: ValueEnum, Enum: []string{"discord", "email"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The channel a new alert fires on."},
+	{Name: "alerts.create_condition", Area: "alerts", Denom: "alerts.create", Values: ValueEnum, Enum: []string{"NM", "SP", "MP", "HP", "PO"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The grade a new alert watches."},
+	{Name: "alerts.create_threshold", Area: "alerts", Denom: "alerts.create", Values: ValueEnum, Enum: []string{"above_abs", "above_pct", "below_abs", "below_pct"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A threshold a new alert set."},
+	{Name: "alerts.create_stores", Area: "alerts", Denom: "alerts.create", Values: ValueBucket, Enum: []string{"0", "1-2", "3-9", "10+"}, Report: ReportContext, Help: "Stores a new alert is scoped to, 0 being every store."},
+	{Name: "alerts.edit", Area: "alerts", Page: "alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert was edited."},
+	{Name: "alerts.pause", Area: "alerts", Page: "alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert was paused."},
+	{Name: "alerts.resume", Area: "alerts", Page: "alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert was resumed."},
+	{Name: "alerts.delete", Area: "alerts", Page: "search,alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert was deleted."},
+	{Name: "alerts.delete_all", Area: "alerts", Page: "alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Every alert was deleted at once."},
+	{Name: "alerts.channel", Area: "alerts", Page: "alerts", Values: ValueEnum, Enum: []string{"add", "change", "resend", "remove", "enable", "confirm", "unsubscribe"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An email channel action."},
+	{Name: "alerts.fired", Area: "alerts", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Report: ReportContext, Help: "A firing settled: delivered, refused or failed, once per attempt; a deferred firing counts when it is finally attempted."},
+	{Name: "alerts.delivered", Area: "alerts", Values: ValueEnum, Enum: []string{"ok", "fail", "refused", "deferred"}, Scope: ScopeEnum, Scopes: []string{"discord", "email"}, Report: ReportSignal, Help: "How a firing's delivery ended: fail is retried, refused parks the alert, deferred counts again on each run until sent."},
+	{Name: "alerts.mail_event", Area: "alerts", Values: ValueEnum, Enum: []string{"hard_bounce", "soft_bounce", "complaint", "other"}, Report: ReportSignal, Help: "A mail provider event the webhook verified."},
+	{Name: "alerts.deep_link", Area: "alerts", Page: "alerts", Values: ValueEnum, Enum: []string{"card", "edit"}, Report: ReportContext, Help: "The alerts page was opened on a card or an alert."},
+	{Name: "auth.login", Area: "account", Values: ValueEnum, Enum: []string{"ok", "no_code", "fail_patreon", "fail_tier"}, Report: ReportSignal, Help: "How a Patreon login callback ended: fail_patreon is Patreon failing or giving no usable answer, fail_tier a reader with no qualifying pledge; the row carries whatever cookie the browser already held."},
+	{Name: "auth.renew", Area: "account", Values: ValueEnum, Enum: []string{"renewed", "not_renewed", "ended", "refused", "gone", "session_gone"}, Report: ReportContext, Help: "What a renewal came to, one row per refresh call made to Patreon, plus session_gone when the session is found gone before any call; a Refresh now press that reaches Patreon also counts under account.refresh, so the two are not added. The row carries the signature from before the renewal, so a grace renewal reads tier Any, unsigned."},
+	{Name: "auth.logout", Area: "account", Page: "home,user", Values: ValueEnum, Enum: []string{"here", "everywhere"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A reader logged out, of this browser or of every session."},
+	{Name: "account.refresh", Area: "account", Page: "user", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Refresh now was pressed on the Account page; a press that reaches Patreon also counts under auth.renew, so the two are not added."},
+	{Name: "userstate.get", Area: "account", Page: "*", Report: ReportContext, Help: "A browser read its synced state, answered 200 or 304."},
+	{Name: "userstate.put", Area: "account", Page: "*", Report: ReportContext, Help: "A browser wrote its whole synced state."},
+	{Name: "userstate.patch", Area: "account", Page: "*", Values: ValueEnum, Enum: []string{"favorites", "recents", "preferences", "backpack"}, Report: ReportContext, Help: "A browser wrote one section of its synced state."},
+	{Name: "userstate.conflict", Area: "account", Page: "*", Report: ReportSignal, Help: "A sync write lost to a newer version."},
+	{Name: "favshare.create", Area: "favorites", Page: "search,sealed", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A favorites share link was made or replaced."},
+	{Name: "favshare.stop", Area: "favorites", Page: "search,sealed", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A favorites share link was ended."},
+	{Name: "favshare.view", Area: "favorites", Page: "search/shared", Report: ReportContext, Help: "A shared favorites list was shown."},
+	{Name: "favshare.view_gone", Area: "favorites", Page: "search/shared", Report: ReportSignal, Help: "A share link was opened after it ended, or was never valid."},
+	{Name: "patreon.webhook", Area: "account", Values: ValueEnum, Enum: []string{"pledge_create", "pledge_update", "pledge_delete", "member_create", "member_update", "member_delete", "other", "bad_signature", "no_email"}, Report: ReportContext, Help: "A call to the Patreon member webhook: its event once handled, or why it was not."},
+	{Name: "go.click", Area: "site", Page: "*", Values: ValueEnum, Enum: []string{"r", "b", "i"}, Scope: ScopeStore, Report: ReportContext, Help: "A /go/ link sent a reader to a store, by the kind of link."},
+	{Name: "redirect.random", Area: "search", Page: "home,search,sealed", Values: ValueEnum, Enum: []string{"card", "sealed", "chart_modal"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A random card or product was asked for."},
+	{Name: "redirect.card", Area: "site", Report: ReportContext, Help: "A /card/ link was followed."},
+	{Name: "redirect.sealed", Area: "site", Report: ReportContext, Help: "A /sealed/ link was followed."},
+	{Name: "redirect.discord", Area: "nav", Page: "*", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The /discord invite link was followed."},
+	{Name: "redirect.partner", Area: "site", Report: ReportCandidate, Unit: UnitValue, Kind: "page", Help: "The /monroecards partner link was followed."},
+	{Name: "view.toggle", Area: "nav", Page: "*", Values: ValueEnum, Enum: []string{"to_mobile", "to_desktop"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The mobile or desktop view was forced."},
+	{Name: "apiplans.view", Area: "api", Page: "api-plans", Values: ValueEnum, Enum: []string{"plain", "prefilled"}, Report: ReportContext, Help: "The API pricing page was shown, plain or opened on an invite, a change or a package."},
+	{Name: "apiplans.handoff", Area: "api", Page: "api-plans", Values: ValueEnum, Enum: []string{"trial", "login", "unknown"}, Scope: ScopeEnum, Scopes: []string{"start", "ok", "refused"}, Report: ReportSignal, Help: "A step of the handoff to the API gateway."},
+	{Name: "api.call", Area: "api", Values: ValueEnum, Enum: []string{"json", "csv", "other"}, Scope: ScopeEnum, Scopes: APIFamilies(), Report: ReportContext, Help: "A price API call that passed the gate, by endpoint family; tier api is the gateway's, api-legacy any other verified signature. A handler refusal is also a call, so refusal rate is api.refuse over api.call."},
+	{Name: "api.option", Area: "api", Denom: "api.call", Values: ValueEnum, Enum: []string{"quantities", "conditions"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A price API call asked for an optional column, counted on v1 and v2 CSV calls only, where the options apply, while api.call counts every family."},
+	{Name: "api.refuse", Area: "api", Values: ValueEnum, Enum: []string{"no_key", "bad_sig", "expired", "rate_limited", "plan"}, Scope: ScopeEnum, Scopes: APIFamilies(), Report: ReportSignal, Help: "A price API call that was refused, by endpoint family and reason; plan is a verified key whose plan lacks the add-on; rate_limited is the same refusal ratelimit.reject:api counts, so the two are not added."},
+	{Name: "offlineapi.fetch", Area: "offline", Page: "offline", Values: ValueEnum, Enum: []string{"manifest", "catalog", "prices", "bucket_auth"}, Report: ReportContext, Help: "An offline API endpoint was fetched."},
+	{Name: "discord.message", Area: "site", Values: ValueEnum, Enum: []string{"card", "sealed", "last_sold", "brackets", "pricefall", "gatherer_link"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A message the Discord bot took as a command or lookup, by its form, counted even when the bot then answered nothing (a failed parse, an unclosed bracket, a Gatherer link with no match)."},
+	{Name: "discord.store_link", Area: "site", Values: ValueEnum, Enum: []string{"ck", "csi", "tcg", "scg", "mp", "ct", "amzn"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The Discord bot answered a store link with an affiliate link."},
+	{Name: "discord.guild_join", Area: "site", Report: ReportContext, Help: "The Discord bot was installed on a server."},
 }
+
+// uploadSources are where the upload handler reads a list from.
+var uploadSources = []string{"hashes", "text", "file_csv", "file_txt", "file_xls", "file_xlsx", "url", "share", "handoff"}
+
+// arbitPages are the arbitrage pages, the scope of every arbit.* name.
+var arbitPages = []string{"arbit", "reverse", "global"}
 
 // searchPages are the paths a search runs on, the scope of most search.* names.
 var searchPages = []string{"search", "sealed", "sets"}
@@ -186,6 +291,33 @@ func foldOther(f func(string) bool, s string) string {
 	return s
 }
 
+// maxStoreLen is the longest shorthand stored; a longer one folds to other.
+const maxStoreLen = 40
+
+// storeShaped reports whether s is short and spelled as shorthands are, TCGSI's , and + included.
+func storeShaped(s string) bool {
+	if s == "" || len(s) > maxStoreLen {
+		return false
+	}
+	for _, c := range []byte(s) {
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		case c == '_', c == '.', c == '-', c == ',', c == '+':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// foldStore is foldOther for a shorthand, which must also be store-shaped.
+func foldStore(f func(string) bool, s string) string {
+	if !storeShaped(s) {
+		return "other"
+	}
+	return foldOther(f, s)
+}
+
 // Check returns the scope and value to store, or ok=false to reject.
 func (n Name) Check(scope, value string, v Validators) (string, string, bool) {
 	if n.Scope == ScopeNone {
@@ -210,7 +342,7 @@ func (n Name) Check(scope, value string, v Validators) (string, string, bool) {
 		case ScopePage:
 			scope = foldOther(v.Page, scope)
 		case ScopeStore:
-			scope = foldOther(v.Store, scope)
+			scope = foldStore(v.Store, scope)
 		}
 	}
 
@@ -232,7 +364,7 @@ func (n Name) Check(scope, value string, v Validators) (string, string, bool) {
 			return "", "", false
 		}
 	case ValueStore:
-		value = foldOther(v.Store, value)
+		value = foldStore(v.Store, value)
 	case ValuePage:
 		value = foldOther(v.Page, value)
 	case ValueOrigin:

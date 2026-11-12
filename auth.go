@@ -20,6 +20,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/pledge"
 	"github.com/mtgban/mtgban-website/internal/siteorigin"
+	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/patreon"
 	"github.com/mtgban/mtgban-website/ratelimit"
 	"github.com/mtgban/mtgban-website/userstate"
@@ -75,6 +76,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 			s.failAPIHandoff(w, r, handoff, "no code from Patreon")
 			return
 		}
+		observe(r, "auth.login", "no_code")
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
@@ -96,6 +98,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 			s.failAPIHandoff(w, r, handoff, "token exchange failed")
 			return
 		}
+		observe(r, "auth.login", "fail_patreon")
 		http.Redirect(w, r, "/?errmsg=TokenNotFound", http.StatusFound)
 		return
 	}
@@ -111,6 +114,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 			s.failAPIHandoff(w, r, handoff, "identity lookup failed")
 			return
 		}
+		observe(r, "auth.login", "fail_patreon")
 		http.Redirect(w, r, "/?errmsg=UserNotFound", http.StatusFound)
 		return
 	}
@@ -129,11 +133,20 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	// Handle error
 	if verdict != pledge.Entitled {
 		LogPages["Admin"].Printf("auth: no tier for %q: verdict=%v err=%v", userData.Email, verdict, err)
+		// Unknown is Patreon giving no usable answer, not a missing pledge
+		failure := "fail_tier"
+		if verdict == pledge.Unknown {
+			failure = "fail_patreon"
+		}
+		observe(r, "auth.login", failure)
 		http.Redirect(w, r, "/?errmsg=TierNotFound", http.StatusFound)
 		return
 	}
 
 	LogPages["Admin"].Printf("auth: email=%q tier=%q", userData.Email, tierTitle)
+
+	// The row carries whatever cookie the browser already held
+	observe(r, "auth.login", "ok")
 
 	s.finishSiteLogin(w, r, r.FormValue("state"), userData, tierTitle, overrides, granted, patreonLogin{
 		clientID:     clientID,
@@ -546,16 +559,24 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		defer recoverPanic(r, w)
 
 		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
+		label := observability.APIFamily(r.URL.Path)
 
 		ip, err := apiLimitAddress(r)
 		if err != nil {
+			// Fills the wrapper's holder, so the 500 reads device=api too.
+			withAPIDims(r, "", false)
 			log.Println(err)
 			errorResponse(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 			return
 		}
 
 		if !APIRateLimiter.Allow(string(ip)) {
+			// signedByGateway runs again only when the refusal will be counted.
+			r = withAPIDims(r, apiGatewayUser, FeatureCounter != nil && signedByGateway(r))
 			observe(r, "ratelimit.reject", "api")
+			if label != "other" {
+				observeScoped(r, label, "api.refuse", "rate_limited")
+			}
 			errorResponse(w, http.StatusTooManyRequests, http.StatusText(http.StatusTooManyRequests))
 			return
 		}
@@ -566,12 +587,20 @@ func enforceAPISigning(next http.Handler) http.Handler {
 
 		// If signature is empty let it pass through
 		if sig == "" && !strings.HasPrefix(r.URL.Path, "/api/load") {
+			r = withAPIDims(r, "", false)
+			if label != "other" {
+				observeScoped(r, label, "api.call", apiFormat(r.URL.Path))
+			}
 			next.ServeHTTP(w, r)
 			return
 		}
 
 		v, err := apisig.Decode(sig)
 		if SigCheck && err != nil {
+			r = withAPIDims(r, "", false)
+			if label != "other" {
+				observeScoped(r, label, "api.refuse", apiRefusal(sig, err))
+			}
 			log.Println("API error, bad sig", err)
 			errorResponse(w, http.StatusUnauthorized, "invalid signature")
 			return
@@ -580,6 +609,10 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		// Kept ungated to match the previous middleware exactly.
 		if exp := v.Get("Expires"); exp != "" {
 			if _, err := strconv.ParseInt(exp, 10, 64); err != nil {
+				r = withAPIDims(r, "", false)
+				if label != "other" {
+					observeScoped(r, label, "api.refuse", apiRefusal(sig, apisig.ErrInvalid))
+				}
 				log.Println("API error", err.Error())
 				errorResponse(w, http.StatusUnauthorized, "invalid or expired signature")
 				return
@@ -594,11 +627,19 @@ func enforceAPISigning(next http.Handler) http.Handler {
 
 		err = apisig.Verify([]byte(secret), r.Method, signatureLink(), v, OptionalFields, time.Now())
 		if SigCheck && err != nil {
+			r = withAPIDims(r, "", false)
+			if label != "other" {
+				observeScoped(r, label, "api.refuse", apiRefusal(sig, err))
+			}
 			log.Println("API error, invalid", v.Get("UserEmail"), err)
 			errorResponse(w, http.StatusUnauthorized, "invalid or expired signature")
 			return
 		}
 
+		r = withAPIDims(r, v.Get("UserEmail"), err == nil)
+		if label != "other" {
+			observeScoped(r, label, "api.call", apiFormat(r.URL.Path))
+		}
 		next.ServeHTTP(w, r)
 	})
 }

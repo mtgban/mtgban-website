@@ -205,7 +205,7 @@
     function pageUploadHashInputs() {
         // Search results render hashes as hidden inputs in a sidebar /upload form.
         // Upload-results pages render them as tr[data-hash] rows.
-        var inputs = document.querySelectorAll('form[action="/upload"] input[name="hashes"]');
+        var inputs = document.querySelectorAll('form[action="/upload"] input[name="hashes"], form[action^="/upload?"] input[name="hashes"]');
         if (inputs.length > 0) return inputs;
         return document.querySelectorAll('tr[data-hash]');
     }
@@ -274,7 +274,7 @@
         if (sources.length === 0) { showToast('No results on this page'); return; }
         var form = document.createElement('form');
         form.method = 'post';
-        form.action = '/upload';
+        form.action = '/upload?from=palette';
         form.style.display = 'none';
         sources.forEach(function (el) {
             // input[name="hashes"] (sidebar form) → use el.value

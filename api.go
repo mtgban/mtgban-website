@@ -146,7 +146,8 @@ func uuid2BuylistCSV(p *prices, w *csv.Writer, ids, qtys []string, vendor string
 
 		w.Flush()
 	}
-	return nil
+	w.Flush()
+	return w.Error()
 }
 
 func SCGRetailRedirect(ctx context.Context, b *matcher.Backend, p *prices, ids, qtys, conds []string) (string, error) {

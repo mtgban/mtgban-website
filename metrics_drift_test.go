@@ -168,8 +168,23 @@ func observedNames(t *testing.T, root string) []observedName {
 	}
 	for _, path := range hookGoFiles(t, root) {
 		called := map[*ast.SelectorExpr]bool{}
+		guarded := map[*ast.SelectorExpr]bool{} // a nil check, or set to a func literal
 		ast.Inspect(parseGoFile(t, fset, path), func(n ast.Node) bool {
 			switch n := n.(type) {
+			case *ast.BinaryExpr:
+				if n.Op == token.EQL || n.Op == token.NEQ {
+					markObserveNilCheck(guarded, n.X, n.Y)
+					markObserveNilCheck(guarded, n.Y, n.X)
+				}
+			case *ast.AssignStmt:
+				if len(n.Lhs) == len(n.Rhs) {
+					for i, lhs := range n.Lhs {
+						sel, ok := lhs.(*ast.SelectorExpr)
+						if _, lit := n.Rhs[i].(*ast.FuncLit); ok && lit && sel.Sel.Name == "Observe" {
+							guarded[sel] = true
+						}
+					}
+				}
 			case *ast.CallExpr:
 				sel, ok := n.Fun.(*ast.SelectorExpr)
 				if !ok {
@@ -187,7 +202,7 @@ func observedNames(t *testing.T, root string) []observedName {
 					out = append(out, misused(fset, root, n, "a lowercase .observe call"))
 				}
 			case *ast.SelectorExpr:
-				if n.Sel.Name == "Observe" && !called[n] {
+				if n.Sel.Name == "Observe" && !called[n] && !guarded[n] {
 					out = append(out, misused(fset, root, n, ".Observe outside a call"))
 				}
 			}
@@ -195,6 +210,14 @@ func observedNames(t *testing.T, root string) []observedName {
 		})
 	}
 	return out
+}
+
+// markObserveNilCheck marks side as guarded when it is an .Observe selector and other is nil.
+func markObserveNilCheck(guarded map[*ast.SelectorExpr]bool, side, other ast.Expr) {
+	sel, ok := side.(*ast.SelectorExpr)
+	if id, isNil := other.(*ast.Ident); ok && isNil && id.Name == "nil" && sel.Sel.Name == "Observe" {
+		guarded[sel] = true
+	}
 }
 
 // counterBypasses lists where root's package reaches FeatureCounter.Add or
@@ -382,6 +405,19 @@ func TestDriftCollectorSeesEveryForm(t *testing.T) {
 		`	d.Observe("s", name, "v")`,
 		`	d.observe("s", "a.fourteen", "v")`,
 		"	f := d.Observe",
+		"	if d.Observe == nil {",
+		"		d.Observe = func(scope, name, value string) {}",
+		"	}",
+		"	if nil != d.Observe {",
+		"	}",
+		"	use(d.Observe)",
+		"	d.Observe = other",
+		"	if d.Observe == other {",
+		"	}",
+		`	d.observe("s", "a.fifteen", "v")`,
+		"}",
+		"func (d deps) observe(scope, name, value string) {",
+		"	d.Observe(scope, name, value)",
 		"}",
 	}
 	metricsSrc := []string{
@@ -428,6 +464,11 @@ func TestDriftCollectorSeesEveryForm(t *testing.T) {
 		{file: "internal/x/x.go", line: lineOf(hookSrc, `"s", name,`)},
 		{file: "internal/x/x.go", line: lineOf(hookSrc, "a.fourteen"), misuse: "a lowercase .observe call"},
 		{file: "internal/x/x.go", line: lineOf(hookSrc, "f := d.Observe"), misuse: ".Observe outside a call"},
+		{file: "internal/x/x.go", line: lineOf(hookSrc, "use(d.Observe)"), misuse: ".Observe outside a call"},
+		{file: "internal/x/x.go", line: lineOf(hookSrc, "d.Observe = other"), misuse: ".Observe outside a call"},
+		{file: "internal/x/x.go", line: lineOf(hookSrc, "d.Observe == other"), misuse: ".Observe outside a call"},
+		{file: "internal/x/x.go", line: lineOf(hookSrc, "a.fifteen"), misuse: "a lowercase .observe call"},
+		{file: "internal/x/x.go", line: lineOf(hookSrc, "d.Observe(scope, name, value)")},
 	}
 	got := observedNames(t, root)
 	if len(got) != len(want) {

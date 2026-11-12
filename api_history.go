@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -432,6 +433,12 @@ func (s *site) HistoryAPI(w http.ResponseWriter, r *http.Request) {
 	p := s.prices()
 	sig := r.FormValue("sig")
 	if !canAccessMode(strings.Split(GetParamFromSig(sig, "APImode"), ","), "history") {
+		// With SigCheck on, only a verified key carries a sig this far.
+		refusal := "plan"
+		if sig == "" {
+			refusal = "no_key"
+		}
+		observeScoped(r, observability.APIFamily(r.URL.Path), "api.refuse", refusal)
 		historyError(w, http.StatusForbidden, "plan does not include history")
 		return
 	}

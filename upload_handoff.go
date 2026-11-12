@@ -56,6 +56,42 @@ func validHandoffOrigin(origin string) bool {
 		parsed.Port() != "443" && !strings.HasSuffix(parsed.Hostname(), ".")
 }
 
+// handoffOriginOf parses raw and finds its origin among handoffOrigins.
+func handoffOriginOf(raw string) (*url.URL, infrastructure.HandoffOrigin, bool) {
+	if raw == "" {
+		return nil, infrastructure.HandoffOrigin{}, false
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return nil, infrastructure.HandoffOrigin{}, false
+	}
+	entry, found := handoffOrigins()[parsed.Scheme+"://"+parsed.Host]
+	return parsed, entry, found
+}
+
+// handoffOriginHost is the host of raw when its origin is an allowed handoff origin, else "".
+func handoffOriginHost(raw string) string {
+	parsed, _, found := handoffOriginOf(raw)
+	if !found {
+		return ""
+	}
+	return parsed.Host
+}
+
+// maxOriginHost is the longest host upload.handoff_origin stores.
+const maxOriginHost = 40
+
+// handoffOriginHosts are the hosts of handoffOrigins' keys, 40 characters at most.
+func handoffOriginHosts() map[string]bool {
+	hosts := map[string]bool{}
+	for origin := range handoffOrigins() {
+		if u, err := url.Parse(origin); err == nil && len(u.Host) <= maxOriginHost {
+			hosts[u.Host] = true
+		}
+	}
+	return hosts
+}
+
 // uploadSourceFrom names the site a handed-over list was read from,
 // for the results heading, along with the link back to it.
 //
@@ -65,16 +101,7 @@ func validHandoffOrigin(origin string) bool {
 // and only one whose origin handoffOrigins allows - anything else is a
 // posted list like any other and says so.
 func uploadSourceFrom(raw string) (name string, link string) {
-	if raw == "" {
-		return "", ""
-	}
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return "", ""
-	}
-
-	origin := parsed.Scheme + "://" + parsed.Host
-	entry, found := handoffOrigins()[origin]
+	parsed, entry, found := handoffOriginOf(raw)
 	if !found {
 		return "", ""
 	}
@@ -193,6 +220,13 @@ func (s *site) UploadHandoff(w http.ResponseWriter, r *http.Request) {
 
 	// The middleware used to count this page; it no longer sees it.
 	recordHit(r)
+	if isPageView(r) {
+		shown := "shown"
+		if !canUpload {
+			shown = "locked"
+		}
+		observe(r, "upload.handoff_page", shown)
+	}
 
 	// A phone gets the handoff in the mobile layout, though the Upload page
 	// it belongs to keeps the desktop one, so it marks the mobile view itself.

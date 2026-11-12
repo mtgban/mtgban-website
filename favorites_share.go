@@ -96,11 +96,17 @@ func (s *site) favoritesShared(w http.ResponseWriter, r *http.Request, store sha
 	case store == nil:
 		vars.SharedNotice, status = sharedUnavailableText, http.StatusServiceUnavailable
 	case !userstate.ValidShareID(id):
+		if isPageView(r) {
+			observe(r, "favshare.view_gone", "")
+		}
 		vars.SharedNotice, status = sharedGoneText, http.StatusNotFound
 	default:
 		raw, err := store.SharedFavorites(r.Context(), id, string(Config().Game))
 		switch {
 		case errors.Is(err, userstate.ErrShareNotFound):
+			if isPageView(r) {
+				observe(r, "favshare.view_gone", "")
+			}
 			vars.SharedNotice, status = sharedGoneText, http.StatusNotFound
 		case err != nil:
 			log.Println("favorites share:", err)
@@ -108,6 +114,9 @@ func (s *site) favoritesShared(w http.ResponseWriter, r *http.Request, store sha
 		default:
 			vars.SharedRows = sharedRows(s.backend(), s.prices(), raw)
 			vars.SharedCount = len(vars.SharedRows)
+			if isPageView(r) {
+				observe(r, "favshare.view", "")
+			}
 		}
 	}
 	s.renderShared(w, r, status, vars)

@@ -395,6 +395,8 @@ describe('grades', () => {
         expect(rows).toEqual(['B', 'A SP', 'A HP']);
         const form = p.window.Backpack.sendForm('retail');
         expect(form.children.filter((i) => i.name === 'hashes').map((i) => i.value)).toEqual(['uuid-2', 'uuid-1', 'uuid-1']);
+        expect(form.getAttribute('action')).toBe('/upload?from=backpack');
+        expect(form.children.filter((i) => i.name === 'from')).toEqual([]);
     });
 
     test('the search add puts an NM copy in beside another grade', () => {
@@ -1377,7 +1379,7 @@ describe('sending', () => {
         ids['backpack-send-retail'].click();
         expect(submitted.length).toBe(1);
         const form = submitted[0];
-        expect(form.getAttribute('action')).toBe('/upload');
+        expect(form.getAttribute('action')).toBe('/upload?from=backpack');
         const inputs = form.children.map((i) => [i.name, i.value]);
         expect(inputs).toEqual([['mode', 'false'], ['hashes', 'uuid-2'], ['hashesQtys', '1'], ['hashesCond', 'NM'], ['hashes', 'uuid-1'], ['hashesQtys', '2'], ['hashesCond', 'NM']]);
         expect(p.stored().filter((e) => !e.del).length).toBe(2);

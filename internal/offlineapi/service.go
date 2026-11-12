@@ -85,6 +85,9 @@ type Deps struct {
 
 	RetailBlockList  func() []string
 	BuylistBlockList func() []string
+
+	// Observe counts an endpoint fetched; nil counts nothing.
+	Observe func(r *http.Request, scope, name, value string)
 }
 
 // Service exposes the offline API endpoints and background refresh logic.
@@ -104,6 +107,9 @@ type Service struct {
 
 // NewService constructs a Service wired to the given Deps.
 func NewService(deps Deps) *Service {
+	if deps.Observe == nil {
+		deps.Observe = func(*http.Request, string, string, string) {}
+	}
 	s := &Service{deps: deps}
 	s.manifestStore = &bucketstore.Store[manifestFile]{Bucket: deps.ManifestBucket}
 	s.imagesStore = &bucketstore.Store[ImagesManifest]{Bucket: deps.ImagesManifestBucket}
@@ -134,12 +140,16 @@ func (s *Service) Handle(w http.ResponseWriter, r *http.Request) {
 	endpoint := strings.TrimPrefix(r.URL.Path, "/api/offline/")
 	switch {
 	case endpoint == "manifest.json":
+		s.deps.Observe(r, "", "offlineapi.fetch", "manifest")
 		s.serveManifest(w, r)
 	case endpoint == "catalog.json":
+		s.deps.Observe(r, "", "offlineapi.fetch", "catalog")
 		s.serveCatalog(w, r)
 	case strings.HasPrefix(endpoint, "prices/"):
+		s.deps.Observe(r, "", "offlineapi.fetch", "prices")
 		s.servePrices(w, r, email, strings.TrimPrefix(endpoint, "prices/"))
 	case endpoint == "bucket-auth":
+		s.deps.Observe(r, "", "offlineapi.fetch", "bucket_auth")
 		s.serveBucketAuth(w, r)
 	default:
 		http.NotFound(w, r)
