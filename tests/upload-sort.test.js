@@ -59,9 +59,9 @@ function table(headers, rows, above = [], kind = 'ures-table') {
     return t;
 }
 
-function load(document = { addEventListener: () => {} }, localStorage = storage()) {
-    return new Function('document', 'localStorage', source +
-        '\nreturn {uresSortBy, uresParseChain, uresMenuAct, uresRenderMenu, uresRefresh, opened: (btn) => { uresMenuButton = btn; }, chains: () => uresChains};')(document, localStorage);
+function load(document = { addEventListener: () => {} }, localStorage = storage(), window = {}) {
+    return new Function('document', 'localStorage', 'window', source +
+        '\nreturn {uresSortBy, uresParseChain, uresMenuAct, uresRenderMenu, uresRefresh, opened: (btn) => { uresMenuButton = btn; }, chains: () => uresChains};')(document, localStorage, window);
 }
 
 // A localStorage that counts its writes

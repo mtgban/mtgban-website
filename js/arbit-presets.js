@@ -246,6 +246,13 @@
         return pins.get(cfg.source) ? link.slice(0, at) + '?source=' + encodeURIComponent(source) : link;
     }
 
+    // pinnedStore is whether storeURL(link) lands on the store's pinned preset.
+    function pinnedStore(link) {
+        var at = link.indexOf('?');
+        var source = at < 0 ? '' : new URLSearchParams(link.slice(at + 1)).get('source');
+        return !!source && !!pins.get(source);
+    }
+
     // openPinned sends a store reached without filters of its own, as from
     // the navbar, to its pinned preset, and says whether it did.
     function openPinned() {
@@ -255,6 +262,7 @@
         if (!p || normalize(p.q) === normalize(cfg.query)) return false;
         var url = sameSiteURL(presetURL(p));
         if (!url) return false;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.arbit.pin_auto');
         window.location.replace(url);
         return true;
     }
@@ -387,12 +395,14 @@
             store.list().forEach(function (p) { if (p.id === select.value) hit = p; });
             if (!hit) { setSelected(null); render(); return; }
             setSelected(hit === DEFAULT ? null : hit.id);
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.arbit.preset', 'apply');
             apply(hit);
         });
 
         if (pinBtn) pinBtn.addEventListener('click', function () {
             if (pinBtn.getAttribute('aria-disabled') === 'true' || !pinnable) return;
             if (!pins.set(cfg.source, pinnable.id)) say('Could not pin: browser storage is unavailable');
+            else if (window.BAN && window.BAN.track) window.BAN.track('ui.arbit.preset', 'pin');
             render();
         });
 
@@ -449,6 +459,7 @@
                 say(r.reason === 'cap' ? 'You can keep ' + CAP + ' presets; delete one first' : 'Could not save: browser storage is unavailable');
                 return;
             }
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.arbit.preset', d.action === 'update' ? 'save' : 'save_as');
             setSelected(r.preset.id);
             closeSaveRow();
             say((d.action === 'update' ? 'Updated ' : 'Saved ') + r.preset.name);
@@ -481,6 +492,7 @@
             var r = store.rename(sel.id, name);
             if (r === 'missing') { gone(); return; }
             if (!r) { say('Could not rename: browser storage is unavailable'); return; }
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.arbit.preset', 'rename');
             render();
         });
 
@@ -492,6 +504,7 @@
             var r = store.remove(sel.id);
             if (r === 'missing') { gone(); return; }
             if (!r) { say('Could not delete: browser storage is unavailable'); return; }
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.arbit.preset', 'delete');
             setSelected(null);
             render();
         });
@@ -513,7 +526,7 @@
 
     window.ArbitPresets = {
         store: store, pins: pins, normalize: normalize, findMatch: findMatch, decideSave: decideSave, formState: formState,
-        presetURL: presetURL, storeURL: storeURL, apply: apply, mount: mount, refresh: refresh,
+        presetURL: presetURL, storeURL: storeURL, pinnedStore: pinnedStore, apply: apply, mount: mount, refresh: refresh,
     };
     if (!openPinned()) mount(document);
 })();

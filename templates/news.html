@@ -47,14 +47,14 @@
         {{if .CanSwitchDay}}
             <p style="font-size:var(--text-md); color:var(--activetext); margin:0 0 16px;">
                 As <b>Admin</b> you can check on the
-                <a href="newspaper?force3day={{.IsOneDay}}">{{if .IsOneDay}}3-day{{else}}early edition{{end}} newspaper</a>.
+                <a href="newspaper?force3day={{.IsOneDay}}" data-track="ui.news.three_day" {{if .IsOneDay}}data-track-value="on"{{else}}data-track-value="off"{{end}}>{{if .IsOneDay}}3-day{{else}}early edition{{end}} newspaper</a>.
             </p>
         {{end}}
 
         <div class="news-toc-grid">
             {{range $i, $page := .ToC}}
                 {{if ne $page.Option "options"}}
-                <a class="card news-toc-card" href="newspaper?page={{$page.Option}}">
+                <a class="card news-toc-card" href="newspaper?page={{$page.Option}}" data-track="ui.news.report" data-track-value="{{$page.Option}}" data-track-scope="card">
                     <span class="news-toc-icon">{{if $page.Icon}}{{$page.Icon}}{{else}}{{inc $i 1}}{{end}}</span>
                     <div class="toc-text">
                         <h3>{{$page.Title}}</h3>
@@ -76,7 +76,7 @@
     <div class="news-page-nav">
         {{range .ToC}}
             {{if ne .Option "options"}}
-                <a href="newspaper?page={{.Option}}" {{if eq .Option $.Page}}class="active"{{end}}>{{if .Short}}{{.Short}}{{else}}{{.Title}}{{end}}</a>
+                <a href="newspaper?page={{.Option}}" {{if eq .Option $.Page}}class="active"{{end}} data-track="ui.news.report" data-track-value="{{.Option}}" data-track-scope="tab">{{if .Short}}{{.Short}}{{else}}{{.Title}}{{end}}</a>
             {{end}}
         {{end}}
         <span class="nav-spacer"></span>
@@ -175,8 +175,8 @@
                                         {{if eq $i $.OffsetCards}}Card{{else}}{{$head.Title}}{{end}}
                                         {{if or $head.CanSort (and (not (eq $.FilterSet "")) $head.ConditionalSort)}}
                                             <span class="sort-links">
-                                                <a href="newspaper?page={{$.Page}}&sort={{$head.Field}}&dir=desc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&#9660;</a>
-                                                <a href="newspaper?page={{$.Page}}&sort={{$head.Field}}&dir=asc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&#9650;</a>
+                                                <a href="newspaper?page={{$.Page}}&sort={{$head.Field}}&dir=desc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}" data-track="ui.news.sort" data-track-value="{{$head.Field}}" data-track-scope="desc">&#9660;</a>
+                                                <a href="newspaper?page={{$.Page}}&sort={{$head.Field}}&dir=asc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}" data-track="ui.news.sort" data-track-value="{{$head.Field}}" data-track-scope="asc">&#9650;</a>
                                             </span>
                                         {{end}}
                                     </th>
@@ -197,7 +197,7 @@
                                         <div class="news-cc">
                                             {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 20 "Class" "set-icon"}}
                                             <div class="card-detail">
-                                                <span class="card-name"><a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$row.CardName}}</a> {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}</span>
+                                                <span class="card-name"><a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" data-track="ui.news.card">{{$row.CardName}}</a> {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}</span>
                                                 <span class="set-sub">{{$row.Edition}} &bull; #{{$row.Number}}</span>
                                             </div>
                                         </div>
@@ -230,24 +230,24 @@
 
             <div class="pagination framed">
                 {{if ne .CurrentIndex 1}}
-                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index=&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&lt;&lt;</a>
-                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&lt;</a>
+                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index=&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}" data-track="ui.news.pager" data-track-value="first">&lt;&lt;</a>
+                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}" data-track="ui.news.pager" data-track-value="prev">&lt;</a>
                 {{end}}
                 <span class="cur">{{.CurrentIndex}}</span>
                 <span class="pg-info">/ {{.TotalIndex}}</span>
                 {{if ne .CurrentIndex .TotalIndex}}
-                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&gt;</a>
-                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.TotalIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&gt;&gt;</a>
+                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}" data-track="ui.news.pager" data-track-value="next">&gt;</a>
+                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.TotalIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}" data-track="ui.news.pager" data-track-value="last">&gt;&gt;</a>
                 {{end}}
             </div>
 
             <div class="news-upload-row">
-                <form action="/upload" method="post">
+                <form action="/upload?from=news" method="post">
                     <input type="hidden" name="mode" value="false"/>
                     {{range .CardHashes}}
                         <input type="hidden" name="hashes" value="{{.}}"/>
                     {{end}}
-                    <button type="submit" class="news-upload-btn">Load this page in the Uploader</button>
+                    <button type="submit" class="news-upload-btn" data-track="ui.news.upload_page">Load this page in the Uploader</button>
                 </form>
             </div>
         </div>

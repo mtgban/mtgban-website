@@ -8,6 +8,8 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 
 	"github.com/mtgban/mtgban-website/internal/jobs"
+	"github.com/mtgban/mtgban-website/observability"
+	"github.com/mtgban/mtgban-website/userstate"
 )
 
 // setTestJobs swaps in an empty job tracker and a site started an hour ago,
@@ -149,5 +151,41 @@ func TestCheckJobHealthAnnouncesTransitions(t *testing.T) {
 	checkJobHealth()
 	if len(notices) != 2 {
 		t.Errorf("just started: got %q, want nothing new", notices[2:])
+	}
+}
+
+// The metrics jobs are scheduled only where the config flags the instance.
+func TestMetricsJobsAreScheduledOnTheFlaggedInstance(t *testing.T) {
+	withConfigCopy(t)
+	savedObs, savedState := ObservabilityDB, UserStateDB
+	t.Cleanup(func() { ObservabilityDB, UserStateDB = savedObs, savedState })
+	withFeatureCounter(t)
+	counter := FeatureCounter
+	ObservabilityDB = &observability.Client{}
+
+	for _, tc := range []struct {
+		name            string
+		flag, counter   bool
+		state           *userstate.Client
+		fold, stock, up bool
+	}{
+		{"flagged, with userstate", true, true, &userstate.Client{}, true, true, true},
+		{"flagged, no userstate", true, true, nil, true, false, true},
+		{"flagged, no feature counter", true, false, &userstate.Client{}, false, false, false},
+		{"not flagged", false, true, &userstate.Client{}, false, false, false},
+	} {
+		setTestJobs(t)
+		Config().MetricsJobs, UserStateDB, FeatureCounter = tc.flag, tc.state, nil
+		if tc.counter {
+			FeatureCounter = counter
+		}
+		testSite.scheduleCrons()
+		scheduled := map[string]bool{}
+		for _, row := range backgroundJobs.Rows() {
+			scheduled[row.Name] = true
+		}
+		if scheduled[jobMetricsFold] != tc.fold || scheduled[jobMetricsStock] != tc.stock || scheduled[jobEventsRollUp] != tc.up {
+			t.Errorf("%s: fold %v, stock %v, roll-up %v", tc.name, scheduled[jobMetricsFold], scheduled[jobMetricsStock], scheduled[jobEventsRollUp])
+		}
 	}
 }

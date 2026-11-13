@@ -48,6 +48,7 @@ func PatreonWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	if !patreon.WebhookSigned(secret, body, r.Header.Get("X-Patreon-Signature")) {
 		LogPages["Admin"].Println("webhook: signature missing or wrong")
+		observeJob("job", "", "patreon.webhook", "bad_signature")
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
@@ -58,6 +59,7 @@ func PatreonWebhook(w http.ResponseWriter, r *http.Request) {
 	email := patreon.WebhookEmail(body)
 	if email == "" {
 		LogPages["Admin"].Printf("webhook: event=%q carries no email", event)
+		observeJob("job", "", "patreon.webhook", "no_email")
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -68,5 +70,25 @@ func PatreonWebhook(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	notifyPoke(ctx, hash)
 	LogPages["Admin"].Printf("webhook: event=%q email=%q", event, email)
+	observeJob("job", "", "patreon.webhook", patreonEventClass(event))
 	w.WriteHeader(http.StatusOK)
+}
+
+// patreonEventClass names a delivery's X-Patreon-Event header, other for any it does not know.
+func patreonEventClass(event string) string {
+	switch event {
+	case "members:pledge:create":
+		return "pledge_create"
+	case "members:pledge:update":
+		return "pledge_update"
+	case "members:pledge:delete":
+		return "pledge_delete"
+	case "members:create":
+		return "member_create"
+	case "members:update":
+		return "member_update"
+	case "members:delete":
+		return "member_delete"
+	}
+	return "other"
 }

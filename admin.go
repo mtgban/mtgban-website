@@ -85,6 +85,9 @@ type AdminVars struct {
 	UsageStats  *UsageDashboard
 	SearchStats *SearchesDashboard
 	AlertStats  *AlertsAdminDashboard
+	Metrics     *MetricsView
+	// MetricsOff says why the Metrics section has no store, when it has none.
+	MetricsOff string
 
 	CheckpointsText    string
 	ACLText            string
@@ -244,6 +247,26 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	if page == "alerts" {
 		if store := s.alerts.Store(); store != nil {
 			pageVars.AlertStats = loadAlertsDashboard(r.Context(), store, string(Config().Game))
+		}
+	}
+	// The Metrics section reads the feature tables the same way.
+	if page == "metrics" {
+		if store := metricsStoreFn(); store == nil {
+			pageVars.MetricsOff = metricsOffText(Config().InstanceName)
+		} else {
+			ctx, cancel := metricsContext(r)
+			defer cancel()
+			cache := metricsCache(store)
+			params := readMetricsParams(r.FormValue, metricsInstances(ctx, store, cache, now))
+			lists := metricsListsFor(s, p, params.Instance)
+			warned := pageVars.WarningMessage
+			if adminMetricsReview(ctx, w, r, store, lists, params, &pageVars) {
+				return
+			}
+			pageVars.Metrics = loadMetricsView(ctx, store, cache, lists, params, now)
+			if pageVars.WarningMessage != warned {
+				pageVars.Metrics.Message = pageVars.WarningMessage
+			}
 		}
 	}
 
@@ -437,6 +460,11 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, p *prices, pag
 		} else {
 			go tracked(jobStash, s.stashInTimeseries)()
 		}
+
+	case "metricsfold":
+		v = url.Values{}
+		v.Set("msg", foldMetricsNow())
+		redirect = true
 
 	case "tcgcsv":
 		v = url.Values{}
@@ -1098,6 +1126,8 @@ type UsageDashboard struct {
 	ByTier      []observability.TierAgg
 	ByDevice    []observability.DeviceAgg
 	SubViews    []observability.PathAgg
+	Dropped     int64
+	Failed      int64
 }
 
 type usageCacheEntry struct {
@@ -1121,7 +1151,7 @@ func loadUsageDashboard(ctx context.Context, includeBots bool) *UsageDashboard {
 
 	entry, found := usageCache.byBots[includeBots]
 	if found && time.Since(entry.fetched) < usageCacheTTL {
-		return entry.dash
+		return withRecorderLoss(entry.dash)
 	}
 
 	since := time.Now().AddDate(0, 0, -30)
@@ -1152,7 +1182,15 @@ func loadUsageDashboard(ctx context.Context, includeBots bool) *UsageDashboard {
 		usageCache.byBots[includeBots] = usageCacheEntry{dash: dash, fetched: time.Now()}
 	}
 
-	return dash
+	return withRecorderLoss(dash)
+}
+
+// withRecorderLoss copies a dashboard with this process's live, uncached loss counts.
+func withRecorderLoss(d *UsageDashboard) *UsageDashboard {
+	c := *d
+	c.Dropped = ObservabilityRecorder.Dropped()
+	c.Failed = ObservabilityRecorder.Failed()
+	return &c
 }
 
 // subViewPrefixes are the paths the Usage tab breaks out in their own table.

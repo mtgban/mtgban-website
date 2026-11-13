@@ -28,6 +28,7 @@ function toggleRemoveRow(btn) {
     } else {
         row.classList.add('ures-removed-row');
         removedRows[rowId] = true;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.result', 'remove_row');
     }
     updateReloadBar();
 }
@@ -85,6 +86,7 @@ function openPrintingPicker(btn) {
         card.appendChild(setDiv);
         card.addEventListener("click", function() {
             updateRowHash(activePicker, uuid);
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.result', 'printing_swap');
             // Update thumbnail and set info in the row
             var row = activePicker.closest('tr');
             var img = row.querySelector('.ures-card-cell img');

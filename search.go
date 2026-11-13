@@ -219,10 +219,15 @@ var AllConditions = []mtgban.Condition{"INDEX", mtgban.NM, mtgban.SP, mtgban.MP,
 // that yields nothing at all is a bar the search will ignore, which is
 // the one thing the reader has to be told.
 func scopeFilters(ds *datastore, p *prices, scope string, sealed, bareIDs bool) []FilterElem {
+	return scopeConfig(ds, p, scope, sealed, bareIDs).CardFilters
+}
+
+// scopeConfig is the pinned bar's whole parse, the zero config for an empty bar.
+func scopeConfig(ds *datastore, p *prices, scope string, sealed, bareIDs bool) SearchConfig {
 	if scope == "" {
-		return nil
+		return SearchConfig{}
 	}
-	return parseSearchPage(ds, p, scope, sealed, bareIDs, nil, nil, nil).CardFilters
+	return parseSearchPage(ds, p, scope, sealed, bareIDs, nil, nil, nil)
 }
 
 // parseSearchPage parses what a reader typed into a search's bars. A sealed
@@ -676,7 +681,8 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// starts with nothing pinned.
 	pageVars.IsSealed = r.URL.Path == "/sealed"
 	scope := strings.TrimSpace(r.FormValue("scope"))
-	pinned := scopeFilters(ds, p, scope, pageVars.IsSealed, false)
+	pinnedConfig := scopeConfig(ds, p, scope, pageVars.IsSealed, false)
+	pinned := pinnedConfig.CardFilters
 	pageVars.SearchScope = scope
 	pageVars.CanScope = true
 	// Something is pinned, and none of it is a filter: the search will pass
@@ -741,6 +747,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 			pageVars.SortOption = sortOpt
 		}
 		tmpl := fillSearchLanding(&pageVars.SearchVars, ds, isSetsPage, sortOpt)
+		if isPageView(r) {
+			observeFacts(r, nil, searchLandingFacts(searchPageName(r.URL.Path), sortOpt, searchChartKind(roster)))
+		}
 		render(w, tmpl, pageVars)
 		return
 	}
@@ -789,6 +798,12 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CleanSearchQuery = config.CleanQuery
 	pageVars.ShowAllQuery = quoteIfFilter(config.CleanQuery)
 	pageVars.SearchSort = readSearchSort(r, config)
+	// Only a search that will be counted reads what it ran with.
+	counting := FeatureCounter != nil && isPageView(r)
+	var run searchRun
+	if counting {
+		run = buildSearchRun(r, b, config, pinnedConfig.AppliedFilters, scope, pageVars.ScopeIgnored, pageVars.ListingLocked, roster, packs)
+	}
 	// A sort the reader may not use leaves the pills up, its own greyed out.
 	pageVars.NoSort = config.SortMode != "" && config.SortMode == pageVars.SearchSort
 
@@ -799,6 +814,16 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if len(result.keys) == 0 {
 		pageVars.PopularSearches = getPopularSearches(ds, p)
 		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(ds, p, query, config, pinned, packs, pageVars.IsSealed)
+		if counting {
+			// The mobile empty page draws no popular list.
+			observeSearch(r, run, searchOutcome{
+				DidYouMean: len(pageVars.DidYouMean) > 0,
+				TryOneOf:   len(pageVars.AltSearches) > 0,
+				Popular:    len(pageVars.PopularSearches) > 0 && !pageVars.IsMobile,
+				Unpin:      scope != "" && !pageVars.ScopeIgnored,
+				Took:       time.Since(start),
+			})
+		}
 		render(w, "search.html", pageVars)
 		return
 	}
@@ -842,6 +867,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		fillChartPage(&pageVars.SearchVars, pageVars.Metadata, r, ds, p, roster)
 	}
 
+	if counting {
+		observeSearch(r, run, searchOutcome{Unique: len(result.keys), Total: result.total, Took: time.Since(start)})
+	}
 	notifyFromSearch(r, query, roster, start)
 
 	if DevMode {
@@ -908,6 +936,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	switch r.FormValue("format") {
 	case "", "json":
 	default:
+		observe(r, "search.oembed", "unsupported")
 		oembedError(w, http.StatusNotImplemented)
 		return
 	}
@@ -917,6 +946,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	// that carries no search at all.
 	u, err := url.Parse(r.FormValue("url"))
 	if err != nil || !siteorigin.Trusted(u.Host) {
+		observe(r, "search.oembed", "not_found")
 		oembedError(w, http.StatusNotFound)
 		return
 	}
@@ -928,6 +958,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	nav, found := ExtraNavs["Search"].pageAt(u.Path)
 	_, open := ACL()["Any"]["Search"]
 	if !found || nav.hiddenOn(s) || !open {
+		observe(r, "search.oembed", "not_found")
 		oembedError(w, http.StatusNotFound)
 		return
 	}
@@ -941,6 +972,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 
 	query := strings.TrimSpace(page.FormValue("q"))
 	if query == "" || len(query) > MaxSearchQueryLen {
+		observe(r, "search.oembed", "not_found")
 		oembedError(w, http.StatusNotFound)
 		return
 	}
@@ -960,6 +992,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 
 	result := runSearch(page, ds, p, config)
 	if len(result.keys) == 0 {
+		observe(r, "search.oembed", "not_found")
 		oembedError(w, http.StatusNotFound)
 		return
 	}
@@ -974,6 +1007,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(payload)
+	observe(r, "search.oembed", "json")
 }
 
 // searchPreview is the preview of a search's first cards, with their
@@ -1037,16 +1071,27 @@ func fillSearchPrefs(pageVars *SearchVars, r *http.Request) {
 // counts only for a reader a handler has unlocked it for; otherwise it is as if
 // not asked, so the next one still applies.
 func readSearchSort(r *http.Request, config SearchConfig) string {
-	for _, asked := range [...]string{config.SortMode, r.FormValue("sort"), readCookie(r, "SearchDefaultSort")} {
+	sort, _ := searchSortFrom(r, config)
+	return sort
+}
+
+// searchSortFrom is readSearchSort's order and where it came from: operator,
+// param, cookie, or default when none applies.
+func searchSortFrom(r *http.Request, config SearchConfig) (sort, from string) {
+	for _, asked := range [...]struct{ sort, from string }{
+		{config.SortMode, "operator"},
+		{r.FormValue("sort"), "param"},
+		{readCookie(r, "SearchDefaultSort"), "cookie"},
+	} {
 		// The order alone would say which cards sell fastest.
-		if asked == "velocity" && !config.VelocitySort {
+		if asked.sort == "velocity" && !config.VelocitySort {
 			continue
 		}
-		if asked != "" {
-			return asked
+		if asked.sort != "" {
+			return asked.sort, asked.from
 		}
 	}
-	return ""
+	return "", "default"
 }
 
 // fillChartRoster reads the chart= roster: it puts the roster on the page for
@@ -1808,12 +1853,17 @@ func refererSource(referer string) string {
 		log.Println(err)
 		return "n/a"
 	}
-	// Trusted reads a forwarded header's first entry, so a comma is not ours.
-	if !strings.Contains(u.Host, ",") && siteorigin.Trusted(u.Host) {
+	if ownSiteHost(u.Host) {
 		return u.Path
 	}
 	// Avoid automatic URL expansion in Discord
 	return fmt.Sprintf("<%s>", u.String())
+}
+
+// ownSiteHost reports whether a link's host is one of the site's own.
+func ownSiteHost(host string) bool {
+	// Trusted reads a forwarded header's first entry, so a comma is not ours.
+	return !strings.Contains(host, ",") && siteorigin.Trusted(host)
 }
 
 // fillChartPage fills a chart page for the roster: the display query, the

@@ -7,12 +7,14 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/observability"
 )
 
 // Card Trader's properties for the stubbed rows below, base64url as its ids
@@ -326,6 +328,14 @@ func TestCartLoadButtons(t *testing.T) {
 		if !strings.Contains(out, `checked autocomplete="off" class="opt-row-check"`) {
 			t.Errorf("%s: the browser can restore a row's box", tc.key)
 		}
+		if tc.key == "MMC" {
+			if !strings.Contains(out, `data-store="MTG Mint Card" data-cart="MMC"`) {
+				t.Errorf("%s: the button does not carry its prefix", tc.key)
+			}
+			if !strings.Contains(out, `data-track="ui.cart" data-track-value="help" data-track-scope="MMC"`) {
+				t.Errorf("%s: the ? beside it is not counted by its prefix", tc.key)
+			}
+		}
 	}
 
 	// CSI is bought from two ways, its deck builder and its cart: one button
@@ -335,7 +345,7 @@ func TestCartLoadButtons(t *testing.T) {
 		OptimizedKeys:   []string{"CSI"},
 		OptimizedTotals: map[string]float64{"CSI": 1},
 	}})
-	if strings.Count(csi, ">Load at CSI<") != 1 || !strings.Contains(csi, `data-store="CSI" data-buylist="false"`) {
+	if strings.Count(csi, ">Load at CSI<") != 1 || !strings.Contains(csi, `data-store="CSI" data-cart="CSI" data-buylist="false"`) {
 		t.Errorf("want one Load at CSI, the cart's, got %d", strings.Count(csi, ">Load at CSI<"))
 	}
 	if !strings.Contains(csi, ">Deck builder at CSI<") || !strings.Contains(csi, `value="Deck builder at CSI"`) {
@@ -399,6 +409,13 @@ func TestCartSendMenu(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
+	var prefixes []string
+	for _, send := range sends {
+		prefixes = append(prefixes, send.Prefix)
+	}
+	if !slices.Equal(prefixes, []string{"ABU", "CSI", "SCG"}) {
+		t.Errorf("prefixes = %q", prefixes)
+	}
 
 	for _, tc := range []struct {
 		buylist bool
@@ -427,7 +444,7 @@ func TestCartSendMenu(t *testing.T) {
 		if tc.menu == 0 {
 			continue
 		}
-		link := `<a href="https://abugames.com/cartview/buylist#ban=101:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="ABU" data-buylist="true" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">ABU<span>$ 3.00</span></a>`
+		link := `<a href="https://abugames.com/cartview/buylist#ban=101:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="ABU" data-cart="ABU" data-buylist="true" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">ABU<span>$ 3.00</span></a>`
 		if !strings.Contains(out, link) {
 			t.Errorf("no %s", link)
 		}
@@ -449,8 +466,8 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		InventoryEntry: mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1},
 		Quantity:       2,
 	}}
-	buy := `href="https://abugames.com/cartview/shop#ban=301:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="ABU" data-buylist="false"`
-	sell := `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="CSI" data-buylist="true"`
+	buy := `href="https://abugames.com/cartview/shop#ban=301:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="ABU" data-cart="ABU" data-buylist="false"`
+	sell := `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="CSI" data-cart="CSI" data-buylist="true"`
 
 	for _, tc := range []struct {
 		name    string
@@ -479,6 +496,11 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		if !strings.Contains(page, `checked autocomplete="off" class="arb-row-check"`) {
 			t.Errorf("%s: the browser can restore a row's box", tc.name)
 		}
+		for _, prefix := range []string{"ABU", "CSI"} {
+			if !strings.Contains(page, `data-track="ui.cart" data-track-value="help" data-track-scope="`+prefix+`"`) {
+				t.Errorf("%s: the ? beside the %s cart is not counted by its prefix", tc.name, prefix)
+			}
+		}
 	}
 
 	// Buying comes first, then selling, CK's own buylist import included
@@ -499,7 +521,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		UserNav:      &NavElem{Short: "beta"},
 		Arb:          []Arbitrage{{Name: "Store", Key: "CK", Arbit: rows}},
 	})
-	if strings.Count(csi, ">Load at CSI<") != 1 || !strings.Contains(csi, `data-store="CSI" data-buylist="false"`) {
+	if strings.Count(csi, ">Load at CSI<") != 1 || !strings.Contains(csi, `data-store="CSI" data-cart="CSI" data-buylist="false"`) {
 		t.Errorf("want one Load at CSI, the cart's, got %d", strings.Count(csi, ">Load at CSI<"))
 	}
 	if !strings.Contains(csi, `class="arb-load-btn builder"`) || !strings.Contains(csi, ">Deck builder at CSI<") {
@@ -532,11 +554,11 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		UserNav:      &NavElem{Short: "beta"},
 		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: mintRows}},
 	})
-	mintBuy := `href="https://www.mtgmintcard.com/shopping-cart#ban=283193:999,663174:20&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="MTG Mint Card" data-buylist="false" data-load-list="cart" data-load-items="283193,663174" data-load-qtys="999,20"`
+	mintBuy := `href="https://www.mtgmintcard.com/shopping-cart#ban=283193:999,663174:20&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="MTG Mint Card" data-cart="MMC" data-buylist="false" data-load-list="cart" data-load-items="283193,663174" data-load-qtys="999,20"`
 	if !strings.Contains(mint, mintBuy) {
 		t.Errorf("buying at Mint: no store cart button with %s", mintBuy)
 	}
-	mintSell := `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:10&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="CSI" data-buylist="true" data-load-list="cart" data-load-items="601,601" onclick`
+	mintSell := `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:10&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="CSI" data-cart="CSI" data-buylist="true" data-load-list="cart" data-load-items="601,601" onclick`
 	if !strings.Contains(mint, mintSell) {
 		t.Errorf("buying at Mint: no buylist cart button with %s", mintSell)
 	}
@@ -548,7 +570,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		UserNav:      &NavElem{Short: "beta"},
 		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: mintRows}},
 	})
-	mpBuy := `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:2,088072ea-66c7-4ef2-86a2-fd90055698a8:8&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Mana Pool" data-buylist="false" data-load-list="cart" data-load-items="001229ab-da01-4346-91f9-23c145cd23c5,088072ea-66c7-4ef2-86a2-fd90055698a8" onclick`
+	mpBuy := `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:2,088072ea-66c7-4ef2-86a2-fd90055698a8:8&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Mana Pool" data-cart="MP" data-buylist="false" data-load-list="cart" data-load-items="001229ab-da01-4346-91f9-23c145cd23c5,088072ea-66c7-4ef2-86a2-fd90055698a8" onclick`
 	if !strings.Contains(mp, mpBuy) {
 		t.Errorf("buying at Mana Pool: no store cart button with %s", mpBuy)
 	}
@@ -578,7 +600,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		UserNav:      &NavElem{Short: "beta"},
 		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: mintRows}},
 	})
-	ctBuy := `href="https://www.cardtrader.com/cart/edit#ban=16310-NM-1450EUR-z-` + ctEnglish + `:999&amp;v=` + cartVersion() + `&amp;side=retail&amp;skip=1" target="_blank" rel="noopener" data-store="Card Trader" data-buylist="false" data-load-list="cart" data-load-items="16310-NM-1450EUR-z-` + ctEnglish + `," data-load-qtys="999,20"`
+	ctBuy := `href="https://www.cardtrader.com/cart/edit#ban=16310-NM-1450EUR-z-` + ctEnglish + `:999&amp;v=` + cartVersion() + `&amp;side=retail&amp;skip=1" target="_blank" rel="noopener" data-store="Card Trader" data-cart="CT" data-buylist="false" data-load-list="cart" data-load-items="16310-NM-1450EUR-z-` + ctEnglish + `," data-load-qtys="999,20"`
 	if !strings.Contains(ct, ctBuy) {
 		t.Errorf("buying at Card Trader Zero: no store cart button with %s", ctBuy)
 	}
@@ -592,7 +614,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		UserNav:      &NavElem{Short: "beta"},
 		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: mintRows}},
 	})
-	directBuy := `href="https://www.tcgplayer.com/cart#ban=590519-8313277-40-d:999&amp;v=` + cartVersion() + `&amp;side=retail&amp;skip=1" target="_blank" rel="noopener" data-store="TCGplayer" data-buylist="false" data-load-list="cart" data-load-items="590519-8313277-40-d," data-load-qtys="999,20"`
+	directBuy := `href="https://www.tcgplayer.com/cart#ban=590519-8313277-40-d:999&amp;v=` + cartVersion() + `&amp;side=retail&amp;skip=1" target="_blank" rel="noopener" data-store="TCGplayer" data-cart="TCG" data-buylist="false" data-load-list="cart" data-load-items="590519-8313277-40-d," data-load-qtys="999,20"`
 	if !strings.Contains(direct, directBuy) {
 		t.Errorf("buying at TCGplayer Direct: no store cart button with %s", directBuy)
 	}
@@ -601,7 +623,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		UserNav:      &NavElem{Short: "beta"},
 		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: mintRows}},
 	})
-	tcgBuy := `href="https://www.tcgplayer.com/cart#ban=1828-15955-25-m:2,1828-15956-20-m:8&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="TCGplayer" data-buylist="false" data-load-list="cart" data-load-items="1828-15955-25-m,1828-15956-20-m" onclick`
+	tcgBuy := `href="https://www.tcgplayer.com/cart#ban=1828-15955-25-m:2,1828-15956-20-m:8&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="TCGplayer" data-cart="TCG" data-buylist="false" data-load-list="cart" data-load-items="1828-15955-25-m,1828-15956-20-m" onclick`
 	if !strings.Contains(tcg, tcgBuy) {
 		t.Errorf("buying at TCGplayer: no store cart button with %s", tcgBuy)
 	}
@@ -689,7 +711,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		InventoryEntry: mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100},
 		Quantity:       2,
 	}}
-	haCart := `href="https://www.hareruyamtg.com/en/cart#ban=88002:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Hareruya" data-buylist="false"`
+	haCart := `href="https://www.hareruyamtg.com/en/cart#ban=88002:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Hareruya" data-cart="HA" data-buylist="false"`
 	for _, tc := range []struct {
 		short string
 		key   string
@@ -884,5 +906,44 @@ func TestCartLoadersCarryCardKingdomIDs(t *testing.T) {
 		if !strings.Contains(page, `"id": ck-777,`) {
 			t.Errorf("%s: the partner_import form carries no ck-777 id", name)
 		}
+	}
+}
+
+// Every cart store's prefix is a scope ui.cart accepts, and a load carries it.
+func TestCartLoadsCarryTheirPrefix(t *testing.T) {
+	stubCartStores(t)
+	n, _ := observability.Lookup("ui.cart")
+	for _, cs := range cartStores {
+		if !slices.Contains(n.Scopes, cs.prefix) {
+			t.Errorf("cart store %s is not a ui.cart scope", cs.prefix)
+		}
+	}
+	if len(n.Scopes) != len(cartStores) {
+		t.Errorf("ui.cart has %d scopes for %d cart stores", len(n.Scopes), len(cartStores))
+	}
+	load := cartLoadFor(currentPrices(), "ABUGames", true, []OptimizedUploadEntry{{CardID: "card-a", Quantity: 2}})
+	if load.Prefix != "ABU" || load.Store != "ABU" {
+		t.Errorf("load = %+v", load)
+	}
+	mint := cartLoadFor(currentPrices(), "MMC", true, []OptimizedUploadEntry{{CardID: "card-a", Quantity: 2}})
+	if mint.Prefix != "MMC" || mint.Store != "MTG Mint Card" {
+		t.Errorf("load = %+v", mint)
+	}
+
+	// The script counts a data-cart only when it is one of these, in this order.
+	src, err := os.ReadFile("js/cart-prompt.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := regexp.MustCompile(`var CART_PREFIXES = \[([^\]]*)\]`).FindSubmatch(src)
+	if line == nil {
+		t.Fatal("js/cart-prompt.js has no CART_PREFIXES")
+	}
+	var script []string
+	for _, m := range regexp.MustCompile(`"([^"]*)"`).FindAllSubmatch(line[1], -1) {
+		script = append(script, string(m[1]))
+	}
+	if !slices.Equal(script, n.Scopes) {
+		t.Errorf("CART_PREFIXES = %q, ui.cart's scopes %q", script, n.Scopes)
 	}
 }

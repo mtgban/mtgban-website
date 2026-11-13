@@ -241,6 +241,23 @@ const (
 	renewalSessionGone
 )
 
+// renewalValue names o for the auth.renew count.
+func renewalValue(o renewalOutcome) string {
+	switch o {
+	case renewalRenewed:
+		return "renewed"
+	case renewalEnded:
+		return "ended"
+	case renewalRefused:
+		return "refused"
+	case renewalGone:
+		return "gone"
+	case renewalSessionGone:
+		return "session_gone"
+	}
+	return "not_renewed"
+}
+
 // remintSignature re-signs a reader's signature, as values describe it,
 // under the access table now: the name and email it carries, the tier the
 // reader's grant names now or else the one it carries, the overrides the
@@ -546,11 +563,14 @@ func (s *site) renewSignature(w http.ResponseWriter, r *http.Request, values url
 
 	token, leased, gone := rn.lease(base, w, r)
 	if gone {
+		observe(r, "auth.renew", "session_gone")
 		return "", renewalSessionGone
 	}
 	if !leased {
 		return "", renewalNotRenewed
 	}
+	// One row per call to Patreon, read from the outcome returned
+	defer func() { observe(r, "auth.renew", renewalValue(outcome)) }()
 
 	refreshCtx, cancelRefresh := context.WithTimeout(base, renewalRefreshTimeout)
 	defer cancelRefresh()

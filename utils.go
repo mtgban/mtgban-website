@@ -1145,7 +1145,7 @@ func productsHTML(b *matcher.Backend, sourceSealed []string, odds *productOdds, 
 		if text != "" {
 			label = ` <span class="product-odds" title="` + title + `">` + text + `</span>`
 		}
-		products += "<a href=/sealed?q=" + sealed + ">" + sealedCo.Name + label + "</a>"
+		products += "<a href=/sealed?q=" + sealed + ` data-track="ui.sidebar.products" data-track-value="click">` + sealedCo.Name + label + "</a>"
 		numProducts++
 	}
 	products += "</h4>"
@@ -1245,7 +1245,7 @@ func genCardPrintings(b *matcher.Backend, co *matcher.CardObject) string {
 		if err != nil {
 			continue
 		}
-		fmt.Fprintf(&sb, `<a class="printing-symbol" title="%s" href="/search?q=%s">`, html.EscapeString(set.Name), url.QueryEscape(quoteIfFilter(co.Name)+" s:"+setCode))
+		fmt.Fprintf(&sb, `<a class="printing-symbol" title="%s" href="/search?q=%s" data-track="ui.sidebar.printing" data-track-value="row">`, html.EscapeString(set.Name), url.QueryEscape(quoteIfFilter(co.Name)+" s:"+setCode))
 
 		// Trimmed, since the strip is inline text and the partial's own
 		// whitespace would space out glyphs that sit flush.

@@ -200,6 +200,7 @@
             }
             if (!searching) {
                 searching = true;
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.settings.search', 'used');
                 saved = entries.map(function (e) { return e.el.classList.contains('expanded'); });
             }
             // A hidden tab's sections neither show nor count

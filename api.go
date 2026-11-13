@@ -88,7 +88,9 @@ func (s *site) TCGHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		dropDownloadHeaders(w)
 		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
 	}
+	observe(r, "export.decklist", "tcgplayer")
 }
 
 func UUID2CKCSV(p *prices, w *csv.Writer, ids, qtys []string) error {
@@ -144,7 +146,8 @@ func uuid2BuylistCSV(p *prices, w *csv.Writer, ids, qtys []string, vendor string
 
 		w.Flush()
 	}
-	return nil
+	w.Flush()
+	return w.Error()
 }
 
 func SCGRetailRedirect(ctx context.Context, b *matcher.Backend, p *prices, ids, qtys, conds []string) (string, error) {
@@ -355,7 +358,8 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 
 		w.Flush()
 	}
-	return nil
+	w.Flush()
+	return w.Error()
 }
 
 // MKMHandler serves a card's sealed product decklist as a Cardmarket CSV.
@@ -381,7 +385,9 @@ func (s *site) MKMHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		dropDownloadHeaders(w)
 		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
 	}
+	observe(r, "export.decklist", "cardmarket")
 }
 
 var mkmcsvHeader = []string{
@@ -485,7 +491,8 @@ func UUID2MKMCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 
 		w.Flush()
 	}
-	return nil
+	w.Flush()
+	return w.Error()
 }
 
 type OpenSearchDescriptionType struct {
@@ -519,6 +526,7 @@ type OpenSearchURL struct {
 // at the origin the request reached it by, so each game's host names its own
 // search; a request from a host that is not ours gets this game's public one.
 func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
+	observe(r, "opensearch.fetch", "")
 	gameName := matcher.Title(string(Config().Game))
 	base := externalURL(r)
 
@@ -762,7 +770,11 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	}
 
 	if isCSV {
-		writeSearchCSV(w, r, s, ds, p, config, sig, isRetail && canRetail, isBuylist && canBuylist, tagName)
+		err := writeSearchCSV(w, r, s, ds, p, config, sig, isRetail && canRetail, isBuylist && canBuylist, tagName)
+		if err == nil && !isAPI {
+			kind, scope := exportKind(isRetail, isBuylist, isSealed)
+			observeScoped(r, scope, "export.search", kind)
+		}
 		return
 	}
 
@@ -818,8 +830,8 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 // filters and order, with the offers the page shows, keyed by BAN UUID so
 // foil and nonfoil stay separate, up to MaxAPISearchResults cards, with
 // X-MTGBAN-Cut naming how many it left out when it left any. CSV is never
-// the demo mode.
-func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datastore, p *prices, config SearchConfig, sig string, retail, buylist bool, tagName string) {
+// the demo mode. It returns the write error after answering it.
+func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datastore, p *prices, config SearchConfig, sig string, retail, buylist bool, tagName string) error {
 	b := ds.backend
 	result := runSearch(r, ds, p, config)
 	sortSearchKeys(r, ds, p, result.keys, result.odds, config.Sales, readSearchSort(r, config))
@@ -848,6 +860,7 @@ func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datasto
 		pageVars.InfoMessage = "Unable to download CSV right now"
 		render(w, "home.html", pageVars)
 	}
+	return err
 }
 
 // exportCut is how many of the cards a search found its export leaves out

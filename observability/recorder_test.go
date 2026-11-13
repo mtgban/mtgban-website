@@ -2,6 +2,7 @@ package observability
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -97,4 +98,36 @@ func TestDoubleCloseNoPanic(t *testing.T) {
 	if err := r.Close(); err != nil {
 		t.Fatalf("second Close: %v", err)
 	}
+}
+
+type failingStore struct{}
+
+func (failingStore) InsertBatch(context.Context, []Event) error { return errors.New("down") }
+
+func TestFailedCountsEventsInFailedBatches(t *testing.T) {
+	r := newRecorder(failingStore{}, recorderCfg{bufferSize: 16, batchSize: 2, flushInterval: time.Hour})
+	r.start()
+	r.Record(Event{})
+	r.Record(Event{})
+	waitFor(t, 2, func() int { return int(r.Failed()) })
+	if err := r.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+type panickingStore struct{}
+
+func (panickingStore) InsertBatch(context.Context, []Event) error { panic("boom") }
+
+func TestFailedCountsEventsInPanickedBatches(t *testing.T) {
+	r := newRecorder(panickingStore{}, recorderCfg{bufferSize: 16, batchSize: 2, flushInterval: time.Hour})
+	r.start()
+	defer r.Close()
+	r.Record(Event{})
+	r.Record(Event{})
+	waitFor(t, 2, func() int { return int(r.Failed()) })
+	// Still running: a second batch is taken and counted too.
+	r.Record(Event{})
+	r.Record(Event{})
+	waitFor(t, 4, func() int { return int(r.Failed()) })
 }

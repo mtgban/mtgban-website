@@ -40,7 +40,7 @@
 
     <!-- Tool strip -->
     <div class="sleepers-tools-strip">
-        <a class="card sleepers-tool" href="?page=reprint">
+        <a class="card sleepers-tool" href="?page=reprint" data-track="ui.sleepers.tool" data-track-value="reprint">
             <div class="tool-top">
                 <span class="tool-icon" style="background:rgba(255,191,127,0.15); color:var(--tier-a);">&#128197;</span>
                 <span class="tool-arrow">&rarr;</span>
@@ -48,7 +48,7 @@
             <h3>Long Time No Reprint</h3>
             <p>No reprint in 2+ years. Excludes bulk, Reserved List, and non-tournament cards.</p>
         </a>
-        <a class="card sleepers-tool" href="?page=mismatch">
+        <a class="card sleepers-tool" href="?page=mismatch" data-track="ui.sleepers.tool" data-track-value="mismatch">
             <div class="tool-top">
                 <span class="tool-icon" style="background:rgba(127,255,127,0.15); color:var(--tier-c);">&#128200;</span>
                 <span class="tool-arrow">&rarr;</span>
@@ -56,7 +56,7 @@
             <h3>Market Mismatch</h3>
             <p>Buylist exceeds market price, or priced below TCG Low. Arbitrage signals.</p>
         </a>
-        <a class="card sleepers-tool" href="?page=hotlist">
+        <a class="card sleepers-tool" href="?page=hotlist" data-track="ui.sleepers.tool" data-track-value="hotlist">
             <div class="tool-top">
                 <span class="tool-icon" style="background:rgba(255,255,127,0.15); color:var(--tier-b);">&#128293;</span>
                 <span class="tool-arrow">&rarr;</span>
@@ -65,7 +65,7 @@
             <p>Most buylist growth over the past 3 months. Spot emerging trends early.</p>
         </a>
         {{if .HasVelocity}}
-        <a class="card sleepers-tool" href="?page=velocity">
+        <a class="card sleepers-tool" href="?page=velocity" data-track="ui.sleepers.tool" data-track-value="velocity">
             <div class="tool-top">
                 <span class="tool-icon" style="background:rgba(127,191,255,0.15); color:var(--tier-d);">&#9889;</span>
                 <span class="tool-arrow">&rarr;</span>
@@ -85,31 +85,31 @@
             <p class="comp-desc">Compare two sellers. Find where one has cheaper cards than the other.</p>
 
             <div class="sleepers-comp-presets">
-                <a class="sleepers-comp-preset" href="?page=gap&ref=TCGLow&target=MKMLow">
+                <a class="sleepers-comp-preset" href="?page=gap&ref=TCGLow&target=MKMLow" data-track="ui.sleepers.gap" data-track-value="preset">
                     <span class="ref-name">TCGLow</span>
                     <span class="vs">vs</span>
                     <span class="target-name">MKMLow</span>
                     <span class="preset-arrow">&rarr;</span>
                 </a>
-                <a class="sleepers-comp-preset" href="?page=gap&ref=TCGLow&target=MKMTrend">
+                <a class="sleepers-comp-preset" href="?page=gap&ref=TCGLow&target=MKMTrend" data-track="ui.sleepers.gap" data-track-value="preset">
                     <span class="ref-name">TCGLow</span>
                     <span class="vs">vs</span>
                     <span class="target-name">MKMTrend</span>
                     <span class="preset-arrow">&rarr;</span>
                 </a>
-                <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=CK">
+                <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=CK" data-track="ui.sleepers.gap" data-track-value="preset">
                     <span class="ref-name">MKMTrend</span>
                     <span class="vs">vs</span>
                     <span class="target-name">Card Kingdom</span>
                     <span class="preset-arrow">&rarr;</span>
                 </a>
-                <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=SCG">
+                <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=SCG" data-track="ui.sleepers.gap" data-track-value="preset">
                     <span class="ref-name">MKMTrend</span>
                     <span class="vs">vs</span>
                     <span class="target-name">SCG</span>
                     <span class="preset-arrow">&rarr;</span>
                 </a>
-                <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=MP">
+                <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=MP" data-track="ui.sleepers.gap" data-track-value="preset">
                     <span class="ref-name">MKMTrend</span>
                     <span class="vs">vs</span>
                     <span class="target-name">Manapool</span>
@@ -138,7 +138,7 @@
                         <option value="{{.}}">{{index $.StoreNames .}}</option>
                     {{end}}
                 </select>
-                <button type="submit" class="sleepers-comp-go" id="sleepers-comp-go" disabled>Compare</button>
+                <button type="submit" class="sleepers-comp-go" id="sleepers-comp-go" disabled data-track="ui.sleepers.gap" data-track-value="compare">Compare</button>
             </form>
         </div>
         {{else if $.ShowUpsell}}
@@ -187,7 +187,7 @@ function checkSleepersCompare() {
                     <div style="min-height: 50px;">
                         {{range $cardIds}}
                             {{$card := index $.Metadata .}}
-                            <a href="{{$card.SearchURL}}">
+                            <a href="{{$card.SearchURL}}"{{if not $card.HasContentWarning}} data-track="ui.sleepers.card"{{end}}>
                                 <nobr>
                                     <span class="small-hidden-text" aria-hidden="true">{{$card.Name}}</span>
                                     <div class="foil-wrap sleep-card-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}" data-etched="{{$card.Etched}}" data-set="{{$card.SetCode}}" data-date="{{$card.Date}}" data-name="{{$card.Name}}" style="margin: 5px;"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed');event.preventDefault()"{{end}}>

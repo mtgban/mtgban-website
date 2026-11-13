@@ -84,6 +84,6 @@ func deckboxIDConvert(b *matcher.Backend, w *csv.Writer, uploadedData []UploadEn
 
 		w.Flush()
 	}
-
-	return nil
+	w.Flush()
+	return w.Error()
 }

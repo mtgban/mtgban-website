@@ -19,6 +19,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 
 	"github.com/mtgban/mtgban-website/banprice"
+	"github.com/mtgban/mtgban-website/observability"
 )
 
 const (
@@ -271,6 +272,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		storesOpt = strings.Join(Config().Stores.APIDemoStores, ",")
 		// Disable a few endpoints for this specific mode
 		if isFullDump && (kind == "all" || kind == "retail" || kind == "buylist") {
+			observeScoped(r, observability.APIFamily(r.URL.Path), "api.refuse", "no_key")
 			out.Error = "Invalid endpoint or missing signature"
 			json.NewEncoder(w).Encode(&out)
 			return
@@ -364,6 +366,15 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	}
 	qty, _ := strconv.ParseBool(r.FormValue("qty"))
 	conds, _ := strconv.ParseBool(r.FormValue("conds"))
+	// Both options apply where v1's output is served: v1, and v2's CSV.
+	if version != APIVersionV2 || !strings.HasSuffix(urlPath, ".json") {
+		if qty {
+			observe(r, "api.option", "quantities")
+		}
+		if conds {
+			observe(r, "api.option", "conditions")
+		}
+	}
 	filterByFinish := r.FormValue("finish")
 	// A finish is a single's; a sealed request lists every product
 	if kind == "sealed" {

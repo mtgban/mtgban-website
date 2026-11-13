@@ -330,6 +330,7 @@ func (s *site) alertsConfirm(w http.ResponseWriter, r *http.Request, store alert
 		notice.Token, notice.Action, notice.Button = token, "/alerts/confirm", "Confirm"
 	default:
 		notice.Text = alertsConfirmedText
+		observe(r, "alerts.channel", "confirm")
 	}
 	s.renderAlertsNotice(w, r, status, notice)
 }
@@ -369,6 +370,7 @@ func (s *site) alertsUnsubscribe(w http.ResponseWriter, r *http.Request, store a
 		notice.Token, notice.Action, notice.Button = token, "/alerts/unsubscribe", "Unsubscribe"
 	default:
 		notice.Text = alertsUnsubscribedText
+		observe(r, "alerts.channel", "unsubscribe")
 	}
 	s.renderAlertsNotice(w, r, status, notice)
 }
@@ -421,6 +423,6 @@ func (s *site) AlertsMailEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *site) alertsMailEvents(w http.ResponseWriter, r *http.Request, store alerts.WebhookStore) {
-	hook := &alerts.Webhook{Secret: s.mailEventsSecret, Store: store, Log: log.Printf}
+	hook := &alerts.Webhook{Secret: s.mailEventsSecret, Store: store, Log: log.Printf, Observe: jobObserver("job")}
 	hook.ServeHTTP(w, r)
 }

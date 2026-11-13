@@ -132,9 +132,11 @@ async function openModal({ pathname, cookie, values }) {
         if (!(path in values)) return Promise.resolve({ ok: false, status: 500 });
         return Promise.resolve({ ok: true, json: () => Promise.resolve(values[path]) });
     };
+    const tracked = [];
     const window = {
         location: { pathname, search: '', hash: '', reload() { window.reloaded = true; } },
         history: { replaceState() {} },
+        BAN: { track: (...a) => tracked.push(a) },
     };
     const sessionStorage = { getItem: () => null, setItem() {}, removeItem() {} };
     new Function('window', 'document', 'fetch', 'sessionStorage',
@@ -149,7 +151,7 @@ async function openModal({ pathname, cookie, values }) {
         saveBtn.listeners.click.forEach(fn => fn());
         await settle();
     };
-    return { find, save, writes, fetches, modalBody, window };
+    return { find, save, writes, fetches, modalBody, window, tracked, press: init => docListeners.keydown({ preventDefault() {}, ...init }) };
 }
 
 test('a tab opened on another page loads the values its own page reads', async () => {
@@ -228,4 +230,12 @@ test('unticking every option saves a value that does not bring the defaults back
 
     const saved = m.writes.find(w => w.startsWith('UploadOptimizerOpts=') && !w.startsWith('UploadOptimizerOpts=;'));
     expect(saved).toStartWith('UploadOptimizerOpts=,;');
+});
+
+test('Ctrl+Comma with settings.js loaded is counted there, and a bare comma is not', async () => {
+    const m = await openModal({ pathname: '/search', cookie: '', values: {} });
+    m.press({ ctrlKey: true, key: ',' });
+    expect(m.tracked.filter(t => t[0] === 'ui.key')).toEqual([['ui.key', 'settings_hotkey']]);
+    m.press({ key: ',' });
+    expect(m.tracked.filter(t => t[0] === 'ui.key')).toHaveLength(1);
 });

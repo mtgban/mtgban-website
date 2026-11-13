@@ -55,6 +55,12 @@ type SearchConfig struct {
 	ContentsProduct string
 	ContentsMode    string
 
+	// The finish a trailing shorthand became: nonfoil, foil, etched or altfoil
+	FinishSuffix string
+
+	// The shorthand the query was rewritten from, for the counters
+	Syntax []string
+
 	// Chain of filters to be applied to card filtering
 	CardFilters []FilterElem
 
@@ -1222,6 +1228,37 @@ const maxPools = 8
 // reach restoreProtected and the pool loop.
 var stripMarks = strings.NewReplacer(protectedMark, "", poolMark, "")
 
+// splitFilterToken reads one token the filter regexp matched.
+// ok is false when the token has no operator or the operator does not take the operation.
+func splitFilterToken(field string) (option, operation, code string, negate, ok bool) {
+	index := strings.Index(field, ":")
+	if index == -1 {
+		index = strings.Index(field, "<")
+	}
+	if index == -1 {
+		index = strings.Index(field, ">")
+	}
+	// Safety check
+	if index == -1 {
+		return "", "", "", false, false
+	}
+
+	option = strings.ToLower(field[:index])
+	operation = string(field[index])
+	code = field[index+1:]
+
+	if strings.HasPrefix(option, "-") {
+		option = strings.TrimPrefix(option, "-")
+		negate = true
+	}
+
+	// Check the operation is allowed on the given option
+	if !slices.Contains(FilterOperations[option], operation) {
+		return "", "", "", false, false
+	}
+	return option, operation, code, negate, true
+}
+
 // parseSearchOptionsDepth reads a query with the numbers snapshot given;
 // with bareIDs a number searched alone stays an id or a name's words even
 // so, while a number after a name is still a collector number.
@@ -1325,30 +1362,8 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 	for _, field := range fields {
 		query = strings.Replace(query, field, "", 1)
 
-		index := strings.Index(field, ":")
-		if index == -1 {
-			index = strings.Index(field, "<")
-		}
-		if index == -1 {
-			index = strings.Index(field, ">")
-		}
-		// Safety check
-		if index == -1 {
-			continue
-		}
-
-		option := strings.ToLower(field[:index])
-		operation := string(field[index])
-		code := field[index+1:]
-
-		negate := false
-		if strings.HasPrefix(option, "-") {
-			option = strings.TrimPrefix(option, "-")
-			negate = true
-		}
-
-		// Check the operation is allowed on the given option
-		if !slices.Contains(FilterOperations[option], operation) {
+		option, operation, code, negate, ok := splitFilterToken(field)
+		if !ok {
 			continue
 		}
 
@@ -1894,12 +1909,16 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 			switch lastChar {
 			case "&":
 				finish = "nonfoil"
+				config.FinishSuffix = "nonfoil"
 			case "*":
 				finish = "foil"
+				config.FinishSuffix = "foil"
 			case "~":
 				finish = "etched"
+				config.FinishSuffix = "etched"
 			case "`":
 				finish = "foil"
+				config.FinishSuffix = "altfoil"
 
 				filters = append(filters, FilterElem{
 					Name:   "is",
@@ -1951,6 +1970,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 
 	// Support Scryfall bot syntax only when the search mode is not set
 	if config.SearchMode == "" && strings.Contains(query, "|") {
+		config.Syntax = append(config.Syntax, "scryfall_bot")
 		elements := strings.Split(query, "|")
 		query = elements[0]
 		extraQuery := strings.TrimSpace(elements[0])
@@ -1998,6 +2018,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 					Values: fixupNumberNG(b, tokens[0], "number_strict"),
 				})
 				config.NumberTerms = tokens[0]
+				config.Syntax = append(config.Syntax, "set_number")
 				query = ""
 				tokens = nil
 			} else if printed {
@@ -2009,6 +2030,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 			if numbered != nil {
 				filters = append(filters, numbered...)
 				config.NumberTerms = numberTerm(b, tokens[0])
+				config.Syntax = append(config.Syntax, "bare_number")
 				query = ""
 			}
 		}
@@ -2018,6 +2040,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 				set, err := b.GetSet(tokens[0])
 				if err == nil {
 					config.NumberTerms = "s:" + set.Code + " " + term
+					config.Syntax = append(config.Syntax, "set_number")
 					extraConfig := parseSearchOptionsNG(b, p, config.NumberTerms, nil, nil, nil)
 					filters = append(filters, extraConfig.CardFilters...)
 					query = ""
@@ -2029,6 +2052,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 			filters = append(filters, numbered...)
 			words := strings.Fields(query)
 			config.NumberTerms = numberTerm(b, words[len(words)-1])
+			config.Syntax = append(config.Syntax, "name_number")
 			query = named
 		}
 	}
@@ -2042,6 +2066,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 			last := tokens[len(tokens)-1]
 			if typesSetTotal(last) {
 				config.NumberTerms = "cn:" + last
+				config.Syntax = append(config.Syntax, "set_total")
 				extraConfig := parseSearchOptionsNG(b, p, "cn:"+last, nil, nil, nil)
 				filters = append(filters, extraConfig.CardFilters...)
 				query = strings.Join(tokens[:len(tokens)-1], " ")

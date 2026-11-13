@@ -216,7 +216,10 @@ if (window.BAN_SEARCH_CHART.multi) {
             btn.setAttribute('data-ref', ref);
             btn.href = 'javascript:void(0)';
             btn.textContent = ref;
-            btn.addEventListener('click', function() { selectReference(ref); });
+            btn.addEventListener('click', function() {
+                if (ref !== currentReference && window.BAN && window.BAN.track) window.BAN.track('ui.chart.reference');
+                selectReference(ref);
+            });
             host.appendChild(btn);
         });
     }
@@ -422,7 +425,10 @@ function drawRange(rangeDays) {
     };
 }
 
+// The ranges the select offers, as the count names them.
+var chartRangeValues = {0: 'all', 30: '30', 90: '90', 180: '180', 365: '365', 730: '730', 1825: '1825', 3650: '3650'};
 function changeRange(rangeDays) {
+    if (Object.prototype.hasOwnProperty.call(chartRangeValues, rangeDays) && window.BAN && window.BAN.track) window.BAN.track('ui.chart.range', chartRangeValues[rangeDays]);
     rememberRange(rangeDays);
     chartRange.ensure(rangeDays, drawRange(rangeDays));
 }
@@ -437,6 +443,7 @@ function toggleGaps() {
     cardChart.options.spanGaps = !cardChart.options.spanGaps;
     cardChart.update();
     localStorage.setItem("chartSpanGaps", cardChart.options.spanGaps);
+    if (window.BAN && window.BAN.track) window.BAN.track('ui.chart.gaps', cardChart.options.spanGaps ? 'off' : 'on');
 }
 function downloadAsImg() {
     var chartImg = document.createElement('a');
@@ -597,8 +604,10 @@ function commitChartBatch() {
 function closeChartAddModal() {
     var overlay = document.getElementById('chartAddOverlay');
     if (!overlay) return;
+    var wasOpen = overlay.classList.contains('open');
     overlay.classList.remove('open');
     document.body.classList.remove('chart-add-open');
+    if (wasOpen && window.BAN && window.BAN.track) window.BAN.track('ui.chart.add_modal', 'close');
 }
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {

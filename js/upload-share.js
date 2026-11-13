@@ -22,7 +22,7 @@
         }, 1500);
     }
 
-    function postShare(el, rows) {
+    function postShare(el, rows, kind) {
         if (busy.has(el)) return;
         var mode = document.getElementById('res_mode');
         var buylist = !!(mode && mode.value === 'true');
@@ -40,6 +40,7 @@
                 return navigator.clipboard.writeText(window.location.origin + body.url);
             });
         }).then(function () {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.share', kind === 'section' ? 'section' : 'list');
             flash(el, '<i data-lucide="check" style="width:14px;height:14px;vertical-align:-2px"></i> Copied!');
         }).catch(function (err) {
             flash(el, 'Could not share', err && err.message ? err.message : 'share failed');
@@ -47,7 +48,7 @@
     }
 
     function copyShareLink(el) {
-        return postShare(el, window.packRows ? packRows('all') : '');
+        return postShare(el, window.packRows ? packRows('all') : '', 'list');
     }
 
     // A store's ticked rows in packRows' seven fields, each with the copies
@@ -63,7 +64,7 @@
     }
 
     function copySectionShareLink(el) {
-        return postShare(el, packSection(el.closest('.opt-store')));
+        return postShare(el, packSection(el.closest('.opt-store')), 'section');
     }
 
     window.copyShareLink = copyShareLink;

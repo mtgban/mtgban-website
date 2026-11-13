@@ -40,3 +40,29 @@ document.addEventListener('click', function (event) {
 
     select.focus();
 });
+
+// What each arbitrage page's store picker picks
+var STORE_PICKS = { arbit: 'buying', reverse: 'selling', global: 'index' };
+
+// A store picked, or a section jumped to; the selects' own onchange navigates.
+document.addEventListener('change', function (event) {
+    var select = event.target;
+    if (!select || typeof select.getAttribute !== 'function' || !select.value) {
+        return;
+    }
+    var pick = select.getAttribute('data-pick');
+    if (pick === 'jump') {
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.arbit.jump');
+        return;
+    }
+    if (pick !== 'store') {
+        return;
+    }
+    var mode = window.BAN_ARBIT ? window.BAN_ARBIT.mode : '';
+    var value = Object.prototype.hasOwnProperty.call(STORE_PICKS, mode) ? STORE_PICKS[mode] : '';
+    if (value && window.BAN && window.BAN.track) window.BAN.track('ui.arbit.store_select', value);
+    var presets = window.ArbitPresets;
+    if (presets && typeof presets.pinnedStore === 'function' && presets.pinnedStore(select.value)) {
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.arbit.pin_auto');
+    }
+});

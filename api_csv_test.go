@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/csv"
+	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/matcher"
@@ -150,6 +152,97 @@ func TestCSVCondQtyIndexing(t *testing.T) {
 			want := [2]string{tc.labels[mtgban.Condition(cond)], qtys[i]}
 			if !got[want] {
 				t.Errorf("%s: missing row condition=%q qty=%q; got rows %v", records[0][0], want[0], want[1], got)
+			}
+		}
+	}
+}
+
+// decklistCSVFixture is a backend and prices both marketplace exports can write from.
+func decklistCSVFixture(t *testing.T) (*matcher.Backend, *prices) {
+	t.Helper()
+	b := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{
+		{"Fixture Card Alpha", "1"}, {"Fixture, Card \"Beta\"", "2"},
+	})
+	b.UUIDs["FIXTUREA-1"].Edition, b.UUIDs["FIXTUREA-1"].Rarity, b.UUIDs["FIXTUREA-1"].Language = "Fixture Edition Alpha", "rare", "English"
+	b.UUIDs["FIXTUREA-2"].Foil = true
+	inventory := func(entries map[string][]mtgban.InventoryEntry) mtgban.InventoryRecord {
+		out := mtgban.InventoryRecord{}
+		for id, list := range entries {
+			for i := range list {
+				out.Add(id, &list[i])
+			}
+		}
+		return out
+	}
+	seller := func(shorthand string, entries map[string][]mtgban.InventoryEntry) mtgban.Seller {
+		return mtgban.NewSellerFromInventory(inventory(entries), mtgban.ScraperInfo{Shorthand: shorthand})
+	}
+	s := fixtureSite(t, b, []mtgban.Seller{
+		seller("TCGPlayer", map[string][]mtgban.InventoryEntry{
+			"FIXTUREA-1": {{Conditions: "NM", Price: 1.5, InstanceID: "111"}, {Conditions: "SP", Price: 1.25, InstanceID: "112"}},
+			"FIXTUREA-2": {{Conditions: "SP", Price: 7, InstanceID: "222"}},
+		}),
+		seller("TCGDirectLow", map[string][]mtgban.InventoryEntry{"FIXTUREA-1": {{Conditions: "NM", Price: 1.4}}}),
+		seller("TCGLow", map[string][]mtgban.InventoryEntry{"FIXTUREA-1": {{Conditions: "NM", Price: 1.1, OriginalID: "9001"}}}),
+		seller("TCGSealed", nil),
+		seller("MKMTrend", map[string][]mtgban.InventoryEntry{"FIXTUREA-1": {{Conditions: "NM", Price: 0.9, OriginalID: "5001"}}}),
+		seller("MKMLow", map[string][]mtgban.InventoryEntry{"FIXTUREA-2": {{Conditions: "NM", Price: 3.3, OriginalID: "5002"}}}),
+	}, nil)
+	return b, s.prices()
+}
+
+// What each marketplace export writes, unchanged by the flush at its end.
+func TestDecklistCSVBytes(t *testing.T) {
+	b, p := decklistCSVFixture(t)
+	ids := []string{"FIXTUREA-1", "FIXTUREA-2", "nope", "FIXTUREA-1", "FIXTUREA-1"}
+	qtys := []string{"1", "2", "1", "3", "x"}
+	conds := []string{"NM", "SP", "NM", "NM", "SP"}
+	// Captured from the exports before they flushed and checked at their end.
+	for _, c := range []struct {
+		name   string
+		export decklistExport
+		want   string
+	}{
+		{"tcgplayer", UUID2TCGCSV, "TCGplayer Id,Product Line,Set Name,Product Name,Title,Number,Rarity,Condition,TCG Market Price,TCG Direct Low,TCG Low Price With Shipping,TCG Low Price,Total Quantity,Add to Quantity,TCG Marketplace Price,Photo URL\n" +
+			"111,,,,,,,Near Mint,1.50,1.40,,1.10,,4,1.50,\n" +
+			"222,,,,,,,Lightly Played Foil,7.00,0.00,,0.00,,2,7.00,\n" +
+			"112,,,,,,,Lightly Played,1.25,0.00,,0.00,,1,1.25,\n"},
+		{"cardmarket", UUID2MKMCSV, "cardmarketId,quantity,name,set,setCode,cn,condition,language,isFoil,isPlayset,isSigned,price,comment,nameDE,nameES,nameFR,nameIT,rarity,listedAt\n" +
+			"5001,4,Fixture Card Alpha,Fixture Edition Alpha,FIXTUREA,1,NM,English,,,,0.90,,,,,,Rare,\n" +
+			"5002,2,\"Fixture, Card \"\"Beta\"\"\",,FIXTUREA,2,EX,,Y,,,3.30,,,,,,,\n" +
+			"5001,1,Fixture Card Alpha,Fixture Edition Alpha,FIXTUREA,1,EX,English,,,,0.90,,,,,,Rare,\n"},
+	} {
+		var buf bytes.Buffer
+		if err := c.export(b, p, csv.NewWriter(&buf), ids, qtys, conds); err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		// No flush here: the client gets only what the export itself flushed.
+		if buf.String() != c.want {
+			t.Errorf("%s: got\n%q\nwant\n%q", c.name, buf.String(), c.want)
+		}
+
+		// A list with no card now reaches the client as its header row.
+		buf.Reset()
+		if err := c.export(b, p, csv.NewWriter(&buf), nil, nil, nil); err != nil {
+			t.Fatalf("%s of nothing: %v", c.name, err)
+		}
+		if header, _, _ := strings.Cut(c.want, "\n"); buf.String() != header+"\n" {
+			t.Errorf("%s of nothing wrote %q, want the header", c.name, buf.String())
+		}
+	}
+}
+
+// decklistExport is the shape of UUID2TCGCSV and UUID2MKMCSV.
+type decklistExport func(*matcher.Backend, *prices, *csv.Writer, []string, []string, []string) error
+
+// A write the client never got is an error, down to the last row.
+func TestDecklistCSVReportsAFailedWrite(t *testing.T) {
+	b, p := decklistCSVFixture(t)
+	for name, export := range map[string]decklistExport{"tcgplayer": UUID2TCGCSV, "cardmarket": UUID2MKMCSV} {
+		for _, ids := range [][]string{nil, {"FIXTUREA-1"}, {"FIXTUREA-1", "FIXTUREA-2"}} {
+			err := export(b, p, csv.NewWriter(failingResponse{httptest.NewRecorder()}), ids, nil, nil)
+			if err == nil {
+				t.Errorf("%s of %d ids: a failed write returned nil", name, len(ids))
 			}
 		}
 	}

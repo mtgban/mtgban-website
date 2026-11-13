@@ -540,7 +540,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 				UserNotify("upload", err.Error())
 				pageVars.InfoMessage = "Unable to forward your list to SCG right now"
 				render(w, "upload.html", pageVars)
+				return
 			}
+			observeUploadTag(r, hashTag)
 			return
 		}
 
@@ -550,7 +552,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 				UserNotify("upload", err.Error())
 				pageVars.InfoMessage = "Unable to download CSV right now"
 				render(w, "upload.html", pageVars)
+				return
 			}
+			observeUploadTag(r, hashTag)
 			return
 		}
 		pageVars.ErrorMessage = "Invalid tag option: " + hashTag
@@ -564,11 +568,17 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	if key := r.FormValue("share"); key != "" {
 		share, found := loadUploadShare(r.Context(), uploadShareSource(), key)
 		if !found {
+			if isPageView(r) {
+				observe(r, "upload_share.open", "gone")
+			}
 			pageVars.InfoMessage = uploadShareMissingMsg
 			render(w, "upload.html", pageVars)
 			return
 		}
 		shared = &share
+		if isPageView(r) {
+			observe(r, "upload_share.open", "ok")
+		}
 	}
 
 	// Check cookies to set preferences
@@ -636,6 +646,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			if formErr != nil {
 				pageVars.WarningMessage += ": " + formErr.Error()
 			}
+			if isPageView(r) {
+				observeScoped(r, "none", "upload.parse_error", "no_list")
+			}
 		}
 		render(w, "upload.html", pageVars)
 		return
@@ -686,6 +699,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	uploadedData, uploadName, err := loadUploadEntries(r, b, p, in, modes.maxRows)
 	if err != nil {
+		if FeatureCounter != nil && isPageView(r) {
+			observeScoped(r, uploadErrorScope(r, in), "upload.parse_error", "load_error")
+		}
 		pageVars.WarningMessage = err.Error()
 		render(w, "upload.html", pageVars)
 		return
@@ -757,7 +773,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to process your list to CardConduit right now"
 			render(w, "upload.html", pageVars)
+			return
 		}
+		observeScoped(r, uploadExportScope(r.FormValue("csvscope")), "upload.export", "estimate")
 		return
 	}
 	if modes.deckbox && canBuylist {
@@ -766,7 +784,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "upload.html", pageVars)
+			return
 		}
+		observeScoped(r, uploadExportScope(r.FormValue("csvscope")), "upload.export", "deckbox")
 		return
 	}
 	if modes.tcgpCSV && canBuylist {
@@ -775,7 +795,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "upload.html", pageVars)
+			return
 		}
+		observeScoped(r, uploadExportScope(r.FormValue("csvscope")), "upload.export", "tcgplayer_csv")
 		return
 	}
 
@@ -791,7 +813,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "upload.html", pageVars)
+			return
 		}
+		observeScoped(r, uploadExportScope(r.FormValue("csvscope")), "upload.export", "download")
 		return
 	}
 
@@ -827,6 +851,11 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(ids.cardIDs), msgMode, pageVars.UploadQuery, time.Since(start))
 	UserNotify("upload", msg)
 	LogPages["Upload"].Println(msg)
+
+	if FeatureCounter != nil && isPageView(r) {
+		run := readUploadRun(r, in, blMode, st, selected, len(uploadedData), ids, prices, time.Since(start))
+		observeFacts(r, p, uploadFacts(run))
+	}
 
 	// Touchdown!
 	render(w, "upload.html", pageVars)
@@ -1546,6 +1575,7 @@ type uploadSettings struct {
 	skipLowValueAbs  bool
 	skipHighValue    bool
 	skipHighValueAbs bool
+	useMargin        bool
 	skipConds        bool
 	skipPrices       bool
 	visualIndicator  bool
@@ -1688,6 +1718,7 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 		skipLowValueAbs:  skipLowValueAbs,
 		skipHighValue:    skipHighValue,
 		skipHighValueAbs: skipHighValueAbs,
+		useMargin:        useMargin,
 		skipConds:        skipConds,
 		skipPrices:       skipPrices,
 		visualIndicator:  visualIndicator,
@@ -3693,4 +3724,5 @@ func UploadURLRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/upload?gdocURL="+url.QueryEscape(u.String()), http.StatusFound)
+	observe(r, "upload.source", "url_prefix")
 }

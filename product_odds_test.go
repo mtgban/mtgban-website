@@ -269,8 +269,11 @@ func sealedUUIDs(t *testing.T, n int) []string {
 	return uuids[:n]
 }
 
-// oldProductsHTML is the markup uuid2card built before productsHTML, kept
-// here so the refactor is pinned byte for byte.
+// productTrack is the count mark productsHTML gives each product link.
+const productTrack = ` data-track="ui.sidebar.products" data-track-value="click"`
+
+// oldProductsHTML is the markup uuid2card built before productsHTML, plus
+// the count mark, so the refactor stays pinned byte for byte.
 func oldProductsHTML(b *matcher.Backend, sourceSealed []string) (string, int) {
 	var products string
 	var numProducts int
@@ -281,7 +284,7 @@ func oldProductsHTML(b *matcher.Backend, sourceSealed []string) (string, int) {
 			if err != nil {
 				continue
 			}
-			products += "<a href=/sealed?q=" + sealed + ">" + sealedCo.Name + "</a>"
+			products += "<a href=/sealed?q=" + sealed + productTrack + ">" + sealedCo.Name + "</a>"
 			numProducts++
 		}
 		products += "</h4>"
@@ -320,9 +323,9 @@ func TestProductsHTMLLabelsOnlyWhereOddsAnswer(t *testing.T) {
 	if count != 2 {
 		t.Errorf("count = %d, want 2", count)
 	}
-	want := "<h4><a href=/sealed?q=" + uuids[0] + ">" + first.Name +
+	want := "<h4><a href=/sealed?q=" + uuids[0] + productTrack + ">" + first.Name +
 		` <span class="product-odds" title="0.083 copies expected">1 in 12</span></a>` +
-		"<a href=/sealed?q=" + uuids[1] + ">" + second.Name + "</a></h4>"
+		"<a href=/sealed?q=" + uuids[1] + productTrack + ">" + second.Name + "</a></h4>"
 	if got != want {
 		t.Errorf("productsHTML =\n%s\nwant\n%s", got, want)
 	}

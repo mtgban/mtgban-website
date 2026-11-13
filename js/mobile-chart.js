@@ -11,6 +11,19 @@
     var libsLoading = false;
 
     var HIDDEN_COOKIE = 'MobileChartHidden';
+    // The ranges the select offers, as the count names them.
+    var RANGE_VALUES = {30: '30', 90: '90', 180: '180', 365: '365', 730: '730', 1825: '1825', 3650: '3650'};
+    // Set while the script resets the zoom itself, which the zoom plugin reports as a zoom.
+    var quietZoom = false;
+
+    function resetZoomQuietly() {
+        quietZoom = true;
+        try {
+            currentChart.resetZoom();
+        } finally {
+            quietZoom = false;
+        }
+    }
 
     function readHiddenVendors() {
         try {
@@ -296,11 +309,19 @@
                         pan: {
                             enabled: true,
                             mode: 'x',
+                            onPanComplete: function() {
+                                if (quietZoom) return;
+                                if (window.BAN && window.BAN.track) window.BAN.track('ui.mchart.gesture', 'pan');
+                            },
                         },
                         zoom: {
                             wheel: { enabled: false },
                             pinch: { enabled: true },
                             mode: 'x',
+                            onZoomComplete: function() {
+                                if (quietZoom) return;
+                                if (window.BAN && window.BAN.track) window.BAN.track('ui.mchart.gesture', 'zoom');
+                            },
                         },
                     },
                 },
@@ -364,6 +385,7 @@
             btn.addEventListener('click', function() {
                 var idx = parseInt(this.getAttribute('data-index'));
                 var visible = chart.isDatasetVisible(idx);
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.chart.legend', visible ? 'hide' : 'show');
                 chart.setDatasetVisibility(idx, !visible);
                 chart.update();
                 this.classList.toggle('hidden');
@@ -374,6 +396,7 @@
     }
 
     window.showChartDrawer = function(cardId, isSealed, cardName) {
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.mchart.open');
         var overlay = document.getElementById('m-chart-overlay');
         var drawer = document.getElementById('m-chart-drawer');
         var nameEl = document.getElementById('m-chart-name');
@@ -457,14 +480,15 @@
     };
 
     window.resetChartZoom = function() {
-        if (currentChart) currentChart.resetZoom();
+        if (currentChart) resetZoomQuietly();
     };
 
     window.changeChartRange = function(range) {
         if (isNaN(range) || range <= 0) return;
+        if (Object.prototype.hasOwnProperty.call(RANGE_VALUES, range) && window.BAN && window.BAN.track) window.BAN.track('ui.chart.range', RANGE_VALUES[range]);
         localStorage.setItem('chartDateRange', String(range));
         setRangePickerValue(range);
-        if (currentChart) currentChart.resetZoom();
+        if (currentChart) resetZoomQuietly();
 
         if (range <= currentMaxLoaded) {
             setRangeFailed(false);

@@ -22,6 +22,8 @@ type fakeAlertStore struct {
 	channels     map[channelKey]Channel
 	confirmSends map[confirmKey]confirmSend
 	nextID       int64
+	// lastClaim keeps claim times distinct: production claims are serialised per user on a fine clock; Windows' ticks in about 0.5ms.
+	lastClaim time.Time
 }
 
 // confirmKey is one user's confirm mails to one address.
@@ -74,6 +76,9 @@ func (f *fakeAlertStore) ClaimConfirmSend(_ context.Context, h, address string) 
 // confirmAddressGap, timed as it is made.
 func (f *fakeAlertStore) claim(h, address string) (time.Time, bool, error) {
 	now := time.Now().Truncate(time.Microsecond)
+	if !now.After(f.lastClaim) {
+		now = f.lastClaim.Add(time.Microsecond)
+	}
 	for k, send := range f.confirmSends {
 		if k.address == strings.ToLower(address) && send.complained {
 			return time.Time{}, false, ErrConfirmComplained
@@ -85,6 +90,7 @@ func (f *fakeAlertStore) claim(h, address string) (time.Time, bool, error) {
 		}
 	}
 	f.confirmSends[confirmKey{h, strings.ToLower(address)}] = confirmSend{at: now}
+	f.lastClaim = now
 	return now, true, nil
 }
 

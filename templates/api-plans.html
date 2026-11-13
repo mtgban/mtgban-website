@@ -28,9 +28,9 @@
             <h1>Price data API</h1>
         </div>
         {{if and .Email .HandoffOn}}
-        <a class="page-action" href="/api-login?return_to={{.ReturnTo}}">Manage your API access</a>
+        <a class="page-action" href="/api-login?return_to={{.ReturnTo}}" data-track="ui.apiplans" data-track-value="manage">Manage your API access</a>
         {{else}}
-        <a class="page-action" href="{{.GatewayURL}}/account">Manage your API access</a>
+        <a class="page-action" href="{{.GatewayURL}}/account" data-track="ui.apiplans" data-track-value="manage">Manage your API access</a>
         {{end}}
     </div>
 
@@ -54,7 +54,7 @@
                 {{end}}
             </div>
             {{if .CanTrial}}
-            <p class="api-cta-note api-trial-note"><a href="/api-trial?return_to={{.ReturnTo}}">Try the API before you commit</a>: as a Patreon supporter you can request a one time key with FULL ACCESS for {{.TrialDays}} days</p>
+            <p class="api-cta-note api-trial-note"><a href="/api-trial?return_to={{.ReturnTo}}" data-track="ui.apiplans" data-track-value="trial">Try the API before you commit</a>: as a Patreon supporter you can request a one time key with FULL ACCESS for {{.TrialDays}} days</p>
             {{else}}
             <p class="api-cta-note api-trial-note">Patreon supporters can try the API before they commit: a one time key with FULL ACCESS for {{.TrialDays}} days</p>
             {{end}}
@@ -135,7 +135,7 @@
 
             <div class="api-total-row">
                 <p class="api-total"><span id="api-total-package">{{.Default.Name}}</span> <strong id="api-total">{{usd .Default.Monthly}}</strong><span id="api-total-period">/month</span></p>
-                <button type="submit" class="api-btn">{{if .Change}}Review the change{{else}}Continue to checkout{{end}}</button>
+                <button type="submit" class="api-btn" data-track="ui.apiplans" data-track-value="checkout">{{if .Change}}Review the change{{else}}Continue to checkout{{end}}</button>
                 <p class="api-note">Confirmed at checkout before anything is charged. Promotion codes are entered there.</p>
             </div>
         </section>

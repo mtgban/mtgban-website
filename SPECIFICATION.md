@@ -94,7 +94,9 @@ Boot sequence (`main()`):
    `tcg_products` when it is configured), `NewNewspaperDB` (PostgreSQL),
    `UserStateDB` (cross-device sync, only if `user_state_config` is set), and
    `ObservabilityDB` (usage telemetry, only if `observability_config` + an
-   instance name are set), each one's settings read from
+   instance name are set, and with it, when the feature tables are ready,
+   the feature counter and the script error buffer,
+   `docs/feature-metrics.md`), each one's settings read from
    `Infrastructure()` (§2.4). Then `startAccessReloadListener()` (picks up
    saves of the ACL, grants, affiliates, datasets and infrastructure files
    made by peer deployments sharing the price DB, recovering a reload that
@@ -387,6 +389,11 @@ sharing the price database re-read it (access_notify.go). The same listener
 hears `patreon_poke`, whose payload is the email hash of a reader to poke
 (§3.2) rather than a file to re-read, and which no instance name skips.
 
+`instance_name` labels this deployment's telemetry and turns the feature
+counts on (none is recorded without it, and `shared` is reserved for the
+stored-state counts); `metrics_jobs`, set on one instance only, schedules
+the nightly metrics jobs there (`docs/feature-metrics.md`).
+
 The `stores` section
 (`StoresConfig`) says which stores show where, by shorthand: `api_demo_stores`
 (what an unsigned API request gets, §5.7), `search_block_list`,
@@ -558,6 +565,10 @@ unless `X-Patreon-Signature` is the hex HMAC-MD5 of the raw body
 computes), and otherwise 200 after
 poking the delivery's `data.attributes.email` here and on the peers (§3.2),
 the rest of the body unread;
+`POST /api/metrics` (`MetricsAPI`, api_metrics.go), the page script's
+feature counts behind `noSigning`, and `GET /api/metrics/settings.json`,
+the preference settings its daily snapshot reads
+(`docs/feature-metrics.md`);
 `/go/{r|i|b}/{store}/{hash}` affiliate redirects, or the 2-segment
 `/go/{store}/{hash}` short form defaulting to retail (redirect.go), resolved
 via mtgjson UUID or an external id (scryfall/tcg product id); `/card/<set>/
@@ -1044,7 +1055,7 @@ Discord answers, without its URL.
 
 One handler, `Admin`, which calls a function of its own for each action,
 tool, editor and table, driving its tabs —
-Dashboard, Usage, Searches, Alerts, People, Config, Checkpoints, Access,
+Dashboard, Usage, Searches, Metrics, Alerts, People, Config, Checkpoints, Access,
 Affiliates, Datasets, Infrastructure, Key Overrides, Tools — through
 command dispatch: scraper refresh via
 GitHub Actions dispatch (`refresh`) or direct reload (`reload`, `table`, `tag`),
@@ -1170,12 +1181,12 @@ staleness alarm's map and messages, from 15 minutes after startup.
 | `banprice/` | Wire types for the price API — `Price`, `ConditionTags` — in the exact JSON shape `api_banprice.go` and the templates share |
 | `collectr/` | Client for Collectr showcase pages (product listings, Magic + Lorcana categories) |
 | `fuzzy/` | Edit-distance string similarity (adjacent swaps count once) powering "did you mean" suggestions |
-| `observability/` | Postgres page-visit recorder backing the admin usage dashboard, plus the search-votes table behind the popular-searches ranking |
+| `observability/` | Postgres page-visit recorder backing the admin usage dashboard, plus the search-votes table behind the popular-searches ranking, and the feature metrics: the registry of names and settings, the minute counter, the script error buffer and the feature tables (`docs/feature-metrics.md`) |
 | `tcgcsv/` | Client for tcgcsv.com's category→group→product/price hierarchy, used to ingest non-Magic prices. The daily-archive reader stays here but every date answers 403 upstream; `ErrArchiveUnavailable` is how callers learn that |
 | `tcgcsvd/` | tcgcsv ingest service: library + `cmd/tcgcsvd` binary. Daily/products/backfill jobs take a cross-process Postgres advisory lock so a standalone process and the website's own crons never crawl tcgcsv.com at once (`tcgcsvd/README.md`). With the archives withdrawn, the per-group daily price files are the only source and backfill falls back to the current snapshot (`docs/tcgcsv-archive-withdrawal.md`) |
 | `userstate/` | Postgres-backed cross-device sync of per-user favorites/recents/prefs/backpack (`/api/userstate/`), keyed by a hash of the login email; a PUT or PATCH body may come with `Content-Encoding: gzip`, held to 1 MB as sent and 8 MB unpacked; also the upload share rows (`upload_shares`), minted by `POST /api/upload/share` and reopened by `/upload?share=`, kept seven days; a reader gets the rows without the owner's notes column. The `favorites_shares` table holds each owner's one live favorites share link per game, made, shown and revoked through `/api/userstate/share`. Startup adds the `backpack` column only when it is missing, and adding it needs the table owner, so a deployment whose app role does not own `user_state` runs `addBackpackSQL`'s statement (`userstate/schema.go`) as the owner before deploying |
 | `cmd/` | Just `cmd/tcgcsvd/main.go` — a thin CLI over the `tcgcsvd` package (`-daily`/`-products`/`-backfill`/`-games`) |
-| `internal/` | Packages only this module imports: `alerts` (price alerts: the model, its Postgres store on the userstate pool, the debounced evaluator, the Discord DM and the `/api/alerts/` JSON API; `docs/adr/0005-price-alerts.md`), `jobs` (what each background job last did, for the admin dashboard and the staleness alarm), `dsreload` (single-flight datastore reload that queues one request behind a running one, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `pledge` (a Patreon login's identity lookup and the site tier its pledge or grant entitles; `Auth` calls it), `poke` (the readers Patreon's webhook or a grant edit poked and the moment the access table last changed, each rounded up to the second, and the signatures re-signed since; a signature issued before either renews or is re-signed on its next request, §3.2), `siteorigin` (the public origin a request reached the site at behind the proxy, and whether a host is the site's own), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `mkmidparser` (Cardmarket product id → the card it names, for uploads that carry one), `tcgskuparser` (TCGplayer SKU → the card it names and the condition it encodes, for uploads that carry one), `sessionstore` (an admin's upload published as a store for the running process), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `salesvelocity` (TCGplayer's copies sold a day per card, from the newspaper's sales table, the last load, and the check on the pull behind them), `suggest` (the names the browser's suggestion bar offers through OpenSearch, and "did you mean" hints for empty search results), `uploadtie` (which store wins an upload row when several offer its best price, by the reader's tie rule), `uploadsort` (each printing's card-property sort keys, written on the upload's rows), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps), `xlsread` (the cell text of a legacy .xls upload, BIFF8 or BIFF5, with every allocation bounded by the file's size; `xlstest` writes small .xls files for the tests) |
+| `internal/` | Packages only this module imports: `alerts` (price alerts: the model, its Postgres store on the userstate pool, the debounced evaluator, the Discord DM and the `/api/alerts/` JSON API; `docs/adr/0005-price-alerts.md`), `jobs` (what each background job last did, for the admin dashboard and the staleness alarm), `metricsreport` (the admin Metrics section's rules, its digest and the cache of its queries), `dsreload` (single-flight datastore reload that queues one request behind a running one, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `pledge` (a Patreon login's identity lookup and the site tier its pledge or grant entitles; `Auth` calls it), `poke` (the readers Patreon's webhook or a grant edit poked and the moment the access table last changed, each rounded up to the second, and the signatures re-signed since; a signature issued before either renews or is re-signed on its next request, §3.2), `siteorigin` (the public origin a request reached the site at behind the proxy, and whether a host is the site's own), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `mkmidparser` (Cardmarket product id → the card it names, for uploads that carry one), `tcgskuparser` (TCGplayer SKU → the card it names and the condition it encodes, for uploads that carry one), `sessionstore` (an admin's upload published as a store for the running process), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `salesvelocity` (TCGplayer's copies sold a day per card, from the newspaper's sales table, the last load, and the check on the pull behind them), `suggest` (the names the browser's suggestion bar offers through OpenSearch, and "did you mean" hints for empty search results), `uploadtie` (which store wins an upload row when several offer its best price, by the reader's tie rule), `uploadsort` (each printing's card-property sort keys, written on the upload's rows), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps), `xlsread` (the cell text of a legacy .xls upload, BIFF8 or BIFF5, with every allocation bounded by the file's size; `xlstest` writes small .xls files for the tests) |
 
 ## 7. Frontend
 

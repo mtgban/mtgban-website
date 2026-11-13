@@ -1,6 +1,6 @@
 {{define "navbar"}}
 <nav class="m-nav"{{if .UserTier}} data-tier="{{.UserTier}}"{{end}}>
-    <a class="m-nav-home" href="/">
+    <a class="m-nav-home" href="/" data-track="ui.nav.link" data-track-value="brand">
         <img class="m-nav-logo-img" src="/img/logo/ban-stroop.png" alt="BAN">
         <span class="m-nav-logo-lockup">
             <span class="m-nav-logo">MTG<span class="m-nav-ban">BAN</span></span>
@@ -8,11 +8,11 @@
         </span>
     </a>
     <div class="m-nav-search">
-        <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="navsearchform">
+        <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="navsearchform" data-track="ui.searchbar.submit" data-track-value="nav">
             <input id="navsearchbox" class="m-nav-search-input" type="text" name="q" placeholder="Search..." value="" maxlength="1000" autocapitalize="none" autocorrect="off" spellcheck="false" data-autocomplete="{{if .IsSealed}}true{{else}}false{{end}}" data-autocomplete-value="{{.SearchQuery}}">
         </form>
         <button class="m-nav-search-btn" type="submit" form="navsearchform" title="Search">&#128269;</button>
-        <button class="m-nav-search-btn m-nav-filter-btn" type="button" title="Filters" onclick="var o=document.getElementById('m-filter-overlay'),s=document.getElementById('m-filter-sheet');if(o&&s){o.classList.add('open');s.classList.add('open');}">&#8942;</button>
+        <button class="m-nav-search-btn m-nav-filter-btn" type="button" title="Filters" onclick="var o=document.getElementById('m-filter-overlay'),s=document.getElementById('m-filter-sheet');if(o&&s){o.classList.add('open');s.classList.add('open');}" data-track="ui.mfilter.open">&#8942;</button>
     </div>
     <div class="m-nav-right">
         {{if not .NoBackpack}}
@@ -27,7 +27,7 @@
             <svg class="theme-icon theme-icon-system" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9a9a9a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         </button>
         <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}" defer></script>
-        <button class="m-nav-hamburger" onclick="document.getElementById('m-menu').classList.toggle('open'); document.getElementById('m-overlay').classList.toggle('open');">&#9776;</button>
+        <button class="m-nav-hamburger" onclick="document.getElementById('m-menu').classList.toggle('open'); document.getElementById('m-overlay').classList.toggle('open');" data-track="ui.nav.menu" data-track-value="open">&#9776;</button>
     </div>
 </nav>
 
@@ -37,7 +37,7 @@
     <ul class="m-menu-links">
         {{range .Nav}}
         <li>
-            <a class="{{.Class}}" href="{{.Link}}">
+            <a class="{{.Class}}" href="{{.Link}}" data-track="ui.nav.link" data-track-value="menu_link">
                 <span class="nav-icon">{{.Short}}</span> {{.Name}}
             </a>
         </li>
@@ -45,8 +45,8 @@
     </ul>
     <hr class="m-menu-divider">
     <div class="m-menu-ext">
-        <a href="https://www.patreon.com/mtgban"><img src="/img/misc/patreon.png" alt="Patreon"></a>
-        <a {{if .PatreonLogin}}style="display:none"{{end}} href="/discord"><img src="/img/misc/discord.png" alt="Discord"></a>
+        <a href="https://www.patreon.com/mtgban" data-track="ui.nav.link" data-track-value="patreon"><img src="/img/misc/patreon.png" alt="Patreon"></a>
+        <a {{if .PatreonLogin}}style="display:none"{{end}} href="/discord" data-track="ui.nav.link" data-track-value="discord"><img src="/img/misc/discord.png" alt="Discord"></a>
     </div>
     <hr class="m-menu-divider">
     <a class="m-menu-view-toggle" href="#" onclick="window.location='/toggle-mobile?redirect='+encodeURIComponent(window.location.pathname+window.location.search); return false;">Switch to Desktop View</a>

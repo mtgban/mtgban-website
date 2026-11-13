@@ -1391,6 +1391,9 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 
 	switch page {
 	case "":
+		if isPageView(r) {
+			observe(r, "news.report", "index")
+		}
 		render(w, "news.html", pageVars)
 
 		return
@@ -1415,7 +1418,9 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 			if err := mtgban.WriteBuylistToCSV(b, syp, 1, w); err != nil {
 				dropDownloadHeaders(w)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
+			observe(r, "news.syp_csv", "")
 			return
 		}
 
@@ -1489,6 +1494,10 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		pageVars.Arb = append(pageVars.Arb, entry)
 
+		if isPageView(r) {
+			observe(r, "news.report", "syp")
+			observe(r, "news.syp_sort", sypSort(sorting))
+		}
 		render(w, "syp.html", pageVars)
 
 		return
@@ -1583,6 +1592,10 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
+	if report.Option != "" && countNews(r) {
+		// No news fact is store-valued, so no prices snapshot.
+		observeFacts(r, nil, newsFacts(readNewsRun(report, pageVars, query)))
+	}
 
 	for _, result := range pageVars.Table {
 		c := uuid2card(b, p, result.UUID, preferFlavor, nil)

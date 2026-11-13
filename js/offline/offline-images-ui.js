@@ -144,6 +144,7 @@
                     ' is free. Narrow the selection.';
                 return;
             }
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.images', 'sync_now');
             syncing = true;
             syncSelectedCount = codes.length;
             pauseRequested = false;
@@ -220,11 +221,13 @@
         window.EditionsPicker.init(root);
         loadSelection();
         root.addEventListener('change', function () {
+            if (!touched && window.BAN && window.BAN.track) window.BAN.track('ui.offline.images', 'editions_changed');
             touched = true;
             renderEstimates();
         });
         syncBtn.addEventListener('click', startSync);
         pauseBtn.addEventListener('click', function () {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.images', 'pause');
             pauseRequested = true;
             pauseBtn.disabled = true;
             labelEl.textContent = 'Pausing after the current edition...';

@@ -124,18 +124,23 @@
         var persist = navigator.storage && navigator.storage.persist
             ? navigator.storage.persist() : Promise.resolve(false);
         var registered = false;
+        var registering = false;
         return persist.then(function () {
+            registering = true;
             return navigator.serviceWorker.register('/sw.js');
         }).then(function () {
             registered = true;
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.sw', 'install_ok');
             return OfflineDB.ensureKey();
         }).then(function () {
             writePref(PREF, 'true');
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.mode', 'enable');
             return reconcileSelections();
         }).then(function () {
             sync();
             return refreshStatus();
         }).catch(function (err) {
+            if (registering && !registered && window.BAN && window.BAN.track) window.BAN.track('ui.offline.sw', 'install_fail');
             if (registered) {
                 navigator.serviceWorker.getRegistrations()
                     .then(function (regs) {
@@ -165,6 +170,7 @@
         removePref('offline_editions');
         removePref('offline_img_editions');
         writePref(PREF, 'false');
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.mode', 'disable');
         // Prefs record the opt-out first; the boot path retries cleanup if this fails.
         return cleanupLocal().then(function () {
             state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false, authLapsed: false };
@@ -244,6 +250,9 @@
             if (m.code) label += ' (' + m.code + ')';
             setSyncStatus('Syncing: ' + label);
         } else if (m.type === 'done') {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.sync', 'ok', 'catalog');
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.sync', 'ok', 'prices');
+            if (m.images && window.BAN && window.BAN.track) window.BAN.track('ui.offline.sync', 'ok', 'images');
             setSyncing(false);
             // A queued image sync keeps the page asking before it is left
             if (pendingImages) window.addEventListener('beforeunload', onBeforeUnload);
@@ -261,6 +270,16 @@
                 }
             });
         } else if (m.type === 'error') {
+            var failedAt = '';
+            switch (m.stage) {
+                case 'manifest': case 'catalog': failedAt = 'catalog'; break;
+                case 'prices': failedAt = 'prices'; break;
+                case 'images': failedAt = 'images'; break;
+            }
+            // Each stage before the failed one got through.
+            if (failedAt !== 'catalog' && failedAt && window.BAN && window.BAN.track) window.BAN.track('ui.offline.sync', 'ok', 'catalog');
+            if (failedAt === 'images' && window.BAN && window.BAN.track) window.BAN.track('ui.offline.sync', 'ok', 'prices');
+            if (failedAt && window.BAN && window.BAN.track) window.BAN.track('ui.offline.sync', 'fail', failedAt);
             setSyncing(false);
             pendingImages = false;
             if (m.message === 'forbidden') {
@@ -374,6 +393,7 @@
         btn.addEventListener('click', function () {
             var on = !(window.OfflinePrefer && OfflinePrefer.get());
             if (window.OfflinePrefer) OfflinePrefer.set(on);
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.offline', on ? 'on' : 'off');
             var params = new URLSearchParams(location.search);
             var q = params.get('q');
             var qs = q ? 'q=' + encodeURIComponent(q) : '';
@@ -400,6 +420,7 @@
     // per-edition rows, so those are dropped here to give the diff work to do.
     function forceResync() {
         if (syncing || !enabled()) return Promise.resolve();
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.data', 'resync');
         setSyncStatus('Syncing: starting');
         return OfflineDB.getAllRows('imgstate').then(function (rows) {
             return Promise.all(rows.map(function (r) {
@@ -414,6 +435,7 @@
     // that fills them. The preference is left alone, so the next sync starts
     // from nothing rather than the feature switching itself off.
     function wipeLocal() {
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.data', 'wipe');
         if (syncWorker) {
             syncWorker.terminate();
             syncWorker = null;

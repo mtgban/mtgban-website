@@ -31,6 +31,7 @@ func (s *site) alertAPIDeps() alerts.APIDeps {
 		Mint:        func(t alerts.Token) string { return alerts.MintToken(alertTokenSecret(), t) },
 		SendConfirm: sendConfirm,
 		ConfirmTTL:  alertConfirmTTL,
+		Observe:     requestObserver,
 	}
 }
 
@@ -64,5 +65,5 @@ func alertsIdentity(r *http.Request) (c alerts.Caller, status int, msg string) {
 	if v.Get("UserEmailUnverified") == "true" {
 		return c, http.StatusForbidden, alertsUnverifiedMsg
 	}
-	return alerts.Caller{UserHash: userstate.HashEmail(email), Tier: v.Get("UserTier"), Values: v, Origin: siteorigin.Of(r)}, http.StatusOK, ""
+	return alerts.Caller{UserHash: userstate.HashEmail(email), Tier: v.Get("UserTier"), Values: v, Origin: siteorigin.Of(r), Page: refererPage(r)}, http.StatusOK, ""
 }

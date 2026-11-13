@@ -55,6 +55,8 @@ type Caller struct {
 	// Origin is the site the request came to, empty when its host is not
 	// one the site trusts.
 	Origin string
+	// Page is the page the request was made from, a page label or "".
+	Page string
 }
 
 // APIDeps is what the API reads; Prices and Resolve read the live data
@@ -78,6 +80,8 @@ type APIDeps struct {
 	ConfirmTTL  time.Duration
 	// ConfirmLimiter caps confirmation mails per user.
 	ConfirmLimiter *ratelimit.Limiter
+	// Observe counts what a request did; nil counts nothing.
+	Observe func(r *http.Request, scope, name, value string)
 }
 
 const (
@@ -111,6 +115,9 @@ func NewAPI(deps APIDeps) *API {
 	}
 	if deps.ConfirmLimiter == nil && deps.Store != nil {
 		deps.ConfirmLimiter = ratelimit.NewLimiter(confirmRate, confirmBurst)
+	}
+	if deps.Observe == nil {
+		deps.Observe = func(*http.Request, string, string, string) {}
 	}
 	return &API{deps: deps}
 }
@@ -196,6 +203,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	userHash := c.UserHash
 	if a.deps.Limiter != nil && !a.deps.Limiter.Allow(userHash) {
+		a.deps.Observe(r, "", "ratelimit.reject", "alerts")
 		jsonError(w, http.StatusTooManyRequests, "too many requests")
 		return
 	}
@@ -241,6 +249,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			a.fail(w, "delete all", err)
 			return
 		}
+		a.deps.Observe(r, "", "alerts.delete_all", "")
 		writeJSON(w, http.StatusOK, map[string]int64{"deleted": n})
 	case rest == "options" && r.Method == http.MethodGet:
 		// keep lists an alert's own stores so the edit form shows them unpriced.
@@ -291,6 +300,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				jsonError(w, http.StatusNotFound, "not found")
 				return
 			}
+			a.deps.Observe(r, "", "alerts.delete", "")
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			jsonError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -495,6 +505,23 @@ func (a *API) create(w http.ResponseWriter, r *http.Request, c Caller) {
 	if hasPrice {
 		v.Current = &best
 	}
+	// A scoped name always sends a scope.
+	page := c.Page
+	if page == "" {
+		page = "other"
+	}
+	a.deps.Observe(r, page, "alerts.create", sideValue(created.Side))
+	switch created.Delivery {
+	case DeliveryDiscord:
+		a.deps.Observe(r, "", "alerts.create_delivery", "discord")
+	case DeliveryEmail:
+		a.deps.Observe(r, "", "alerts.create_delivery", "email")
+	}
+	a.deps.Observe(r, "", "alerts.create_condition", created.Condition)
+	for _, v := range thresholdValues(created) {
+		a.deps.Observe(r, "", "alerts.create_threshold", v)
+	}
+	a.deps.Observe(r, "", "alerts.create_stores", storesBucket(len(created.Stores)))
 	writeJSON(w, http.StatusCreated, v)
 }
 
@@ -564,6 +591,11 @@ func (a *API) patch(w http.ResponseWriter, r *http.Request, c Caller, id int64) 
 			return
 		}
 		cur.Status = req.Status
+		if req.Status == StatusPaused {
+			a.deps.Observe(r, "", "alerts.pause", "")
+		} else {
+			a.deps.Observe(r, "", "alerts.resume", "")
+		}
 		writeJSON(w, http.StatusOK, View{Alert: cur})
 		return
 	}
@@ -624,6 +656,7 @@ func (a *API) patch(w http.ResponseWriter, r *http.Request, c Caller, id int64) 
 		jsonError(w, http.StatusNotFound, "not found")
 		return
 	}
+	a.deps.Observe(r, "", "alerts.edit", "")
 	writeJSON(w, http.StatusOK, View{Alert: next})
 }
 
@@ -754,10 +787,11 @@ func (a *API) confirmRefusal(c Caller) (int, string) {
 // address and mails it under the claim made at claimedAt, releasing the
 // claim when the limiter or the provider refuses; false means it answered
 // with the failure.
-func (a *API) mailConfirm(ctx context.Context, w http.ResponseWriter, c Caller, address string, claimedAt time.Time) bool {
+func (a *API) mailConfirm(ctx context.Context, r *http.Request, w http.ResponseWriter, c Caller, address string, claimedAt time.Time) bool {
 	// Charged only now, so a claim the hourly gap refused costs nothing.
 	if !a.deps.ConfirmLimiter.Allow(c.UserHash) {
 		a.releaseConfirm(ctx, c, address, claimedAt)
+		a.deps.Observe(r, "", "ratelimit.reject", "alerts_confirm")
 		jsonError(w, http.StatusTooManyRequests, "too many confirmation mails; try again later")
 		return false
 	}
@@ -854,8 +888,15 @@ func (a *API) setEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 	if a.claimRefused(w, claimed, err) {
 		return
 	}
-	if !a.mailConfirm(ctx, w, c, address, claimedAt) {
+	if !a.mailConfirm(ctx, r, w, c, address, claimedAt) {
 		return
+	}
+	if !found {
+		a.deps.Observe(r, "", "alerts.channel", "add")
+	} else if !strings.EqualFold(cur.Address, address) {
+		a.deps.Observe(r, "", "alerts.channel", "change")
+	} else {
+		a.deps.Observe(r, "", "alerts.channel", "resend")
 	}
 	writeJSON(w, http.StatusAccepted, emailState{State: statePending, Address: address})
 }
@@ -929,9 +970,10 @@ func (a *API) resendEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 	if a.claimRefused(w, claimed, err) {
 		return
 	}
-	if !a.mailConfirm(ctx, w, c, address, claimedAt) {
+	if !a.mailConfirm(ctx, r, w, c, address, claimedAt) {
 		return
 	}
+	a.deps.Observe(r, "", "alerts.channel", "resend")
 	writeJSON(w, http.StatusAccepted, emailState{State: statePending, Address: address})
 }
 
@@ -1003,6 +1045,7 @@ func (a *API) deleteEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 		a.fail(w, "channel", err)
 		return
 	}
+	a.deps.Observe(r, "", "alerts.channel", "remove")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1037,5 +1080,6 @@ func (a *API) enableChannel(w http.ResponseWriter, r *http.Request, c Caller) {
 		jsonError(w, http.StatusUnprocessableEntity, "this address cannot receive mail from us")
 		return
 	}
+	a.deps.Observe(r, "", "alerts.channel", "enable")
 	w.WriteHeader(http.StatusNoContent)
 }

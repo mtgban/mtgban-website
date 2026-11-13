@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test';
 import { readFileSync } from 'fs';
+import { trackProblems, trackText } from './track-registry.js';
 
 const source = readFileSync(new URL('../js/recent-searches.js', import.meta.url), 'utf8');
 const listStorageSource = readFileSync(new URL('../js/list-storage.js', import.meta.url), 'utf8');
@@ -98,7 +99,7 @@ test('a visitor the page renders as signed out sends no vote', () => {
 
 // Drives recent-searches.js through one page load with a desktop list to
 // render into, and reports what it stored and what the list links to.
-function runListPage({pathname = '/search', search = '', pending = null, url = '', stored = null, values = new Map()} = {}) {
+function runListPage({pathname = '/search', search = '', pending = null, url = '', stored = null, values = new Map(), mode = 'desktop', BAN, confirmDialog} = {}) {
     const events = {};
     if (pending !== null) values.set('mtgban_pending_search', pending);
     if (stored !== null) values.set('mtgban_recent_searches', JSON.stringify(stored));
@@ -116,7 +117,7 @@ function runListPage({pathname = '/search', search = '', pending = null, url = '
         readyState: 'loading',
         documentElement: {dataset: {signedIn: 'false'}},
         addEventListener: (type, handler) => { events[type] = handler; },
-        getElementById: id => id === 'desktop-recent-searches' ? container : null,
+        getElementById: id => id === (mode === 'mobile' ? 'm-recent-searches' : 'desktop-recent-searches') ? container : null,
         querySelector: () => null,
     };
     const window = {
@@ -124,6 +125,8 @@ function runListPage({pathname = '/search', search = '', pending = null, url = '
         BAN_SEARCH_RESULT: {found: true, label: '', url},
         addEventListener: () => {},
     };
+    if (BAN) window.BAN = BAN;
+    if (confirmDialog) window.confirmDialog = confirmDialog;
     const utils = readFileSync(new URL('../js/utils.js', import.meta.url), 'utf8');
     const ListStorage = new Function('localStorage', listStorageSource + '\nreturn ListStorage;')(localStorage);
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'DOMParser', 'ListStorage', utils + '\n' + source)(
@@ -186,4 +189,57 @@ test('a search noted from another page is recorded by the page that answers it',
     runListPage({search: '?q=bolt', values}).window.notePendingSearch('bolt');
     const {searches} = runListPage({search: '?q=bolt&scope=s%3Asos', values});
     expect(searches[0]).toMatchObject({q: 'bolt', sc: 's:sos'});
+});
+
+const twoRecents = [{q: 'bolt', t: 2, m: 2, pinned: 2}, {q: 'opal', t: 1, m: 1}];
+
+test('the desktop list marks each entry and its buttons', () => {
+    const {html} = runListPage({stored: twoRecents});
+    expect(html.split('data-track="ui.recents" data-track-value="open"').length - 1).toBe(2);
+    expect(html.split('data-track-value="unpin"').length - 1).toBe(1);
+    expect(html.split('data-track-value="pin"').length - 1).toBe(1);
+    expect(html.split('data-track-value="delete"').length - 1).toBe(2);
+    expect(trackProblems(html)).toEqual([]);
+});
+
+test('the mobile list has entries only', () => {
+    const {html} = runListPage({stored: twoRecents, mode: 'mobile'});
+    expect(html.split('data-track="ui.recents" data-track-value="open"').length - 1).toBe(2);
+    expect(html).not.toContain('data-track-value="pin"');
+    expect(html).not.toContain('data-track-value="unpin"');
+    expect(html).not.toContain('data-track-value="delete"');
+    expect(trackProblems(html)).toEqual([]);
+});
+
+test('clearing counts when it is confirmed', () => {
+    const calls = [];
+    let kept = null;
+    const {window} = runListPage({
+        stored: twoRecents,
+        BAN: {track: (...a) => calls.push(a)},
+        confirmDialog: (msg, cb) => { kept = cb; },
+    });
+    window.clearRecentSearches({closest: () => null});
+    expect(calls).toEqual([]);
+    kept();
+    expect(calls).toEqual([['ui.recents', 'clear']]);
+});
+
+test('clearing with no BAN still clears', () => {
+    const values = new Map();
+    const {window} = runListPage({stored: twoRecents, values});
+    window.clearRecentSearches({closest: () => null});
+    const left = JSON.parse(values.get('mtgban_recent_searches')).filter(s => !s.del);
+    expect(left).toEqual([]);
+});
+
+test('no stored query, pinned bar or image reaches a count attribute', () => {
+    const stored = [{q: 'zzqueryzz', sc: 'zzscope', img: 'https://zz.test/zzimg.jpg', crop: 'https://zz.test/zzcrop.jpg', t: 1, m: 1}];
+    for (const mode of ['desktop', 'mobile']) {
+        const {html} = runListPage({stored, mode});
+        expect(html).toContain('zzqueryzz');
+        expect(html).toContain('zzscope');
+        expect(trackText(html)).not.toContain('zz');
+        expect(trackProblems(html)).toEqual([]);
+    }
 });

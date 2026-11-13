@@ -70,6 +70,7 @@
         <button class="admin-tab{{if or (eq .Page "") (eq .Page "dashboard")}} active{{end}}" onclick="window.switchTab && switchTab(this,'dashboard')">Dashboard</button>
         <button class="admin-tab{{if eq .Page "usage"}} active{{end}}" onclick="location.href='?page=usage'">Usage</button>
         <button class="admin-tab{{if eq .Page "searches"}} active{{end}}" onclick="location.href='?page=searches'">Searches</button>
+        <button class="admin-tab{{if eq .Page "metrics"}} active{{end}}" onclick="location.href='?page=metrics'">Metrics</button>
         <button class="admin-tab{{if eq .Page "alerts"}} active{{end}}" onclick="location.href='?page=alerts'">Alerts</button>
         <button class="admin-tab{{if eq .Page "people"}} active{{end}}" onclick="window.switchTab && switchTab(this,'people')">People</button>
         <button class="admin-tab{{if $isFile}} active{{end}}" onclick="window.switchTab && switchTab(this,'files')">Files</button>
@@ -202,6 +203,13 @@
          ═══════════════════════ -->
     <div class="admin-panel{{if eq .Page "searches"}} active{{end}}" id="panel-searches">
         {{if eq .Page "searches"}}{{template "admin-searches" .}}{{end}}
+    </div>
+
+    <!-- ═══════════════════════
+         METRICS
+         ═══════════════════════ -->
+    <div class="admin-panel{{if eq .Page "metrics"}} active{{end}}" id="panel-metrics">
+        {{if eq .Page "metrics"}}{{template "admin-metrics" .}}{{end}}
     </div>
 
     <!-- ═══════════════════════
@@ -580,6 +588,9 @@
                     <button type="submit" class="admin-action" name="tool" value="snapshot" onclick="return confirm('Take a data snapshot?')">
                         <span class="act-icon">📸</span> Take Snapshot
                         {{if .DisableChart}}<span title="Stashing in progress">⚠️</span>{{end}}
+                    </button>
+                    <button type="submit" class="admin-action" name="tool" value="metricsfold" onclick="return confirm('Fold metrics through today?')">
+                        <span class="act-icon">📊</span> Fold metrics
                     </button>
                     <a class="admin-action" href="/admin?download=variantmap" title="TSV joining each archive alias to its matcher id, for the mtgban_id backfill">Export variant map</a>
                     <button type="submit" class="admin-action" name="tool" value="tcgcsv" onclick="return confirm('Ingest the latest TCGCSV prices?')">
@@ -1043,4 +1054,6 @@ window.addEventListener("beforeunload", function(e) {
 })();
 </script>
 {{end}}
+
+{{if and (eq .Page "metrics") .Metrics (not .IsMobile)}}{{template "admin-metrics-scripts" .}}{{end}}
 {{end}}

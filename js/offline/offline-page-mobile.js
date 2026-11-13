@@ -23,6 +23,7 @@
     function wireCardInteractions(results) {
         results.querySelectorAll('.m-tab').forEach(function (tab) {
             tab.addEventListener('click', function () {
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.page', 'tab');
                 var card = this.closest('.m-card');
                 card.querySelectorAll('.m-tab').forEach(function (t) { t.classList.remove('active'); });
                 card.querySelectorAll('.m-tab-panel').forEach(function (p) { p.classList.remove('active'); });
@@ -36,6 +37,7 @@
                 var cond = this.getAttribute('data-cond');
                 var card = this.closest('.m-card');
                 if (!card) return;
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.page', 'condition');
                 this.closest('.m-cond-pills').querySelectorAll('.m-cond-pill').forEach(function (p) { p.classList.remove('active'); });
                 this.classList.add('active');
                 card.querySelectorAll('.m-cond-group').forEach(function (g) {

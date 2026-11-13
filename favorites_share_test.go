@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/mtgban-website/ratelimit"
 	"github.com/mtgban/mtgban-website/userstate"
 )
 
@@ -318,5 +319,40 @@ func TestSharedRowsTakeArtFromTheDatastore(t *testing.T) {
 	}
 	if !strings.Contains(body, thumb.Host) {
 		t.Errorf("the page lacks the datastore's image host %q", thumb.Host)
+	}
+}
+
+// A list shown and a link that has ended are counted per page view; a
+// script's fetch and a refused request count neither.
+func TestSharedFavoritesAreCounted(t *testing.T) {
+	saved := sharedPageLimiter
+	t.Cleanup(func() { sharedPageLimiter = saved })
+	sharedPageLimiter = ratelimit.NewLimiter(1000, 1000)
+	store := &fakeShareStore{favorites: map[string]string{liveShareID: "[]"}}
+
+	rows := withFeatureCounter(t)
+	sharedGet(t, store, "?id="+liveShareID, "192.0.2.40:1", false)
+	sharedGet(t, store, "?id=BBBBBBBBBBBBBBBBBBBBBB", "192.0.2.40:1", false)
+	sharedGet(t, store, "?id=short", "192.0.2.40:1", false)
+	sharedGet(t, nil, "?id="+liveShareID, "192.0.2.40:1", false)
+	fetch := httptest.NewRequest(http.MethodGet, "/search/shared?id="+liveShareID, nil)
+	fetch.Header.Set("Sec-Fetch-Dest", "empty")
+	testSite.favoritesShared(httptest.NewRecorder(), fetch, store)
+	gone := httptest.NewRequest(http.MethodGet, "/search/shared?id=short", nil)
+	gone.Header.Set("Sec-Fetch-Dest", "empty")
+	testSite.favoritesShared(httptest.NewRecorder(), gone, store)
+	sharedPageLimiter = ratelimit.NewLimiter(0, 0)
+	sharedGet(t, store, "?id="+liveShareID, "192.0.2.40:1", false)
+
+	got := rows.rows()
+	if view := find(got, "favshare.view"); len(view) != 1 || view[0].N != 1 {
+		t.Errorf("favshare.view rows %+v, want one of 1", view)
+	}
+	var n int64
+	for _, row := range find(got, "favshare.view_gone") {
+		n += row.N
+	}
+	if n != 2 {
+		t.Errorf("favshare.view_gone counted %d, want 2", n)
 	}
 }

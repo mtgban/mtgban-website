@@ -78,6 +78,7 @@ func (s *site) apiHandoff(w http.ResponseWriter, r *http.Request, purpose string
 		}
 	}
 	if nonce == "" {
+		observeScoped(r, "refused", "apiplans.handoff", handoffPurpose(purpose))
 		s.renderAPIHandoffError(w, r, ErrMsgAPIHandoffOff)
 		return
 	}
@@ -105,6 +106,7 @@ func (s *site) apiHandoff(w http.ResponseWriter, r *http.Request, purpose string
 		"scope":         {"identity identity[email] campaigns campaigns.members"},
 		"state":         {handoffStatePrefix + state.Encode()},
 	}
+	observeScoped(r, "start", "apiplans.handoff", handoffPurpose(purpose))
 	http.Redirect(w, r, patreonAuthorizeURL+"?"+q.Encode(), http.StatusFound)
 }
 
@@ -180,6 +182,11 @@ func (s *site) finishAPIHandoff(w http.ResponseWriter, r *http.Request, state ha
 		}
 	}
 	logHandoff(state, email, tier, outcome)
+	step := "ok"
+	if msg != "" {
+		step = "refused"
+	}
+	observeScoped(r, step, "apiplans.handoff", handoffPurpose(state.purpose))
 	if msg != "" {
 		s.renderAPIHandoffError(w, r, msg)
 		return
@@ -206,7 +213,19 @@ func (s *site) finishAPIHandoff(w http.ResponseWriter, r *http.Request, state ha
 func (s *site) failAPIHandoff(w http.ResponseWriter, r *http.Request, state handoffState, outcome string) {
 	spendHandoffCookie(w, r, state)
 	logHandoff(state, "", "", outcome)
+	observeScoped(r, "refused", "apiplans.handoff", handoffPurpose(state.purpose))
 	s.renderAPIHandoffError(w, r, ErrMsgAPIHandoffNoAnswer)
+}
+
+// handoffPurpose names a handoff's purpose for a count: trial, login or unknown.
+func handoffPurpose(p string) string {
+	switch p {
+	case apihandoff.PurposeTrial:
+		return "trial"
+	case apihandoff.PurposeLogin:
+		return "login"
+	}
+	return "unknown"
 }
 
 // logHandoff records how a handoff ended, as the site login records its own.

@@ -13,12 +13,12 @@
             <p class="page-subtitle">{{if .SignedIn}}Your BAN account on this site{{else}}What each tier unlocks{{end}}</p>
         </div>
         {{if .SignedIn}}
-        <a class="page-action" href="/?errmsg=logout">Log out</a>
+        <a class="page-action" href="/?errmsg=logout" data-track="ui.account" data-track-value="logout">Log out</a>
         {{else if $.PatreonLogin}}
             {{template "patreon-login-script" $}}
             {{if $.PatreonIDs}}
                 {{range $ref, $id := $.PatreonIDs}}
-                <a class="page-action user-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in with Patreon</a>
+                <a class="page-action user-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.account" data-track-value="login">Log in with Patreon</a>
                 {{end}}
             {{else}}
                 <button class="page-action user-login" type="button" disabled title="Login is unavailable because Patreon is not configured">Log in with Patreon</button>
@@ -47,7 +47,7 @@
                 <dt>Discord</dt>
                 <dd>
                     {{if eq .Discord.State "linked"}}{{if .Discord.Handle}}{{.Discord.Handle}}{{else}}Linked{{end}}{{else if eq .Discord.State "unlinked"}}Not linked{{else if eq .Discord.State "unverified"}}Verify your Patreon email to show it{{else if eq .Discord.State "unavailable"}}Not available on this site{{else}}Shown after your next login{{end}}
-                    <a class="user-manage" href="https://www.patreon.com/settings/apps" target="_blank" rel="noopener">Manage on Patreon</a>
+                    <a class="user-manage" href="https://www.patreon.com/settings/apps" target="_blank" rel="noopener" data-track="ui.account" data-track-value="manage_patreon">Manage on Patreon</a>
                 </dd>
             </div>
         </dl>
@@ -57,13 +57,13 @@
         {{if .CanRefresh}}
         <form method="post" action="/user">
             <input type="hidden" name="action" value="refresh">
-            <button class="page-action" type="submit" title="Ask Patreon again for your tier and sign you in anew">Refresh now</button>
+            <button class="page-action" type="submit" title="Ask Patreon again for your tier and sign you in anew" data-track="ui.account" data-track-value="refresh">Refresh now</button>
         </form>
         {{end}}
         {{if .CanEndSessions}}
         <form method="post" action="/user">
             <input type="hidden" name="action" value="logout-everywhere">
-            <button class="page-action" type="submit" title="End your sign-in on every device">Log out everywhere</button>
+            <button class="page-action" type="submit" title="End your sign-in on every device" data-track="ui.account" data-track-value="logout_everywhere">Log out everywhere</button>
         </form>
         {{end}}
     </div>
@@ -73,7 +73,7 @@
     {{if .Features}}
     <div class="user-features">
         {{range .Features}}
-        <a class="card user-feature" href="{{.Link}}">
+        <a class="card user-feature" href="{{.Link}}" data-track="ui.account" data-track-value="feature_card">
             <span class="user-feature-name">{{.Name}}</span>
             <span class="user-feature-desc">{{.Description}}</span>
         </a>
@@ -138,7 +138,7 @@
     {{else}}
     <p class="user-note">Tier details are unavailable right now.</p>
     {{end}}
-    <p class="user-note">Each tier is a Patreon membership: <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">join or switch tiers on Patreon</a>.</p>
+    <p class="user-note">Each tier is a Patreon membership: <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener" data-track="ui.account" data-track-value="join_tier">join or switch tiers on Patreon</a>.</p>
 </div>
 {{end}}
 {{end}}

@@ -14,19 +14,7 @@ import (
 // deleted on cleanup so the test is safe to run against the shared DB.
 func testClient(t *testing.T) *Client {
 	t.Helper()
-	if os.Getenv("OBSERVABILITY_TEST") == "" {
-		t.Skip("OBSERVABILITY_TEST not set; skipping DB integration test")
-	}
-	port, _ := strconv.Atoi(getenv("OBS_PORT", "5432"))
-	cfg := SQLConfig{
-		Host:     getenv("OBS_HOST", "127.0.0.1"),
-		Port:     port,
-		User:     getenv("OBS_USER", "observability_app"),
-		Password: os.Getenv("OBS_PASS"),
-		DBName:   getenv("OBS_DB", "observability"),
-		SSLMode:  getenv("OBS_SSLMODE", "disable"),
-	}
-	c, err := NewClient(cfg)
+	c, err := NewClient(testSQLConfig(t))
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -35,6 +23,23 @@ func testClient(t *testing.T) *Client {
 		c.Close()
 	})
 	return c
+}
+
+// testSQLConfig reads the test DB from env vars, skipping unless OBSERVABILITY_TEST is set.
+func testSQLConfig(t *testing.T) SQLConfig {
+	t.Helper()
+	if os.Getenv("OBSERVABILITY_TEST") == "" {
+		t.Skip("OBSERVABILITY_TEST not set; skipping DB integration test")
+	}
+	port, _ := strconv.Atoi(getenv("OBS_PORT", "5432"))
+	return SQLConfig{
+		Host:     getenv("OBS_HOST", "127.0.0.1"),
+		Port:     port,
+		User:     getenv("OBS_USER", "observability_app"),
+		Password: os.Getenv("OBS_PASS"),
+		DBName:   getenv("OBS_DB", "observability"),
+		SSLMode:  getenv("OBS_SSLMODE", "disable"),
+	}
 }
 
 func getenv(k, def string) string {

@@ -62,11 +62,13 @@
             a.classList.add('chart-remove-link');
             a.title = 'Remove from this chart';
             a.innerHTML = '&#128200;&#10134;';
+            a.setAttribute('data-track-value', 'chart_remove');
         } else {
             a.classList.remove('chart-remove-link');
             a.classList.add('chart-add-link');
             a.title = 'Add to this chart';
             a.innerHTML = '&#128200;&#10133;';
+            a.setAttribute('data-track-value', 'chart_add');
         }
     }
     var chartToastEl;
@@ -107,6 +109,7 @@
             pending.splice(idx, 1);
         }
         localStorage.setItem('chartAddPending', pending.join(','));
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.chart.roster', added ? 'add' : 'remove', 'modal');
         setChartRowState(a, added);
 
         var row = a.closest('[data-card-name]');

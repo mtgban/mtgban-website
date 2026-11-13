@@ -174,6 +174,51 @@ func TestIntegrationPruneSearchVotes(t *testing.T) {
 	}
 }
 
+// The nightly sweep takes old votes of every instance, a bounded batch at a
+// time, and leaves votes inside the window.
+func TestIntegrationPruneAllSearchVotes(t *testing.T) {
+	c := voteClient(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	u := HashVisitor("sweep@b.com")
+	const otherInstance = testInstance + "_retired"
+	t.Cleanup(func() {
+		_, _ = c.db.Exec("DELETE FROM search_votes WHERE instance = $1", otherInstance)
+	})
+	for _, inst := range []string{testInstance, otherInstance} {
+		if err := c.RecordSearchVote(ctx, inst, "card:Old", u, now.AddDate(0, 0, -400), "old", 30); err != nil {
+			t.Fatalf("RecordSearchVote: %v", err)
+		}
+		if err := c.RecordSearchVote(ctx, inst, "card:Kept", u, now.AddDate(0, 0, -100), "kept", 30); err != nil {
+			t.Fatalf("RecordSearchVote: %v", err)
+		}
+	}
+	before := now.AddDate(0, 0, -300)
+	if n, err := c.PruneAllSearchVotes(ctx, before, 1); err != nil || n != 1 {
+		t.Fatalf("first batch = %d, %v, want 1", n, err)
+	}
+	for {
+		n, err := c.PruneAllSearchVotes(ctx, before, 1000)
+		if err != nil {
+			t.Fatalf("PruneAllSearchVotes: %v", err)
+		}
+		if n < 1000 {
+			break
+		}
+	}
+	for _, inst := range []string{testInstance, otherInstance} {
+		var old, kept int
+		err := c.db.QueryRow(`SELECT count(*) FILTER (WHERE key = 'card:Old'), count(*) FILTER (WHERE key = 'card:Kept')
+FROM search_votes WHERE instance = $1 AND user_hash = $2`, inst, u).Scan(&old, &kept)
+		if err != nil {
+			t.Fatalf("count: %v", err)
+		}
+		if old != 0 || kept != 1 {
+			t.Errorf("%s: old %d kept %d after the sweep, want 0 and 1", inst, old, kept)
+		}
+	}
+}
+
 // The window's totals count what the ranking saw: every vote, each user
 // and each key once, from the window start on.
 func TestIntegrationSearchVoteTotalsCountTheWindow(t *testing.T) {

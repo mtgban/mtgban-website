@@ -7,6 +7,8 @@
 
     var modal, backdrop, form, saveBtn;
     var state = null;
+    // Set by the save path so the close that follows is not counted as a cancel.
+    var closingAfterSave = false;
 
     // ── Channels: pure helpers (exported for tests/alerts-channels.test.js) ──
 
@@ -532,7 +534,10 @@
 
     function open(opts) {
         if (!els()) return;
+        var from = document.getElementById('alerts-page') ? 'alerts_page' : 'search';
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.alerts.modal', 'open', from);
         state = {
+            from: from,
             cardId: opts.cardId || '',
             side: opts.side === 'retail' ? 'retail' : 'buylist',
             alertId: opts.alertId || null,
@@ -574,6 +579,8 @@
 
     function close() {
         if (!els()) return;
+        if (modal.classList.contains('open') && !closingAfterSave && state && window.BAN && window.BAN.track) window.BAN.track('ui.alerts.modal', 'cancel', state.from);
+        closingAfterSave = false;
         modal.classList.remove('open');
         backdrop.classList.remove('open');
     }
@@ -626,6 +633,8 @@
         saveBtn.disabled = true;
         var req = state.alertId ? api('PATCH', '/api/alerts/' + state.alertId, body) : api('POST', '/api/alerts/', body);
         req.then(function () {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.alerts.modal', 'save', state.from);
+            closingAfterSave = true;
             close();
             toast(state.alertId ? 'Alert saved' : 'Alert created');
             if (!state.alertId) markExistingBells();
@@ -706,10 +715,17 @@
 
     // Row actions on the alerts page.
     function runRowAction(id, action) {
+        var counted = '';
+        switch (action) {
+            case 'pause': case 'resume': case 'delete': counted = action; break;
+        }
         var req = action === 'delete'
             ? api('DELETE', '/api/alerts/' + id)
             : api('PATCH', '/api/alerts/' + id, { status: action === 'pause' ? 'paused' : 'active' });
-        req.then(function () { window.location.reload(); })
+        req.then(function () {
+            if (counted && window.BAN && window.BAN.track) window.BAN.track('ui.alerts.row', counted);
+            window.location.reload();
+        })
            .catch(function (err) { toast(err.message); });
     }
 
@@ -730,6 +746,7 @@
         var n = document.querySelectorAll('.alerts-table tr[data-id]').length;
         var run = function () {
             api('DELETE', '/api/alerts/').then(function (data) {
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.alerts.row', 'delete_all');
                 var note = deletedNote(n, data && data.deleted);
                 if (!note) { window.location.reload(); return; }
                 toast(note);
@@ -750,6 +767,7 @@
         var id = row.getAttribute('data-id');
         var action = btn.getAttribute('data-action');
         if (action === 'edit') {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.alerts.row', 'edit');
             open({ alertId: id, cardId: row.getAttribute('data-card-id'), side: row.getAttribute('data-side') });
             return;
         }
@@ -873,11 +891,13 @@
         show(sort);
         pick.addEventListener('change', function () {
             show(parseSort(pick.value));
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.alerts.sort', sort.field, sort.dir);
             saveSort(sort);
         });
         document.querySelectorAll('.alerts-table th[data-sort]').forEach(function (th) {
-            var onPick = function () {
+            var onPick = function (e) {
                 show(headerSort(sort, th.getAttribute('data-sort')));
+                if (!(e && e.repeat) && window.BAN && window.BAN.track) window.BAN.track('ui.alerts.sort', sort.field, sort.dir);
                 saveSort(sort);
             };
             th.setAttribute('role', 'columnheader');
@@ -886,7 +906,7 @@
             th.addEventListener('keydown', function (e) {
                 if (e.key !== 'Enter' && e.key !== ' ') return;
                 e.preventDefault();
-                onPick();
+                onPick(e);
             });
         });
     }
@@ -1181,6 +1201,11 @@
         var btn = e.target.closest('[data-channel-action]');
         if (!btn) return;
         var action = btn.getAttribute('data-channel-action');
+        var counted = '';
+        switch (action) {
+            case 'change': case 'cancel': case 'add': case 'save': case 'resend': case 'remove': case 'enable': counted = action; break;
+        }
+        if (counted && window.BAN && window.BAN.track) window.BAN.track('ui.alerts.channel', counted);
         if (action === 'change') { channelsChanging = true; renderChannels(); return; }
         if (action === 'cancel') { channelsChanging = false; renderChannels(); return; }
         if (action === 'add' || action === 'save') { submitEmail(btn); return; }

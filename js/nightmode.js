@@ -62,9 +62,15 @@
         if (pref() === 'system') apply();
     });
 
+    // A toggle press counts the pref it lands on; cycle() itself stays uncounted.
+    function onToggle() {
+        var next = cycle();
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.theme', next, 'toggle');
+    }
+
     // Wire every theme toggle on the page (navbar, landing, etc.).
     document.querySelectorAll('.ban-theme-toggle').forEach(function (btn) {
-        btn.addEventListener('click', cycle);
+        btn.addEventListener('click', onToggle);
     });
 
     window.BANTheme = { pref: pref, resolve: resolve, apply: apply, set: set, cycle: cycle };

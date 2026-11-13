@@ -145,3 +145,39 @@ func TestAdminUsagePathLinks(t *testing.T) {
 		t.Error("home path should link to /")
 	}
 }
+
+func TestAdminUsageShowsRecorderLoss(t *testing.T) {
+	lossy := &UsageDashboard{Instance: "magic", Dropped: 3, Failed: 5}
+	html := renderAdminPage(t, PageVars{Page: "usage", AdminVars: AdminVars{UsageStats: lossy}})
+	for _, want := range []string{"3 events dropped", "5 not written"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("usage panel missing %q", want)
+		}
+	}
+
+	clean := &UsageDashboard{Instance: "magic"}
+	html = renderAdminPage(t, PageVars{Page: "usage", AdminVars: AdminVars{UsageStats: clean}})
+	for _, absent := range []string{"events dropped", "not written"} {
+		if strings.Contains(html, absent) {
+			t.Errorf("usage panel contains %q with nothing lost", absent)
+		}
+	}
+}
+
+// The "other" bucket is no page: it shows as text, not a link to /other.
+func TestAdminUsageOtherIsNotALink(t *testing.T) {
+	row := []observability.PathAgg{{Path: "other", Hits: 3, Uniques: 1}}
+	dash := &UsageDashboard{
+		Instance: "magic",
+		TopPages: row,
+		ByDevice: []observability.DeviceAgg{{Path: "other", Device: "desktop", Hits: 3, Uniques: 1}},
+		SubViews: row,
+	}
+	html := renderAdminPage(t, PageVars{Page: "usage", AdminVars: AdminVars{UsageStats: dash}})
+	if strings.Contains(html, `href="/other"`) || strings.Contains(html, `href=""`) {
+		t.Error("the usage panel links the other bucket")
+	}
+	if !strings.Contains(html, ">other<") {
+		t.Error("the usage panel does not show other")
+	}
+}

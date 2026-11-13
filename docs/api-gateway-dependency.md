@@ -49,6 +49,14 @@ gateway's `go.mod`.
 ## Changing one of them
 
 - **Keep them light.** Whatever these packages import, the gateway compiles.
+- **The site owns the `observability` schema.** The gateway is to open the
+  client with `SkipSchema()` and only insert into `events`, so that its
+  database role needs `INSERT` on that table and nothing else, and to label
+  each call with `APIFamily`, the table the site's route labels use, so a
+  new API route gets its label there first. Until the gateway makes that
+  change, opening the client there runs the site's schema setup as well,
+  feature tables included, so the site deploys before a gateway pinned to
+  this commit or later.
 - **The verifier deploys first.** A failing golden test means the wire bytes
   changed, and every verifier still running will refuse the new ones. For
   `apisig` the verifiers are the game sites, which all deploy before the

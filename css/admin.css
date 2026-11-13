@@ -337,6 +337,95 @@ td.admin-stale-date { color: var(--adanger); font-weight: 600; }
     align-items: start;
 }
 .admin-usage-grid .admin-section { margin-bottom: 0; }
+/* ── Metrics Tab ── */
+.admin-metrics-bar { flex-wrap: wrap; gap: 0.6em 0.8em; }
+.admin-metrics-bar .admin-usage-range { flex: 1 1 100%; }
+.admin-metrics-bar .admin-usage-toggle { margin-left: 0; flex-wrap: wrap; }
+.admin-metrics .admin-metrics-views { display: flex; width: fit-content; max-width: 100%; flex-wrap: wrap; margin: 0 0 1.2em; }
+.admin-metrics .admin-usage-grid { margin-bottom: 1.4em; }
+.admin-metrics .admin-usage-grid > * { min-width: 0; }
+.admin-metrics-health { margin: 0 0 1.2em; font-size: var(--text-md); }
+.admin-metrics-dim { color: var(--text-dim); }
+.admin-metrics p.admin-metrics-dim { margin: 0 0 0.8em; }
+.admin-metrics-help {
+    display: block;
+    margin-top: 0.25em;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    line-height: 1.35;
+    white-space: normal;
+}
+.admin-metrics p.admin-metrics-help { margin: 0 0 0.6em; }
+/* .admin-table td is nowrap; these cells hold names, notes, rates and evidence */
+.admin-metrics .admin-table td.admin-metrics-name,
+.admin-metrics .admin-table td.admin-metrics-wrap,
+.admin-metrics .admin-table td.admin-usage-empty { white-space: normal; overflow-wrap: break-word; }
+/* Short fixed words stay on one line; rate, out of and measured wrap only between words */
+.admin-metrics .admin-table td.admin-metrics-class { white-space: nowrap; }
+.admin-metrics .admin-table td.admin-metrics-words { min-width: 9em; }
+.admin-metrics-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+.admin-metrics-counts { margin-left: 0.4em; font-size: var(--text-sm); white-space: nowrap; }
+.admin-metrics-area > summary { cursor: pointer; list-style: none; }
+.admin-metrics-area > summary::-webkit-details-marker { display: none; }
+.admin-metrics-area > summary::before { content: "\25B8"; color: var(--text-dim); }
+.admin-metrics-area[open] > summary::before { content: "\25BE"; }
+/* closed areas sit as a compact list; an open one keeps the section's spacing */
+.admin-metrics-area:not([open]) { margin-bottom: 0.3em; }
+.admin-metrics-area:not([open]) > summary { margin-bottom: 0; padding-top: 0.2em; padding-bottom: 0.2em; }
+.admin-metrics-area:not([open]) > summary h2 { line-height: 1.4; }
+.admin-metrics .admin-table td.admin-metrics-name { min-width: 12em; width: 30%; }
+.admin-metrics-digest h3,
+.admin-metrics-kind {
+    margin: 1em 0 0.4em;
+    font-size: var(--text-md);
+    font-weight: 600;
+}
+.admin-metrics-digest ul,
+.admin-metrics-more { margin: 0.3em 0 0; padding-left: 1.4em; }
+.admin-metrics-more { color: var(--text-dim); font-size: var(--text-sm); }
+.admin-metrics details > summary { cursor: pointer; padding: 0.4em 0; }
+.admin-metrics-more-rows > summary { font-size: var(--text-xl); font-weight: 600; }
+.admin-metrics-stock details { border-bottom: 1px solid var(--border-subtle); }
+.admin-metrics-stock details[open] { padding-bottom: 0.8em; }
+.admin-metrics-lead { margin: 0 0 0.8em; font-size: var(--text-lg); line-height: 1.4; }
+.admin-metrics-links,
+.admin-metrics-total { margin: 0 0 0.8em; }
+.admin-metrics p.admin-metrics-scope { margin: 0 0 1.2em; }
+.admin-metrics-problems { margin: 0.3em 0 0.8em; padding-left: 1.4em; }
+/* Chart.js sizes a canvas to its box; Task 10 draws into these */
+.admin-metrics-chart { position: relative; height: 16em; margin: 0 0 0.8em; }
+.admin-metrics-spark { position: relative; width: 8em; height: 2em; }
+.admin-metrics-days,
+.admin-metrics-group { border-bottom: 1px solid var(--border-subtle); }
+.admin-metrics-days .admin-table-wrap { max-height: 24em; overflow-y: auto; }
+.admin-metrics-names-list { columns: 16em; margin: 0.3em 0 0.8em; padding-left: 1.4em; overflow-wrap: anywhere; }
+.admin-metrics-names-list a[aria-current] { font-weight: 600; }
+.admin-metrics-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6em; margin: 0 0 1.2em; }
+.admin-metrics-picker select,
+.admin-metrics-picker button {
+    padding: 0.5em 0.8em;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-2);
+    color: var(--normal);
+    font-size: var(--text-md);
+    font-family: inherit;
+}
+.admin-metrics-picker select { min-width: 0; max-width: 100%; cursor: pointer; }
+.admin-metrics-picker button { cursor: pointer; font-weight: 600; }
+.admin-metrics-review { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4em; min-width: 16em; }
+.admin-metrics-review input[type="text"] { flex: 1 1 10em; min-width: 0; }
+/* A row's review form stays folded under a one-word summary until asked for */
+.admin-metrics .admin-table td.admin-metrics-review-cell { min-width: 6em; }
+.admin-metrics .admin-metrics-review-box > summary { padding: 0; color: var(--ainfo); font-weight: 500; white-space: nowrap; }
+.admin-metrics .admin-metrics-review-box[open] > summary { margin-bottom: 0.4em; }
 /* ── Tools Tab ── */
 .tools-grid {
     display: grid;

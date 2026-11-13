@@ -1,0 +1,115 @@
+{{define "admin-metrics-remove"}}
+{{with .Metrics.Remove}}
+{{if .ReviewsFailed}}<div class="admin-msg">Review marks could not be read, so rows already reviewed may appear again.</div>{{end}}
+{{with .ReviewsCap}}<div class="admin-msg">{{.}}</div>{{end}}
+{{with $.Metrics.PagesNote}}<p class="admin-metrics-dim">{{.}}</p>{{end}}
+{{with .Total}}<p class="admin-metrics-total">{{.}}. Open an area to see its rows.</p>{{end}}
+{{range .Areas}}
+<details class="admin-section admin-metrics-area"{{if .Open}} open{{end}}>
+    <summary class="admin-section-header"><h2>{{if .Area}}{{.Area}}{{else}}No area{{end}}</h2> <span class="count">{{.Summary}}</span></summary>
+    {{range .Kinds}}
+    <h3 class="admin-metrics-kind">{{if .Kind}}{{.Kind}}{{else}}other{{end}} <span class="admin-metrics-dim">{{len .Rows}}</span></h3>
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table admin-metrics-remove{{if $.IsMobile}} admin-metrics-stack{{end}}">
+        <thead><tr><th>Name</th><th>Class</th><th class="num">Count</th>{{if .HasOutOf}}<th>Out of</th>{{end}}<th>Rate</th><th>Measured</th>{{if .HasTiers}}<th>Tiers</th>{{end}}<th>Last seen</th><th><span class="admin-metrics-hidden">Feature page</span></th>{{if not $.Metrics.Remove.ReviewsFailed}}<th>Review</th>{{end}}</tr></thead>
+        <tbody>
+        {{$kind := .}}{{range .Rows}}
+            <tr id="{{.Anchor}}">
+                <td class="admin-metrics-name">{{template "admin-metrics-key" .}}{{if .Help}}<span class="admin-metrics-help">{{.Help}}</span>{{end}}{{template "admin-metrics-numbers" .}}</td>
+                <td class="admin-metrics-class"{{if $.IsMobile}} data-label="Class"{{end}}>{{template "admin-metrics-class" .}}</td>
+                <td class="num admin-mono"{{if $.IsMobile}} data-label="Count"{{end}}>{{.Count}}</td>
+                {{if $kind.HasOutOf}}<td class="admin-metrics-wrap admin-metrics-words"{{if $.IsMobile}} data-label="Out of"{{end}}>{{.OutOf}}</td>{{end}}
+                <td class="admin-metrics-wrap admin-metrics-words"{{if $.IsMobile}} data-label="Rate"{{end}}>{{template "admin-metrics-rate" .}}</td>
+                <td class="admin-metrics-wrap admin-metrics-words"{{if $.IsMobile}} data-label="Measured"{{end}}>{{.DaysMeasured}} days; counted on {{.CountedOn}}</td>
+                {{if $kind.HasTiers}}<td class="admin-metrics-wrap"{{if $.IsMobile}} data-label="Tiers"{{end}}>{{.Tiers}}</td>{{end}}
+                <td{{if $.IsMobile}} data-label="Last seen"{{end}}>{{.LastSeenText}}</td>
+                <td>{{if .URL}}<a href="{{.URL}}">Feature</a>{{end}}</td>
+                {{if not $.Metrics.Remove.ReviewsFailed}}<td class="admin-metrics-review-cell">{{template "admin-metrics-review-form" (dict "Row" . "URL" $.Metrics.Remove.ReviewURL "Reviewed" false)}}</td>{{end}}
+            </tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{end}}
+</details>
+{{else}}
+<div class="admin-msg">{{if .Counted}}{{.Empty}}{{else}}{{template "admin-metrics-uncounted" .Read}}{{end}}</div>
+{{end}}
+
+<details class="admin-section admin-metrics-more-rows">
+    <summary>Not measured ({{len .NotMeasured}}{{if .NotMeasuredSettings}}, {{.NotMeasuredSettings}} of them settings{{end}})</summary>
+    {{if .NotMeasured}}
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Name</th><th>Why</th></tr></thead>
+        <tbody>
+        {{range .NotMeasured}}
+            <tr id="{{.Anchor}}"><td class="admin-metrics-name">{{template "admin-metrics-key" .}}{{if .Help}}<span class="admin-metrics-help">{{.Help}}</span>{{end}}{{template "admin-metrics-numbers" .}}</td><td class="admin-metrics-wrap">{{.Reason}}</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{else if .Counted}}
+    <p class="admin-metrics-dim">Every candidate is measured.</p>
+    {{else}}
+    <p class="admin-metrics-dim">{{template "admin-metrics-uncounted" .Read}}</p>
+    {{end}}
+</details>
+
+<details class="admin-section admin-metrics-more-rows"{{if .ReviewedOpen}} open{{end}}>
+    <summary>Reviewed ({{len .Reviewed}})</summary>
+    {{if .Reviewed}}
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table{{if $.IsMobile}} admin-metrics-stack{{end}}">
+        <thead><tr><th>Name</th><th>Verdict</th><th>Note</th><th class="num">Count</th><th>Review</th></tr></thead>
+        <tbody>
+        {{range .Reviewed}}
+            <tr id="{{.Anchor}}"><td class="admin-metrics-name">{{template "admin-metrics-key" .}}{{if .Gone}} <span class="admin-metrics-dim">no longer listed</span>{{end}}{{if .Help}}<span class="admin-metrics-help">{{.Help}}</span>{{end}}</td><td class="admin-metrics-class"{{if $.IsMobile}} data-label="Verdict"{{end}}>{{.Verdict}}</td><td class="admin-metrics-wrap"{{if $.IsMobile}} data-label="Note"{{end}}>{{.Note}}</td><td class="num admin-mono"{{if $.IsMobile}} data-label="Count"{{end}}>{{if not .Gone}}{{.Count}}{{end}}</td><td class="admin-metrics-review-cell">{{if .Gone}}{{template "admin-metrics-review-clear" (dict "Row" . "URL" $.Metrics.Remove.ReviewURL)}}{{else}}{{template "admin-metrics-review-form" (dict "Row" . "URL" $.Metrics.Remove.ReviewURL "Reviewed" true)}}{{end}}</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{else if .ReviewsFailed}}
+    <p class="admin-metrics-dim">Review marks could not be read.</p>
+    {{else if .Counted}}
+    <p class="admin-metrics-dim">Nothing has been reviewed.</p>
+    {{else}}
+    <p class="admin-metrics-dim">{{template "admin-metrics-uncounted" .Read}}</p>
+    {{end}}
+</details>
+{{end}}
+{{end}}
+
+{{/* A setting row's three numbers side by side; a name's row has none. */}}
+{{define "admin-metrics-numbers"}}{{with .Numbers}}<span class="admin-metrics-help">{{range $i, $n := .}}{{if $i}}; {{end}}{{$n}}{{end}}</span>{{end}}{{end}}
+
+{{/* One row's review form, folded: plain HTML, posted to the admin page with the Remove view's link. */}}
+{{define "admin-metrics-review-form"}}
+<details class="admin-metrics-review-box">
+<summary>{{if .Reviewed}}Marked {{.Row.Verdict}}{{else}}Review{{end}}</summary>
+<form method="POST" action="/admin{{.URL}}" class="admin-metrics-review">
+    <input type="hidden" name="reviewName" value="{{.Row.Name}}">
+    <input type="hidden" name="reviewScope" value="{{.Row.Scope}}">
+    <input type="hidden" name="reviewValue" value="{{.Row.Value}}">
+    <label>Verdict<span class="admin-metrics-hidden"> for {{.Row.Name}}{{with .Row.Scope}} {{.}}{{end}}{{with .Row.Value}} {{.}}{{end}}</span> <select name="reviewVerdict">
+        <option value="keep"{{if eq .Row.Verdict "keep"}} selected{{end}}>keep</option>
+        <option value="remove"{{if eq .Row.Verdict "remove"}} selected{{end}}>remove</option>
+        <option value="watch"{{if eq .Row.Verdict "watch"}} selected{{end}}>watch</option>
+        {{if .Reviewed}}<option value="clear">clear the mark</option>{{end}}
+    </select></label>
+    <label>Note<span class="admin-metrics-hidden"> for {{.Row.Name}}{{with .Row.Scope}} {{.}}{{end}}{{with .Row.Value}} {{.}}{{end}}</span> <input type="text" name="reviewNote" maxlength="200" value="{{.Row.Note}}"></label>
+    <button type="submit">{{if .Reviewed}}Save the mark{{else}}Mark reviewed{{end}}</button>
+</form>
+</details>
+{{end}}
+
+{{/* A mark whose unit is no longer listed can only be cleared. */}}
+{{define "admin-metrics-review-clear"}}
+<form method="POST" action="/admin{{.URL}}" class="admin-metrics-review">
+    <input type="hidden" name="reviewName" value="{{.Row.Name}}">
+    <input type="hidden" name="reviewScope" value="{{.Row.Scope}}">
+    <input type="hidden" name="reviewValue" value="{{.Row.Value}}">
+    <input type="hidden" name="reviewVerdict" value="clear">
+    <button type="submit">Clear the mark<span class="admin-metrics-hidden"> for {{.Row.Name}}{{with .Row.Scope}} {{.}}{{end}}{{with .Row.Value}} {{.}}{{end}}</span></button>
+</form>
+{{end}}

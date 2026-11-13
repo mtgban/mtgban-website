@@ -34,6 +34,8 @@
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
     <!-- Before content: search's modal decorates links with sameSiteURL as it loads. -->
     <script type="text/javascript" src="/js/utils.js?hash={{.Hash}}"></script>
+    <script>window.BAN_METRICS = {on: {{if .MetricsOn}}true{{else}}false{{end}}, page: "{{if not (or .ModalMode .ErrorMessage)}}{{.MetricsPage}}{{end}}", build: "{{.MetricsBuild}}"};</script>
+    <script type="text/javascript" src="/js/metrics.js?hash={{.Hash}}" defer></script>
     {{if not .NoBackpack}}
     <script>window.BAN_BACKPACK = {canUpload: {{if .CanUpload}}true{{else}}false{{end}}};</script>
     <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>

@@ -33,6 +33,7 @@ type Recorder struct {
 	store   store
 	cfg     recorderCfg
 	dropped int64
+	failed  int64
 	done    chan struct{}
 	wg      sync.WaitGroup
 	once    sync.Once
@@ -79,6 +80,14 @@ func (r *Recorder) Dropped() int64 {
 	return atomic.LoadInt64(&r.dropped)
 }
 
+// Failed returns the number of events in batches whose insert failed.
+func (r *Recorder) Failed() int64 {
+	if r == nil {
+		return 0
+	}
+	return atomic.LoadInt64(&r.failed)
+}
+
 // Close stops the goroutine after draining and flushing pending events.
 func (r *Recorder) Close() error {
 	if r == nil {
@@ -102,12 +111,14 @@ func (r *Recorder) runFlush() {
 		func() {
 			defer func() {
 				if p := recover(); p != nil {
+					atomic.AddInt64(&r.failed, int64(len(batch)))
 					log.Println("observability: flush panic:", p)
 				}
 			}()
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if err := r.store.InsertBatch(ctx, batch); err != nil {
+				atomic.AddInt64(&r.failed, int64(len(batch)))
 				log.Println("observability: insert batch:", err)
 			}
 		}()

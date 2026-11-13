@@ -67,6 +67,8 @@
             link.setAttribute('data-section', item.id);
             link.setAttribute('data-category', catName);
             link.setAttribute('data-tab', catTab);
+            link.setAttribute('data-track', 'ui.guide');
+            link.setAttribute('data-track-value', 'section_link');
             link.innerHTML = '<i data-lucide="' + escapeAttr(item.icon) + '"></i>' +
                 '<span>' + escapeHtml(item.title) + '</span>';
             sidebarNav.appendChild(link);
@@ -195,7 +197,7 @@
                         html += '<span class="guide-example-query guide-example-palette">' + escapeHtml(ex.query) + '</span>';
                         html += '<span class="guide-example-desc">' + escapeHtml(ex.desc) + '</span>';
                     } else {
-                        html += '<a class="guide-example-query" href="/search?q=' + encodeURIComponent(ex.query) + '">' + escapeHtml(ex.query) + '</a>';
+                        html += '<a class="guide-example-query" href="/search?q=' + encodeURIComponent(ex.query) + '" data-track="ui.guide" data-track-value="example_link">' + escapeHtml(ex.query) + '</a>';
                         html += '<span class="guide-example-desc">' + escapeHtml(ex.desc) + '</span>';
                     }
                     html += '</div>';
@@ -402,8 +404,14 @@
 
     // ── Filter ──
     var filterInput = document.getElementById('guide-filter');
-    filterInput.addEventListener('input', function() {
+    // The first query a reader types is counted once a page; a tab switch's synthetic clear is not.
+    var filterCounted = false;
+    filterInput.addEventListener('input', function(e) {
         var query = this.value.toLowerCase().trim();
+        if (query && !filterCounted && e && e.isTrusted) {
+            filterCounted = true;
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.guide', 'search_used');
+        }
         var visibleCategories = {};
 
         for (var i = 0; i < sectionEls.length; i++) {
@@ -580,6 +588,7 @@
 // refuses when the page lacks permission; the selection fallback then has
 // its turn, and the toast shows only for a copy that happened.
 function copySnippet(btn, text) {
+    if (window.BAN && window.BAN.track) window.BAN.track('ui.guide', 'copy');
     if (navigator.clipboard) {
         navigator.clipboard.writeText(text).then(showCopied, function () {
             if (copyBySelection(text)) showCopied();

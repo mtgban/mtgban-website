@@ -120,6 +120,17 @@ func TestReport(t *testing.T) {
 	}
 }
 
+// A note changes the result and leaves the reported problem standing.
+func TestNote(t *testing.T) {
+	now := time.Date(2026, 9, 29, 15, 40, 0, 0, time.UTC)
+	tracker := newTestTracker(now, &now)
+	tracker.Report("fold", "folded 2 days", "fold failed")
+	tracker.Note("fold", "stood aside")
+	if row := rowOf(t, tracker, "fold"); row.Result != "stood aside" || row.Problem != "fold failed" {
+		t.Errorf("noted: got %+v", row)
+	}
+}
+
 func TestAge(t *testing.T) {
 	for d, want := range map[time.Duration]string{
 		59 * time.Minute: "59m",

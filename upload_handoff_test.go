@@ -773,3 +773,36 @@ func TestHandoffClosesWhatItOpens(t *testing.T) {
 		}
 	}
 }
+
+// The validator knows the configured handoff hosts, and handoffOriginHost
+// answers only for an allowed origin.
+func TestMetricValidatorsKnowTheHandoffOrigins(t *testing.T) {
+	long := strings.Repeat("a", 37) + ".com"
+	withHandoffOrigins(t, map[string]infrastructure.HandoffOrigin{
+		"https://www.cardmarket.com": {},
+		"https://" + long:            {},
+	})
+	v := metricValidators(nil)
+	if !v.Origin("www.cardmarket.com") {
+		t.Error("a configured host is refused")
+	}
+	for _, host := range []string{long, "evil.test", ""} {
+		if v.Origin(host) {
+			t.Errorf("Origin(%q) is accepted", host)
+		}
+	}
+	for raw, want := range map[string]string{
+		"https://www.cardmarket.com/en/Magic/Users/x": "www.cardmarket.com",
+		"https://evil.test/x":                         "",
+		"http://www.cardmarket.com/x":                 "",
+		"":                                            "",
+	} {
+		if got := handoffOriginHost(raw); got != want {
+			t.Errorf("handoffOriginHost(%q) = %q, want %q", raw, got, want)
+		}
+	}
+
+	rows := withFeatureCounter(t)
+	observe(httptest.NewRequest(http.MethodGet, "/upload", nil), "upload.handoff_origin", "evil.test")
+	wantRow(t, rows.rows(), "", "upload.handoff_origin", "other", 1)
+}

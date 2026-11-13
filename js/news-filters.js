@@ -77,11 +77,13 @@
         }
         var q = choices(params);
         if (!q) return;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.news.filter_submit', 'auto_applied');
         window.location.replace(window.location.pathname + '?page=' + encodeURIComponent(report) + '&' + q);
     }
 
     if (form) {
         form.addEventListener('submit', function () {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.news.filter_submit', 'manual');
             save(choices(new URLSearchParams(new FormData(form))));
         });
     }

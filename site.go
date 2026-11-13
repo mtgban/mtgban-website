@@ -92,7 +92,8 @@ func newSite() *site {
 			ds := s.datastore()
 			return ds.backend, ds.loadedAt
 		},
-		Allow: offlineModeAllowed,
+		Allow:   offlineModeAllowed,
+		Observe: requestObserver,
 
 		CanonicalSetCode: func(b *matcher.Backend, setCode string) (string, error) {
 			set, err := b.GetSet(setCode)

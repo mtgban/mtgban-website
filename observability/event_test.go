@@ -1,7 +1,10 @@
 // observability/event_test.go
 package observability
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestNormalizePath(t *testing.T) {
 	cases := []struct{ base, page, want string }{
@@ -59,10 +62,28 @@ func TestPathURL(t *testing.T) {
 		{"sleepers/gap", "/sleepers?page=gap"},
 		{"sleepers/other", "/sleepers?page=other"},
 		{"newspaper/combined_spike_score", "/newspaper?page=combined_spike_score"},
+		{"other", ""},
+		{"upload/handoff", "/upload/handoff"},
+		{"search/shared", "/search"},
 	}
 	for _, c := range cases {
 		if got := PathURL(c.key); got != c.want {
 			t.Errorf("PathURL(%q)=%q want %q", c.key, got, c.want)
 		}
+	}
+}
+
+func TestSubviews(t *testing.T) {
+	news := Subviews("newspaper")
+	if !slices.IsSorted(news) || !slices.Contains(news, "syp") || !slices.Contains(news, "options") {
+		t.Errorf("newspaper subviews = %v", news)
+	}
+	for _, sub := range news {
+		if got := NormalizePath("newspaper", sub); got != "newspaper/"+sub {
+			t.Errorf("NormalizePath(newspaper, %q) = %q", sub, got)
+		}
+	}
+	if Subviews("search") != nil || Subviews("") != nil {
+		t.Error("a route with no subviews has none")
 	}
 }

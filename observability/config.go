@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -16,11 +17,29 @@ type SQLConfig = timeseries.SQLConfig
 
 // Client wraps a Postgres connection pool for the telemetry tables.
 type Client struct {
-	db *sql.DB
+	db            *sql.DB
+	featuresReady bool
+}
+
+// Option changes how NewClient sets up a Client.
+type Option func(*clientOptions)
+
+type clientOptions struct {
+	skipSchema bool
+}
+
+// SkipSchema makes NewClient apply no schema, for a process that does not own it.
+func SkipSchema() Option {
+	return func(o *clientOptions) { o.skipSchema = true }
 }
 
 // NewClient opens a pool, applies small pool caps, pings, and ensures the schema.
-func NewClient(cfg SQLConfig) (*Client, error) {
+func NewClient(cfg SQLConfig, opts ...Option) (*Client, error) {
+	var o clientOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	db, err := sql.Open("postgres", cfg.DSN())
 	if err != nil {
 		return nil, fmt.Errorf("observability: open: %w", err)
@@ -48,11 +67,22 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 		db.Close()
 		return nil, fmt.Errorf("observability: ping: %w", err)
 	}
-	if err := ensureSchema(db); err != nil {
+	if o.skipSchema {
+		return &Client{db: db, featuresReady: true}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), schemaTimeout)
+	defer cancel()
+	featuresReady, err := ensureSchema(ctx, db)
+	if err != nil {
 		db.Close()
 		return nil, fmt.Errorf("observability: ensure schema: %w", err)
 	}
-	return &Client{db: db}, nil
+	return &Client{db: db, featuresReady: featuresReady}, nil
+}
+
+// FeaturesReady reports whether the feature tables exist for this client to write.
+func (c *Client) FeaturesReady() bool {
+	return c != nil && c.featuresReady
 }
 
 // Close shuts down the connection pool.

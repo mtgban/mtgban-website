@@ -394,6 +394,8 @@
     // Modal controller
     // ============================================================
     let baseline = null;
+    // Each binding's serialized value at load, for the changes a save reports
+    let baselineParts = [];
     let modalEl = null;
     let backdropEl = null;
     let shell = null;
@@ -507,6 +509,7 @@
         pendingHint = null;
         loadAll();
         baseline = serializeAll();
+        baselineParts = bindings.map(function (b) { return b.serialize(); });
         modalEl.dataset.dirty = '0';
         updateDirtyUI();
     }
@@ -559,7 +562,11 @@
 
     function saveAndClose() {
         if (!hasBindings()) { closeModal(); return; }
+        const after = bindings.map(function (b) { return b.serialize(); });
         saveAll().then(function () {
+            try {
+                if (window.SettingsChanges) window.SettingsChanges.report(window.SettingsChanges.parse(baselineParts), window.SettingsChanges.parse(after), 'modal');
+            } catch (e) {}
             try { sessionStorage.setItem('settingsSavedToast', '1'); } catch (e) {}
             // The reload below is asked for, so a running sync must not turn it
             // into a "leave site?" confirmation.
@@ -610,6 +617,8 @@
             const tag = (document.activeElement && document.activeElement.tagName) || '';
             if (tag === 'INPUT' || tag === 'TEXTAREA') return;
             if (!ensureEls()) return;
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.key', 'settings_hotkey');
+            if (!modalEl.classList.contains('open') && window.BAN && window.BAN.track) window.BAN.track('ui.settings.open', 'hotkey');
             e.preventDefault();
             openSettings();
         }
@@ -650,6 +659,7 @@
         const q = params.toString();
         const cleaned = window.location.pathname + (q ? '?' + q : '') + window.location.hash;
         window.history.replaceState(null, '', cleaned);
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.settings.open', 'param');
         setTimeout(function () { openSettings(tab); }, 0);
     }
 

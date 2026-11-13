@@ -1,7 +1,14 @@
+// Whether the arbit edition box has been counted on this page
+var editionFilterCounted = false;
+
 function filterTableByEdition() {
     var input, filter, tables, tr, i, j, txtValue, el;
     input = document.getElementById("filterInput");
     filter = input.value.toUpperCase();
+    if (filter && !editionFilterCounted) {
+        editionFilterCounted = true;
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.arbit.edition_filter', 'used');
+    }
     tables = document.getElementsByClassName("filterable");
 
     for (j = 0; j < tables.length; j++) {

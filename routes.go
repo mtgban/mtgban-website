@@ -92,26 +92,24 @@ func (s *site) registerRoutes() {
 	http.HandleFunc("/sealed/", s.SealedRedirect)
 	http.HandleFunc("/random", s.RandomSearch)
 	http.HandleFunc("/randomsealed", s.RandomSealedSearch)
-	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, Config().Discord.InviteURL, http.StatusFound)
-	})
+	http.HandleFunc("/discord", discordRedirect)
 
 	// Public changelog sourced from the Discord announcement channel.
-	http.Handle("/changelog", noSigning(http.HandlerFunc(s.Changelog)))
+	http.Handle("/changelog", publicPage(http.HandlerFunc(s.Changelog)))
 	// Public account page: the tier table, and the reader's own account when signed in.
-	http.Handle("/user", noSigning(http.HandlerFunc(s.User)))
+	http.Handle("/user", publicPage(http.HandlerFunc(s.User)))
 
 	// when navigating to /home it should serve the home page
-	http.Handle("/", noSigning(http.HandlerFunc(s.Home)))
+	http.Handle("/", publicPage(http.HandlerFunc(s.Home)))
 
 	// Public guide page
-	http.Handle("/guide", noSigning(http.HandlerFunc(s.Guide)))
+	http.Handle("/guide", publicPage(http.HandlerFunc(s.Guide)))
 
 	// Public privacy policy (cookie + Amazon Associates disclosures)
-	http.Handle("/privacy", noSigning(http.HandlerFunc(s.Privacy)))
+	http.Handle("/privacy", publicPage(http.HandlerFunc(s.Privacy)))
 
 	// Offline shell page, precached by the service worker
-	http.Handle("/offline", noSigning(http.HandlerFunc(s.OfflinePage)))
+	http.Handle("/offline", publicPage(http.HandlerFunc(s.OfflinePage)))
 
 	// Mobile/desktop view toggle
 	http.HandleFunc("/toggle-mobile", toggleMobileView)
@@ -166,6 +164,8 @@ func (s *site) registerRoutes() {
 	// own signature for the Upload grant.
 	http.Handle("/api/upload/share", noSigning(http.HandlerFunc(UploadShareAPI)))
 	http.Handle("/api/popular/vote", noSigning(http.HandlerFunc(s.PopularVoteAPI)))
+	http.Handle("/api/metrics", noSigning(http.HandlerFunc(s.MetricsAPI)))
+	http.Handle("/api/metrics/settings.json", noSigning(http.HandlerFunc(MetricsSettings)))
 	// Its closures read the live datastore and prices per request.
 	http.Handle("/api/alerts/", noSigning(s.alerts.API()))
 	// Resend's webhook: the Svix signature is the credential.
@@ -176,21 +176,21 @@ func (s *site) registerRoutes() {
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(s.LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(s.LoadFromCloud)))
-	http.Handle("/api/palette/card/", noSigning(http.HandlerFunc(s.palette.CardMeta)))
-	http.Handle("/api/palette/sealed/", noSigning(http.HandlerFunc(s.palette.Sealed)))
-	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(s.palette.Sets)))
-	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(s.palette.Stores)))
+	http.Handle("/api/palette/card/", noSigning(paletteChip("card", s.palette.CardMeta)))
+	http.Handle("/api/palette/sealed/", noSigning(paletteChip("sealed", s.palette.Sealed)))
+	http.Handle("/api/palette/sets.json", noSigning(paletteList("sets", s.palette.Sets)))
+	http.Handle("/api/palette/stores.json", noSigning(paletteList("stores", s.palette.Stores)))
 	// The gateway reads the store families without a signature, so this
 	// cannot hang off the API page: a sub-page is served unsigned only when
 	// the ACL's Any tier grants the page (see enforceSigning).
 	http.Handle("/api-plans/stores.json", noSigning(http.HandlerFunc(s.APIStores)))
-	http.Handle("/api/palette/promos.json", noSigning(http.HandlerFunc(s.palette.Promos)))
-	http.Handle("/api/palette/finishes.json", noSigning(http.HandlerFunc(s.palette.Finishes)))
-	http.Handle("/api/palette/rarities.json", noSigning(http.HandlerFunc(s.palette.Rarities)))
-	http.Handle("/api/palette/colors.json", noSigning(http.HandlerFunc(s.palette.Colors)))
+	http.Handle("/api/palette/promos.json", noSigning(paletteList("promos", s.palette.Promos)))
+	http.Handle("/api/palette/finishes.json", noSigning(paletteList("finishes", s.palette.Finishes)))
+	http.Handle("/api/palette/rarities.json", noSigning(paletteList("rarities", s.palette.Rarities)))
+	http.Handle("/api/palette/colors.json", noSigning(paletteList("colors", s.palette.Colors)))
 	http.Handle("/api/offline/", noSigning(http.HandlerFunc(s.offline.Handle)))
 
-	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))
+	http.HandleFunc("/monroecards", partnerRedirect)
 
 	http.HandleFunc("/auth", s.Auth)
 

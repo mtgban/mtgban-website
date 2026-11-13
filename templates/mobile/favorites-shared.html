@@ -17,7 +17,7 @@
         <div class="m-fav-header">
             <span class="m-fav-title">Shared favorites{{if .SharedCount}} ({{.SharedCount}}){{end}}</span>
             <span class="m-fav-actions">
-                {{if .SharedRows}}<button class="m-fav-btn m-fav-merge" id="shared-merge" type="button">Merge</button>{{end}}
+                {{if .SharedRows}}<button class="m-fav-btn m-fav-merge" id="shared-merge" type="button" data-track="ui.fav.merge">Merge</button>{{end}}
             </span>
         </div>
         {{if .SharedNotice}}
@@ -27,7 +27,7 @@
         {{else}}
         <div class="m-fav-list">
             {{range .SharedRows}}
-            <a class="m-fav-item" href="/search?q={{.Query}}" data-fav-id="{{.ID}}">
+            <a class="m-fav-item" href="/search?q={{.Query}}" data-fav-id="{{.ID}}" data-track="ui.fav.shared_open">
                 <div class="m-fav-thumb" data-shared-thumb><span class="landing-item-thumb-placeholder">&#9733;</span></div>
                 <div class="m-fav-item-body">
                     <div class="m-fav-item-top">

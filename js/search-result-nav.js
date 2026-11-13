@@ -20,6 +20,7 @@
             var tag = e.target.tagName;
             if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
                 e.preventDefault();
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.search.key', 'tab_to_search');
                 searchbox.focus();
                 searchbox.setSelectionRange(0, searchbox.value.length);
                 return;
@@ -50,6 +51,7 @@
 
         if (e.key === 'PageDown') {
             e.preventDefault();
+            if (!e.repeat && window.BAN && window.BAN.track) window.BAN.track('ui.search.key', 'result_page_down');
             if (currentIdx < headers.length - 1) {
                 currentIdx++;
             }
@@ -58,6 +60,7 @@
             window.scrollBy(0, delta);
         } else if (e.key === 'PageUp') {
             e.preventDefault();
+            if (!e.repeat && window.BAN && window.BAN.track) window.BAN.track('ui.search.key', 'result_page_up');
             if (currentIdx <= 0) {
                 currentIdx = 0;
                 window.scrollTo(0, 0);

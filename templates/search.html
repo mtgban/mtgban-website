@@ -113,18 +113,18 @@
         {{else}}
             {{$isChronoSorted := or (eq .SearchSort "chrono") (not .SearchSort)}}
             {{$isAlphaSorted := or (eq .SearchSort "alpha") (eq .SearchSort "hybrid")}}
-            <a class="search-sort-pill{{if $isChronoSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=chrono{{if and $isChronoSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Chronological"><i data-lucide="clock"></i>{{if $isChronoSorted}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            <a class="search-sort-pill{{if $isAlphaSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort={{if $isAlphaSorted}}{{.SearchSort}}{{else}}{{.AlphaSort}}{{end}}{{if and $isAlphaSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Alphabetical"><i data-lucide="a-large-small"></i>{{if $isAlphaSorted}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            <a class="search-sort-pill{{if eq .SearchSort "number"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=number{{if and (eq .SearchSort "number") (not .ReverseMode)}}&reverse=true{{end}}" title="Collector Number"><i data-lucide="hash"></i>{{if eq .SearchSort "number"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            <a class="search-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price"><i data-lucide="tag"></i>{{if eq .SearchSort "retail"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            {{if .HasVelocity}}{{if .CanVelocity}}<a class="search-sort-pill{{if eq .SearchSort "velocity"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=velocity{{if and (eq .SearchSort "velocity") (not .ReverseMode)}}&reverse=true{{end}}" title="Sales Velocity"><i data-lucide="gauge"></i>{{if eq .SearchSort "velocity"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>{{else}}<span class="search-sort-pill sort-pill-locked" title="Increase your tier to sort by sales velocity"><i data-lucide="gauge"></i></span>{{end}}{{end}}
+            <a class="search-sort-pill{{if $isChronoSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=chrono{{if and $isChronoSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Chronological" data-track="ui.search.sort" data-track-value="chrono" {{if $isChronoSorted}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="clock"></i>{{if $isChronoSorted}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="search-sort-pill{{if $isAlphaSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort={{if $isAlphaSorted}}{{.SearchSort}}{{else}}{{.AlphaSort}}{{end}}{{if and $isAlphaSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Alphabetical" data-track="ui.search.sort" data-track-value="alpha" {{if $isAlphaSorted}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="a-large-small"></i>{{if $isAlphaSorted}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="search-sort-pill{{if eq .SearchSort "number"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=number{{if and (eq .SearchSort "number") (not .ReverseMode)}}&reverse=true{{end}}" title="Collector Number" data-track="ui.search.sort" data-track-value="number" {{if eq .SearchSort "number"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="hash"></i>{{if eq .SearchSort "number"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="search-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price" data-track="ui.search.sort" data-track-value="retail" {{if eq .SearchSort "retail"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="tag"></i>{{if eq .SearchSort "retail"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price" data-track="ui.search.sort" data-track-value="buylist" {{if eq .SearchSort "buylist"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            {{if .HasVelocity}}{{if .CanVelocity}}<a class="search-sort-pill{{if eq .SearchSort "velocity"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=velocity{{if and (eq .SearchSort "velocity") (not .ReverseMode)}}&reverse=true{{end}}" title="Sales Velocity" data-track="ui.search.sort" data-track-value="velocity" {{if eq .SearchSort "velocity"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="gauge"></i>{{if eq .SearchSort "velocity"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>{{else}}<span class="search-sort-pill sort-pill-locked" title="Increase your tier to sort by sales velocity" data-track="ui.search.sort_locked" data-track-value="velocity"><i data-lucide="gauge"></i></span>{{end}}{{end}}
         {{end}}
         <span class="search-sort-actions search-sort-extras">
             {{if and (not .DisableChart) (gt (len .AllKeys) 1) (not .ChartID) (not .ModalMode)}}
-            <a class="search-sort-settings" href="/search?chart={{first_csv .AllKeys .MaxChartCards}}" title="Chart the top {{.MaxChartCards}} results"><i data-lucide="chart-line"></i></a>
+            <a class="search-sort-settings" href="/search?chart={{first_csv .AllKeys .MaxChartCards}}" title="Chart the top {{.MaxChartCards}} results" data-track="ui.search.chart_top"><i data-lucide="chart-line"></i></a>
             {{end}}
-            <a class="search-sort-settings" href="/random{{if .IsSealed}}sealed{{end}}{{if .ModalMode}}?chart={{.ChartIDsCSV}}&modal=1{{end}}" title="Random {{if .IsSealed}}Product{{else}}Card{{end}}"><i data-lucide="dice-5"></i></a>
+            <a class="search-sort-settings" href="/random{{if .IsSealed}}sealed{{end}}{{if .ModalMode}}?chart={{.ChartIDsCSV}}&modal=1{{end}}" title="Random {{if .IsSealed}}Product{{else}}Card{{end}}" data-track="ui.search.random" {{if .IsSealed}}data-track-value="sealed"{{else}}data-track-value="card"{{end}}><i data-lucide="dice-5"></i></a>
         </span>
     </div>
     {{/* Only over a product that holds a fixed list and a variable one, where
@@ -132,14 +132,14 @@
     {{if .Contents}}
         <div class="search-sort-row">
             <span class="search-sort-label">Contents</span>
-            <a class="search-sort-pill{{if eq .Contents.Mode "contents"}} active{{end}}" href="?q={{.Contents.All}}{{with .SearchScope}}&scope={{.}}{{end}}" title="Everything {{.Contents.Product}} can hold"><i data-lucide="boxes"></i></a>
-            <a class="search-sort-pill{{if eq .Contents.Mode "decklist"}} active{{end}}" href="?q={{.Contents.Fixed}}{{with .SearchScope}}&scope={{.}}{{end}}" title="Only what {{.Contents.Product}} always holds"><i data-lucide="package-check"></i></a>
-            <a class="search-sort-pill{{if eq .Contents.Mode "variable"}} active{{end}}" href="?q={{.Contents.Variable}}{{with .SearchScope}}&scope={{.}}{{end}}" title="Only the cards {{.Contents.Product}} might hold"><i data-lucide="dices"></i></a>
+            <a class="search-sort-pill{{if eq .Contents.Mode "contents"}} active{{end}}" href="?q={{.Contents.All}}{{with .SearchScope}}&scope={{.}}{{end}}" title="Everything {{.Contents.Product}} can hold" data-track="ui.search.contents_mode" data-track-value="everything"><i data-lucide="boxes"></i></a>
+            <a class="search-sort-pill{{if eq .Contents.Mode "decklist"}} active{{end}}" href="?q={{.Contents.Fixed}}{{with .SearchScope}}&scope={{.}}{{end}}" title="Only what {{.Contents.Product}} always holds" data-track="ui.search.contents_mode" data-track-value="fixed"><i data-lucide="package-check"></i></a>
+            <a class="search-sort-pill{{if eq .Contents.Mode "variable"}} active{{end}}" href="?q={{.Contents.Variable}}{{with .SearchScope}}&scope={{.}}{{end}}" title="Only the cards {{.Contents.Product}} might hold" data-track="ui.search.contents_mode" data-track-value="variable"><i data-lucide="dices"></i></a>
             {{/* Over the cards it might hold, how likely each is: a sort of
                  its own, set off to the right of the three readings. */}}
             {{if eq .Contents.Mode "variable"}}
             <span class="search-sort-actions">
-                <a class="search-sort-pill{{if eq .SearchSort "odds"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=odds{{if and (eq .SearchSort "odds") (not .ReverseMode)}}&reverse=true{{end}}" title="Expected copies"><i data-lucide="copy"></i>{{if eq .SearchSort "odds"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+                <a class="search-sort-pill{{if eq .SearchSort "odds"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=odds{{if and (eq .SearchSort "odds") (not .ReverseMode)}}&reverse=true{{end}}" title="Expected copies" data-track="ui.search.sort" data-track-value="odds" {{if eq .SearchSort "odds"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="copy"></i>{{if eq .SearchSort "odds"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
             </span>
             {{end}}
         </div>
@@ -163,7 +163,7 @@
                 <div class="sealed-toc-title">Categories</div>
                 {{range $key := .EditionSort}}
                     {{$editionList := index $.EditionList $key}}
-                    <a class="sealed-toc-item" href="#sealed-{{slug $key}}">{{$key}} <span class="toc-count">{{len $editionList}}</span></a>
+                    <a class="sealed-toc-item" href="#sealed-{{slug $key}}" data-track="ui.sealed.toc">{{$key}} <span class="toc-count">{{len $editionList}}</span></a>
                 {{end}}
             </div>
 
@@ -179,7 +179,7 @@
                         </div>
                         <div class="sealed-grid">
                             {{range $editionList}}
-                                <a class="sealed-edition" href="/sealed?q=s:{{.Code}}">
+                                <a class="sealed-edition" href="/sealed?q=s:{{.Code}}" data-track="ui.sealed.edition">
                                     {{template "set-symbol" dict "Keyrune" .Keyrune "Edition" .Name "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" ""}} {{.Name}}
                                 </a>
                             {{end}}
@@ -207,7 +207,7 @@
                 <div class="search-suggestions">
                     <p class="search-suggestion-label">Pinned filters are narrowing this search:</p>
                     <ul class="search-suggestion-list">
-                        <li><a class="search-suggestion-unpin" href="?q={{.SearchQuery}}">Search again without <code>{{.SearchScope}}</code></a></li>
+                        <li><a class="search-suggestion-unpin" href="?q={{.SearchQuery}}" data-track="ui.search.suggestion" data-track-value="unpin_scope">Search again without <code>{{.SearchScope}}</code></a></li>
                     </ul>
                 </div>
             {{end}}
@@ -215,14 +215,14 @@
                 <div class="search-suggestions">
                     {{if .DidYouMean}}
                         <p class="search-suggestion-didyoumean">
-                            Did you mean {{range $i, $q := .DidYouMean}}{{if $i}} or {{end}}<a href="?q={{$q}}{{with $.SearchScope}}&scope={{.}}{{end}}">{{$q}}</a>{{end}}?
+                            Did you mean {{range $i, $q := .DidYouMean}}{{if $i}} or {{end}}<a href="?q={{$q}}{{with $.SearchScope}}&scope={{.}}{{end}}" data-track="ui.search.suggestion" data-track-value="did_you_mean">{{$q}}</a>{{end}}?
                         </p>
                     {{end}}
                     {{if .AltSearches}}
                         <p class="search-suggestion-label">Try one of these:</p>
                         <ul class="search-suggestion-list">
                             {{range .AltSearches}}
-                                <li><a href="?q={{.Query}}{{with $.SearchScope}}&scope={{.}}{{end}}">{{.Label}}</a></li>
+                                <li><a href="?q={{.Query}}{{with $.SearchScope}}&scope={{.}}{{end}}" data-track="ui.search.suggestion" data-track-value="try_one_of">{{.Label}}</a></li>
                             {{end}}
                         </ul>
                     {{end}}
@@ -233,7 +233,7 @@
                 <p class="search-suggestion-label">Popular searches:</p>
                 <ul class="search-suggestion-list">
                     {{range .PopularSearches}}
-                    <li><a href="{{.URL}}">{{.Label}}</a></li>
+                    <li><a href="{{.URL}}" data-track="ui.search.suggestion" data-track-value="popular">{{.Label}}</a></li>
                     {{end}}
                 </ul>
             </div>
@@ -249,14 +249,14 @@
                 <div class="search-sidebar">
                     <div class="sidebar-pinned">
                         {{template "sidebar-search" .}}
-                        <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper"{{if .IsSealed}} data-sealed{{end}} onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox')||document.getElementById('nav-searchbox');if(input){input.focus();input.setSelectionRange(0,input.value.length);}">
+                        <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper"{{if .IsSealed}} data-sealed{{end}} onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');this.removeAttribute('data-track');return}var input=document.getElementById('searchbox')||document.getElementById('nav-searchbox');if(input){input.focus();input.setSelectionRange(0,input.value.length);}" data-track="ui.result.image" data-track-value="focus_search">
                             <img class="sidebar-card-img" id="cardImage" src="" alt="Card image"/>
                         </div>
                         <div class="sidebar-printings" id="printings"></div>
                     </div>
                     <div class="sidebar-body">
                         {{if .CanShowAll}}
-                            <a class="sidebar-action primary" href="search?q={{.ShowAllQuery}}{{with .SearchScope}}&scope={{.}}{{end}}">Show all versions</a>
+                            <a class="sidebar-action primary" href="search?q={{.ShowAllQuery}}{{with .SearchScope}}&scope={{.}}{{end}}" data-track="ui.sidebar.link" data-track-value="show_all_versions">Show all versions</a>
                         {{end}}
                         {{if .HasAvailable}}
                             <div class="sidebar-products-card" id="productsCard">
@@ -265,32 +265,32 @@
                             </div>
                         {{end}}
                         {{if .Alternative}}
-                            <a class="sidebar-action warning" href="/search?chart={{.Alternative}}">Switch Foil/Non-Foil</a>
+                            <a class="sidebar-action warning" href="/search?chart={{.Alternative}}" data-track="ui.sidebar.link" data-track-value="switch_foil">Switch Foil/Non-Foil</a>
                         {{end}}
                         {{if .AltEtchedID}}
-                            <a class="sidebar-action warning" href="/search?chart={{.AltEtchedID}}">Switch Etched/Non-Etched</a>
+                            <a class="sidebar-action warning" href="/search?chart={{.AltEtchedID}}" data-track="ui.sidebar.link" data-track-value="switch_etched">Switch Etched/Non-Etched</a>
                         {{end}}
                         {{if .StocksURL}}
-                            <a class="sidebar-action success" href="{{.StocksURL}}" target="_blank">Check MTGStocks charts</a>
+                            <a class="sidebar-action success" href="{{.StocksURL}}" target="_blank" data-track="ui.sidebar.link" data-track-value="mtgstocks">Check MTGStocks charts</a>
                         {{end}}
                     {{if .CanDownloadCSV}}
                     <div class="sidebar-footer">
                         <div class="sidebar-actions-compact">
                             <div class="sidebar-compact-row">
                                 <span class="sidebar-compact-label">Export</span>
-                                <a class="sidebar-action success" href="/search/export/retail{{if .IsSealed}}/sealed{{end}}/{{path_escape .SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
-                                <a class="sidebar-action warning" href="/search/export/buylist{{if .IsSealed}}/sealed{{end}}/{{path_escape .SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
-                                <a class="sidebar-action default" href="/search/export/list{{if .IsSealed}}/sealed{{end}}/{{path_escape .SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">List</a>
+                                <a class="sidebar-action success" href="/search/export/retail{{if .IsSealed}}/sealed{{end}}/{{path_escape .SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv" data-track="ui.sidebar.export" data-track-value="retail">Retail</a>
+                                <a class="sidebar-action warning" href="/search/export/buylist{{if .IsSealed}}/sealed{{end}}/{{path_escape .SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv" data-track="ui.sidebar.export" data-track-value="buylist">Buylist</a>
+                                <a class="sidebar-action default" href="/search/export/list{{if .IsSealed}}/sealed{{end}}/{{path_escape .SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv" data-track="ui.sidebar.export" data-track-value="list">List</a>
                             </div>
                             <div class="sidebar-compact-row">
                                 <span class="sidebar-compact-label">Upload</span>
-                                <form action="/upload" method="post" style="display:contents">
+                                <form action="/upload?from=search_sidebar" method="post" style="display:contents">
                                     <input id="mode" type="hidden" name="mode" value="false"/>
                                     {{range .CardHashes}}
                                         <input type="hidden" name="hashes" value="{{.}}"/>
                                     {{end}}
-                                    <button type="button" class="sidebar-action success" onclick='document.getElementById("mode").value=false; this.closest("form").submit();'>Retail</button>
-                                    <button type="button" class="sidebar-action warning" onclick='document.getElementById("mode").value=true; this.closest("form").submit();'>Buylist</button>
+                                    <button type="button" class="sidebar-action success" onclick='document.getElementById("mode").value=false; this.closest("form").submit();' data-track="ui.sidebar.upload" data-track-value="retail">Retail</button>
+                                    <button type="button" class="sidebar-action warning" onclick='document.getElementById("mode").value=true; this.closest("form").submit();' data-track="ui.sidebar.upload" data-track-value="buylist">Buylist</button>
                                     <noscript><input type="submit" value="Check Uploader!"/></noscript>
                                 </form>
                             </div>
@@ -331,9 +331,9 @@
                                         <option value="3650"{{if lt $.MaxLookbackDays 3650}} disabled {{end}}>10 Years{{if lt $.MaxLookbackDays 3650}} (Legacy+){{end}}</option>
                                     </select>
                                     <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
-                                    <a class="btn success" href="javascript:downloadAsImg()">Download</a>
+                                    <a class="btn success" href="javascript:downloadAsImg()" data-track="ui.chart.download">Download</a>
                                     {{if lt (len .ChartIDs) .MaxChartCards}}
-                                    <a class="btn default chart-add-btn" href="javascript:openChartAddModal()" title="Add another card to this chart">&#10133; Add card</a>
+                                    <a class="btn default chart-add-btn" href="javascript:openChartAddModal()" title="Add another card to this chart" data-track="ui.chart.add_modal" data-track-value="open">&#10133; Add card</a>
                                     {{else}}
                                     <span class="btn default chart-add-btn chart-add-full" title="Charts hold up to {{.MaxChartCards}} cards - remove one to add another">&#10133; Add card</span>
                                     {{end}}
@@ -394,9 +394,9 @@
                                     <span class="chart-add-title">&#10133; Add cards to this chart</span>
                                     <span style="display:flex;align-items:center;gap:8px;">
                                         <button type="button" onclick="window.newChartSearch && newChartSearch()" title="Search for another card"
-                                                style="background:var(--surface-2,rgba(0,0,0,0.05));border:1px solid var(--border-moderate,rgba(0,0,0,0.12));border-radius:6px;font-size:13px;line-height:1;cursor:pointer;color:var(--normal);padding:7px 12px;">New search</button>
+                                                style="background:var(--surface-2,rgba(0,0,0,0.05));border:1px solid var(--border-moderate,rgba(0,0,0,0.12));border-radius:6px;font-size:13px;line-height:1;cursor:pointer;color:var(--normal);padding:7px 12px;" data-track="ui.chart.add_modal" data-track-value="new_search">New search</button>
                                         <button id="chartBatchCommit" type="button" onclick="window.commitChartBatch && commitChartBatch()" disabled title="Apply the batched cards and view the chart"
-                                                style="background:var(--search-link,#3b6fd4);border:1px solid var(--search-link,#3b6fd4);border-radius:6px;font-size:13px;font-weight:600;line-height:1;color:#fff;padding:7px 12px;opacity:0.5;cursor:default;">Update chart</button>
+                                                style="background:var(--search-link,#3b6fd4);border:1px solid var(--search-link,#3b6fd4);border-radius:6px;font-size:13px;font-weight:600;line-height:1;color:#fff;padding:7px 12px;opacity:0.5;cursor:default;" data-track="ui.chart.add_modal" data-track-value="commit">Update chart</button>
                                         <button class="chart-add-close" type="button" onclick="window.closeChartAddModal && closeChartAddModal()" aria-label="Close">&times;</button>
                                     </span>
                                 </div>
@@ -427,66 +427,66 @@
                                     <div class="hover-printings">{{trusted_html (index $.Printings $cardId)}}</div>
                                     <div class="hover-products">{{trusted_html $card.Products}}</div>
                                 </template>
-                                <a class="result-set-link" href="?q=s:{{$card.SetCode}}" aria-label="{{$card.Edition}}">
+                                <a class="result-set-link" href="?q=s:{{$card.SetCode}}" aria-label="{{$card.Edition}}" data-track="ui.result.link" data-track-value="set_icon">
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 32 "Class" "result-set-icon"}}
                                 </a>
                                 <div class="result-card-info">
                                     <div class="result-card-name-row">
-                                        <a class="result-card-name" href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
+                                        <a class="result-card-name" href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" data-track="ui.result.link" data-track-value="name">{{$card.Name}}</a>
                                         <div class="result-badges">
                                             {{$qty := index $.CardQuantities $cardId}}{{if gt $qty 1}}<span class="result-badge qty" title="{{$qty}} copies in this list">{{$qty}}x copies</span>{{end}}
                                             {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
-                                            {{range $card.Treatments}}<a class="result-badge treatment" href="?q=is:{{.}}" title="Search every {{index $card.PromoLabels .}} printing">{{index $card.PromoLabels .}}</a>{{end}}
+                                            {{range $card.Treatments}}<a class="result-badge treatment" href="?q=is:{{.}}" title="Search every {{index $card.PromoLabels .}} printing" data-track="ui.result.link" data-track-value="treatment">{{index $card.PromoLabels .}}</a>{{end}}
                                             {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}
                                             {{if $card.Stocks}}<span class="result-badge stocks">Stocks</span>{{end}}
                                             {{if $card.Newspaper}}<span class="result-badge news">News</span>{{end}}
                                         </div>
                                     </div>
                                     <span class="result-set-title">
-                                        <a href="?q=s:{{$card.SetCode}}{{if $card.Date}} date:{{$card.Date}}{{end}}">{{$card.Title}}</a>
+                                        <a href="?q=s:{{$card.SetCode}}{{if $card.Date}} date:{{$card.Date}}{{end}}" data-track="ui.result.link" data-track-value="set_title">{{$card.Title}}</a>
                                         {{if $card.SourceSealed}}
-                                            - <a href="/sealed?q=container:{{$card.UUID}}">Found in {{len $card.SourceSealed}} product{{if gt (len $card.SourceSealed) 1}}s{{end}}</a>
+                                            - <a href="/sealed?q=container:{{$card.UUID}}" data-track="ui.result.link" data-track-value="found_in_products">Found in {{len $card.SourceSealed}} product{{if gt (len $card.SourceSealed) 1}}s{{end}}</a>
                                         {{end}}
                                     </span>
                                 </div>
                                 <div class="result-quick-icons">
-                                    <button type="button" class="qi-toggle" title="More actions" aria-label="More actions" aria-expanded="false"><i data-lucide="ellipsis-vertical"></i></button>
+                                    <button type="button" class="qi-toggle" title="More actions" aria-label="More actions" aria-expanded="false" data-track="ui.result.icon_menu" data-track-value="open"><i data-lucide="ellipsis-vertical"></i></button>
                                     <div class="qi-actions">
                                     {{if $.CanFixSearch}}
-                                        <a class="raw-record" href="/search/raw/{{$cardId}}" target="_blank" rel="noopener" title="Raw matcher record for this card (admin)"><span class="emoji">&#128300;</span></a>
-                                        <span class="emoji" style="cursor: pointer;" title="Toggle Fix mode - show a Fix link on each store (admin)" onclick="toggleAdminFixMode()">&#128295;</span>
+                                        <a class="raw-record" href="/search/raw/{{$cardId}}" target="_blank" rel="noopener" title="Raw matcher record for this card (admin)" data-track="ui.result.icon" data-track-value="admin_raw" data-track-scope="header"><span class="emoji">&#128300;</span></a>
+                                        <span class="emoji" style="cursor: pointer;" title="Toggle Fix mode - show a Fix link on each store (admin)" onclick="toggleAdminFixMode()" data-track="ui.result.icon" data-track-value="admin_fix" data-track-scope="header">&#128295;</span>
                                     {{end}}
                                     {{if $card.Sealed}}
                                         {{if $card.Booster}}
-                                            <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate opening a booster pack"><span class="emoji">&#127873;</span></a>
+                                            <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate opening a booster pack" data-track="ui.result.icon" data-track-value="unpack" data-track-scope="header"><span class="emoji">&#127873;</span></a>
                                         {{end}}
                                         {{if $card.HasDeck}}
-                                            <a href='/search/decklist/tcgplayer/{{$card.UUID}}' title="Download a TCGplayer-formatted decklist"><img width=28 height=28 alt="TCGplayer decklist" src="/img/misc/decklist.png"></a>
-                                            <a href='/search/decklist/cardmarket/{{$card.UUID}}' title="Download a Cardmarket-formatted decklist"><img width=28 height=28 alt="Cardmarket decklist" src="/img/misc/decklist-mkm.png"></a>
+                                            <a href='/search/decklist/tcgplayer/{{$card.UUID}}' title="Download a TCGplayer-formatted decklist" data-track="ui.result.icon" data-track-value="decklist_tcg" data-track-scope="header"><img width=28 height=28 alt="TCGplayer decklist" src="/img/misc/decklist.png"></a>
+                                            <a href='/search/decklist/cardmarket/{{$card.UUID}}' title="Download a Cardmarket-formatted decklist" data-track="ui.result.icon" data-track-value="decklist_mkm" data-track-scope="header"><img width=28 height=28 alt="Cardmarket decklist" src="/img/misc/decklist-mkm.png"></a>
                                         {{end}}
-                                        <a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">&#128270;</span></a>
+                                        <a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product" data-track="ui.result.icon" data-track-value="contents" data-track-scope="header"><span class="emoji">&#128270;</span></a>
                                     {{else if $.HasAvailable}}
-                                        <a href='/sealed?q=container:"{{$card.Name}}"' title="Search which products can contain a reprint"><span class="emoji">&#128214;</span></a>
+                                        <a href='/sealed?q=container:"{{$card.Name}}"' title="Search which products can contain a reprint" data-track="ui.result.icon" data-track-value="find_in_sealed" data-track-scope="header"><span class="emoji">&#128214;</span></a>
                                     {{end}}
-                                    <span class="emoji" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>
+                                    <span class="emoji" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard" data-track="ui.result.icon" data-track-value="copy_name" data-track-scope="header">&#128221;</span>
                                     {{if not $card.Sealed}}
-                                        <a href="{{$card.DeckboxURL}}" title="Open the Deckbox page for this card" target=_blank><img width=22 height=22 alt="" src="/img/logo/deckbox.webp"></a>
+                                        <a href="{{$card.DeckboxURL}}" title="Open the Deckbox page for this card" target=_blank data-track="ui.result.icon" data-track-value="deckbox" data-track-scope="header"><img width=22 height=22 alt="" src="/img/logo/deckbox.webp"></a>
                                     {{end}}
                                     {{if $card.CKRestockURL}}
-                                        <a href="{{$card.CKRestockURL}}" title="Set a Restock Notice at CardKingdom" target=_blank><span class="emoji">&#127984;</span></a>
+                                        <a href="{{$card.CKRestockURL}}" title="Set a Restock Notice at CardKingdom" target=_blank data-track="ui.result.icon" data-track-value="ck_restock" data-track-scope="header"><span class="emoji">&#127984;</span></a>
                                     {{end}}
                                     {{if $card.ScryfallURL}}
-                                        <a href="{{$card.ScryfallURL}}" title="Check this card on Scryfall.com" target=_blank><img width=28 height=28 alt="" src="/img/logo/scryfall.svg"></a>
+                                        <a href="{{$card.ScryfallURL}}" title="Check this card on Scryfall.com" target=_blank data-track="ui.result.icon" data-track-value="scryfall" data-track-scope="header"><img width=28 height=28 alt="" src="/img/logo/scryfall.svg"></a>
                                     {{end}}
                                     {{if $card.TCGId}}
-                                        <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="Manage your TCGplayer inventory" target=_blank><img width=22 height=25 alt="" src="/img/logo/tcgapp.png"></a>
+                                        <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="Manage your TCGplayer inventory" target=_blank data-track="ui.result.icon" data-track-value="tcg_inventory" data-track-scope="header"><img width=22 height=25 alt="" src="/img/logo/tcgapp.png"></a>
                                     {{end}}
                                     {{if not $.DisableChart}}
                                         {{if eq $.ChartIDsCSV ""}}
-                                            <a href="?chart={{$card.ChartID}}" title="See historical data">&#128200;</a>
+                                            <a href="?chart={{$card.ChartID}}" title="See historical data" data-track="ui.result.icon" data-track-value="chart_view" data-track-scope="header">&#128200;</a>
                                         {{else if slice_has $.ChartIDs $card.ChartID}}
                                             {{if or $.ModalMode (gt (len $.ChartIDs) 1)}}
-                                            <a class="chart-remove-link" data-card-id="{{$card.ChartID}}" href="?chart={{csv_without $.ChartIDsCSV $card.ChartID}}" title="Remove from this chart">&#128200;&#10134;</a>
+                                            <a class="chart-remove-link" data-card-id="{{$card.ChartID}}" href="?chart={{csv_without $.ChartIDsCSV $card.ChartID}}" title="Remove from this chart" data-track="ui.result.icon" data-track-value="chart_remove" data-track-scope="header">&#128200;&#10134;</a>
                                             {{else}}
                                             {{/* Sole card on a non-modal chart page: a remove link would
                                                  point at ?chart= and dump the user on a blank landing, so
@@ -494,26 +494,26 @@
                                             <span class="emoji" title="The only card on this chart">&#128200;</span>
                                             {{end}}
                                         {{else}}
-                                            <a class="chart-add-link" data-card-id="{{$card.ChartID}}" href="?chart={{$.ChartIDsCSV}},{{$card.ChartID}}" title="Add to this chart">&#128200;&#10133;</a>
+                                            <a class="chart-add-link" data-card-id="{{$card.ChartID}}" href="?chart={{$.ChartIDsCSV}},{{$card.ChartID}}" title="Add to this chart" data-track="ui.result.icon" data-track-value="chart_add" data-track-scope="header">&#128200;&#10133;</a>
                                         {{end}}
                                     {{end}}
                                     {{/* Shown only when the screen is narrow enough that the sidebar
                                          preview is hidden; opens the card art in a lightbox. */}}
-                                    <button type="button" class="qi-view-image" title="View image" onclick="window.showCardImageFromBtn && showCardImageFromBtn(this)"><i data-lucide="image"></i></button>
-                                    <button class="fav-btn" data-card-id="{{$cardId}}" onclick="window.toggleFavorite && toggleFavorite(this)" title="Toggle favorite"><i data-lucide="star"></i></button>
+                                    <button type="button" class="qi-view-image" title="View image" onclick="window.showCardImageFromBtn && showCardImageFromBtn(this)" data-track="ui.result.icon" data-track-value="view_image" data-track-scope="header"><i data-lucide="image"></i></button>
+                                    <button class="fav-btn" data-card-id="{{$cardId}}" onclick="window.toggleFavorite && toggleFavorite(this)" title="Toggle favorite" data-track="ui.result.icon" data-track-value="star_add" data-track-scope="header"><i data-lucide="star"></i></button>
                                     {{/* The minus pops up below the backpack on hover, once the card is in. */}}
                                     <div class="pack-wrap">
-                                        <button type="button" class="pack-btn" data-card-id="{{$cardId}}" onclick="window.addToBackpack && addToBackpack(this)" title="Add to backpack"><i data-lucide="backpack"></i><span class="pack-btn-count" hidden></span></button>
-                                        <button type="button" class="pack-minus-btn" data-card-id="{{$cardId}}" onclick="window.takeFromBackpack && takeFromBackpack(this)" title="Remove from backpack" hidden><i data-lucide="circle-minus"></i></button>
+                                        <button type="button" class="pack-btn" data-card-id="{{$cardId}}" onclick="window.addToBackpack && addToBackpack(this)" title="Add to backpack" data-track="ui.result.icon" data-track-value="pack_add" data-track-scope="header"><i data-lucide="backpack"></i><span class="pack-btn-count" hidden></span></button>
+                                        <button type="button" class="pack-minus-btn" data-card-id="{{$cardId}}" onclick="window.takeFromBackpack && takeFromBackpack(this)" title="Remove from backpack" hidden data-track="ui.result.icon" data-track-value="pack_take" data-track-scope="header"><i data-lucide="circle-minus"></i></button>
                                     </div>
-                                    {{if $.CanAlerts}}<button type="button" class="alert-link" data-card-id="{{$cardId}}" onclick="window.openAlertModal && openAlertModal({cardId: this.getAttribute('data-card-id'), side: 'buylist'})" title="Set a price alert"><i data-lucide="bell"></i></button>{{end}}
+                                    {{if $.CanAlerts}}<button type="button" class="alert-link" data-card-id="{{$cardId}}" onclick="window.openAlertModal && openAlertModal({cardId: this.getAttribute('data-card-id'), side: 'buylist'})" title="Set a price alert" data-track="ui.result.icon" data-track-value="bell" data-track-scope="header"><i data-lucide="bell"></i></button>{{end}}
                                     </div>
                                 </div>
                             </div>
                             {{if or $card.FlavorName $card.PromoTypes $card.Flag}}
                             <div class="result-card-extra">
                                 {{if or $card.FlavorName $card.PromoTypes}}
-                                    <span class="result-variant">{{if $card.FlavorName}}"{{$card.FlavorName}}"{{if $card.PromoTypes}} - {{end}}{{end}}{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}<a href="?q=is:{{$p}}" title="Search every {{index $card.PromoLabels $p}} printing">{{index $card.PromoLabels $p}}</a>{{end}}</span>
+                                    <span class="result-variant">{{if $card.FlavorName}}"{{$card.FlavorName}}"{{if $card.PromoTypes}} - {{end}}{{end}}{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}<a href="?q=is:{{$p}}" title="Search every {{index $card.PromoLabels $p}} printing" data-track="ui.result.link" data-track-value="promo_type">{{index $card.PromoLabels $p}}</a>{{end}}</span>
                                 {{end}}
                                 {{if $card.Flag}}
                                     <span class="result-variant result-flag">{{$card.Flag}}</span>
@@ -552,15 +552,15 @@
                                                     {{if .Locked}}
                                                         <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
                                                         <span class="locked-cta">
-                                                            <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                                            <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="join">Join</a>
                                                             {{range $ref, $id := $.PatreonIDs}}
-                                                                <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
+                                                                <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="login">Log in</a>
                                                             {{end}}
                                                         </span>
                                                     {{else if eq .URL ""}}
                                                         <a class="store-name dim{{if .Restricted}} store-restricted{{end}}">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                     {{else}}
-                                                        <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                        <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or .Shorthand "other"}}" data-track-scope="seller">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                     {{end}}
                                                     {{if not .Locked}}
                                                     {{if and (eq $conditions "INDEX") $card.Sealed}}
@@ -604,9 +604,9 @@
                                                     {{if .Locked}}
                                                         <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
                                                         <span class="locked-cta">
-                                                            <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                                            <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="join">Join</a>
                                                             {{range $ref, $id := $.PatreonIDs}}
-                                                                <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
+                                                                <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="login">Log in</a>
                                                             {{end}}
                                                         </span>
                                                     {{else}}
@@ -614,10 +614,10 @@
                                                         {{if eq .URL ""}}
                                                             <a class="store-name dim{{if .Restricted}} store-restricted{{end}}">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                         {{else}}
-                                                            <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                            <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or .Shorthand "other"}}" data-track-scope="seller">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                         {{end}}
                                                         {{if $.CanFixSearch}}
-                                                            <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=retail&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}">FIX</a>
+                                                            <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=retail&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}" data-track="ui.row.admin_fix" data-track-value="retail">FIX</a>
                                                         {{end}}
                                                         </span>
                                                     {{end}}
@@ -681,7 +681,7 @@
                                                 <div class="sales-velocity-detail">{{tip_html $card.VelocityDetail}}</div>
                                             </details>
                                         {{else if $.ShowUpsell}}
-                                            <a class="sales-velocity-upsell" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener">Increase your tier to unlock sales velocity</a>
+                                            <a class="sales-velocity-upsell" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener" data-track="ui.row.locked" data-track-value="velocity_upsell">Increase your tier to unlock sales velocity</a>
                                         {{end}}
                                     {{end}}
                                     {{$condsEntry := (index $.FoundVendors $cardId)}}
@@ -701,9 +701,9 @@
                                                 {{if .Locked}}
                                                     <span class="store-name dim">{{.ScraperName}} {{.Country}}</span>
                                                     <span class="locked-cta">
-                                                        <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                                        <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="join">Join</a>
                                                         {{range $ref, $id := $.PatreonIDs}}
-                                                            <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
+                                                            <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="login">Log in</a>
                                                         {{end}}
                                                     </span>
                                                 {{else}}
@@ -711,10 +711,10 @@
                                                     {{if eq .URL ""}}
                                                         <a class="store-name dim{{if .Restricted}} store-restricted{{end}}"{{with .RuleTip}} title="{{.}}"{{end}}>{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait}}
                                                     {{else}}
-                                                        <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait}}
+                                                        <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or .Shorthand "other"}}" data-track-scope="buyer">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait}}
                                                     {{end}}
                                                     {{if and $.CanFixSearch (ne .Shorthand "AvgCopies")}}
-                                                        <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=buylist&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}">FIX</a>
+                                                        <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=buylist&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}" data-track="ui.row.admin_fix" data-track-value="buylist">FIX</a>
                                                     {{end}}
                                                     </span>
                                                 {{end}}
@@ -763,14 +763,14 @@
                     {{if .CurrentIndex}}
                         <div class="pagination search-pagination">
                             {{if ne .CurrentIndex 1}}
-                                <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p=1{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&laquo;</a>
-                                <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.PrevIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&lsaquo;</a>
+                                <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p=1{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="first">&laquo;</a>
+                                <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.PrevIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="prev">&lsaquo;</a>
                             {{end}}
                             <span class="cur">{{.CurrentIndex}}</span>
                             <span class="pg-info">/ {{.TotalIndex}}</span>
                             {{if ne .CurrentIndex .TotalIndex}}
-                                <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.NextIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&rsaquo;</a>
-                                <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.TotalIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&raquo;</a>
+                                <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.NextIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="next">&rsaquo;</a>
+                                <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.TotalIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="last">&raquo;</a>
                             {{end}}
                         </div>
                     {{end}}
@@ -821,6 +821,7 @@
 {{define "extra-scripts"}}
 {{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}" defer></script>{{end}}
 <script type="text/javascript" src="/js/search-quick-icons.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/search-track.js?hash={{.Hash}}" defer></script>
 
 <!-- Lightbox for the card image, used when the screen is too narrow to show
      the sidebar preview (see .qi-view-image / .card-image-modal). -->

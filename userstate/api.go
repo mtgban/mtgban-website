@@ -104,12 +104,21 @@ func backpackPack(v any) int {
 	return max(n, 1)
 }
 
+// Hooks is what the caller hands ServeAPI; the zero value observes nothing.
+type Hooks struct {
+	Observe func(r *http.Request, scope, name, value string)
+}
+
 // ServeAPI handles GET/PUT on /api/userstate/, PATCH on /{section} and
 // GET/POST/DELETE on /share for an already-authenticated email, who may
 // keep backpackTabs backpacks of backpackMax cards each; a nil db is 503.
-// game is the site's, which a new share is made for.
-func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game string, backpackMax, backpackTabs int) {
+// game is the site's, which a new share is made for; h counts what it served.
+func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game string, backpackMax, backpackTabs int, h Hooks) {
+	if h.Observe == nil {
+		h.Observe = func(*http.Request, string, string, string) {}
+	}
 	if !apiLimiter.Allow(email) {
+		h.Observe(r, "", "ratelimit.reject", "userstate")
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many requests"})
 		return
 	}
@@ -124,7 +133,7 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game st
 	// Determine section suffix after the base path, if any.
 	section := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/userstate/"), "/")
 	if section == "share" {
-		serveShare(w, r, db, hash, game)
+		serveShare(w, r, db, hash, game, h)
 		return
 	}
 
@@ -140,6 +149,7 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game st
 			if v, verr := db.GetVersion(ctx, hash); verr == nil && strconv.FormatInt(v, 10) == inm {
 				w.Header().Set("ETag", `"`+inm+`"`)
 				w.WriteHeader(http.StatusNotModified)
+				h.Observe(r, "", "userstate.get", "")
 				return
 			}
 		}
@@ -151,6 +161,7 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game st
 		}
 		w.Header().Set("ETag", `"`+strconv.FormatInt(st.Version, 10)+`"`)
 		writeJSON(w, http.StatusOK, st)
+		h.Observe(r, "", "userstate.get", "")
 
 	case http.MethodPut:
 		if section != "" {
@@ -178,9 +189,11 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game st
 		}
 		if conflict {
 			writeJSON(w, http.StatusConflict, result)
+			h.Observe(r, "", "userstate.conflict", "")
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]int64{"version": result.Version})
+		h.Observe(r, "", "userstate.put", "")
 
 	case http.MethodPatch:
 		if section == "" {
@@ -215,9 +228,11 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game st
 		}
 		if conflict {
 			writeJSON(w, http.StatusConflict, result)
+			h.Observe(r, "", "userstate.conflict", "")
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]int64{"version": result.Version})
+		h.Observe(r, "", "userstate.patch", section)
 
 	default:
 		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
@@ -234,7 +249,10 @@ type shareStore interface {
 
 // serveShare is /api/userstate/share: the owner's live favorites share
 // link id. GET shows it, POST makes or replaces it, DELETE ends it.
-func serveShare(w http.ResponseWriter, r *http.Request, db shareStore, hash, game string) {
+func serveShare(w http.ResponseWriter, r *http.Request, db shareStore, hash, game string, h Hooks) {
+	if h.Observe == nil {
+		h.Observe = func(*http.Request, string, string, string) {}
+	}
 	ctx := r.Context()
 	w.Header().Set("Cache-Control", "private, no-store")
 	// The cookie rides cross-site requests; a custom header needs a CORS
@@ -268,6 +286,7 @@ func serveShare(w http.ResponseWriter, r *http.Request, db shareStore, hash, gam
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"id": id})
+		h.Observe(r, "", "favshare.create", "")
 	case http.MethodDelete:
 		if err := db.RevokeShare(ctx, hash, game); err != nil {
 			log.Printf("userstate: share DELETE failed for %.10s: %v", hash, err)
@@ -275,6 +294,7 @@ func serveShare(w http.ResponseWriter, r *http.Request, db shareStore, hash, gam
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+		h.Observe(r, "", "favshare.stop", "")
 	default:
 		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 	}

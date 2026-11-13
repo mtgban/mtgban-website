@@ -117,6 +117,8 @@ type EvalDeps struct {
 	PerRun func(d EvalDeps) EvalDeps
 	// PruneDue says whether this run prunes old events; nil prunes every run.
 	PruneDue func(now time.Time) bool
+	// Observe counts what a run did; nil counts nothing.
+	Observe func(scope, name, value string)
 }
 
 // logf logs through Log, or the standard logger when it is unset.
@@ -199,6 +201,9 @@ func setState(ctx context.Context, deps EvalDeps, sum *evalSummary, a ActiveAler
 // state and events, then the prune. A contact older than contactMaxAge is
 // parked and skipped, and a user whose alerts this run parks is told so once.
 func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary {
+	if deps.Observe == nil {
+		deps.Observe = func(string, string, string) {}
+	}
 	var sum evalSummary
 	label := deps.StoreLabel
 	if label == nil {
@@ -389,6 +394,17 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 			id := f.Alert.ID
 			res := resultFor(results, id)
 			recordEvents(wctx, deps, &sum, id, f.Decision, now, res.Err, res.MessageID)
+			outcome := deliveryOutcome(res.Err)
+			switch k.kind {
+			case ChannelDiscord:
+				deps.Observe("discord", "alerts.delivered", outcome)
+			case ChannelEmail:
+				deps.Observe("email", "alerts.delivered", outcome)
+			}
+			// A deferred firing is claimed again and counted once it is settled.
+			if outcome != "deferred" {
+				deps.Observe("", "alerts.fired", sideValue(f.Alert.Side))
+			}
 			switch {
 			case res.Err == nil:
 				sum.sent++

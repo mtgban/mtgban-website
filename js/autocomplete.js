@@ -413,6 +413,7 @@ function autocomplete(form, inp, sealed) {
 
         var newToken = prefix + committed + candidate.value;
         row.addEventListener("click", function () {
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.autocomplete.pick', 'token', prefix.toLowerCase().replace(/^-/, ''));
             inp.value = valueBefore + newToken + tail;
             var pos = (valueBefore + newToken).length;
             closeAllLists();
@@ -509,6 +510,7 @@ function autocomplete(form, inp, sealed) {
             b.appendChild(hidden);
             /* Execute a function when someone clicks on the item value (DIV element) */
             b.addEventListener("click", function(e) {
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.autocomplete.pick', 'name', 'name');
                 /* Insert the value for the autocomplete text field */
                 inp.value = this.getElementsByTagName("input")[0].value;
                 /* Close the list of autocompleted values,
@@ -595,6 +597,7 @@ function autocomplete(form, inp, sealed) {
                  * not the name the row displays */
                 var chosen = x[currentFocus].getElementsByTagName("input")[0];
                 this.value = chosen ? chosen.value : x[currentFocus].textContent;
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.autocomplete.pick', 'complete', 'name');
             }
         }
     });

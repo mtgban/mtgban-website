@@ -34,6 +34,9 @@ func TestMain(m *testing.M) {
 	Config().Game = DefaultGame
 	testSite = newSite()
 	Sessions = sessionstore.New(sessionHooks(testSite))
+	// Built from the real nav before any test swaps it for its own.
+	pageLabelSet()
+	routeLabelSet()
 
 	// Tests written against fixtures build their own site, so this lets them
 	// run - under -race included - without the real datastore load; the

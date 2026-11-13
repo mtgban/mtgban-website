@@ -1,0 +1,41 @@
+{{define "admin-metrics-invest"}}
+{{with .Metrics.Invest}}
+{{range .Sections}}
+<div class="admin-section admin-metrics-invest">
+    <div class="admin-section-header">
+        <h2>{{.Title}}</h2>
+        <span class="count">{{len .Rows}} rows</span>
+    </div>
+    {{with .Note}}<p class="admin-metrics-dim">{{.}}</p>{{end}}
+    {{if .Rows}}
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table{{if $.IsMobile}} admin-metrics-stack{{end}}">
+        <thead><tr><th>Signal</th><th class="num">Count</th><th class="num">Out of</th><th>Rate</th>{{if .HasPrevious}}<th>Previous</th>{{end}}{{if .HasEvidence}}<th>Evidence</th>{{end}}{{if .HasTiers}}<th>Tiers</th>{{end}}</tr></thead>
+        <tbody>
+        {{$section := .}}{{range .Rows}}
+        {{if .NotMeasured}}
+            <tr title="{{.Help}}"><td class="admin-metrics-name">{{.Label}}{{if .Help}}<span class="admin-metrics-help">{{.Help}}</span>{{end}}</td><td colspan="{{$section.Span}}" class="admin-metrics-dim">not measured</td></tr>
+        {{else}}
+            <tr title="{{.Help}}">
+                <td class="admin-metrics-name">{{if .URL}}<a href="{{.URL}}">{{.Label}}</a>{{else}}{{.Label}}{{end}}{{if .Help}}<span class="admin-metrics-help">{{.Help}}</span>{{end}}</td>
+                <td class="num admin-mono"{{if $.IsMobile}} data-label="Count"{{end}}>{{.Count}}</td>
+                <td class="num admin-mono"{{if $.IsMobile}} data-label="Out of"{{end}}>{{if .Denom}}{{.Denom}}{{end}}</td>
+                <td class="admin-metrics-wrap admin-metrics-words"{{if $.IsMobile}} data-label="Rate"{{end}}>{{template "admin-metrics-signal-rate" .}}</td>
+                {{if $section.HasPrevious}}<td class="admin-metrics-wrap"{{if $.IsMobile}} data-label="Previous"{{end}}>{{.PrevText}}</td>{{end}}
+                {{if $section.HasEvidence}}<td class="admin-metrics-wrap"{{if $.IsMobile}} data-label="Evidence"{{end}}>{{.Evidence}}</td>{{end}}
+                {{if $section.HasTiers}}<td class="admin-metrics-wrap"{{if $.IsMobile}} data-label="Tiers"{{end}}>{{.Tiers}}</td>{{end}}
+            </tr>
+        {{end}}
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{else if $.Metrics.Invest.Counted}}
+    <p class="admin-metrics-dim">{{.Empty}}</p>
+    {{else}}
+    <p class="admin-metrics-dim">{{template "admin-metrics-uncounted" $.Metrics.Invest.Read}}</p>
+    {{end}}
+</div>
+{{end}}
+{{end}}
+{{end}}

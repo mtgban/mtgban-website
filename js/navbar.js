@@ -26,7 +26,12 @@
 
     btn.addEventListener('click', function(e) {
         e.stopPropagation();
-        isOpen() ? shut() : open();
+        if (isOpen()) {
+            shut();
+        } else {
+            open();
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.tools', 'open');
+        }
     });
     document.addEventListener('click', function(e) {
         if (isOpen() && !btn.contains(e.target) && !dd.contains(e.target)) shut();
@@ -168,6 +173,7 @@
             var tool = dragged.getAttribute('data-tool');
             navSections.insertBefore(createSectionBtn(tool), navSections.querySelector('.nav2-tools-wrap'));
             dragged.remove();
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'promote');
             saveLayout();
         });
         navSections.insertBefore(promoteSlot, navSections.querySelector('.nav2-tools-wrap'));
@@ -221,20 +227,25 @@
             e.stopPropagation();
             if (isTile(dragged) && isTile(slot)) {
                 var after = slot.classList.contains('drop-after');
+                var was = dragged.nextSibling;
                 clearIndicators();
                 if (after) {
                     slot.parentNode.insertBefore(dragged, slot.nextSibling);
                 } else {
                     slot.parentNode.insertBefore(dragged, slot);
                 }
+                // Dropped where it already was, nothing changed.
+                if (dragged.nextSibling !== was && window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'reorder');
             } else {
                 clearIndicators();
                 swapEntries(dragged, slot);
+                if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'swap');
             }
             saveLayout();
         });
         slot.addEventListener('click', function(e) {
             if (didDrag) { e.preventDefault(); e.stopPropagation(); }
+            else if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.link', isTile(slot) ? 'tools_tile' : 'section');
         });
     }
 
@@ -266,6 +277,7 @@
         navSections.insertBefore(createSectionBtn(tool), navSections.querySelector('.nav2-tools-wrap'));
         dragged.remove();
         clearIndicators();
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'promote');
         saveLayout();
     });
 
@@ -286,6 +298,7 @@
         e.preventDefault();
         demote(dragged);
         clearIndicators();
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'demote');
         saveLayout();
     });
 
@@ -316,6 +329,7 @@
             e.stopPropagation();
             demote(dragged);
             clearIndicators();
+            if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'demote');
             saveLayout();
         });
     }
@@ -331,6 +345,7 @@
     function dockUtil(el) {
         dock.appendChild(el);
         clearIndicators();
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'dock');
         saveLayout();
     }
     function placeUtil(el) {
@@ -345,6 +360,7 @@
     function undockUtil(el) {
         placeUtil(el);
         clearIndicators();
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.layout', 'undock');
         saveLayout();
     }
     function applyDock(wide) {
@@ -514,6 +530,8 @@
         a.className = 'nav2-section-btn offline-mode-btn' + (active ? ' active' : '');
         a.setAttribute('href', href);
         if (active) a.setAttribute('aria-current', 'page');
+        a.setAttribute('data-track', 'ui.offline.page');
+        a.setAttribute('data-track-value', 'kind');
         a.textContent = label;
         return a;
     }

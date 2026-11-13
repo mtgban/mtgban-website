@@ -1,0 +1,588 @@
+package observability
+
+import (
+	"slices"
+	"strconv"
+)
+
+// Family says where a name is emitted from.
+type Family int
+
+// The families a name belongs to.
+const (
+	FamilyServer Family = iota
+	FamilyUI
+	FamilyState
+	FamilyStock
+)
+
+// ValueKind says what a name's value may hold.
+type ValueKind int
+
+// The kinds of value a name takes.
+const (
+	ValueNone ValueKind = iota
+	ValueEnum
+	ValueBucket
+	ValueStore
+	ValueFlag
+	ValuePage
+	ValueSetting
+	ValueOrigin
+)
+
+// ScopeKind says what a name's scope may hold.
+type ScopeKind int
+
+// The kinds of scope a name takes.
+const (
+	ScopeNone ScopeKind = iota
+	ScopeRoute
+	ScopePage
+	ScopeEnum
+	ScopeStore
+	ScopeSetting
+)
+
+// ReportKind says how a report treats a name.
+type ReportKind int
+
+// The report treatments.
+const (
+	ReportCandidate ReportKind = iota
+	ReportSignal
+	ReportContext
+	ReportInternal
+)
+
+// UnitKind says what one candidate is in a report.
+type UnitKind int
+
+// The candidate units.
+const (
+	UnitValue UnitKind = iota
+	UnitScope
+	UnitScopeAndValue
+)
+
+// Name is one thing the counter may count.
+type Name struct {
+	Name   string
+	Family Family
+	Values ValueKind
+	Enum   []string
+	Scope  ScopeKind
+	Scopes []string
+	Area   string
+	Page   string // "", "*" or comma-separated page labels with no spaces
+	Denom  string // a registered name; used instead of Page when set
+	Report ReportKind
+	Unit   UnitKind
+	Kind   string
+	Help   string
+}
+
+// Validators answers the checks the registry cannot make by itself.
+type Validators struct {
+	Store        func(string) bool
+	Page         func(string) bool
+	Route        func(string) bool
+	Setting      func(string) bool
+	SettingValue func(setting, value string) bool
+	Origin       func(string) bool
+}
+
+var names = []Name{
+	{Name: "metrics.flush", Report: ReportInternal, Help: "Counter flushes written to the database."},
+	{Name: "metrics.dropped", Report: ReportInternal, Help: "Counts dropped because the counter was full."},
+	{Name: "metrics.flush_fail", Report: ReportInternal, Help: "Counter flushes that failed."},
+	{Name: "metrics.rejected", Report: ReportInternal, Help: "Counts the registry refused to store."},
+	{Name: "metrics.beacon", Values: ValueEnum, Enum: []string{"ok", "bad_body", "too_many"}, Report: ReportInternal, Help: "One client beacon request, by how its body read."},
+	{Name: "metrics.client", Values: ValueEnum, Enum: []string{"accepted", "unknown", "family", "value", "count"}, Report: ReportInternal, Help: "One entry of a client beacon: stored, or why it was refused."},
+	{Name: "page.view", Values: ValuePage, Report: ReportCandidate, Unit: UnitValue, Kind: "page", Area: "site", Help: "Page views, by page."},
+	{Name: "http.status", Report: ReportContext, Values: ValueEnum, Enum: []string{"2xx", "3xx", "4xx", "5xx"}, Scope: ScopeRoute, Help: "Responses by status class, per route."},
+	{Name: "http.duration", Report: ReportContext, Values: ValueBucket, Enum: []string{"<50ms", "<200ms", "<1s", "<5s", "5s+"}, Scope: ScopeRoute, Help: "Response time buckets, per route."},
+	{Name: "auth.refuse", Report: ReportSignal, Area: "account", Values: ValueEnum, Enum: []string{"unauthenticated", "no_access", "rate_limited", "other"}, Scope: ScopeRoute, Help: "Requests refused at the door, by reason."},
+	{Name: "ratelimit.reject", Report: ReportSignal, Area: "site", Values: ValueEnum, Enum: []string{"page", "api", "vote", "upload_share", "favorites_share", "userstate", "alerts", "alerts_confirm", "metrics"}, Help: "Requests a rate limiter refused, by limiter."},
+	{Name: "search.mode", Area: "search", Values: ValueEnum, Enum: []string{"default", "exact", "any", "prefix", "regexp", "hashing", "sealed", "mixed", "scryfall"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "search.result", Help: "Search strategy the request ran with."},
+	{Name: "search.sort", Area: "search", Values: ValueEnum, Enum: []string{"chrono", "hybrid", "alpha", "number", "retail", "buylist", "velocity", "odds"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "search.result", Help: "Order the results were sorted in."},
+	{Name: "search.sort_from", Area: "search", Values: ValueEnum, Enum: []string{"param", "operator", "cookie", "default"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Help: "Where the sort came from; page links carry sort= so param is inflated."},
+	{Name: "search.reverse", Area: "search", Scope: ScopeEnum, Scopes: searchPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "search.result", Help: "The request asked for the reversed order."},
+	{Name: "search.filter", Area: "search", Values: ValueEnum, Enum: searchFilters, Scope: ScopeEnum, Scopes: searchPages, Report: ReportCandidate, Unit: UnitValue, Kind: "operator", Denom: "search.result", Help: "An operator the reader typed, negated as -name; once per distinct operator per results page view; a pinned bar the search ignored is not counted."},
+	{Name: "search.is", Area: "search", Values: ValueEnum, Enum: []string{"foil", "nonfoil", "reserved", "token", "oversize", "funny", "wcd", "gold", "fullart", "promo", "gamechanger", "extendedart", "showcase", "borderless", "future", "reskin", "japanese", "phyrexian", "commander", "productless", "ampersand", "p9", "altfoil", "promo_type", "tag", "other"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportCandidate, Unit: UnitValue, Kind: "operator", Denom: "search.result", Help: "An is: or not: value, aliases folded."},
+	{Name: "search.on", Area: "search", Values: ValueEnum, Enum: []string{"mtgstocks", "tcgsyp", "hotlist", "newhigh", "cksell", "ckwait", "newspaper", "backpack"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportCandidate, Unit: UnitValue, Kind: "operator", Denom: "search.result", Help: "An on: list of the site's own."},
+	{Name: "search.region", Area: "search", Values: ValueEnum, Enum: []string{"us", "eu", "jp"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportCandidate, Unit: UnitValue, Kind: "operator", Denom: "search.result", Help: "A region: value."},
+	{Name: "search.pool", Area: "search", Values: ValueEnum, Enum: []string{"in", "not_in", "backpack_name"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportCandidate, Unit: UnitValue, Kind: "operator", Denom: "search.result", Help: "An in: pool, or an on: naming one of the reader's backpacks."},
+	{Name: "search.finish_suffix", Area: "search", Values: ValueEnum, Enum: []string{"nonfoil", "foil", "etched", "altfoil"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportCandidate, Unit: UnitValue, Kind: "operator", Denom: "search.result", Help: "The trailing & * ~ or backtick shorthand."},
+	{Name: "search.syntax", Area: "search", Values: ValueEnum, Enum: []string{"scryfall_bot", "set_number", "set_total", "bare_number", "name_number", "regexp"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportCandidate, Unit: UnitValue, Kind: "operator", Denom: "search.result", Help: "A non-operator form the parser rewrote."},
+	{Name: "search.filter_count", Area: "search", Values: ValueBucket, Enum: []string{"0", "1", "2", "3-5", "6+"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Help: "Operator tokens typed across both bars."},
+	{Name: "search.scope", Area: "search", Values: ValueEnum, Enum: []string{"none", "set", "ignored"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Help: "The pinned bar: empty, holding a filter (set, whether or not this search applied it; a hashing or scryfall search passes over it), or holding none."},
+	{Name: "search.page", Area: "search", Values: ValueBucket, Enum: []string{"1", "2", "3-5", "6+"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Help: "Page of results asked for."},
+	{Name: "search.page_size", Area: "search", Values: ValueEnum, Enum: []string{"25", "100"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Help: "Results per page."},
+	{Name: "search.source", Area: "search", Values: ValueEnum, Enum: []string{"banbot", "autocard", "chart", "own_site", "other_site", "direct"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Help: "Where the request came from."},
+	{Name: "search.chart", Area: "chart", Page: "search,sealed,sets", Values: ValueEnum, Enum: []string{"single", "multi", "modal"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The request drew a chart or was the chart picker."},
+	{Name: "search.view", Area: "settings", Values: ValueEnum, Enum: []string{"sellers", "buyers", "NM", "SP", "MP", "HP", "PO", "INDEX", "stores", "prices", "credit", "market", "contents", "decklist", "variable", "expanded", "compact"}, Scope: ScopeEnum, Scopes: []string{"SearchDefaultTab", "SearchDefaultView", "SearchListingPriority", "SearchSealedContents", "MobileSearchLayout"}, Report: ReportContext, Unit: UnitScope, Kind: "setting", Denom: "search.result", Help: "A view cookie the request carried; scope is the cookie."},
+	{Name: "search.misc", Area: "settings", Values: ValueEnum, Enum: []string{"noSussy", "hidePrelPack", "hidePromos", "preferFlavor", "hideBLconds", "skipEmpty", "noUpsell"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Unit: UnitValue, Kind: "setting", Denom: "search.result", Help: "A SearchMiscOpts flag in force."},
+	{Name: "search.store_factors", Area: "settings", Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Unit: UnitValue, Kind: "setting", Denom: "search.result", Help: "The request carried store factors."},
+	{Name: "search.custom_buylist", Area: "settings", Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Unit: UnitValue, Kind: "setting", Denom: "search.result", Help: "The custom buylist was appended."},
+	{Name: "search.result", Area: "search", Values: ValueEnum, Enum: []string{"found", "empty", "single"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportSignal, Help: "Outcome of a results page view, not of a search: page 2, a re-sort, a reload, a chart page and the chart picker each count again, options with them."},
+	{Name: "search.results", Area: "search", Values: ValueBucket, Enum: []string{"0", "1-9", "10-99", "100-999", "1000-9999", "10000+"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Help: "Cards matched."},
+	{Name: "search.suggestion_shown", Area: "search", Values: ValueEnum, Enum: []string{"did_you_mean", "try_one_of", "popular", "unpin_scope"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Help: "What an empty page offered."},
+	{Name: "search.duration", Area: "search", Values: ValueBucket, Enum: []string{"<50ms", "<200ms", "<1s", "<5s", "5s+"}, Scope: ScopeEnum, Scopes: searchPages, Report: ReportContext, Help: "Parse to ready-to-render."},
+	{Name: "sets.sort", Area: "search", Page: "sets", Values: ValueEnum, Enum: []string{"date", "name", "size"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "Order of the /sets tree."},
+	{Name: "search.oembed", Area: "search", Values: ValueEnum, Enum: []string{"json", "unsupported", "not_found"}, Report: ReportContext, Help: "An oEmbed consumer's request and its answer."},
+	{Name: "export.search", Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"retail", "buylist", "list"}, Scope: ScopeEnum, Scopes: []string{"singles", "sealed"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A CSV download from the results sidebar, labelled by what was asked for, which a restricted reader may not have received in full."},
+	{Name: "export.decklist", Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"tcgplayer", "cardmarket"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A sealed product's decklist CSV."},
+	{Name: "export.raw", Area: "search", Report: ReportInternal, Help: "The admin raw card record."},
+	{Name: "data.chart", Area: "chart", Values: ValueEnum, Enum: []string{"30", "90", "180", "365", "730", "1825", "3650", "all", "other"}, Scope: ScopeEnum, Scopes: []string{"single", "multi"}, Report: ReportContext, Help: "A chart data fetch: on desktop a widening one at the tier ceiling, on mobile two per chart open (the saved range, then the ceiling); requests, a not-found after the ids parsed included."},
+	{Name: "data.chart_ids", Area: "chart", Values: ValueBucket, Enum: []string{"1", "2", "3-5", "6+"}, Report: ReportContext, Help: "Cards in a chart fetch."},
+	{Name: "data.prices", Area: "site", Values: ValueBucket, Enum: []string{"0", "1-9", "10-24", "25-49", "50+"}, Report: ReportContext, Help: "Ids in a batch price fetch."},
+	{Name: "suggest.fetch", Area: "search", Values: ValueEnum, Enum: []string{"all", "prefix"}, Scope: ScopeEnum, Scopes: []string{"cards", "sealed"}, Report: ReportContext, Help: "A name list or prefix suggestion fetch."},
+	{Name: "palette.list", Area: "palette", Values: ValueEnum, Enum: []string{"sets", "stores", "rarities", "finishes", "promos", "colors"}, Report: ReportContext, Help: "A list fetch, not a use; the search box and the guide fetch these too; most are cached an hour, stores is not cached."},
+	{Name: "palette.chip_fetch", Area: "palette", Values: ValueEnum, Enum: []string{"card", "sealed"}, Report: ReportContext, Help: "A fetch of a locked chip's data, cached five minutes; not a count of chips locked."},
+	{Name: "settings.modal_fetch", Area: "settings", Report: ReportContext, Help: "The settings modal body was fetched."},
+	{Name: "settings.values_fetch", Area: "settings", Scope: ScopePage, Report: ReportContext, Help: "Another page's cookies fetched for the modal."},
+	{Name: "opensearch.fetch", Area: "search", Report: ReportContext, Help: "A browser fetched the search engine descriptor."},
+	{Name: "upload.source", Area: "upload", Values: ValueEnum, Enum: append(slices.Clone(uploadSources), "url_prefix"), Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "Where an upload's list came from; a URL prefix upload also counts url at the upload."},
+	{Name: "upload.url_host", Area: "upload", Values: ValueEnum, Enum: []string{"tcgplayer", "moxfield", "manabox", "archidekt", "cubecobra", "mythictools", "collectr", "gdocs", "other"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "The site a remote URL upload pointed at."},
+	{Name: "upload.handoff_origin", Area: "upload", Page: "upload", Values: ValueOrigin, Report: ReportContext, Help: "The site that handed a list over; an unconfigured host is other."},
+	{Name: "upload.from", Area: "upload", Values: ValueEnum, Enum: []string{"search_sidebar", "favorites", "backpack", "news", "screener", "palette", "results_reload", "upload_form", "unknown"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Denom: "upload.mode", Help: "The control that posted a list of card ids."},
+	{Name: "upload.mode", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Report: ReportContext, Help: "The side an upload was priced on, once per priced results view; a reload from the results counts again, as upload.from:results_reload shows."},
+	{Name: "upload.rows", Area: "upload", Page: "upload", Values: ValueBucket, Enum: []string{"0", "1-9", "10-99", "100-999", "1000+"}, Report: ReportContext, Help: "Rows in an upload after merging."},
+	{Name: "upload.sealed", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"none", "some", "all"}, Report: ReportContext, Help: "How much of an upload was sealed product."},
+	{Name: "upload.option", Area: "upload", Values: ValueEnum, Enum: []string{"lowval", "lowvalabs", "highval", "highvalabs", "minmargin", "nocond", "noprice", "customperc"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "A buylist option set away from the page's default in the reader's saved settings and in force; a default-on option counts when turned off. Counted on buylist runs only, while upload.mode counts retail too."},
+	{Name: "upload.value_set", Area: "upload", Values: ValueEnum, Enum: []string{"percspread", "percspreadmax", "minval", "maxval", "margin", "custompercmax", "multiplier", "maxqty"}, Report: ReportContext, Unit: UnitValue, Kind: "setting", Denom: "upload.mode", Help: "A numeric upload setting off its default; margin only when the option is on and the margin is not the page's 10."},
+	{Name: "upload.sorting", Area: "upload", Values: ValueEnum, Enum: []string{"highprice", "alphabetical", "setalpha", "setchrono", "highspread", "profitability"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "The sort an upload's results ran with."},
+	{Name: "upload.price_source", Area: "upload", Values: ValueEnum, Enum: []string{"default", "credit", "marketCredit"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "The price a buylist upload compared in. Counted on buylist runs only, while upload.mode counts retail too."},
+	{Name: "upload.custom_buylist", Area: "upload", Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "An upload priced a custom buylist."},
+	{Name: "upload.stores", Area: "upload", Page: "upload", Values: ValueBucket, Enum: []string{"0", "1-4", "5-9", "10-19", "20+"}, Report: ReportContext, Help: "Stores an upload was priced against, singles and sealed."},
+	{Name: "upload.index_pref", Area: "upload", Report: ReportCandidate, Unit: UnitValue, Kind: "option", Denom: "upload.mode", Help: "An upload ran with a changed index selection."},
+	{Name: "upload.unpack", Area: "upload", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Denom: "upload.mode", Help: "An upload opened its sealed rows."},
+	{Name: "upload.publish", Area: "upload", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Denom: "upload.mode", Help: "An upload was published as a store."},
+	{Name: "upload.parse_error", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"no_list", "load_error"}, Scope: ScopeEnum, Scopes: append([]string{"none"}, uploadSources...), Report: ReportSignal, Help: "An upload that could not be read, scoped by where its list came from."},
+	{Name: "upload.duration", Area: "upload", Page: "upload", Values: ValueBucket, Enum: []string{"<50ms", "<200ms", "<1s", "<5s", "5s+"}, Report: ReportContext, Help: "Time to price an upload."},
+	{Name: "upload_share.open", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"ok", "gone"}, Report: ReportSignal, Help: "A share link was opened."},
+	{Name: "upload.export", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"download", "estimate", "deckbox", "tcgplayer_csv"}, Scope: ScopeEnum, Scopes: []string{"all", "singles", "sealed"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "An export run from upload results, scoped by the rows a download kept."},
+	{Name: "upload.tag", Area: "upload", Page: "upload,arbit,reverse,global", Values: ValueEnum, Enum: []string{"load_at", "csv", "tcg_remove"}, Scope: ScopeEnum, Scopes: []string{"CK", "SCG", "TCG"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A per-store transfer from the upload results or the arbitrage tables."},
+	{Name: "upload.handoff_page", Area: "upload", Page: "upload/handoff", Values: ValueEnum, Enum: []string{"shown", "locked"}, Report: ReportContext, Help: "The handoff page was opened; locked when the reader lacks the Upload grant."},
+	{Name: "upload_share.create", Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A share link was made for upload results, by their side."},
+	{Name: "arbit.view", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"landing", "store"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportContext, Help: "An arbitrage page was shown, with or without a store picked."},
+	{Name: "arbit.source", Area: "arbit", Page: "arbit,reverse,global", Values: ValueStore, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportContext, Help: "The store an arbitrage view compared from."},
+	{Name: "arbit.apply", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"apply", "reset"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The filter form was submitted, or Restore defaults was followed."},
+	{Name: "arbit.bound", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"minsell", "maxsell", "minbuy", "maxbuy", "minspread", "maxspread", "mindiff", "minqty", "minprof"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A numeric limit the view ran with."},
+	{Name: "arbit.pick", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"cond", "finish", "rarity"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A picker narrowed from its full list."},
+	{Name: "arbit.toggle", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"rl", "abu4h", "nocollector", "nooversize", "notoken", "decklists", "syp", "stocks", "legit", "stable", "tradable"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "An on/off option set away from the page's default, chosen by the reader, defaults not counted."},
+	{Name: "arbit.sort", Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"profitability", "spread", "diff", "available", "sell_price", "buy_price", "edition", "alpha"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The sort the tables ran with."},
+	{Name: "arbit.excluded_vendors", Area: "arbit", Page: "arbit,reverse,global", Values: ValueBucket, Enum: []string{"0", "1-4", "5-9", "10+"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportContext, Help: "Stores the reader hides from the page."},
+	{Name: "arbit.sections", Area: "arbit", Page: "arbit,reverse,global", Values: ValueBucket, Enum: []string{"0", "1-4", "5-9", "10-19", "20+"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportContext, Help: "Store tables a view returned."},
+	{Name: "arbit.duration", Area: "arbit", Page: "arbit,reverse,global", Values: ValueBucket, Enum: []string{"<50ms", "<200ms", "<1s", "<5s", "5s+"}, Scope: ScopeEnum, Scopes: arbitPages, Report: ReportContext, Help: "Time to build a view."},
+	{Name: "news.report", Area: "news", Page: "newspaper/index,newspaper/syp,newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"combined_spike_score", "spike_score", "greatest_increase_listings", "greatest_decrease_listings", "greatest_increase_buylist", "greatest_decrease_buylist", "syp", "index"}, Report: ReportContext, Help: "A newspaper page was served to a reader with the tier."},
+	{Name: "news.three_day", Area: "news", Page: "newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"on", "off"}, Report: ReportContext, Help: "A report ran on the delayed edition."},
+	{Name: "news.sort", Area: "news", Page: "newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"ranking", "product_name", "set_name", "product_number", "variant", "bucket_name", "bucket_rank", "ck_buy_price", "ck_buy_1d", "ck_buy_7d", "ck_buy_30d", "ck_retail_price", "current_price", "tcg_market_price", "pct_decrease_7d", "pct_drop_7d", "pct_gain_7d", "pct_increase_7d", "sellers_Today", "sellers_d7", "sellers_d30"}, Scope: ScopeEnum, Scopes: []string{"asc", "desc"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A report was sorted by a column."},
+	{Name: "news.filter", Area: "news", Page: "newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"rarity", "bucket", "finish", "min_price", "max_price", "min_change", "max_change", "edition"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A report filter in force."},
+	{Name: "news.page", Area: "news", Page: "newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueBucket, Enum: []string{"1", "2", "3-5", "6+"}, Report: ReportContext, Help: "The page of a report that was read."},
+	{Name: "news.syp_csv", Area: "news", Page: "newspaper/syp", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The SYP list was downloaded as CSV."},
+	{Name: "news.syp_sort", Area: "news", Page: "newspaper/syp", Values: ValueEnum, Enum: []string{"alpha", "edition", "available", "sell_price"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The sort the SYP list ran with."},
+	{Name: "news.editions_hidden", Area: "news", Page: "newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueBucket, Enum: []string{"0", "1-4", "5-19", "20+"}, Report: ReportContext, Help: "Editions the reader hides from reports."},
+	{Name: "sleepers.page", Area: "sleepers", Page: "sleepers/index,sleepers/reprint,sleepers/mismatch,sleepers/gap,sleepers/hotlist,sleepers/velocity", Values: ValueEnum, Enum: []string{"reprint", "mismatch", "gap", "hotlist", "velocity", "index"}, Report: ReportContext, Help: "A sleepers page was built."},
+	{Name: "sleepers.gap", Area: "sleepers", Page: "sleepers/gap", Values: ValueEnum, Enum: []string{"preset", "custom"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An Ocean Gap comparison came from a preset link or a custom pair."},
+	{Name: "sleepers.ref", Area: "sleepers", Page: "sleepers/gap", Values: ValueStore, Report: ReportContext, Help: "The reference store of a gap comparison."},
+	{Name: "sleepers.target", Area: "sleepers", Page: "sleepers/gap", Values: ValueStore, Report: ReportContext, Help: "The target store of a gap comparison."},
+	{Name: "sleepers.lists", Area: "sleepers", Values: ValueEnum, Enum: []string{"sellers", "vendors", "editions"}, Report: ReportContext, Unit: UnitValue, Kind: "setting", Denom: "sleepers.page", Help: "A sleepers hide list the reader keeps."},
+	{Name: "sleepers.duration", Area: "sleepers", Page: "sleepers/index,sleepers/reprint,sleepers/mismatch,sleepers/gap,sleepers/hotlist,sleepers/velocity", Values: ValueBucket, Enum: []string{"<50ms", "<200ms", "<1s", "<5s", "5s+"}, Report: ReportContext, Help: "Time to build a sleepers page."},
+	{Name: "screener.provider", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"CKRetail", "CKBuylist", "TCGLow", "TCGMarket", "TCGMid", "TCGHigh", "TCGDirectLow", "MKMLow", "MKMTrend", "SCGBuylist", "ABUBuylist", "CSIBuylist", "SealedEV"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The price the screener compared."},
+	{Name: "screener.window", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"1", "7", "14", "30", "60", "90", "180", "365"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The screener's window in days."},
+	{Name: "screener.kind", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"singles", "sealed", "both"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "What the screener listed."},
+	{Name: "screener.move", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"up", "down", "either"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The direction the screener kept."},
+	{Name: "screener.filter", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"min_price", "min_was", "min_pct", "max_pct", "edition"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A screener filter the reader set away from the landing's."},
+	{Name: "screener.size", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"25", "50", "100"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The screener's page size."},
+	{Name: "screener.sort", Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"current", "prior", "pct", "abs"}, Scope: ScopeEnum, Scopes: []string{"asc", "desc"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The column the screener sorted by."},
+	{Name: "screener.page", Area: "screener", Page: "screener", Values: ValueBucket, Enum: []string{"1", "2", "3-5", "6+"}, Report: ReportContext, Help: "The page of screener rows read."},
+	{Name: "alerts.create", Area: "alerts", Page: "search,alerts", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Scope: ScopePage, Report: ReportCandidate, Unit: UnitScope, Kind: "control", Help: "An alert was created, by the page it was created from."},
+	{Name: "alerts.create_delivery", Area: "alerts", Denom: "alerts.create", Values: ValueEnum, Enum: []string{"discord", "email"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The channel a new alert fires on."},
+	{Name: "alerts.create_condition", Area: "alerts", Denom: "alerts.create", Values: ValueEnum, Enum: []string{"NM", "SP", "MP", "HP", "PO"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The grade a new alert watches."},
+	{Name: "alerts.create_threshold", Area: "alerts", Denom: "alerts.create", Values: ValueEnum, Enum: []string{"above_abs", "above_pct", "below_abs", "below_pct"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A threshold a new alert set."},
+	{Name: "alerts.create_stores", Area: "alerts", Denom: "alerts.create", Values: ValueBucket, Enum: []string{"0", "1-2", "3-9", "10+"}, Report: ReportContext, Help: "Stores a new alert is scoped to, 0 being every store."},
+	{Name: "alerts.edit", Area: "alerts", Page: "alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert was edited."},
+	{Name: "alerts.pause", Area: "alerts", Page: "alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert was paused."},
+	{Name: "alerts.resume", Area: "alerts", Page: "alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert was resumed."},
+	{Name: "alerts.delete", Area: "alerts", Page: "search,alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert was deleted."},
+	{Name: "alerts.delete_all", Area: "alerts", Page: "alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Every alert was deleted at once."},
+	{Name: "alerts.channel", Area: "alerts", Page: "alerts", Values: ValueEnum, Enum: []string{"add", "change", "resend", "remove", "enable", "confirm", "unsubscribe"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An email channel action."},
+	{Name: "alerts.fired", Area: "alerts", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Report: ReportContext, Help: "A firing settled: delivered, refused or failed, once per attempt; a deferred firing counts when it is finally attempted."},
+	{Name: "alerts.delivered", Area: "alerts", Values: ValueEnum, Enum: []string{"ok", "fail", "refused", "deferred"}, Scope: ScopeEnum, Scopes: []string{"discord", "email"}, Report: ReportSignal, Help: "How a firing's delivery ended: fail is retried, refused parks the alert, deferred counts again on each run until sent."},
+	{Name: "alerts.mail_event", Area: "alerts", Values: ValueEnum, Enum: []string{"hard_bounce", "soft_bounce", "complaint", "other"}, Report: ReportSignal, Help: "A mail provider event the webhook verified."},
+	{Name: "alerts.deep_link", Area: "alerts", Page: "alerts", Values: ValueEnum, Enum: []string{"card", "edit"}, Report: ReportContext, Help: "The alerts page was opened on a card or an alert."},
+	{Name: "auth.login", Area: "account", Values: ValueEnum, Enum: []string{"ok", "no_code", "fail_patreon", "fail_tier"}, Report: ReportSignal, Help: "How a Patreon login callback ended: fail_patreon is Patreon failing or giving no usable answer, fail_tier a reader with no qualifying pledge; the row carries whatever cookie the browser already held."},
+	{Name: "auth.renew", Area: "account", Values: ValueEnum, Enum: []string{"renewed", "not_renewed", "ended", "refused", "gone", "session_gone"}, Report: ReportContext, Help: "What a renewal came to, one row per refresh call made to Patreon, plus session_gone when the session is found gone before any call; a Refresh now press that reaches Patreon also counts under account.refresh, so the two are not added. The row carries the signature from before the renewal, so a grace renewal reads tier Any, unsigned."},
+	{Name: "auth.logout", Area: "account", Page: "home,user", Values: ValueEnum, Enum: []string{"here", "everywhere"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A reader logged out, of this browser or of every session."},
+	{Name: "account.refresh", Area: "account", Page: "user", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Refresh now was pressed on the Account page; a press that reaches Patreon also counts under auth.renew, so the two are not added."},
+	{Name: "userstate.get", Area: "account", Page: "*", Report: ReportContext, Help: "A browser read its synced state, answered 200 or 304."},
+	{Name: "userstate.put", Area: "account", Page: "*", Report: ReportContext, Help: "A browser wrote its whole synced state."},
+	{Name: "userstate.patch", Area: "account", Page: "*", Values: ValueEnum, Enum: []string{"favorites", "recents", "preferences", "backpack"}, Report: ReportContext, Help: "A browser wrote one section of its synced state."},
+	{Name: "userstate.conflict", Area: "account", Page: "*", Report: ReportSignal, Help: "A sync write lost to a newer version."},
+	{Name: "favshare.create", Area: "favorites", Page: "search,sealed", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A favorites share link was made or replaced."},
+	{Name: "favshare.stop", Area: "favorites", Page: "search,sealed", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A favorites share link was ended."},
+	{Name: "favshare.view", Area: "favorites", Page: "search/shared", Report: ReportContext, Help: "A shared favorites list was shown."},
+	{Name: "favshare.view_gone", Area: "favorites", Page: "search/shared", Report: ReportSignal, Help: "A share link was opened after it ended, or was never valid."},
+	{Name: "patreon.webhook", Area: "account", Values: ValueEnum, Enum: []string{"pledge_create", "pledge_update", "pledge_delete", "member_create", "member_update", "member_delete", "other", "bad_signature", "no_email"}, Report: ReportContext, Help: "A call to the Patreon member webhook: its event once handled, or why it was not."},
+	{Name: "go.click", Area: "site", Page: "*", Values: ValueEnum, Enum: []string{"r", "b", "i"}, Scope: ScopeStore, Report: ReportContext, Help: "A /go/ link sent a reader to a store, by the kind of link."},
+	{Name: "redirect.random", Area: "search", Page: "home,search,sealed", Values: ValueEnum, Enum: []string{"card", "sealed", "chart_modal"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A random card or product was asked for."},
+	{Name: "redirect.card", Area: "site", Report: ReportContext, Help: "A /card/ link was followed."},
+	{Name: "redirect.sealed", Area: "site", Report: ReportContext, Help: "A /sealed/ link was followed."},
+	{Name: "redirect.discord", Area: "nav", Page: "*", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The /discord invite link was followed."},
+	{Name: "redirect.partner", Area: "site", Report: ReportCandidate, Unit: UnitValue, Kind: "page", Help: "The /monroecards partner link was followed."},
+	{Name: "view.toggle", Area: "nav", Page: "*", Values: ValueEnum, Enum: []string{"to_mobile", "to_desktop"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The mobile or desktop view was forced."},
+	{Name: "apiplans.view", Area: "api", Page: "api-plans", Values: ValueEnum, Enum: []string{"plain", "prefilled"}, Report: ReportContext, Help: "The API pricing page was shown, plain or opened on an invite, a change or a package."},
+	{Name: "apiplans.handoff", Area: "api", Page: "api-plans", Values: ValueEnum, Enum: []string{"trial", "login", "unknown"}, Scope: ScopeEnum, Scopes: []string{"start", "ok", "refused"}, Report: ReportSignal, Help: "A step of the handoff to the API gateway."},
+	{Name: "api.call", Area: "api", Values: ValueEnum, Enum: []string{"json", "csv", "other"}, Scope: ScopeEnum, Scopes: APIFamilies(), Report: ReportContext, Help: "A price API call that passed the gate, by endpoint family; tier api is the gateway's, api-legacy any other verified signature. A handler refusal is also a call, so refusal rate is api.refuse over api.call."},
+	{Name: "api.option", Area: "api", Denom: "api.call", Values: ValueEnum, Enum: []string{"quantities", "conditions"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A price API call asked for an optional column, counted on v1 and v2 CSV calls only, where the options apply, while api.call counts every family."},
+	{Name: "api.refuse", Area: "api", Values: ValueEnum, Enum: []string{"no_key", "bad_sig", "expired", "rate_limited", "plan"}, Scope: ScopeEnum, Scopes: APIFamilies(), Report: ReportSignal, Help: "A price API call that was refused, by endpoint family and reason; plan is a verified key whose plan lacks the add-on; rate_limited is the same refusal ratelimit.reject:api counts, so the two are not added."},
+	{Name: "offlineapi.fetch", Area: "offline", Page: "offline", Values: ValueEnum, Enum: []string{"manifest", "catalog", "prices", "bucket_auth"}, Report: ReportContext, Help: "An offline API endpoint was fetched."},
+	{Name: "discord.message", Area: "site", Values: ValueEnum, Enum: []string{"card", "sealed", "last_sold", "brackets", "pricefall", "gatherer_link"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A message the Discord bot took as a command or lookup, by its form, counted even when the bot then answered nothing (a failed parse, an unclosed bracket, a Gatherer link with no match)."},
+	{Name: "discord.store_link", Area: "site", Values: ValueEnum, Enum: []string{"ck", "csi", "tcg", "scg", "mp", "ct", "amzn"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The Discord bot answered a store link with an affiliate link."},
+	{Name: "discord.guild_join", Area: "site", Report: ReportContext, Help: "The Discord bot was installed on a server."},
+	{Name: "job.run", Area: "site", Values: ValueEnum, Enum: []string{"ok", "fail"}, Scope: ScopeEnum, Scopes: []string{"fold", "stock", "events_rollup"}, Report: ReportInternal, Help: "A run of a metrics job, by how it ended."},
+	{Name: "ui.load", Family: FamilyUI, Scope: ScopePage, Area: "site", Report: ReportInternal, Help: "A page ran its scripts; the denominator for that page's controls."},
+	// ui: search page (2b)
+	{Name: "ui.result.link", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"set_icon", "name", "treatment", "set_title", "found_in_products", "promo_type"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A link in a result header was followed."},
+	{Name: "ui.result.icon", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"unpack", "decklist_tcg", "decklist_mkm", "contents", "find_in_sealed", "copy_name", "deckbox", "ck_restock", "scryfall", "tcg_inventory", "chart_view", "chart_add", "chart_remove", "view_image", "star_add", "star_remove", "pack_add", "pack_take", "bell", "admin_raw", "admin_fix"}, Scope: ScopeEnum, Scopes: []string{"header", "menu"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A result's action icon was used, inline or from its menu."},
+	{Name: "ui.result.icon_menu", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"open"}, Report: ReportContext, Help: "The result actions menu button was pressed."},
+	{Name: "ui.result.image", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"reveal_warning", "focus_search", "drawer_open"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The card image, or the mobile header that opens it, was pressed."},
+	{Name: "ui.search.sort", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"chrono", "alpha", "number", "retail", "buylist", "velocity", "odds"}, Scope: ScopeEnum, Scopes: []string{"sort", "reverse"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A sort pill was clicked: sort picks it, reverse is a click on the active one."},
+	{Name: "ui.search.sort_locked", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"velocity"}, Report: ReportSignal, Help: "The tier-locked sort pill was clicked."},
+	{Name: "ui.search.chart_top", Family: FamilyUI, Area: "search", Page: "search,sealed", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Chart the top N results was clicked."},
+	{Name: "ui.search.random", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"card", "sealed"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The random card or product link was clicked."},
+	{Name: "ui.search.contents_mode", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"everything", "fixed", "variable"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A reading of a product's contents was picked."},
+	{Name: "ui.sidebar.printing", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"row", "overflow"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A set symbol under the card image was followed, from the row or the overflow panel."},
+	{Name: "ui.sidebar.printings_more", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"open", "filter_used"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The editions overflow panel was opened, or its filter typed in."},
+	{Name: "ui.sidebar.link", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"show_all_versions", "switch_foil", "switch_etched", "mtgstocks"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A sidebar action link was followed."},
+	{Name: "ui.sidebar.products", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"expand", "click"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Available In was pressed open, or a product in it followed."},
+	{Name: "ui.sidebar.export", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"retail", "buylist", "list"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A sidebar CSV export was downloaded."},
+	{Name: "ui.sidebar.upload", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The results were sent to the uploader."},
+	{Name: "ui.row.store", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueStore, Scope: ScopeEnum, Scopes: []string{"seller", "buyer"}, Report: ReportContext, Help: "A reader followed a row's link to the store."},
+	{Name: "ui.row.locked", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"join", "login", "velocity_upsell", "listing_priority"}, Report: ReportSignal, Help: "A locked row's Join or Log in, the sales velocity upsell, or the phone drawer's listing priority Join link was clicked."},
+	{Name: "ui.row.velocity", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"open"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The TCGplayer sales row was opened."},
+	{Name: "ui.row.detail", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"open"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A mobile offer row was opened for its details."},
+	{Name: "ui.row.tab", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"sellers", "buyers"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The mobile Sellers or Buyers tab was picked."},
+	{Name: "ui.row.condition", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"NM", "SP", "MP", "HP", "PO", "INDEX"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A mobile condition pill was picked."},
+	{Name: "ui.row.admin_fix", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Report: ReportContext, Help: "An admin followed a row's FIX link."},
+	{Name: "ui.search.pager", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"first", "prev", "next", "last"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A results page link was followed."},
+	{Name: "ui.search.suggestion", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"did_you_mean", "try_one_of", "popular", "unpin_scope"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A link offered on an empty results page was followed."},
+	{Name: "ui.chart.roster", Family: FamilyUI, Area: "chart", Page: "search,sealed", Values: ValueEnum, Enum: []string{"add", "remove"}, Scope: ScopeEnum, Scopes: []string{"modal", "page"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A card was added to or removed from a chart's roster."},
+	{Name: "ui.searchbar.submit", Family: FamilyUI, Area: "search", Page: "*", Values: ValueEnum, Enum: []string{"nav", "landing", "home", "results", "modal"}, Report: ReportContext, Help: "A search was submitted, by which bar."},
+	{Name: "ui.autocomplete.pick", Family: FamilyUI, Area: "search", Page: "*", Values: ValueEnum, Enum: []string{"name", "token", "complete"}, Scope: ScopeEnum, Scopes: []string{"name", "r:", "f:", "cond:", "sm:", "sort:", "on:", "format:", "is:", "not:", "skip:", "region:", "c:", "ci:", "s:", "e:", "in:", "store:", "seller:", "vendor:"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A suggestion was taken: a card name, a filter value (scope: its prefix), or a name completed with Tab."},
+	{Name: "ui.scope.toggle", Family: FamilyUI, Area: "search", Page: "*", Values: ValueEnum, Enum: []string{"open", "close"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The pinned filter bar was opened or closed."},
+	{Name: "ui.scope.apply", Family: FamilyUI, Area: "search", Page: "*", Values: ValueEnum, Enum: []string{"go", "enter"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A search was run from the pinned filter bar."},
+	{Name: "ui.scope.clear", Family: FamilyUI, Area: "search", Page: "*", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "CLEAR on the pinned filter bar was pressed."},
+	{Name: "ui.scope.chip", Family: FamilyUI, Area: "search", Page: "*", Values: ValueEnum, Enum: []string{"nonfoil", "foil", "altfoil"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A fill chip under the pinned filter bar was pressed."},
+	{Name: "ui.mfilter.open", Family: FamilyUI, Area: "search", Page: "search,sealed", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The mobile filter sheet button was pressed."},
+	{Name: "ui.mfilter.apply", Family: FamilyUI, Area: "search", Page: "search,sealed", Denom: "ui.mfilter.open", Values: ValueEnum, Enum: []string{"set", "finish", "both", "none"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The mobile filter sheet was applied, with what."},
+	{Name: "ui.chart.range", Family: FamilyUI, Area: "chart", Page: "search,sealed", Values: ValueEnum, Enum: []string{"30", "90", "180", "365", "730", "1825", "3650", "all"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A chart date range was picked."},
+	{Name: "ui.chart.gaps", Family: FamilyUI, Area: "chart", Page: "search,sealed", Values: ValueFlag, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Toggle gaps was pressed: on shows gaps, off bridges them."},
+	{Name: "ui.chart.download", Family: FamilyUI, Area: "chart", Page: "search,sealed", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The chart was downloaded as an image."},
+	{Name: "ui.chart.checkpoint", Family: FamilyUI, Area: "chart", Page: "search,sealed", Values: ValueEnum, Enum: []string{"reprint", "release", "ban"}, Scope: ScopeEnum, Scopes: []string{"on", "off"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A checkpoint type was switched on or off."},
+	{Name: "ui.chart.reference", Family: FamilyUI, Area: "chart", Page: "search,sealed", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The multi-card chart's price source was changed."},
+	{Name: "ui.chart.legend", Family: FamilyUI, Area: "chart", Page: "search,sealed", Values: ValueEnum, Enum: []string{"hide", "show"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A chart legend entry was toggled."},
+	{Name: "ui.chart.add_modal", Family: FamilyUI, Area: "chart", Page: "search,sealed", Values: ValueEnum, Enum: []string{"open", "new_search", "commit", "close"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The Add card modal was opened or closed, or one of its buttons pressed."},
+	{Name: "ui.mchart.open", Family: FamilyUI, Area: "chart", Page: "search,sealed", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The mobile chart drawer was opened."},
+	{Name: "ui.mchart.reset_zoom", Family: FamilyUI, Area: "chart", Page: "search,sealed", Denom: "ui.mchart.open", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Reset Zoom on the mobile chart was pressed."},
+	{Name: "ui.mchart.gesture", Family: FamilyUI, Area: "chart", Page: "search,sealed", Denom: "ui.mchart.open", Values: ValueEnum, Enum: []string{"zoom", "pan"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A pinch or a drag on the mobile chart finished."},
+	{Name: "ui.recents", Family: FamilyUI, Area: "search", Page: "search", Values: ValueEnum, Enum: []string{"open", "pin", "unpin", "delete", "clear"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The recent searches list: an entry run, pinned, removed, or the list cleared."},
+	{Name: "ui.fav", Family: FamilyUI, Area: "favorites", Page: "search,sealed", Values: ValueEnum, Enum: []string{"add", "remove", "open", "pin", "unpin", "delete", "page", "clear", "refresh", "reorder"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Favorites: a star on a result, or an action in the list."},
+	{Name: "ui.fav.sort", Family: FamilyUI, Area: "favorites", Page: "search", Values: ValueEnum, Enum: []string{"chrono", "alpha", "sell", "buy"}, Scope: ScopeEnum, Scopes: []string{"asc", "desc"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A favorites sort pill, with the direction it left the list in."},
+	{Name: "ui.fav.csv", Family: FamilyUI, Area: "favorites", Page: "search", Values: ValueEnum, Enum: []string{"download", "import"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Favorites CSV download or import."},
+	{Name: "ui.fav.chart", Family: FamilyUI, Area: "favorites", Page: "search", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Chart favorites was pressed."},
+	{Name: "ui.fav.upload", Family: FamilyUI, Area: "favorites", Page: "search", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Favorites sent to the uploader."},
+	{Name: "ui.fav.share", Family: FamilyUI, Area: "favorites", Page: "search", Values: ValueEnum, Enum: []string{"open", "create", "copy", "stop"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The share panel: an existing link shown, a new one made, copied, or ended."},
+	{Name: "ui.fav.merge", Family: FamilyUI, Area: "favorites", Page: "search/shared", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Merge into my favorites was pressed on a shared list."},
+	{Name: "ui.fav.shared_open", Family: FamilyUI, Area: "favorites", Page: "search/shared", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An entry on a shared list was followed."},
+	{Name: "ui.sealed.toc", Family: FamilyUI, Area: "search", Page: "sealed", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A category was jumped to on the sealed index."},
+	{Name: "ui.sealed.edition", Family: FamilyUI, Area: "search", Page: "sealed", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An edition was opened from the sealed index."},
+	{Name: "ui.sets", Family: FamilyUI, Area: "search", Page: "sets", Values: ValueEnum, Enum: []string{"filter_used", "expand", "set", "finish_tag", "color_tag", "rarity_tag"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The editions page: the filter typed in, details shown, a set or one of its tags followed."},
+	{Name: "ui.home", Family: FamilyUI, Area: "site", Page: "home", Values: ValueEnum, Enum: []string{"tool_tile", "popular_card", "popular_collapse", "popular_expand", "random", "sets", "sealed"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The home page: a tool tile, a popular search, the strip folded or unfolded, the random card, the blurb's singles or sealed link."},
+	// ui: palette, keys and gestures (2c)
+	{Name: "ui.palette.open", Family: FamilyUI, Area: "palette", Page: "*", Values: ValueEnum, Enum: []string{"ctrl_k", "slash"}, Report: ReportCandidate, Unit: UnitValue, Kind: "palette", Help: "The palette was opened, by which shortcut."},
+	{Name: "ui.palette.close", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"acted", "dismissed"}, Report: ReportContext, Help: "One an open: a pick ended it, or it was closed with none."},
+	{Name: "ui.palette.mode", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"nav", "help", "saved", "recent", "sealed", "upload", "provider", "subview", "sealed_actions", "search"}, Scope: ScopeEnum, Scopes: []string{"prefix", "tile", "chip", "typed"}, Report: ReportCandidate, Unit: UnitValue, Kind: "palette", Help: "A palette mode was entered, once an open; scope is how."},
+	{Name: "ui.palette.pick", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"enter", "shift_enter", "ctrl_enter", "tab", "click"}, Scope: ScopeEnum, Scopes: []string{"shortcut", "nav", "nav_sub", "card", "filter_candidate", "recent", "saved", "help", "command", "search", "sealed_suggestion", "sealed_fallback", "sealed_action", "upload_url", "upload_file", "upload_page_results", "upload_export"}, Report: ReportCandidate, Unit: UnitScope, Kind: "palette", Help: "A palette row was picked; scope is the row type, value is how."},
+	{Name: "ui.palette.composed_run", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"search", "nav"}, Report: ReportCandidate, Unit: UnitValue, Kind: "palette", Help: "Enter ran the locked chips with no row picked."},
+	{Name: "ui.palette.command", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"toggle_theme", "random_card", "random_sealed", "open_guide", "copy_url", "save_search"}, Scope: ScopeEnum, Scopes: []string{"row", "hotkey"}, Report: ReportCandidate, Unit: UnitValue, Kind: "palette", Help: "A palette command ran, from its row or its hotkey."},
+	{Name: "ui.palette.filter", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"r", "f", "cond", "sm", "sort", "on", "format", "is", "not", "skip", "region", "c", "ci", "s", "e", "in", "store", "seller", "vendor", "-r", "-f", "-cond", "-sm", "-sort", "-on", "-format", "-is", "-not", "-skip", "-region", "-c", "-ci", "-s", "-e", "-in", "-store", "-seller", "-vendor"}, Report: ReportCandidate, Unit: UnitValue, Kind: "palette", Help: "A filter row was picked, by its prefix; a leading - is a negated filter."},
+	{Name: "ui.palette.chip", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"lock", "remove", "edit"}, Scope: ScopeEnum, Scopes: []string{"card", "filter", "sealed", "nav", "nav_sub"}, Report: ReportCandidate, Unit: UnitValue, Kind: "palette", Help: "A chip was locked, removed or sent back to the input."},
+	{Name: "ui.palette.saved", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"new", "updated", "overwrite", "cap", "run", "restore", "delete", "delete_silent"}, Report: ReportCandidate, Unit: UnitValue, Kind: "palette", Help: "A saved search was written, run, restored or deleted; cap is a save refused at 50."},
+	{Name: "ui.palette.recent", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"run", "delete"}, Report: ReportCandidate, Unit: UnitValue, Kind: "palette", Help: "A recent search was run or removed from the palette."},
+	{Name: "ui.palette.help", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"copy", "open_guide"}, Report: ReportCandidate, Unit: UnitValue, Kind: "palette", Help: "A help row copied its snippet or opened the guide."},
+	{Name: "ui.palette.sealed", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"search", "contents", "unpack"}, Report: ReportCandidate, Unit: UnitValue, Kind: "palette", Help: "A sealed product was opened from the palette, by action."},
+	{Name: "ui.palette.upload", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"url", "file", "page_results", "export"}, Scope: ScopeEnum, Scopes: []string{"tcgplayer", "moxfield", "manabox", "archidekt", "cubecobra", "mythictools", "sheets", "picker", "page", "download", "estimate", "deckbox", "tcgplayer_csv"}, Report: ReportCandidate, Unit: UnitValue, Kind: "palette", Help: "An upload was started from the palette; scope is the url host, picker, page, or the export field."},
+	{Name: "ui.palette.nav", Family: FamilyUI, Area: "palette", Page: "*", Denom: "ui.palette.open", Values: ValueEnum, Enum: []string{"home", "changelog", "account", "search", "sets", "sealed", "newspaper", "syp", "screener", "sleepers", "upload", "global", "arbitrage", "reverse", "alerts", "api", "other"}, Scope: ScopeEnum, Scopes: []string{"leaf", "parent", "sub"}, Report: ReportContext, Help: "A page was opened from the palette."},
+	{Name: "ui.key", Family: FamilyUI, Area: "site", Page: "*", Values: ValueEnum, Enum: []string{"type_to_focus", "settings_hotkey", "backpack_tab_move", "backpack_tab_switch"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A keyboard shortcut was used, by name."},
+	{Name: "ui.search.key", Family: FamilyUI, Area: "search", Page: "search,sealed", Values: ValueEnum, Enum: []string{"tab_to_search", "result_page_down", "result_page_up"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A results page keyboard shortcut was used, by name."},
+	{Name: "ui.nav.layout", Family: FamilyUI, Area: "nav", Page: "*", Values: ValueEnum, Enum: []string{"promote", "swap", "demote", "dock", "undock", "reorder"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A navbar drag and drop changed the layout."},
+	{Name: "ui.backpack.drag", Family: FamilyUI, Area: "backpack", Page: "*", Values: ValueEnum, Enum: []string{"card_to_tab", "tab_reorder"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A backpack drag and drop."},
+	{Name: "ui.upload.file_drop", Family: FamilyUI, Area: "upload", Page: "upload", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A file dropped on the upload page was taken."},
+	// ui: navbar, settings and the other pages (2d)
+	{Name: "ui.nav.link", Family: FamilyUI, Area: "nav", Page: "*", Values: ValueEnum, Enum: []string{"brand", "section", "tools_tile", "account", "guide", "patreon", "discord", "menu_link"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A navbar link was followed, by where it sits."},
+	{Name: "ui.nav.tools", Family: FamilyUI, Area: "nav", Page: "*", Values: ValueEnum, Enum: []string{"open"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The Tools menu was opened."},
+	{Name: "ui.nav.hint", Family: FamilyUI, Area: "nav", Page: "*", Values: ValueEnum, Enum: []string{"dismiss"}, Report: ReportContext, Help: "The drag tip in the Tools menu was dismissed."},
+	{Name: "ui.nav.menu", Family: FamilyUI, Area: "nav", Page: "*", Values: ValueEnum, Enum: []string{"open"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The hamburger menu button was pressed."},
+	{Name: "ui.nav.offline", Family: FamilyUI, Area: "offline", Page: "*", Values: ValueEnum, Enum: []string{"on", "off"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The navbar offline switch was pressed, by the state it switched to."},
+	{Name: "ui.settings.open", Family: FamilyUI, Area: "settings", Page: "*", Values: ValueEnum, Enum: []string{"gear", "hotkey", "param", "link"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The settings were opened, by how."},
+	{Name: "ui.settings.tab", Family: FamilyUI, Area: "settings", Page: "*", Denom: "ui.settings.open", Values: ValueEnum, Enum: []string{"search", "upload", "arbit", "global", "reverse", "news", "sleep", "offline"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A settings tab was picked from the rail."},
+	{Name: "ui.settings.search", Family: FamilyUI, Area: "settings", Page: "*", Denom: "ui.settings.open", Values: ValueEnum, Enum: []string{"used"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The settings search box was used, once each time a search starts."},
+	{Name: "ui.settings.change", Family: FamilyUI, Area: "settings", Page: "*", Values: ValueEnum, Enum: []string{"on", "off", "set", "cleared", "chrono", "hybrid", "alpha", "number", "retail", "buylist", "stores", "prices", "credit", "market", "priceRatio", "creditPrice", "marketCredit", "contents", "decklist", "variable", "setchrono", "setalpha", "alphabetical", "highprice", "highspread", "profitability", "consolidate", "custom", "sellers", "buyers", "NM", "SP", "MP", "HP", "PO", "INDEX", "expanded", "compact"}, Scope: ScopeSetting, Report: ReportContext, Help: "A setting a save changed, in scope, by what it was set to: a flag on or off, an enum's new word, otherwise set or cleared."},
+	{Name: "ui.settings.save", Family: FamilyUI, Area: "settings", Page: "*", Values: ValueEnum, Enum: []string{"modal", "mobile_drawer"}, Report: ReportContext, Help: "Settings were saved, from the modal or the mobile drawer."},
+	{Name: "ui.backpack.panel", Family: FamilyUI, Area: "backpack", Page: "*", Values: ValueEnum, Enum: []string{"open"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The backpack panel was opened."},
+	{Name: "ui.backpack.card", Family: FamilyUI, Area: "backpack", Page: "*", Denom: "ui.backpack.panel", Values: ValueEnum, Enum: []string{"qty_up", "qty_down", "remove", "condition", "condition_add", "move_pack"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "One entry in the backpack panel was changed, by how."},
+	{Name: "ui.backpack.tab", Family: FamilyUI, Area: "backpack", Page: "*", Denom: "ui.backpack.panel", Values: ValueEnum, Enum: []string{"new", "switch", "rename", "delete"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A backpack tab was made, picked, renamed or deleted."},
+	{Name: "ui.backpack.sort", Family: FamilyUI, Area: "backpack", Page: "*", Denom: "ui.backpack.panel", Values: ValueEnum, Enum: []string{"added", "name", "edition", "retail", "buylist"}, Scope: ScopeEnum, Scopes: []string{"asc", "desc"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The backpack panel was sorted, with the direction it was left in."},
+	{Name: "ui.backpack", Family: FamilyUI, Area: "backpack", Page: "*", Values: ValueEnum, Enum: []string{"undo", "clear", "search", "empty_after_on", "empty_after_off", "switch_menu"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "One of the backpack's other controls was used: undo, empty, search, the empty-after switch or the navbar pick."},
+	{Name: "ui.backpack.upload", Family: FamilyUI, Area: "backpack", Page: "*", Denom: "ui.backpack.panel", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The backpack was sent to Upload, by side."},
+	{Name: "ui.theme", Family: FamilyUI, Area: "nav", Page: "*", Values: ValueEnum, Enum: []string{"light", "dark", "system"}, Scope: ScopeEnum, Scopes: []string{"toggle", "palette"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The theme a reader switched to, from a toggle button or the palette."},
+	{Name: "ui.upload.preset", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"apply", "save_as", "save", "rename", "delete"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An upload preset was applied, saved, renamed or deleted."},
+	{Name: "ui.upload.tab", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"singles", "sealed"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A tab of the upload store grid was picked."},
+	{Name: "ui.upload.source_pick", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"file", "url", "text"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The source of the upload list was picked."},
+	{Name: "ui.upload.file", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"pick", "clear"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A file was chosen with the upload picker, or cleared."},
+	{Name: "ui.upload.stores", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"select_all", "clear", "only", "exclude"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A bulk change was made to the upload store grid."},
+	{Name: "ui.upload.submit", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"upload", "download", "estimate", "deckbox", "tcgplayer_csv"}, Scope: ScopeEnum, Scopes: []string{"form", "results"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "What an upload list was submitted for, from the form or the results."},
+	{Name: "ui.upload.result_tab", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"results", "optimizer", "all", "singles", "sealed", "not_found"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A tab or sub-tab of the upload results was picked."},
+	{Name: "ui.upload.result", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"sort", "printing_swap", "remove_row", "switch_mode", "reload", "unpack", "back", "sort_menu", "sort_key", "sort_dir", "sort_move", "sort_clear", "pack_add", "pack_take"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An action was taken on the upload results or their sort menu."},
+	{Name: "ui.upload.upsell", Family: FamilyUI, Area: "upload", Page: "upload", Report: ReportSignal, Help: "Join BAN beside the locked upload mode switch was clicked."},
+	{Name: "ui.upload.share", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"list", "section"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A share link was copied, for the whole upload list or one store."},
+	{Name: "ui.upload.publish", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"open", "submit"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Publish as store was opened, or its form submitted."},
+	{Name: "ui.optimizer", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"toc_jump", "section_nav", "row_check", "check_all", "fold", "copy_name", "pack_add", "pack_take"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An upload optimizer control was used."},
+	{Name: "ui.optimizer.send", Family: FamilyUI, Area: "upload", Page: "upload", Values: ValueEnum, Enum: []string{"deck_builder", "mass_entry", "load_at", "sellcart", "csv", "tcg_csv", "row_popover"}, Scope: ScopeStore, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An optimizer store's list was sent somewhere, by the section's store."},
+	{Name: "ui.cart", Family: FamilyUI, Area: "upload", Page: "upload,arbit,reverse,global", Values: ValueEnum, Enum: []string{"prompt_shown", "prompt_skip", "help", "open"}, Scope: ScopeEnum, Scopes: []string{"ABU", "CSI", "SCG", "MMC", "SZ", "HA", "ML", "MP", "GN", "VS", "CT", "CK", "TCG"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A store cart button, its help or its panel's Continue was pressed, by store."},
+	{Name: "ui.arbit.store_select", Family: FamilyUI, Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"buying", "selling", "index", "landing_card"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A store was picked, from the arbitrage store picker or a landing card."},
+	{Name: "ui.arbit.jump", Family: FamilyUI, Area: "arbit", Page: "arbit,reverse,global", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A section was picked in the arbitrage Jump to select."},
+	{Name: "ui.arbit.preset", Family: FamilyUI, Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"apply", "pin", "save_as", "save", "rename", "delete"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An arbitrage filter preset was applied, pinned, saved, renamed or deleted."},
+	{Name: "ui.arbit.pin_auto", Family: FamilyUI, Area: "arbit", Page: "arbit,reverse,global", Report: ReportContext, Help: "A pinned arbitrage preset was applied with no pick of the reader's."},
+	{Name: "ui.arbit.filters", Family: FamilyUI, Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"open", "close", "apply", "reset", "clear_saved"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The arbitrage filter bar was opened, closed, applied or reset, or a saved limit dropped."},
+	{Name: "ui.arbit.edition_filter", Family: FamilyUI, Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"used"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The arbitrage edition filter box was used, once a page."},
+	{Name: "ui.arbit.sort", Family: FamilyUI, Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"alpha", "edition", "available", "sell_price", "buy_price", "profitability", "diff", "spread"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An arbitrage table was sorted, by the column."},
+	{Name: "ui.arbit.row", Family: FamilyUI, Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"check", "check_all", "fold", "section_nav"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An arbitrage section or row control was used."},
+	{Name: "ui.arbit.quick_link", Family: FamilyUI, Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"buy", "sell", "buy_reference"}, Scope: ScopeStore, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An arbitrage row's store link was followed, by the section's store."},
+	{Name: "ui.arbit.send", Family: FamilyUI, Area: "arbit", Page: "arbit,reverse,global", Values: ValueEnum, Enum: []string{"deck_builder", "mass_entry", "load_at", "sellcart", "csv"}, Scope: ScopeStore, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An arbitrage section's list was sent somewhere, by its store."},
+	{Name: "ui.arbit.contents", Family: FamilyUI, Area: "arbit", Page: "arbit,reverse,global", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A sealed arbitrage row's contents search was opened."},
+	{Name: "ui.news.report", Family: FamilyUI, Area: "news", Page: "newspaper/index,newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"combined_spike_score", "spike_score", "greatest_increase_listings", "greatest_decrease_listings", "greatest_increase_buylist", "greatest_decrease_buylist"}, Scope: ScopeEnum, Scopes: []string{"card", "tab", "pill"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A newspaper report was opened, by where it was picked."},
+	{Name: "ui.news.three_day", Family: FamilyUI, Area: "news", Page: "newspaper/index,newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"on", "off"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The 3-day or early edition newspaper switch was pressed, by the edition it switches to."},
+	{Name: "ui.news.filter_submit", Family: FamilyUI, Area: "news", Page: "newspaper/index,newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"manual", "auto_applied"}, Report: ReportContext, Help: "Newspaper filters were applied by the reader, or replayed from the saved ones."},
+	{Name: "ui.news.sort", Family: FamilyUI, Area: "news", Page: "newspaper/index,newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"ranking", "product_name", "set_name", "product_number", "variant", "bucket_name", "bucket_rank", "ck_retail_price", "tcg_market_price", "ck_buy_price", "current_price", "sellers_Today", "sellers_d7", "sellers_d30", "pct_gain_7d", "pct_drop_7d", "ck_buy_1d", "ck_buy_7d", "ck_buy_30d", "pct_increase_7d", "pct_decrease_7d"}, Scope: ScopeEnum, Scopes: []string{"asc", "desc"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A newspaper report column sort link was followed, by the column."},
+	{Name: "ui.news.edition", Family: FamilyUI, Area: "news", Page: "newspaper/index,newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"pick", "clear"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An edition was picked or cleared in the newspaper edition box."},
+	{Name: "ui.news.pager", Family: FamilyUI, Area: "news", Page: "newspaper/index,newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Values: ValueEnum, Enum: []string{"first", "prev", "next", "last"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The newspaper pager was used."},
+	{Name: "ui.news.upload_page", Family: FamilyUI, Area: "news", Page: "newspaper/index,newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A newspaper page was sent to the Uploader."},
+	{Name: "ui.news.card", Family: FamilyUI, Area: "news", Page: "newspaper/index,newspaper/combined_spike_score,newspaper/spike_score,newspaper/greatest_increase_listings,newspaper/greatest_decrease_listings,newspaper/greatest_increase_buylist,newspaper/greatest_decrease_buylist", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A card was opened from a newspaper report."},
+	{Name: "ui.news.syp", Family: FamilyUI, Area: "news", Page: "newspaper/syp", Values: ValueEnum, Enum: []string{"csv", "sort", "page", "buy_link", "card"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A control on the SYP list was used."},
+	{Name: "ui.sleepers.tool", Family: FamilyUI, Area: "sleepers", Page: "sleepers/index", Values: ValueEnum, Enum: []string{"reprint", "mismatch", "hotlist", "velocity"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A sleepers tool card was opened, by the tool."},
+	{Name: "ui.sleepers.gap", Family: FamilyUI, Area: "sleepers", Page: "sleepers/index", Values: ValueEnum, Enum: []string{"preset", "compare"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The sleepers gap tool was used: a preset pair, or Compare."},
+	{Name: "ui.sleepers.card", Family: FamilyUI, Area: "sleepers", Page: "sleepers/reprint,sleepers/mismatch,sleepers/gap,sleepers/hotlist,sleepers/velocity", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A card was opened from a sleepers result."},
+	{Name: "ui.screener.card", Family: FamilyUI, Area: "screener", Page: "screener", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A card was opened from the screener."},
+	{Name: "ui.screener.control", Family: FamilyUI, Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"provider", "window", "kind", "move", "editions", "size", "reset", "apply"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A screener filter control was used, by the control."},
+	{Name: "ui.screener.sort", Family: FamilyUI, Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"current", "prior", "pct", "abs"}, Scope: ScopeEnum, Scopes: []string{"asc", "desc"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A screener column sort link was followed, by the column."},
+	{Name: "ui.screener.pager", Family: FamilyUI, Area: "screener", Page: "screener", Values: ValueEnum, Enum: []string{"prev", "next"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The screener pager was used."},
+	{Name: "ui.screener.upload_page", Family: FamilyUI, Area: "screener", Page: "screener", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A screener page was sent to the Uploader."},
+	{Name: "ui.alerts.modal", Family: FamilyUI, Area: "alerts", Page: "alerts,search,sealed,sets", Values: ValueEnum, Enum: []string{"open", "save", "cancel"}, Scope: ScopeEnum, Scopes: []string{"alerts_page", "search"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The alert modal was opened, saved or dismissed, by where it opened."},
+	{Name: "ui.alerts.row", Family: FamilyUI, Area: "alerts", Page: "alerts", Values: ValueEnum, Enum: []string{"edit", "pause", "resume", "delete", "delete_all"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An action on the alerts list was taken."},
+	{Name: "ui.alerts.sort", Family: FamilyUI, Area: "alerts", Page: "alerts", Values: ValueEnum, Enum: []string{"created", "name", "now", "fired", "status", "side"}, Scope: ScopeEnum, Scopes: []string{"asc", "desc"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The alerts list was sorted, by the field."},
+	{Name: "ui.alerts.channel", Family: FamilyUI, Area: "alerts", Page: "alerts", Values: ValueEnum, Enum: []string{"change", "cancel", "add", "save", "resend", "remove", "enable"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert delivery channel button was pressed."},
+	{Name: "ui.account", Family: FamilyUI, Area: "account", Page: "user,home", Values: ValueEnum, Enum: []string{"login", "logout", "refresh", "logout_everywhere", "manage_patreon", "join_tier", "feature_card"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An Account page control, or the home page's log in or log out, was used."},
+	{Name: "ui.apiplans.choose", Family: FamilyUI, Area: "api", Page: "api-plans", Values: ValueEnum, Enum: []string{"starter", "all_stores", "all_data", "history"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "An API package was chosen on the plans page."},
+	{Name: "ui.apiplans", Family: FamilyUI, Area: "api", Page: "api-plans", Values: ValueEnum, Enum: []string{"addon", "stores", "games", "interval", "checkout", "trial", "manage"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "One of the API plans configurator's other controls was used."},
+	{Name: "ui.guide.tab", Family: FamilyUI, Area: "site", Page: "guide", Values: ValueEnum, Enum: []string{"overview", "palette", "syntax", "api", "faq"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A guide tab was opened."},
+	{Name: "ui.guide", Family: FamilyUI, Area: "site", Page: "guide", Values: ValueEnum, Enum: []string{"search_used", "section_link", "example_link", "copy"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The guide's filter, a sidebar or example link, or a copy button was used."},
+	{Name: "ui.changelog", Family: FamilyUI, Area: "site", Page: "changelog", Values: ValueEnum, Enum: []string{"page", "lightbox"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The changelog pager or an image preview was used."},
+	{Name: "ui.offline.mode", Family: FamilyUI, Area: "offline", Page: "*", Values: ValueEnum, Enum: []string{"enable", "disable"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Offline mode was switched on or off."},
+	{Name: "ui.offline.live", Family: FamilyUI, Area: "offline", Page: "*", Values: ValueEnum, Enum: []string{"on", "off"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Offline results as you type were switched on or off."},
+	{Name: "ui.offline.images", Family: FamilyUI, Area: "offline", Page: "*", Values: ValueEnum, Enum: []string{"sync_now", "pause", "editions_changed"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An offline image sync control was used."},
+	{Name: "ui.offline.data", Family: FamilyUI, Area: "offline", Page: "*", Values: ValueEnum, Enum: []string{"resync", "wipe"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "Force Resync or Delete Offline Data was pressed."},
+	{Name: "ui.offline.sync", Family: FamilyUI, Area: "offline", Page: "*", Values: ValueEnum, Enum: []string{"ok", "fail"}, Scope: ScopeEnum, Scopes: []string{"catalog", "prices", "images"}, Report: ReportSignal, Help: "An offline sync finished or failed, by stage."},
+	{Name: "ui.offline.sw", Family: FamilyUI, Area: "offline", Page: "*", Values: ValueEnum, Enum: []string{"install_ok", "install_fail"}, Report: ReportSignal, Help: "The service worker registered, or did not, when offline mode was switched on."},
+	{Name: "ui.offline.search", Family: FamilyUI, Area: "offline", Page: "offline", Report: ReportContext, Help: "A search settled on the offline page."},
+	{Name: "ui.offline.page", Family: FamilyUI, Area: "offline", Page: "offline", Values: ValueEnum, Enum: []string{"sort", "tab", "condition", "kind"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "A control on the offline page was used."},
+	{Name: "ui.offline.failover", Family: FamilyUI, Area: "offline", Page: "offline", Report: ReportSignal, Help: "The offline shell was served in place of a page the network could not reach."},
+	{Name: "ui.offline.banner", Family: FamilyUI, Area: "offline", Page: "*", Values: ValueEnum, Enum: []string{"back_to_live", "browse_offline", "dismiss"}, Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "The offline banner's exit, or a button in the unreachable toast, was pressed."},
+	// ui: script errors (2f)
+	{Name: "ui.js.error", Family: FamilyUI, Area: "site", Page: "*", Values: ValueEnum, Enum: errorClasses, Scope: ScopeEnum, Scopes: errorScopes, Report: ReportSignal, Help: "An uncaught script error, by script and class."},
+	{Name: "ui.js.rejection", Family: FamilyUI, Area: "site", Page: "*", Values: ValueEnum, Enum: errorClasses, Scope: ScopeEnum, Scopes: errorScopes, Report: ReportSignal, Help: "An unhandled promise rejection, by script and class."},
+	// ui: page timings, one load in ten (2f)
+	{Name: "ui.perf.ttfb", Family: FamilyUI, Area: "site", Values: ValueBucket, Enum: []string{"<200ms", "<500ms", "<800ms", "<1.8s", "1.8s+"}, Scope: ScopePage, Report: ReportContext, Help: "Time to first byte, one page load in ten."},
+	{Name: "ui.perf.lcp", Family: FamilyUI, Area: "site", Values: ValueBucket, Enum: []string{"<1s", "<2.5s", "<4s", "<8s", "8s+"}, Scope: ScopePage, Report: ReportContext, Help: "Largest contentful paint, one page load in ten."},
+	{Name: "ui.perf.dom_ready", Family: FamilyUI, Area: "site", Values: ValueBucket, Enum: []string{"<500ms", "<1s", "<2s", "<4s", "<8s", "8s+"}, Scope: ScopePage, Report: ReportContext, Help: "DOMContentLoaded end, one page load in ten."},
+	{Name: "stock.rows", Family: FamilyStock, Area: "account", Report: ReportContext, Help: "Nightly standing count of user_state rows, one a reader a game."},
+	{Name: "stock.synced_7d", Family: FamilyStock, Area: "account", Report: ReportContext, Help: "Nightly standing count of user_state rows updated in the last 7 days."},
+	{Name: "stock.synced_30d", Family: FamilyStock, Area: "account", Report: ReportContext, Help: "Nightly standing count of user_state rows updated in the last 30 days."},
+	{Name: "stock.favorites", Family: FamilyStock, Area: "favorites", Values: ValueBucket, Enum: stockBuckets("stock.favorites"), Report: ReportContext, Help: "Nightly standing count of user_state rows, by how many live favorites each holds."},
+	{Name: "stock.recents", Family: FamilyStock, Area: "search", Values: ValueBucket, Enum: stockBuckets("stock.recents"), Report: ReportContext, Help: "Nightly standing count of user_state rows, by how many live recent searches each holds."},
+	{Name: "stock.backpack", Family: FamilyStock, Area: "backpack", Values: ValueBucket, Enum: stockBuckets("stock.backpack"), Report: ReportContext, Help: "Nightly standing count of user_state rows, by how many live backpack entries each holds."},
+	{Name: "stock.backpack_tabs", Family: FamilyStock, Area: "backpack", Values: ValueBucket, Enum: stockBuckets("stock.backpack_tabs"), Report: ReportContext, Help: "Nightly standing count of user_state rows, by how many backpacks each has in use."},
+	{Name: "stock.upload_presets", Family: FamilyStock, Area: "upload", Values: ValueBucket, Enum: stockBuckets("stock.upload_presets"), Report: ReportContext, Help: "Nightly standing count of user_state rows, by how many upload presets each has saved."},
+	{Name: "stock.arbit_presets", Family: FamilyStock, Area: "arbit", Values: ValueBucket, Enum: stockBuckets("stock.arbit_presets"), Report: ReportContext, Help: "Nightly standing count of user_state rows, by how many arbit presets each has saved."},
+	{Name: "stock.arbit_pins", Family: FamilyStock, Area: "arbit", Report: ReportContext, Help: "Nightly standing count of user_state rows with a pinned arbit preset."},
+	{Name: "stock.news_filters", Family: FamilyStock, Area: "news", Report: ReportContext, Help: "Nightly standing count of user_state rows with saved newspaper choices."},
+	{Name: "stock.nav_layout", Family: FamilyStock, Area: "nav", Report: ReportContext, Help: "Nightly standing count of user_state rows with a saved navbar layout."},
+	{Name: "stock.pref", Family: FamilyStock, Area: "settings", Values: ValueEnum, Enum: stockPrefKeys, Report: ReportContext, Help: "Nightly standing count of user_state rows holding each synced preference key."},
+	{Name: "stock.sessions", Family: FamilyStock, Area: "account", Report: ReportContext, Help: "Nightly standing count of live Patreon sessions."},
+	{Name: "stock.upload_shares", Family: FamilyStock, Area: "upload", Scope: ScopeEnum, Scopes: stockGames, Report: ReportContext, Help: "Nightly standing count of live upload share links, per game."},
+	{Name: "stock.fav_shares", Family: FamilyStock, Area: "favorites", Scope: ScopeEnum, Scopes: stockGames, Report: ReportContext, Help: "Nightly standing count of live favorites share links, per game."},
+	{Name: "stock.alerts", Family: FamilyStock, Area: "alerts", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Scope: ScopeEnum, Scopes: stockGames, Report: ReportContext, Help: "Nightly standing count of stored alerts, by side, per game."},
+	{Name: "stock.alerts_delivery", Family: FamilyStock, Area: "alerts", Values: ValueEnum, Enum: []string{"discord", "email"}, Scope: ScopeEnum, Scopes: stockGames, Report: ReportContext, Help: "Nightly standing count of stored alerts, by delivery channel, per game."},
+	{Name: "stock.alerts_status", Family: FamilyStock, Area: "alerts", Values: ValueEnum, Enum: []string{"active", "paused", "over_allowance", "undeliverable", "unresolvable"}, Scope: ScopeEnum, Scopes: stockGames, Report: ReportContext, Help: "Nightly standing count of stored alerts, by status, per game."},
+	{Name: "stock.alerts_condition", Family: FamilyStock, Area: "alerts", Values: ValueEnum, Enum: []string{"NM", "SP", "MP", "HP", "PO"}, Scope: ScopeEnum, Scopes: stockGames, Report: ReportContext, Help: "Nightly standing count of stored alerts, by condition, per game."},
+	{Name: "stock.alerts_stores", Family: FamilyStock, Area: "alerts", Values: ValueBucket, Enum: stockBuckets("stock.alerts_stores"), Scope: ScopeEnum, Scopes: stockGames, Report: ReportContext, Help: "Nightly standing count of stored alerts, by how many stores each names, 0 being any, per game."},
+	{Name: "stock.channels", Family: FamilyStock, Area: "alerts", Values: ValueEnum, Enum: []string{"discord", "email"}, Report: ReportContext, Help: "Nightly standing count of alert channel rows in any state (verified, pending or disabled), by kind; a reader can hold more than one."},
+	{Name: "stock.channels_disabled", Family: FamilyStock, Area: "alerts", Values: ValueEnum, Enum: []string{"bounced", "complained", "unsubscribed", "other"}, Report: ReportContext, Help: "Nightly standing count of disabled alert channels, by reason."},
+	{Name: "stock.alert_events", Family: FamilyStock, Area: "alerts", Values: ValueEnum, Enum: []string{"delivered", "failed"}, Scope: ScopeEnum, Scopes: stockGames, Report: ReportContext, Help: "Nightly standing count of the alert firings still kept, the last 90 days, by outcome, per game."},
+	// state: the daily settings snapshot (2e)
+	{Name: "state.set", Family: FamilyState, Values: ValueSetting, Scope: ScopeSetting, Area: "settings", Report: ReportContext, Help: "Readers seen in a day with the setting off its default."},
+	{Name: "state.reader", Family: FamilyState, Values: ValueNone, Scope: ScopeEnum, Scopes: SettingPaths, Area: "settings", Report: ReportInternal, Help: "Readers who sent a settings snapshot for the path scope that day."},
+}
+
+// uploadSources are where the upload handler reads a list from.
+var uploadSources = []string{"hashes", "text", "file_csv", "file_txt", "file_xls", "file_xlsx", "url", "share", "handoff"}
+
+// arbitPages are the arbitrage pages, the scope of every arbit.* name.
+var arbitPages = []string{"arbit", "reverse", "global"}
+
+// searchPages are the paths a search runs on, the scope of most search.* names.
+var searchPages = []string{"search", "sealed", "sets"}
+
+// searchFilters are the parser's operators as typed, plus in, each also negated but sm and sort.
+var searchFilters = []string{
+	"arb_price", "buy_price", "c", "ci", "cn", "cne", "cns", "color", "cond", "condb", "condr", "container",
+	"contents", "date", "decklist", "e", "edition", "ee", "f", "format", "id", "identity", "in", "is", "legal",
+	"name", "namee", "not", "number", "on", "price", "qty", "quantity", "r", "ratio", "region", "rev_price", "s",
+	"se", "seller", "set", "skip", "sm", "sort", "store", "t", "unpack", "v", "variable", "velocity", "vendor",
+	"year", "-arb_price", "-buy_price", "-c", "-ci", "-cn", "-cne", "-cns", "-color", "-cond", "-condb",
+	"-condr", "-container", "-contents", "-date", "-decklist", "-e", "-edition", "-ee", "-f", "-format", "-id",
+	"-identity", "-in", "-is", "-legal", "-name", "-namee", "-not", "-number", "-on", "-price", "-qty",
+	"-quantity", "-r", "-ratio", "-region", "-rev_price", "-s", "-se", "-seller", "-set", "-skip", "-store",
+	"-t", "-unpack", "-v", "-variable", "-velocity", "-vendor", "-year",
+}
+
+var byName map[string]Name
+
+func init() {
+	byName = make(map[string]Name, len(names))
+	for _, n := range names {
+		byName[n.Name] = n
+	}
+}
+
+// Lookup returns the registered name.
+func Lookup(name string) (Name, bool) {
+	n, ok := byName[name]
+	return n, ok
+}
+
+// All returns every registered name.
+func All() []Name {
+	return slices.Clone(names)
+}
+
+func foldOther(f func(string) bool, s string) string {
+	if f == nil || !f(s) {
+		return "other"
+	}
+	return s
+}
+
+// maxStoreLen is the longest shorthand stored; a longer one folds to other.
+const maxStoreLen = 40
+
+// storeShaped reports whether s is short and spelled as shorthands are, TCGSI's , and + included.
+func storeShaped(s string) bool {
+	if s == "" || len(s) > maxStoreLen {
+		return false
+	}
+	for _, c := range []byte(s) {
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		case c == '_', c == '.', c == '-', c == ',', c == '+':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// foldStore is foldOther for a shorthand, which must also be store-shaped.
+func foldStore(f func(string) bool, s string) string {
+	if !storeShaped(s) {
+		return "other"
+	}
+	return foldOther(f, s)
+}
+
+// Check returns the scope and value to store, or ok=false to reject.
+func (n Name) Check(scope, value string, v Validators) (string, string, bool) {
+	if n.Scope == ScopeNone {
+		if scope != "" {
+			return "", "", false
+		}
+	} else {
+		if scope == "" {
+			return "", "", false
+		}
+		switch n.Scope {
+		case ScopeEnum:
+			if !slices.Contains(n.Scopes, scope) {
+				return "", "", false
+			}
+		case ScopeSetting:
+			if v.Setting == nil || !v.Setting(scope) {
+				return "", "", false
+			}
+		case ScopeRoute:
+			scope = foldOther(v.Route, scope)
+		case ScopePage:
+			scope = foldOther(v.Page, scope)
+		case ScopeStore:
+			scope = foldStore(v.Store, scope)
+		}
+	}
+
+	switch n.Values {
+	case ValueNone:
+		if value != "" {
+			return "", "", false
+		}
+	case ValueEnum, ValueBucket:
+		if !slices.Contains(n.Enum, value) {
+			return "", "", false
+		}
+	case ValueFlag:
+		if value != "on" && value != "off" {
+			return "", "", false
+		}
+	case ValueSetting:
+		if v.SettingValue == nil || !v.SettingValue(scope, value) {
+			return "", "", false
+		}
+	case ValueStore:
+		value = foldStore(v.Store, value)
+	case ValuePage:
+		value = foldOther(v.Page, value)
+	case ValueOrigin:
+		value = foldOther(v.Origin, value)
+	}
+	return scope, value, true
+}
+
+// Bucket names the range of edges that n falls in.
+func Bucket(edges []int64, n int64) string {
+	if len(edges) == 0 || n < edges[0] {
+		return "0"
+	}
+	i := 0
+	for i+1 < len(edges) && edges[i+1] <= n {
+		i++
+	}
+	lo := strconv.FormatInt(edges[i], 10)
+	if i == len(edges)-1 {
+		return lo + "+"
+	}
+	if edges[i+1]-1 == edges[i] {
+		return lo
+	}
+	return lo + "-" + strconv.FormatInt(edges[i+1]-1, 10)
+}

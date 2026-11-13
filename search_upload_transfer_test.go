@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
@@ -35,18 +36,36 @@ func TestSearchUploadTransferReachesUploader(t *testing.T) {
 		t.Skip("t:creature does not fill the result cap in this datastore")
 	}
 
-	form := url.Values{"mode": {"false"}}
-	for _, m := range regexp.MustCompile(`name="hashes" value="([^"]+)"`).FindAllStringSubmatch(w.Body.String(), -1) {
-		form.Add("hashes", m[1])
+	// Post what the browser would: every hidden input of the sidebar form, to its action.
+	sidebar := regexp.MustCompile(`(?s)<form action="([^"]*)" method="post" style="display:contents">(.*?)</form>`).FindStringSubmatch(w.Body.String())
+	if sidebar == nil {
+		t.Fatal("the page has no sidebar Upload form")
+	}
+	action := html.UnescapeString(sidebar[1])
+	if action != "/upload?from=search_sidebar" {
+		t.Errorf("the sidebar form posts to %q", action)
+	}
+	form := url.Values{}
+	inputs := regexp.MustCompile(`<input[^>]*type="hidden"[^>]*>`).FindAllString(sidebar[2], -1)
+	attr := regexp.MustCompile(`\s(name|value)="([^"]*)"`)
+	for _, in := range inputs {
+		kv := map[string]string{}
+		for _, m := range attr.FindAllStringSubmatch(in, -1) {
+			kv[m[1]] = html.UnescapeString(m[2])
+		}
+		form.Add(kv["name"], kv["value"])
 	}
 	if len(form["hashes"]) != MaxUploadTransfer {
 		t.Fatalf("the transfer carries %d results, want %d", len(form["hashes"]), MaxUploadTransfer)
+	}
+	if len(inputs) != MaxUploadTransfer+1 || len(form["mode"]) != 1 {
+		t.Fatalf("the form posts %d values, want the %d results and the mode", len(inputs), MaxUploadTransfer)
 	}
 	if !strings.Contains(w.Body.String(), TransferCutMessage) {
 		t.Errorf("the page does not say the transfer stops at %d results", MaxUploadTransfer)
 	}
 
-	post := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+	post := httptest.NewRequest(http.MethodPost, action, strings.NewReader(form.Encode()))
 	post.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w = httptest.NewRecorder()
 	enforceSigning(testSite, http.HandlerFunc(testSite.Upload)).ServeHTTP(w, post)

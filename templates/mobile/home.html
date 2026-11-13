@@ -22,7 +22,7 @@
     </div>
 
     <div class="m-home-search-wrap">
-        <form class="autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
+        <form class="autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform" data-track="ui.searchbar.submit" data-track-value="home">
             <input id="searchbox" class="m-search-input" type="text" name="q"
                    placeholder="Search for a card or product..."
                    maxlength="1000" autofocus autocapitalize="none" autocorrect="off" spellcheck="false"
@@ -35,7 +35,7 @@
     <div class="m-home-tools">
         {{range .Nav}}
             {{if and (ne .Name "Home") (ne .Name "Changelog") (ne .Name "Account")}}
-                <a class="m-home-tool" href="{{.Link}}">
+                <a class="m-home-tool" href="{{.Link}}"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="tool_tile"{{end}}>
                     <span class="m-home-tool-icon">{{.Short}}</span> {{.Name}}
                 </a>
             {{end}}
@@ -56,22 +56,22 @@
                 {{template "patreon-login-script" .}}
                 {{if .PatreonIDs}}
                     {{range $ref, $id := .PatreonIDs}}
-                        <a class="m-home-login-btn patreon" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Login</a>
+                        <a class="m-home-login-btn patreon" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.account" data-track-value="login"{{end}}>Login</a>
                     {{end}}
                 {{else}}
                     <button class="m-home-login-btn patreon" type="button" disabled title="Login is unavailable because Patreon is not configured">Login</button>
                 {{end}}
             {{else}}
-                <a class="m-home-login-btn patreon" href="/?errmsg=logout">Logout</a>
+                <a class="m-home-login-btn patreon" href="/?errmsg=logout"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.account" data-track-value="logout"{{end}}>Logout</a>
             {{end}}
-            {{range .Nav}}{{if eq .Name "Account"}}<a class="m-home-icon-btn" href="{{.Link}}" title="Account"><i data-lucide="user-round"></i></a>{{end}}{{end}}
+            {{range .Nav}}{{if eq .Name "Account"}}<a class="m-home-icon-btn" href="{{.Link}}" title="Account"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.nav.link" data-track-value="account"{{end}}><i data-lucide="user-round"></i></a>{{end}}{{end}}
             <button class="ban-theme-toggle" type="button" title="Toggle theme">
                 <svg class="theme-icon theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffdd00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                 <svg class="theme-icon theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a5ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
                 <svg class="theme-icon theme-icon-system" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9a9a9a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             </button>
-            <a class="m-home-icon-btn" href="/guide" title="Guide"><i data-lucide="circle-question-mark"></i></a>
-            <a class="m-home-login-btn discord" href="/discord">Discord</a>
+            <a class="m-home-icon-btn" href="/guide" title="Guide"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.nav.link" data-track-value="guide"{{end}}><i data-lucide="circle-question-mark"></i></a>
+            <a class="m-home-login-btn discord" href="/discord"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.nav.link" data-track-value="discord"{{end}}>Discord</a>
         </div>
 
         <div class="m-home-copyright">&copy; 2019&ndash;2026 MTGBAN Inc</div>

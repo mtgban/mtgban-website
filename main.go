@@ -104,6 +104,9 @@ type ConfigType struct {
 
 	Game         matcher.Game `json:"game"`
 	InstanceName string       `json:"instance_name"`
+	// MetricsJobs runs the nightly metrics jobs here. The crons read it once at scheduling
+	// and the by-hand fold reads it live; the job lock makes a disagreement harmless.
+	MetricsJobs bool `json:"metrics_jobs"`
 
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
@@ -566,16 +569,28 @@ func (s *site) openDBs() (err error) {
 
 	if infra.ObservabilityConfig == nil {
 		log.Println("no observability configuration set, telemetry won't be recorded")
-	} else if observabilityInstance == "" {
-		log.Println("observability disabled: instance_name not set in config")
+	} else if problem := instanceProblem(observabilityInstance); problem != "" {
+		log.Println("observability disabled: " + problem)
+		observabilityInstance = ""
 	} else if obsDB, oerr := observability.NewClient(*infra.ObservabilityConfig); oerr != nil {
-		log.Println("observability disabled, init failed:", oerr)
+		// Page hits, popular votes and feature counts are lost: tell the server channel.
+		ServerNotify("init", "observability disabled, init failed: "+oerr.Error())
 	} else {
 		ObservabilityDB = obsDB
 		ObservabilityRecorder = observability.NewRecorder(obsDB)
 		s.popularVotes = obsDB
 		s.popularRanks = obsDB
 		log.Println("observability telemetry enabled")
+		if obsDB.FeaturesReady() {
+			counter := observability.NewCounter(obsDB, observabilityInstance, time.Now)
+			FeatureCounter = counter
+			go tracked(jobFeatureCounter, func() { counter.Run(ServerContext, time.Minute) })()
+			errs := observability.NewErrorBuffer(obsDB, observabilityInstance, time.Now, rejectChecked)
+			FeatureErrors = errs
+			go tracked(jobFeatureErrors, func() { errs.Run(ServerContext, time.Minute) })()
+		} else {
+			ServerNotify("init", "feature counts off: the feature table is not ready")
+		}
 	}
 
 	if infra.NewNewspaperSQLConfig != nil {
@@ -835,13 +850,13 @@ func (s *site) serve() {
 	debugHandler := enforceSigning(s, adminOnly(http.DefaultServeMux))
 	srv := &http.Server{
 		Addr: ":" + Config().Port,
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Handler: statusWrapper(http.DefaultServeMux, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(r.URL.Path, "/debug") {
 				debugHandler.ServeHTTP(w, r)
 				return
 			}
 			http.DefaultServeMux.ServeHTTP(w, r)
-		}),
+		})),
 		// The App Platform apps face clients directly, with no nginx to
 		// close a connection that never sends its headers or goes quiet.
 		// No WriteTimeout: a full dump or /api/load runs for minutes.
@@ -874,8 +889,10 @@ func (s *site) serve() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		ServerNotify("shutdown", "Server cleaning up...")
-		ObservabilityRecorder.Close()
-		cleanupDiscord()
+		// The listener's ctx is spent by now: Discord's cleanup gets a fresh bound.
+		tctx, tcancel := context.WithTimeout(context.Background(), 4*time.Second)
+		s.shutdownTelemetry(tctx)
+		tcancel()
 		cancel()
 	}()
 
@@ -885,4 +902,55 @@ func (s *site) serve() {
 		return
 	}
 	ServerNotify("shutdown", "Server shutdown correctly")
+}
+
+// discordCleanup closes the bot; a variable so a test can see what it emits.
+var discordCleanup = cleanupDiscord
+
+// telemetryCloseBudget bounds the counter's and the recorder's close, after Discord's.
+const telemetryCloseBudget = 4 * time.Second
+
+// errorsCloseBudget bounds the error buffer's close, before the counter's.
+const errorsCloseBudget = time.Second
+
+// shutdownTelemetry closes Discord within ctx, then the stores that record it within their own budget.
+func (s *site) shutdownTelemetry(ctx context.Context) {
+	cleaned := make(chan struct{})
+	go func() {
+		defer close(cleaned)
+		defer recoverJob("discord cleanup")
+		discordCleanup()
+	}()
+	select {
+	case <-cleaned:
+	case <-ctx.Done():
+		log.Println("discord cleanup:", ctx.Err())
+	}
+
+	// Error rows first: a refused row is a reject the counter's last flush must carry.
+	errCtx, errCancel := context.WithTimeout(context.Background(), errorsCloseBudget)
+	if err := FeatureErrors.Close(errCtx); err != nil {
+		log.Println("feature errors close:", err)
+	}
+	errCancel()
+
+	// The counter and the recorder share ctx: a recorder still busy at the deadline is left on purpose.
+	ctx, cancel := context.WithTimeout(context.Background(), telemetryCloseBudget)
+	defer cancel()
+	if err := FeatureCounter.Close(ctx); err != nil {
+		log.Println("feature counter close:", err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		defer recoverJob("observability recorder close")
+		done <- ObservabilityRecorder.Close()
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			log.Println("observability recorder close:", err)
+		}
+	case <-ctx.Done():
+		log.Println("observability recorder close:", ctx.Err())
+	}
 }

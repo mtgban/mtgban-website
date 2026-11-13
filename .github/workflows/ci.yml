@@ -67,6 +67,14 @@ jobs:
       USERSTATE_TEST_USER: postgres
       USERSTATE_TEST_PASSWORD: ""
       USERSTATE_TEST_DB: postgres
+      # The observability store tests share that database: no table name or
+      # advisory lock class of theirs is one the userstate or alerts tests use.
+      OBSERVABILITY_TEST: 1
+      OBS_HOST: 127.0.0.1
+      OBS_PORT: 5432
+      OBS_USER: postgres
+      OBS_PASS: ""
+      OBS_DB: postgres
     services:
       postgres:
         image: postgres:17
@@ -148,3 +156,6 @@ jobs:
 
       - name: go test ./...
         run: go test ./...
+
+      - name: go test -race (metrics)
+        run: go test -race ./observability/ ./internal/metricsreport/
