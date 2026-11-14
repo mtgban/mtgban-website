@@ -18,6 +18,7 @@ class FakeElement {
         this.children = [];
         this.parent = null;
         this.nodeType = 1;
+        this.isConnected = true;
         this.classList = { contains: c => this.cls.split(' ').includes(c) };
     }
     get parentElement() { return this.parent; }
@@ -113,7 +114,7 @@ function load(dom, opts) {
     // Enough of #cardImage/#printings/#products for the first-card seed's
     // call into the real updateSidebar to run without touching anything
     // we're not testing here.
-    const cardImageStub = { addEventListener() {} };
+    const cardImageStub = { addEventListener() {}, checkVisibility() { return !this.hidden; } };
     const printingsStub = {
         classList: { remove() {} },
         querySelector() { return null; },
@@ -133,8 +134,12 @@ function load(dom, opts) {
             if (id === 'products') return productsStub;
             return null;
         },
-        addEventListener: (ev, fn) => { if (ev === 'DOMContentLoaded') fn(); },
+        addEventListener: (ev, fn) => {
+            if (ev === 'DOMContentLoaded') fn();
+            else (docListeners[ev] = docListeners[ev] || []).push(fn);
+        },
     };
+    const docListeners = {};
     // Recorded from the start (not swapped in after source runs): the
     // seed call fires synchronously during DOMContentLoaded, before any
     // post-source override would be in place.
@@ -154,7 +159,7 @@ function load(dom, opts) {
     const fn = new Function('document', 'window', 'self', 'performance',
         utilsSource + '\n' + source + '\n' + stubTail);
     const w = fn(document, window, window, window.performance);
-    return { w, calls: w.__hoverCalls, cardArtCalls, printingsStub, productsStub };
+    return { w, calls: w.__hoverCalls, cardArtCalls, printingsStub, productsStub, cardImageStub, docListeners };
 }
 
 test('hoverDataFor finds the header from a nested body element and parses once', () => {
@@ -293,4 +298,102 @@ test('showHoverFor(el, false) is rejected by the phantom-hover guard under the s
     expect(shown).toBe(true);
     // ...but hoverSidebar's own guard swallowed the untrusted call.
     expect(cardArtCalls.length).toBe(before);
+});
+
+// The backpack keys act on the header whose card the sidebar shows, through
+// that header's own add and minus buttons.
+function packDom() {
+    const dom = fakeDom();
+    for (const h of [dom.h1, dom.h2]) {
+        h.add = h.append(new FakeElement('pack-btn'));
+        h.minus = h.append(new FakeElement('pack-minus-btn'));
+    }
+    return dom;
+}
+
+function packKeys(dom) {
+    const loaded = load(dom, { stubHoverSidebar: false, now: () => 1000 });
+    const { w, docListeners } = loaded;
+    const acted = [], tracked = [];
+    w.addToBackpack = btn => acted.push(['add', btn]);
+    w.takeFromBackpack = btn => acted.push(['take', btn]);
+    w.BAN = { track: (name, value) => tracked.push([name, value]) };
+    const press = (init, target) => {
+        const e = Object.assign({ key: 'b', target: target || { tagName: 'BODY' }, defaultPrevented: false }, init);
+        e.preventDefault = () => { e.defaultPrevented = true; };
+        (docListeners.keydown || []).forEach(fn => fn(e));
+        return e.defaultPrevented;
+    };
+    return { ...loaded, acted, tracked, press };
+}
+
+test('Ctrl/Cmd+B adds the card on show and Shift takes one out', () => {
+    const dom = packDom();
+    const { w, acted, tracked, press } = packKeys(dom);
+
+    // The seed shows the first result
+    expect(press({ ctrlKey: true })).toBe(true);
+    expect(acted).toEqual([['add', dom.h1.add]]);
+
+    w.showHoverFor(dom.span1, true); // still h1: nothing moves
+    w.showHoverFor(dom.h2, true);
+    expect(press({ metaKey: true })).toBe(true);
+    expect(press({ metaKey: true, shiftKey: true, key: 'B' })).toBe(true);
+    expect(acted.slice(1)).toEqual([['add', dom.h2.add], ['take', dom.h2.minus]]);
+    expect(tracked).toEqual([['ui.search.key', 'pack_add'], ['ui.search.key', 'pack_add'], ['ui.search.key', 'pack_take']]);
+});
+
+test('a hover the phantom guard turns away leaves the backpack keys on the card on show', () => {
+    const dom = packDom();
+    const { w, acted, press } = packKeys(dom);
+    w.showHoverFor(dom.h2, true);
+    w.showHoverFor(dom.h1, false);
+    press({ ctrlKey: true });
+    expect(acted).toEqual([['add', dom.h2.add]]);
+});
+
+test('the backpack keys leave fields, other chords and a hidden sidebar alone', () => {
+    const dom = packDom();
+    const { acted, tracked, press, cardImageStub } = packKeys(dom);
+
+    expect(press({})).toBe(false);
+    expect(press({ ctrlKey: true, altKey: true })).toBe(false);
+    expect(press({ ctrlKey: true, key: 'k' })).toBe(false);
+    expect(press({ ctrlKey: true }, { tagName: 'INPUT', id: 'alert-price' })).toBe(false);
+    expect(press({ ctrlKey: true }, { tagName: 'TEXTAREA', id: 'searchbox-notes' })).toBe(false);
+    expect(press({ ctrlKey: true }, { tagName: 'DIV', isContentEditable: true })).toBe(false);
+    // A held key keeps the browser's shortcut away but adds only once
+    expect(press({ ctrlKey: true, repeat: true })).toBe(true);
+    cardImageStub.hidden = true;
+    expect(press({ ctrlKey: true })).toBe(false);
+    cardImageStub.hidden = false;
+    // Without checkVisibility, a sidebar with no boxes is hidden too
+    cardImageStub.checkVisibility = undefined;
+    cardImageStub.getClientRects = () => [];
+    expect(press({ ctrlKey: true })).toBe(false);
+    cardImageStub.getClientRects = () => [{}];
+    expect(press({ ctrlKey: true })).toBe(true);
+    acted.length = 0; tracked.length = 0;
+    // No NM copy to take: the minus is hidden, and Ctrl+Shift+B stays the browser's
+    dom.h1.minus.hidden = true;
+    expect(press({ ctrlKey: true, shiftKey: true })).toBe(false);
+    dom.h1.isConnected = false;
+    expect(press({ ctrlKey: true })).toBe(false);
+
+    expect(acted).toEqual([]);
+    expect(tracked).toEqual([]);
+});
+
+test('the autofocused search box passes the backpack keys on', () => {
+    const dom = packDom();
+    const { acted, press } = packKeys(dom);
+    expect(press({ metaKey: true }, { tagName: 'INPUT', id: 'nav-searchbox' })).toBe(true);
+    expect(press({ ctrlKey: true, shiftKey: true }, { tagName: 'INPUT', id: 'searchbox' })).toBe(true);
+    expect(acted).toEqual([['add', dom.h1.add], ['take', dom.h1.minus]]);
+});
+
+test('with no backpack buttons on the header the browser keeps Ctrl/Cmd+B', () => {
+    const dom = fakeDom();
+    const { press } = packKeys(dom);
+    expect(press({ ctrlKey: true })).toBe(false);
 });

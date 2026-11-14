@@ -31,7 +31,7 @@ func TestPaletteNames(t *testing.T) {
 		{"ui.palette.upload", f("url file page_results export"), f("tcgplayer moxfield manabox archidekt cubecobra mythictools sheets picker page download estimate deckbox tcgplayer_csv")},
 		{"ui.palette.nav", f("home changelog account search sets sealed newspaper syp screener sleepers upload global arbitrage reverse alerts api other"), f("leaf parent sub")},
 		{"ui.key", f("type_to_focus settings_hotkey backpack_tab_move backpack_tab_switch"), nil},
-		{"ui.search.key", f("tab_to_search result_page_down result_page_up"), nil},
+		{"ui.search.key", f("tab_to_search result_page_down result_page_up pack_add pack_take"), nil},
 		{"ui.nav.layout", f("promote swap demote dock undock reorder"), nil},
 		{"ui.backpack.drag", f("card_to_tab tab_reorder"), nil},
 		{"ui.upload.file_drop", nil, nil},
@@ -271,7 +271,7 @@ func addNew(list []string, values ...string) []string {
 // Every literal a BAN.track call in this stage's scripts can send, value or scope, is registered, and a
 // name whose parts are only sent so sends every registered one.
 func TestPaletteKeyAndDragLiteralsAreRegistered(t *testing.T) {
-	files := []string{"command-palette.js", "search-type-focus.js", "search-result-nav.js", "settings-loader.js", "settings.js", "backpack.js", "navbar.js", "upload-form.js"}
+	files := []string{"command-palette.js", "search-type-focus.js", "search-result-nav.js", "search-sidebar.js", "settings-loader.js", "settings.js", "backpack.js", "navbar.js", "upload-form.js"}
 	call := regexp.MustCompile(`BAN\.track\(\s*["'](ui\.[a-z_.]+)["']([^;]*)\);`)
 	values, scopes := map[string][]string{}, map[string][]string{}
 	for _, f := range files {
