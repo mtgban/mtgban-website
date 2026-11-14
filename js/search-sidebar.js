@@ -460,16 +460,23 @@ function hoverArgsFrom(data) {
     return [httpURL(a[0]), printings, products, a[1], a[2], a[3], a[4], a[5], a[6], a[7]];
 }
 
+// The result header whose card the sidebar shows, for the backpack keys.
+var shownHeader = null;
+
 // Shared by callers that used to rely on the removed inline
 // onmouseenter (keyboard paging, the scroll hit-test, chart legend
 // hover). trusted bypasses the phantom-hover guard; returns whether a row was found.
 function showHoverFor(el, trusted) {
-    var data = hoverDataFor(el);
+    var header = headerFor(el);
+    var data = header && hoverDataFor(header);
     if (!data) return false;
     // Every bubbling mouseover lands here: the card on show already is
     // not worth cloning its template for updateSidebar to ignore
     var img = document.getElementById('cardImage');
-    if (img && img.__sidebarCardKey === data.key) return true;
+    if (img && img.__sidebarCardKey === data.key) {
+        shownHeader = header;
+        return true;
+    }
     var args = hoverArgsFrom(data);
     if (trusted) {
         __hoverTrusted = true;
@@ -481,9 +488,35 @@ function showHoverFor(el, trusted) {
     } else {
         window.hoverSidebar.apply(null, args);
     }
+    // The phantom guard may have turned the hover away
+    if (img && img.__sidebarCardKey === data.key) shownHeader = header;
     return true;
 }
 window.showHoverFor = showHoverFor;
+
+// Ctrl/Cmd+B adds a copy of the card on show to the active backpack and
+// Shift+Ctrl/Cmd+B takes one out, as the buttons on its header do. A held
+// key adds once, and a hidden sidebar shows no card to act on. The search
+// box is autofocused, so it passes the keys on; other fields keep them.
+document.addEventListener('keydown', function(e) {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    if (e.key !== 'b' && e.key !== 'B' && e.keyCode !== 66) return;
+    var t = e.target;
+    var searchBox = t.id === 'nav-searchbox' || t.id === 'searchbox';
+    if (t.isContentEditable || (!searchBox && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    var img = document.getElementById('cardImage');
+    if (!shownHeader || !shownHeader.isConnected || !img) return;
+    // checkVisibility is missing before Safari 17.4 and Firefox 125
+    if (typeof img.checkVisibility === 'function' ? !img.checkVisibility() : !img.getClientRects().length) return;
+    var btn = shownHeader.querySelector(e.shiftKey ? '.pack-minus-btn' : '.pack-btn');
+    var act = e.shiftKey ? window.takeFromBackpack : window.addToBackpack;
+    // A hidden minus means no NM copy to take
+    if (!btn || btn.hidden || typeof act !== 'function') return;
+    e.preventDefault();
+    if (e.repeat) return;
+    if (window.BAN && window.BAN.track) window.BAN.track('ui.search.key', e.shiftKey ? 'pack_take' : 'pack_add');
+    act(btn);
+});
 
 document.addEventListener('DOMContentLoaded', function() {
     var results = document.querySelector('.search-results');
@@ -496,5 +529,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // setCardArtSource falls back to the game's card back.
     var first = results.querySelector('.result-header');
     var seed = first ? hoverDataFor(first) : null;
+    if (seed) shownHeader = first;
     updateSidebar.apply(null, seed ? hoverArgsFrom(seed) : ['', null, null, false, false, '', false, 0, '', '']);
 });
