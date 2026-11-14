@@ -115,6 +115,7 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     if (res) {
         window.currentExportView = () => res.view;
         window.exportRows = (view) => (view === 'all' ? res.rows : []);
+        window.setRowRemoved = (tr, on) => tr.classList.toggle('ures-removed-row', on);
     }
     const docListeners = {};
     const document = {
@@ -1760,6 +1761,52 @@ describe('the Upload results\' backpack pair', () => {
             p.fireClick(p.res.remove);
             expect([store.length, n]).toEqual([store.length, reads]);
         }
+    });
+});
+
+describe('a card leaving the backpack on Upload', () => {
+    const ban = { canUpload: true, priced: null };
+    const struck = (p) => p.res.rows.map((tr) => tr.classes.has('ures-removed-row'));
+    // The panel draws after each change, as renderBackpack does here.
+    const upload = (opts) => page({ ban, ...opts });
+
+    test('strikes its result rows, the other cards\' left as they are', () => {
+        const p = upload({ store: [{ id: 'a', qty: 2, t: 2, m: 2 }, { id: 'b', qty: 1, t: 1, m: 1 }], results: [['a', 1, 'NM'], ['b', 1, 'NM'], ['a', 1, 'SP'], ['c', 1, 'NM']] });
+        p.window.Backpack.remove('a');
+        p.window.renderBackpack();
+        expect(struck(p)).toEqual([true, false, true, false]);
+    });
+
+    test('from another tab too', () => {
+        const p = upload({ store: [{ id: 'a', qty: 1, t: 1, m: 1 }], results: [['a', 1, 'NM']] });
+        p.m.mtgban_backpack = JSON.stringify([{ id: 'a', qty: 1, t: 1, m: 2, del: 2 }]);
+        p.fireStorage();
+        expect(struck(p)).toEqual([true]);
+    });
+
+    test('not while another backpack still holds it', () => {
+        const p = upload({ store: [{ id: 'a', qty: 1, t: 2, m: 2 }, { id: 'a', pack: 2, qty: 1, t: 1, m: 1 }], tabs: 2, results: [['a', 1, 'NM']] });
+        p.window.Backpack.remove('a');
+        p.window.renderBackpack();
+        expect(struck(p)).toEqual([false]);
+    });
+
+    test('undo puts back the rows it struck, not the ones the reader removed', () => {
+        const p = upload({ store: [{ id: 'a', qty: 1, t: 1, m: 1 }], results: [['a', 1, 'NM'], ['a', 1, 'SP', true]] });
+        p.window.Backpack.remove('a');
+        p.window.renderBackpack();
+        expect(struck(p)).toEqual([true, true]);
+        p.window.Backpack.undo();
+        p.window.renderBackpack();
+        expect(struck(p)).toEqual([false, true]);
+    });
+
+    test('a send emptying the backpack as it asked strikes nothing', () => {
+        const store = [{ id: 'a', qty: 1, t: 1, m: 1 }];
+        const p = upload({ store, pending: ['a'], ban: { canUpload: true, priced: ['a'] }, results: [['a', 1, 'NM']] });
+        expect(p.stored().filter((e) => !e.del)).toEqual([]);
+        p.fireStorage();
+        expect(struck(p)).toEqual([false]);
     });
 });
 
