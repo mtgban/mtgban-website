@@ -681,6 +681,33 @@
         });
     }
 
+    // heldIds is the cards in any backpack at the last draw on Upload.
+    var heldIds = null;
+
+    // strikeLeftRows strikes the result rows of a card that has left every
+    // backpack since the last draw, so a re-post of the list leaves it out,
+    // and puts back the ones it struck when the card returns.
+    function strikeLeftRows() {
+        if (!onUpload()) return;
+        var held = {};
+        live().forEach(function (e) { held[e.id] = true; });
+        var before = heldIds;
+        heldIds = held;
+        if (!before || typeof window.exportRows !== "function" || typeof window.setRowRemoved !== "function") return;
+        var moved = Object.keys(before).some(function (id) { return !held[id]; }) || Object.keys(held).some(function (id) { return !before[id]; });
+        if (!moved) return;
+        Array.prototype.forEach.call(window.exportRows("all"), function (tr) {
+            var id = tr.getAttribute("data-hash");
+            if (before[id] && !held[id] && !tr.classList.contains("ures-removed-row")) {
+                tr.setAttribute("data-pack-struck", "");
+                window.setRowRemoved(tr, true);
+            } else if (held[id] && tr.getAttribute("data-pack-struck") !== null) {
+                tr.removeAttribute("data-pack-struck");
+                window.setRowRemoved(tr, false);
+            }
+        });
+    }
+
     function ticked(section) {
         return Array.prototype.filter.call(section.querySelectorAll("tr[data-opt-id]"), function (tr) { return !tr.classList.contains("opt-removed"); });
     }
@@ -1501,6 +1528,7 @@
 
     function render() {
         markRows();
+        strikeLeftRows();
         markSections();
         markNav();
         renderPanel();

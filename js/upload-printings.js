@@ -21,14 +21,21 @@ function rowOriginId(row) {
 function toggleRemoveRow(btn) {
     var row = btn.closest('tr');
     if (!row || !row.dataset.hash) return;
+    var removed = !row.classList.contains('ures-removed-row');
+    setRowRemoved(row, removed);
+    if (removed && window.BAN && window.BAN.track) window.BAN.track('ui.upload.result', 'remove_row');
+}
+
+// setRowRemoved strikes a result row from the list, which every re-post
+// leaves out, or puts it back.
+function setRowRemoved(row, removed) {
     var rowId = rowOriginId(row);
-    if (row.classList.contains('ures-removed-row')) {
-        row.classList.remove('ures-removed-row');
-        delete removedRows[rowId];
-    } else {
+    if (removed) {
         row.classList.add('ures-removed-row');
         removedRows[rowId] = true;
-        if (window.BAN && window.BAN.track) window.BAN.track('ui.upload.result', 'remove_row');
+    } else {
+        row.classList.remove('ures-removed-row');
+        delete removedRows[rowId];
     }
     updateReloadBar();
 }
