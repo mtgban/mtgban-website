@@ -55,7 +55,7 @@
         <span class="admin-sep"></span>
         <div class="admin-stat"><span class="sl">Disk</span><span class="sv">{{.DiskStatus}}</span></div>
         <span class="admin-sep"></span>
-        <div class="admin-stat"><span class="sl">Hash</span><a target="_blank" href="https://github.com/mtgban/mtgban-website/commit/{{.LatestHash}}">{{.LatestHash}}</a></div>
+        <div class="admin-stat"><span class="sl">Hash</span><a target="_blank" href="https://github.com/mtgban/mtgban-website/commit/{{.LatestHash}}">{{printf "%.9s" .LatestHash}}</a></div>
         <span class="admin-sep"></span>
         <div class="admin-stat"><span class="sl">Datastore</span><span class="sv">{{if .DatastoreReload.Running}}<span class="admin-updating">updating, {{.DatastoreReload.Elapsed}}</span>{{else}}<time class="admin-localtime" datetime="{{.LastUpdate.UTC.Format "2006-01-02T15:04:05Z"}}">{{.LastUpdate.Format "Jan 02 15:04"}}</time>{{end}}</span></div>
         <span class="admin-sep"></span>
