@@ -489,6 +489,10 @@ type UploadVars struct {
 	RemoteLinkURL        string
 	TotalQuantity        int
 	Optimized            map[string][]OptimizedUploadEntry
+	// The buylist rows in no store's list: those no store priced here
+	// offers anything for, and those whose offers the filters all drop
+	NotBought   []LeftoverEntry
+	FilteredOut []LeftoverEntry
 	// CartLoads is each split's cart button, by store key
 	CartLoads           map[string]cartLoad
 	OptimizedKeys       []string
@@ -974,7 +978,8 @@ func uploadSortKeys(b *matcher.Backend, uploadedData []UploadEntry) map[string]u
 }
 
 // fillCarts gives each split its cart button and each row the stores it can
-// be moved to, among stores, the page's stores in their order.
+// be moved to, among stores, the page's stores in their order, filtered out
+// rows included.
 func (v *UploadVars) fillCarts(p *prices, stores []string) {
 	v.CartLoads = map[string]cartLoad{}
 	for key, entries := range v.Optimized {
@@ -983,6 +988,10 @@ func (v *UploadVars) fillCarts(p *prices, stores []string) {
 			offerKey := entries[i].CardID + string(entries[i].Condition)
 			entries[i].MoveTo = moveOptions(stores, key, v.ResultPrices[offerKey], v.IsBuylist)
 		}
+	}
+	for i := range v.FilteredOut {
+		offerKey := v.FilteredOut[i].CardID + string(v.FilteredOut[i].Condition)
+		v.FilteredOut[i].MoveTo = moveOptions(stores, "", v.ResultPrices[offerKey], v.IsBuylist)
 	}
 }
 
@@ -1047,14 +1056,16 @@ func fillUploadResults(pageVars *UploadVars, b *matcher.Backend, p *prices, repr
 	}
 	pageVars.AllScraperKeys = activeTotalStores
 
+	// When prices are ignored, the loaded price IS the alternate source, so
+	// it can be linked directly; otherwise it's the user's uploaded price
+	// and only a separate symbol should link out to the alternate source.
+	pageVars.IgnorePrices = st.skipPrices
+	pageVars.NotBought = rows.notBought.rows
+	pageVars.FilteredOut = rows.filteredOut.rows
+
 	// Assign the resulting optimized data to the page variables
 	if len(rows.optimizedResults) > 0 {
-		// When prices are ignored, the loaded price IS the alternate source, so
-		// it can be linked directly; otherwise it's the user's uploaded price
-		// and only a separate symbol should link out to the alternate source.
-		pageVars.IgnorePrices = st.skipPrices
 		pageVars.Optimized = rows.optimizedResults
-		pageVars.fillCarts(p, slices.Concat(prices.enabledStores, prices.enabledSealedStores))
 		// Only the stores that render a results section, in display order,
 		// so that the template can link each section to the previous/next one
 		for _, key := range activeTotalStores {
@@ -1066,13 +1077,14 @@ func fillUploadResults(pageVars *UploadVars, b *matcher.Backend, p *prices, repr
 		pageVars.OptimizedQuantities = rows.optimizedQtys
 		pageVars.HighestTotal = rows.highestTotal
 	}
+	pageVars.fillCarts(p, slices.Concat(prices.enabledStores, prices.enabledSealedStores))
 }
 
 // uploadRows are what pricing an upload's rows adds up to: each row's price at
 // every store and index, each store's total and the rows it lacks, the
-// optimizer's picks and totals, the quantities, and the same tallies per
-// opened product. anyCounted says whether any row counted, matched and not an
-// opened product.
+// optimizer's picks and totals, the buylist rows in no store's list, the
+// quantities, and the same tallies per opened product. anyCounted says
+// whether any row counted, matched and not an opened product.
 type uploadRows struct {
 	resultPrices     map[string]map[string]float64
 	totalEntries     map[string]float64
@@ -1083,6 +1095,8 @@ type uploadRows struct {
 	openedCounted    map[optimizedKey]int
 	optimizedTotals  map[string]float64
 	optimizedQtys    map[string]int
+	notBought        leftovers
+	filteredOut      leftovers
 	highestTotal     float64
 	singlesHighest   float64
 	sealedHighest    float64
@@ -1161,7 +1175,20 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 			bestStores = []string{moved}
 		}
 
-		rows.optimizeRow(row, offers, bestStores, st, indexes)
+		listed := rows.optimizeRow(row, offers, bestStores, st, indexes)
+		if blMode && !listed {
+			e := LeftoverEntry{CardID: row.CardID, Condition: row.conds, Quantity: row.qty, Loaded: rowComparePrice(row, st, indexes), CompareSource: st.altPriceSource}
+			if len(bestStores) == 0 {
+				rows.notBought.add(row, e)
+			} else {
+				e.Store = bestStores[0]
+				e.Price = rows.resultPrices[row.priceKey][e.Store]
+				if e.Loaded != 0 {
+					e.Spread = e.Price / e.Loaded * 100
+				}
+				rows.filteredOut.add(row, e)
+			}
+		}
 		rows.anyCounted = true
 	}
 
@@ -1205,29 +1232,54 @@ func uploadTiebreak(blMode bool, st uploadSettings, prices uploadPrices, shares 
 	return uploadtie.Breaker{}
 }
 
+// LeftoverEntry is an upload row in no store's list: the price it is
+// compared against, and when a store buys it, the best offer a copy, its
+// store and its spread.
+type LeftoverEntry struct {
+	CardID        string
+	Condition     mtgban.Condition
+	Quantity      int
+	Loaded        float64
+	CompareSource string
+	Store         string
+	Price         float64
+	Spread        float64
+	// MoveTo is the stores that offer for the row, as OptimizedUploadEntry's
+	MoveTo string
+}
+
+// leftovers lists upload rows in no store's list, copies of a card opened
+// from different products as one line, as a store's list takes them.
+type leftovers struct {
+	rows []LeftoverEntry
+	at   map[string]int
+}
+
+func (l *leftovers) add(row uploadRow, e LeftoverEntry) {
+	opened := row.UnpackedFrom != ""
+	at, seen := l.at[row.priceKey]
+	if opened && seen {
+		l.rows[at].Quantity += row.qty
+		return
+	}
+	if opened {
+		if l.at == nil {
+			l.at = map[string]int{}
+		}
+		l.at[row.priceKey] = len(l.rows)
+	}
+	l.rows = append(l.rows, e)
+}
+
 // optimizeRow files the row under each of its best stores that the
 // optimizer's filters keep, with its spread and profitability against the
-// comparison price, and adds the best offer it kept to the highest totals.
-func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, bestStores []string, st uploadSettings, indexes uploadIndexes) {
+// comparison price, adds the best offer it kept to the highest totals, and
+// reports whether any store kept it.
+func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, bestStores []string, st uploadSettings, indexes uploadIndexes) bool {
 	counted := false
 	for _, bestStore := range bestStores {
 		bestPrice := offers[bestStore]
-
-		// Load comparison price, either the loaded one or one of the alternatives
-		comparePrice := 0.0
-		if st.skipPrices {
-			var compareConds mtgban.Condition
-			prices := indexes.results[row.CardID][st.altPriceSource]
-			if slices.Index(indexes.keys, st.altPriceSource) >= len(UploadIndexKeys) {
-				compareConds = row.conds
-			}
-
-			// Normally index has no conditions to check, but the price might be coming
-			// from a regular store (in which case we attempt to match it)
-			comparePrice = getPrice(prices, compareConds)
-		} else {
-			comparePrice = row.OriginalPrice
-		}
+		comparePrice := rowComparePrice(row, st, indexes)
 
 		// Load the single item priceprice
 		price := rows.resultPrices[row.priceKey][bestStore]
@@ -1309,6 +1361,24 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 			}
 		}
 	}
+	return counted
+}
+
+// rowComparePrice is the price a row's offers are compared against, either
+// the loaded one or one of the alternatives.
+func rowComparePrice(row uploadRow, st uploadSettings, indexes uploadIndexes) float64 {
+	if !st.skipPrices {
+		return row.OriginalPrice
+	}
+	var compareConds mtgban.Condition
+	prices := indexes.results[row.CardID][st.altPriceSource]
+	if slices.Index(indexes.keys, st.altPriceSource) >= len(UploadIndexKeys) {
+		compareConds = row.conds
+	}
+
+	// Normally index has no conditions to check, but the price might be coming
+	// from a regular store (in which case we attempt to match it)
+	return getPrice(prices, compareConds)
 }
 
 // tallyOffers files the row's price at every store, in credit when the price
