@@ -127,3 +127,46 @@ func TestUploadWithoutStoresDropsAGoneVendor(t *testing.T) {
 		}
 	}
 }
+
+// The optimizer's + Add store menu offers the stores this mode could price
+// against that were not picked, in the picker's order: sealed ones only for
+// a list with sealed products, and none to a reader who may not change stores.
+func TestFillUploadKeysAddStores(t *testing.T) {
+	selected := uploadStores{
+		enabledStores:       []string{"CK"},
+		enabledSealedStores: []string{"CKSealed"},
+		singlesSellers:      []string{"CK", "SCG", "TCGPlayer"},
+		sealedSellers:       []string{"CKSealed", "TCGSealed"},
+		singlesVendors:      []string{"ABUGames", "CK", "CSI"},
+		sealedVendors:       []string{"CKSealed", "SZSealed"},
+	}
+	singles := uploadIDs{cardIDs: []string{"card"}}
+	both := uploadIDs{cardIDs: []string{"card"}, sealedProductIDs: []string{"product"}}
+	sealedOnly := uploadIDs{sealedProductIDs: []string{"product"}}
+
+	tests := []struct {
+		name            string
+		canChange       bool
+		blMode          bool
+		ids             uploadIDs
+		stores, sealeds []string
+	}{
+		{"retail singles", true, false, singles, []string{"SCG", "TCGPlayer"}, nil},
+		{"retail with sealed", true, false, both, []string{"SCG", "TCGPlayer"}, []string{"TCGSealed"}},
+		{"buylist with sealed", true, true, both, []string{"ABUGames", "CSI"}, []string{"SZSealed"}},
+		{"sealed only", true, false, sealedOnly, nil, []string{"TCGSealed"}},
+		{"cannot change stores", false, false, both, nil, nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			vars := UploadVars{CanChangeStores: tc.canChange}
+			fillUploadKeys(&vars, tc.blMode, selected, tc.ids, uploadPrices{}, uploadIndexes{})
+			if !slices.Equal(vars.OptAddStores, tc.stores) {
+				t.Errorf("OptAddStores = %v, want %v", vars.OptAddStores, tc.stores)
+			}
+			if !slices.Equal(vars.OptAddSealedStores, tc.sealeds) {
+				t.Errorf("OptAddSealedStores = %v, want %v", vars.OptAddSealedStores, tc.sealeds)
+			}
+		})
+	}
+}

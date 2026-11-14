@@ -110,3 +110,61 @@ document.addEventListener('scroll', function() {
         menu.hidePopover();
     });
 }, {capture: true, passive: true});
+
+// resubmitOptStores prices the rows on the page again against these stores,
+// back on the optimizer. The list goes the way the exports send it.
+function resubmitOptStores(stores, sealed) {
+    ensureHashesLoaded('all');
+    resExportFields.forEach(function(id) {
+        document.getElementById(id).value = "";
+    });
+    var scope = document.getElementById("res_csvscope");
+    if (scope) scope.value = "";
+    var form = document.getElementById("upload_form");
+    form.querySelectorAll('input[name="stores"], input[name="sealed_stores"]').forEach(function(el) {
+        el.remove();
+    });
+    [['stores', stores], ['sealed_stores', sealed]].forEach(function(field) {
+        field[1].forEach(function(key) {
+            var input = document.createElement("input");
+            input.type = "hidden";
+            input.name = field[0];
+            input.value = key;
+            form.appendChild(input);
+        });
+    });
+    try {
+        sessionStorage.setItem('uploadReload', '1');
+        sessionStorage.setItem('uploadResView', 'optimizer');
+    } catch (e) {}
+    form.target = '';
+    if (window.showUploadProcessing) showUploadProcessing();
+    form.submit();
+}
+
+function optStores() {
+    var picked = window.BAN_OPT_STORES || {};
+    return {stores: (picked.stores || []).slice(), sealed: (picked.sealed || []).slice()};
+}
+
+// dropOptStore prices the list again without the button's store.
+function dropOptStore(button) {
+    var key = button.dataset.store;
+    var picked = optStores();
+    var keep = function(k) { return k !== key; };
+    resubmitOptStores(picked.stores.filter(keep), picked.sealed.filter(keep));
+}
+
+// addOptStore prices the list again with the store picked from the menu.
+function addOptStore(select) {
+    var option = select.options[select.selectedIndex];
+    if (!option || !option.value) return;
+    var picked = optStores();
+    if (option.hasAttribute('data-sealed')) {
+        picked.sealed.push(option.value);
+    } else {
+        picked.stores.push(option.value);
+    }
+    if (window.BAN && window.BAN.track) window.BAN.track('ui.optimizer', 'store_add');
+    resubmitOptStores(picked.stores, picked.sealed);
+}

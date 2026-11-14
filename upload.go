@@ -390,6 +390,17 @@ func keepInOrder(all, enabled []string) []string {
 	return out
 }
 
+// leaveOut returns the keys of all that are not in picked, in order.
+func leaveOut(all, picked []string) []string {
+	var out []string
+	for _, key := range all {
+		if !slices.Contains(picked, key) {
+			out = append(out, key)
+		}
+	}
+	return out
+}
+
 // bestOffers returns the stores the optimizer keeps for a row: the one with
 // the best offer, the highest on a buylist and the lowest at retail, then,
 // best first, every other within the margin of it, where the lower of the
@@ -445,6 +456,11 @@ type UploadVars struct {
 	SealedSellerKeys []string
 	SealedVendorKeys []string
 	UploadEntries    []UploadEntry
+
+	// The singles and sealed stores the optimizer's menu offers to add to
+	// the ones this list was priced against
+	OptAddStores       []string
+	OptAddSealedStores []string
 
 	// UnpackSealed counts the rows holding a decklist, which is what decides
 	// whether the results offer to open them. The contents themselves are
@@ -877,6 +893,20 @@ func fillUploadKeys(pageVars *UploadVars, blMode bool, selected uploadStores, id
 	if len(ids.sealedProductIDs) > 0 {
 		pageVars.SealedIndexKeys = indexes.sealedKeys
 		pageVars.SealedScraperKeys = prices.enabledSealedStores
+	}
+
+	if !pageVars.CanChangeStores {
+		return
+	}
+	offered, offeredSealed := selected.singlesSellers, selected.sealedSellers
+	if blMode {
+		offered, offeredSealed = selected.singlesVendors, selected.sealedVendors
+	}
+	if len(ids.cardIDs) > 0 {
+		pageVars.OptAddStores = leaveOut(offered, selected.enabledStores)
+	}
+	if len(ids.sealedProductIDs) > 0 {
+		pageVars.OptAddSealedStores = leaveOut(offeredSealed, selected.enabledSealedStores)
 	}
 }
 
