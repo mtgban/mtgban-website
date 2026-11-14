@@ -490,6 +490,11 @@
     // onUpload says whether this is Upload, the one page naming what it priced.
     function onUpload() { return !!window.BAN_BACKPACK && "priced" in window.BAN_BACKPACK; }
 
+    // lastMode is the side last picked on Upload, as upload-form.js keeps it.
+    function lastMode() {
+        try { return localStorage.getItem("uploadMode") === "buylist" ? "buylist" : "retail"; } catch (e) { return "retail"; }
+    }
+
     function send(mode) {
         if (!canUpload() || !ordered().length) return;
         var form = sendForm(mode);
@@ -967,7 +972,7 @@
     // ---- the panel ----
 
     var panel = null, overlay = null, stripEl = null, listEl = null, countEl = null, emptyEl = null;
-    var sendRetail = null, sendBuylist = null, emptySwitch = null, undoBtn = null, searchBtn = null;
+    var sendBtn = null, emptySwitch = null, undoBtn = null, searchBtn = null;
     var sortBar = null, sortSel = null, sortDirBtn = null, sortNote = null;
     // draggedTab is the backpack whose tab is being dragged along the strip.
     var draggedTab = 0;
@@ -1084,18 +1089,13 @@
             if (typeof window.confirmDialog === "function") window.confirmDialog("Empty the backpack?", doClear, { anchor: panel, confirmLabel: "Empty" });
             else if (window.confirm("Empty the backpack?")) doClear();
         });
-        sendRetail = text("button", "backpack-btn backpack-btn-retail", "Retail");
-        sendRetail.setAttribute("id", "backpack-send-retail");
-        sendRetail.setAttribute("type", "button");
-        sendRetail.addEventListener("click", function () { send("retail"); });
-        sendBuylist = text("button", "backpack-btn backpack-btn-buylist", "Buylist");
-        sendBuylist.setAttribute("id", "backpack-send-buylist");
-        sendBuylist.setAttribute("type", "button");
-        sendBuylist.addEventListener("click", function () { send("buylist"); });
-        actions.append(sortBar, undoBtn, clearBtn, sendRetail, sendBuylist);
+        sendBtn = text("button", "backpack-btn backpack-btn-send", "Optimize");
+        sendBtn.setAttribute("id", "backpack-send");
+        sendBtn.setAttribute("type", "button");
+        sendBtn.addEventListener("click", function () { send(lastMode()); });
+        actions.append(sortBar, undoBtn, clearBtn, sendBtn);
         if (!canUpload()) {
-            sendRetail.setAttribute("title", "Upload needs a higher tier");
-            sendBuylist.setAttribute("title", "Upload needs a higher tier");
+            sendBtn.setAttribute("title", "Upload needs a higher tier");
             emptySwitch.disabled = true;
         }
         footer.append(label, sortNote, actions);
@@ -1520,8 +1520,8 @@
         var c = count();
         countEl.textContent = countLine(c);
         emptyEl.hidden = entries.length > 0;
-        sendRetail.disabled = entries.length === 0 || !canUpload();
-        sendBuylist.disabled = entries.length === 0 || !canUpload();
+        sendBtn.disabled = entries.length === 0 || !canUpload();
+        if (canUpload()) sendBtn.setAttribute("title", lastMode() === "buylist" ? "Buylist, as last picked on Upload" : "Retail, as last picked on Upload");
         undoBtn.disabled = undoSteps().length === 0;
         searchBtn.disabled = entries.length === 0;
     }

@@ -386,15 +386,12 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 .backpack-btn-icon svg,
 .backpack-sort-dir svg { width: 1.1em; height: 1.1em; display: block; }
 
-/* the sends give up their padding before the row runs out of room */
-.backpack-btn-retail,
-.backpack-btn-buylist { min-width: 0; padding-left: 0.4em; padding-right: 0.4em; }
+/* the send gives up its padding before the row runs out of room */
+.backpack-btn-send { min-width: 0; padding-left: 0.4em; padding-right: 0.4em; }
 
 .backpack-btn:disabled { opacity: 0.5; cursor: default; }
 
-.backpack-btn-retail { background: var(--dodgerblue-fill); border-color: var(--dodgerblue-fill); color: #fff; }
-
-.backpack-btn-buylist { border-color: var(--dodgerblue); color: var(--dodgerblue); }
+.backpack-btn-send { background: var(--dodgerblue-fill); border-color: var(--dodgerblue-fill); color: #fff; }
 
 @media (max-width: 30em) {
     .backpack-panel { width: 100vw; }

@@ -37,9 +37,10 @@ function el(tag) {
 }
 
 // page loads backpack.js over a stored backpack; BAN is the fake window.BAN, or none.
-function page({ store = [], tabs, tabList, ban, BAN, confirmDialog, navMenu = false, signedIn = true } = {}) {
+function page({ store = [], tabs, tabList, ban, BAN, confirmDialog, navMenu = false, signedIn = true, uploadMode } = {}) {
     ids = {}; submitted = [];
     const m = { mtgban_backpack: JSON.stringify(store) };
+    if (uploadMode) m.uploadMode = uploadMode;
     if (tabList) m.mtgban_backpack_tabs = JSON.stringify(tabList);
     const localStorage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const sm = {};
@@ -225,17 +226,17 @@ test('the search, the empty-after switch and the navbar pick count under ui.back
 test('a send that is refused counts nothing', () => {
     const { BAN, calls } = fakeBAN();
     page({ BAN, store: [{ id: 'uuid-1', name: 'One', qty: 1, t: 1, m: 1 }], ban: { canUpload: false } }).nav.click();
-    ids['backpack-send-buylist'].click();
+    ids['backpack-send'].click();
     page({ BAN }).nav.click();
-    ids['backpack-send-retail'].click();
+    ids['backpack-send'].click();
     expect(submitted).toEqual([]);
     expect(ours(calls).filter((c) => c[0] === 'ui.backpack.upload')).toEqual([]);
 });
 
 test('a send reports its mode', () => {
     const { BAN, calls } = fakeBAN();
-    page({ BAN, store: [{ id: 'uuid-1', name: 'One', qty: 1, t: 1, m: 1 }] }).nav.click();
-    ids['backpack-send-buylist'].click();
+    page({ BAN, store: [{ id: 'uuid-1', name: 'One', qty: 1, t: 1, m: 1 }], uploadMode: 'buylist' }).nav.click();
+    ids['backpack-send'].click();
     expect(submitted.length).toBe(1);
     expect(ours(calls).filter((c) => c[0] === 'ui.backpack.upload')).toEqual([['ui.backpack.upload', 'buylist', undefined]]);
 });
@@ -247,7 +248,7 @@ test('every value and scope sent is registered', () => {
     rowsOf()[0].querySelector('.backpack-plus').click();
     pick(ids['backpack-sort-by'], 'edition');
     ids['backpack-tab-add'].click();
-    ids['backpack-send-retail'].click();
+    ids['backpack-send'].click();
     expect(ours(calls).length).toBeGreaterThan(3);
     for (const [name, value, scope] of ours(calls)) {
         const n = registry[name];
@@ -264,7 +265,7 @@ test('with no window.BAN the panel still opens and sends', () => {
     rowsOf()[0].querySelector('.backpack-plus').click();
     pick(ids['backpack-sort-by'], 'name');
     ids['backpack-sort-dir'].click();
-    ids['backpack-send-retail'].click();
+    ids['backpack-send'].click();
     expect(submitted.length).toBe(1);
     ids['backpack-tab-add'].click();
     expect(tabsOf().length).toBe(2);

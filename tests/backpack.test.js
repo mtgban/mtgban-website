@@ -39,9 +39,10 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], results, navMenu = false, sort, fetch, signedIn = false, timers } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], results, navMenu = false, sort, fetch, signedIn = false, timers, uploadMode } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
+    if (uploadMode) m.uploadMode = uploadMode;
     if (active) m.mtgban_backpack_active = String(active);
     if (tabList) m.mtgban_backpack_tabs = JSON.stringify(tabList);
     if (sort) m.mtgban_backpack_sort = JSON.stringify(sort);
@@ -450,7 +451,7 @@ describe('grades', () => {
         const store = [{ id: 'uuid-1', cond: 'SP', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', qty: 1, t: 1, m: 1 }, { id: 'uuid-2', qty: 1, t: 2, m: 2 }];
         const p = page({ store, emptyAfter: '1' });
         p.nav.click();
-        ids['backpack-send-retail'].click();
+        ids['backpack-send'].click();
         expect(p.pendingIds()).toEqual(['uuid-2', 'uuid-1', 'uuid-1|SP']);
         const later = [...store, { id: 'uuid-1', cond: 'HP', qty: 1, t: 3, m: 3 }];
         const u = page({ store: later, pending: p.pendingIds(), ban: { canUpload: true, priced: ['uuid-2', 'uuid-1', 'uuid-1'] } });
@@ -515,7 +516,7 @@ describe('numbered backpacks', () => {
         p.nav.click();
         expect(ids['backpack-panel'].querySelectorAll('.backpack-row-name').map((n) => n.textContent)).toEqual(['Two B', 'Two']);
         expect(ids['backpack-count'].textContent).toBe('6 copies of 2 products');
-        ids['backpack-send-retail'].click();
+        ids['backpack-send'].click();
         expect(submitted[0].children.filter((i) => i.name === 'hashesQtys').map((i) => i.value)).toEqual(['1', '5']);
         expect(p.pendingIds()).toEqual(['2/uuid-2', '2/uuid-1']);
         ids['backpack-clear'].click();
@@ -778,7 +779,7 @@ describe('taking from the backpack a send came from', () => {
     function sent() {
         const p = page({ store, tabs: 2, active: 2, tabList });
         p.nav.click();
-        ids['backpack-send-retail'].click();
+        ids['backpack-send'].click();
         return p.sm;
     }
 
@@ -1111,7 +1112,7 @@ describe('the panel', () => {
         const names = panel.querySelectorAll('.backpack-row-name').map((n) => n.textContent);
         expect(names).toEqual(['New', 'Old']);
         expect(ids['backpack-count'].textContent).toBe('3 copies of 2 products');
-        expect(ids['backpack-send-retail'].disabled).toBe(false);
+        expect(ids['backpack-send'].disabled).toBe(false);
     });
 
     test("a row's name links to the card's search and Tab reaches it", () => {
@@ -1146,7 +1147,7 @@ describe('the panel', () => {
         for (let i = 0; i < 3; i++) panel.querySelectorAll('.backpack-minus')[0].click(); // A is the only row now
         expect(p.stored().filter((e) => !e.del).length).toBe(0);
         expect(ids['backpack-list'].querySelectorAll('.backpack-row').length).toBe(0);
-        expect(ids['backpack-send-retail'].disabled).toBe(true);
+        expect(ids['backpack-send'].disabled).toBe(true);
         expect(ids['backpack-empty'].textContent).toBe('Add products from any search with the backpack button.');
     });
 
@@ -1245,11 +1246,11 @@ describe('the panel', () => {
         const panel = open(p);
         expect(panel.getAttribute('aria-modal')).toBe('true');
         expect(p.document.activeElement).toBe(ids['backpack-close']);
-        ids['backpack-send-buylist'].focus();
+        ids['backpack-send'].focus();
         expect(p.key('Tab')).toBe(true);
         expect(p.document.activeElement).toBe(ids['backpack-close']);
         expect(p.key('Tab', true)).toBe(true);
-        expect(p.document.activeElement).toBe(ids['backpack-send-buylist']);
+        expect(p.document.activeElement).toBe(ids['backpack-send']);
         ids['backpack-clear'].focus();
         expect(p.key('Tab')).toBe(false);
     });
@@ -1260,7 +1261,7 @@ describe('the panel', () => {
         const dlg = p.document.createElement('div'); dlg.setAttribute('id', 'ban-confirm-dialog'); dlg.hidden = true;
         dlg.appendChild(p.document.createElement('button'));
         panel.appendChild(dlg);
-        ids['backpack-send-buylist'].focus();
+        ids['backpack-send'].focus();
         expect(p.key('Tab')).toBe(true);
         expect(p.document.activeElement).toBe(ids['backpack-close']);
     });
@@ -1376,10 +1377,10 @@ describe('undo', () => {
 });
 
 describe('sending', () => {
-    test('Retail posts hashes and quantities in order, keeping the backpack', () => {
+    test('Optimize posts hashes and quantities in order as retail, keeping the backpack', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', qty: 1, t: 2, m: 2 }] });
         p.nav.click();
-        ids['backpack-send-retail'].click();
+        ids['backpack-send'].click();
         expect(submitted.length).toBe(1);
         const form = submitted[0];
         expect(form.getAttribute('action')).toBe('/upload?from=backpack');
@@ -1388,13 +1389,13 @@ describe('sending', () => {
         expect(p.stored().filter((e) => !e.del).length).toBe(2);
     });
 
-    test('Buylist with the switch on keeps the backpack and records the cards sent', () => {
-        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', qty: 1, t: 2, m: 2 }], emptyAfter: '1' });
+    test('Optimize after a buylist Upload, with the switch on, keeps the backpack and records the cards sent', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', qty: 1, t: 2, m: 2 }], emptyAfter: '1', uploadMode: 'buylist' });
         p.nav.click();
         expect(ids['backpack-empty-after'].checked).toBe(true);
         let liveAtSubmit = null;
         submitHook = () => { liveAtSubmit = p.stored().filter((e) => !e.del).length; };
-        ids['backpack-send-buylist'].click();
+        ids['backpack-send'].click();
         expect(liveAtSubmit).toBe(2);
         expect(submitted[0].children[0].value).toBe('true');
         expect(submitted[0].children.length).toBe(7);
@@ -1405,19 +1406,17 @@ describe('sending', () => {
     test('a send with the switch off drops an earlier request to empty', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }], pending: ['uuid-1'] });
         p.nav.click();
-        ids['backpack-send-retail'].click();
+        ids['backpack-send'].click();
         expect(submitted.length).toBe(1);
         expect(p.pendingIds()).toBeUndefined();
     });
 
-    test('a reader without Upload gets disabled buttons and sends nothing', () => {
+    test('a reader without Upload gets a disabled button and sends nothing', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }], emptyAfter: '1', ban: { canUpload: false } });
         p.nav.click();
-        for (const id of ['backpack-send-retail', 'backpack-send-buylist']) {
-            expect(ids[id].disabled).toBe(true);
-            expect(ids[id].getAttribute('title')).toBe('Upload needs a higher tier');
-            ids[id].click();
-        }
+        expect(ids['backpack-send'].disabled).toBe(true);
+        expect(ids['backpack-send'].getAttribute('title')).toBe('Upload needs a higher tier');
+        ids['backpack-send'].click();
         expect(ids['backpack-empty-after'].disabled).toBe(true);
         expect(submitted).toEqual([]);
         expect(p.stored().filter((e) => !e.del).length).toBe(1);
@@ -1426,11 +1425,20 @@ describe('sending', () => {
     test('a reader with Upload sends as without BAN_BACKPACK', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }], ban: { canUpload: true } });
         p.nav.click();
-        expect(ids['backpack-send-retail'].disabled).toBe(false);
-        expect(ids['backpack-send-retail'].getAttribute('title')).toBeNull();
+        expect(ids['backpack-send'].disabled).toBe(false);
+        expect(ids['backpack-send'].getAttribute('title')).toBe('Retail, as last picked on Upload');
         expect(ids['backpack-empty-after'].disabled).toBe(false);
-        ids['backpack-send-retail'].click();
+        ids['backpack-send'].click();
         expect(submitted.length).toBe(1);
+    });
+
+    test('Optimize names and sends the buylist side when it was last picked on Upload', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }], uploadMode: 'buylist' });
+        p.nav.click();
+        expect(ids['backpack-send'].getAttribute('title')).toBe('Buylist, as last picked on Upload');
+        ids['backpack-send'].click();
+        expect(submitted.length).toBe(1);
+        expect(submitted[0].children[0].value).toBe('true');
     });
 
     test('the switch is remembered locally', () => {
@@ -1486,13 +1494,13 @@ describe('on the Upload page', () => {
     test('Back to a cached search page shows the backpack Upload emptied', () => {
         const p = page({ store, emptyAfter: '1' });
         p.nav.click();
-        ids['backpack-send-retail'].click();
+        ids['backpack-send'].click();
         // The Upload page empties the shared store while this one sits in the cache.
         p.m.mtgban_backpack = JSON.stringify(store.map((e) => ({ ...e, del: 9, m: 9 })));
         p.firePageshow(true);
         expect(p.navCount.hidden).toBe(true);
         expect(ids['backpack-list'].querySelectorAll('.backpack-row').length).toBe(0);
-        expect(ids['backpack-send-retail'].disabled).toBe(true);
+        expect(ids['backpack-send'].disabled).toBe(true);
     });
 });
 
