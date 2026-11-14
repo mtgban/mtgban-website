@@ -23,6 +23,56 @@
     {{- else if eq . "backpack"}}<path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 10h8"/><path d="M8 18h8"/><path d="M8 22v-6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
     {{- end}}</svg>{{end}}
 
+{{/* The optimizer's leftover rows after the stores' sections, in the
+     stores' table: each card, what it is compared against and, when a store
+     buys it, its best offer and the stores it can be moved to. Without
+     data-load-idx, no total, cart or send counts these rows. */}}
+{{define "upload-leftovers"}}
+{{$root := .Root}}{{$id := .ID}}
+<div class="opt-store opt-leftovers" id="{{$id}}" data-fold>
+    <table class="opt-table" onmouseout="window.optTableOut && optTableOut(this, event)">
+    <colgroup><col><col><col><col><col><col><col></colgroup>
+    <thead><tr><td class="opt-store-head" colspan="7">
+    <div class="opt-store-header">
+        <h3 title="{{.Tip}}">{{.Title}}</h3>
+        <div class="opt-header-actions"></div>
+        <span class="opt-count">{{plural (len .Rows) "card"}}</span>
+        <button type="button" class="section-fold" aria-expanded="true" title="Hide these cards" data-track="ui.optimizer" data-track-value="fold"><i data-lucide="chevron-up"></i></button>
+    </div>
+    </td></tr>
+        <tr>
+            <th role="columnheader">Card <button type="button" class="sort-ties-btn" data-sort-area="opt" title="Sort by card properties" aria-label="Sort by card properties">{{template "upload-icon" "arrow-down-wide-narrow"}}</button></th>
+            <th role="columnheader">Set</th>
+            <th role="columnheader">Store</th>
+            <th class="c" role="columnheader" data-sort-method="number" data-sort-descending="true">Offer</th>
+            <th class="c" role="columnheader" data-sort-method="number" data-sort-descending="true">Loaded</th>
+            <th role="columnheader" data-sort-method="number" data-sort-descending="true">Spread</th>
+            <th class="c" data-sort-method="none"></th>
+        </tr></thead>
+        <tbody>
+        {{range $n, $row := .Rows}}
+            {{$card := index $root.Metadata .CardID}}
+            <tr data-opt-id="{{.CardID}}" data-opt-cond="{{.Condition}}"{{with .MoveTo}} data-move="{{.}}"{{end}}{{with index $root.SortKeys .CardID}} data-k-name="{{.Name}}" data-k-set="{{.Set}}" data-k-release="{{.Release}}" data-k-number="{{.Number}}" data-k-finish="{{.Finish}}" data-k-color="{{.Color}}" data-k-rarity="{{.Rarity}}"{{end}} data-k-cond="{{cond_rank .Condition}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});hw.toggleAttribute('data-sealed',{{$card.Sealed}});">
+                <td class="opt-name"><div class="opt-name-cell">
+                    <span class="emoji opt-copy" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>
+                    <div class="opt-name-text"><a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}
+                    {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}</div>
+                </div></td>
+                <td class="opt-set" data-sort="{{$card.Edition}}&#9;{{$card.Name}}">
+                    {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 20 "Class" ""}} {{$card.SetCode}} #{{$card.Number}}{{if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}
+                </td>
+                <td>{{with .Store}}{{index $root.StoreNames .}}{{end}}</td>
+                <td class="opt-offer" data-sort="{{if .Store}}{{printf "%.2f" .Price}}{{end}}">{{if .Store}}<span class="offer">$ <a href="/go/b/{{.Store}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a></span>{{end}}</td>
+                <td class="opt-loaded" data-sort="{{if .Loaded}}{{printf "%.2f" .Loaded}}{{end}}"><span class="loaded-wrap"><span class="loaded">{{if .Loaded}}$ {{if $root.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Loaded}}</a>{{else}}{{printf "%.2f" .Loaded}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{end}}</span><span class="loaded-qty">&times;{{.Quantity}}</span></span></td>
+                <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}" data-sort="{{if .Spread}}{{printf "%.2f" .Spread}}{{end}}">{{if .Spread}}{{printf "%.2f" .Spread}}%{{end}}</td>
+                <td class="c">{{if .MoveTo}}<button type="button" class="opt-move-btn" popovertarget="{{$id}}-move-{{$n}}" title="Move to a store" aria-label="Move to a store" data-track="ui.optimizer" data-track-value="move_menu"><svg aria-hidden="true"><use href="#opt-move-icon"/></svg></button><div class="opt-move-menu" id="{{$id}}-move-{{$n}}" popover></div>{{end}}</td>
+            </tr>
+        {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}
+
 {{define "content"}}
     <!-- Shared by input and results pages: inject optimizer settings (cookies) as hidden upload_form inputs -->
     <script type="text/javascript" src="/js/upload-options.js?hash={{.Hash}}" defer></script>
@@ -692,7 +742,7 @@
         <div class="res-buttons-row">
             <div class="res-tabs">
                 <button class="res-tab on" onclick="window.showResTab && showResTab('results',this)" data-track="ui.upload.result_tab" data-track-value="results">Results</button>
-                {{if .Optimized}}<button class="res-tab" onclick="window.showResTab && showResTab('optimizer',this)" data-track="ui.upload.result_tab" data-track-value="optimizer">Optimizer</button>{{end}}
+                {{if or .Optimized .FilteredOut .NotBought}}<button class="res-tab" onclick="window.showResTab && showResTab('optimizer',this)" data-track="ui.upload.result_tab" data-track-value="optimizer">Optimizer</button>{{end}}
             </div>
             <div class="res-btn-sep"></div>
             {{if .Optimized}}
@@ -858,7 +908,7 @@
     </div>
 
     <!-- Tab: Optimizer -->
-    {{if .Optimized}}
+    {{if or .Optimized .FilteredOut .NotBought}}
     <div class="res-panel" id="panel-optimizer">
         <div id="hoverWrap" class="foil-wrap hoverWrap">
             <img id="hoverImage" class="hoverImage" src="{{card_art_placeholder}}"/>
@@ -866,7 +916,7 @@
         <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}" defer></script>
         <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}" defer></script>
 
-        <p class="opt-intro">{{len .Optimized}} store splits for a theoretical maximum of <strong>$ {{printf "%.2f" .HighestTotal}}</strong></p>
+        {{if .Optimized}}<p class="opt-intro">{{len .Optimized}} store splits for a theoretical maximum of <strong>$ {{printf "%.2f" .HighestTotal}}</strong></p>{{end}}
 
         {{/* The stores this list was priced against, which dropping or adding
              one re-posts it with; the custom buylist is in neither. */}}
@@ -1116,6 +1166,8 @@
                 </div>
             {{end}}
         {{end}}
+        {{with .FilteredOut}}{{template "upload-leftovers" dict "ID" "opt-filtered-out" "Title" "Filtered out" "Tip" "A store buys these, but the value or spread filters drop every offer" "Rows" . "Root" $}}{{end}}
+        {{with .NotBought}}{{template "upload-leftovers" dict "ID" "opt-not-bought" "Title" "Not bought" "Tip" "No store priced here buys these right now" "Rows" . "Root" $}}{{end}}
     </div>
     {{end}}
 
@@ -1127,7 +1179,7 @@
     </script>
     <script type="text/javascript" src="/js/upload-tabs.js?hash={{.Hash}}" defer></script>
 
-    {{if .Optimized}}
+    {{if or .Optimized .FilteredOut .NotBought}}
     <script type="text/javascript" src="/js/load-lists.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-optimizer.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/section-fold.js?hash={{.Hash}}" defer></script>

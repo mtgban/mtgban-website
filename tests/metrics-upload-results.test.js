@@ -24,11 +24,9 @@ test.each([
     ['class="opt-toc-item"', 'ui.optimizer', 'toc_jump', undefined],
     ['title="Previous"', 'ui.optimizer', 'section_nav', undefined],
     ['title="Next"', 'ui.optimizer', 'section_nav', undefined],
-    ['class="section-fold"', 'ui.optimizer', 'fold', undefined],
     ['>Load buylist at {{$scraperKey}}', 'ui.optimizer.send', 'sellcart', '{{$scraperKey}}'],
     ['>Download {{$scraperKey}} CSV</a>', 'ui.optimizer.send', 'csv', '{{$scraperKey}}'],
     ['>Remove from TCG CSV</a>', 'ui.optimizer.send', 'tcg_csv', '{{$scraperKey}}'],
-    ['class="opt-move-btn"', 'ui.optimizer', 'move_menu', undefined],
     ['>Mass entry at TCGplayer</a>', 'ui.optimizer.send', 'mass_entry', '{{$sourceKey}}'],
     ['>Mass entry at Mana Pool</a>', 'ui.optimizer.send', 'mass_entry', '{{$sourceKey}}'],
     ['>Load at {{$sourceKey}}</a>', 'ui.optimizer.send', 'load_at', '{{$sourceKey}}'],
@@ -38,6 +36,18 @@ test.each([
     const found = marker.startsWith('>') ? [upload.slice(upload.lastIndexOf('<', at), at + 1)] : tagsWith(upload, marker);
     expect(found.length).toBe(1);
     expectTrack(found[0], name, value, scope);
+});
+
+test('every fold button, the stores and the leftovers, tracks ui.optimizer:fold', () => {
+    const tags = tagsWith(upload, 'class="section-fold"');
+    expect(tags.length).toBe(2);
+    tags.forEach((t) => expectTrack(t, 'ui.optimizer', 'fold', undefined));
+});
+
+test('every Move to button, the stores and the filtered out, tracks ui.optimizer:move_menu', () => {
+    const tags = tagsWith(upload, 'class="opt-move-btn"');
+    expect(tags.length).toBe(2);
+    tags.forEach((t) => expectTrack(t, 'ui.optimizer', 'move_menu', undefined));
 });
 
 test('both deck builder links name their store', () => {
@@ -345,7 +355,7 @@ test('the results toolbar pair counts under ui.upload.result, the optimizer pair
 
 test('the sort menu buttons and the results backpack pair carry no mark: the scripts count them', () => {
     const tags = tagsWith(upload, 'data-sort-area=').concat(tagsWith(upload, 'data-pack-rows="results"'));
-    expect(tags.length).toBe(5);
+    expect(tags.length).toBe(6);
     tags.forEach((t) => expect(t).not.toContain('data-track'));
 });
 

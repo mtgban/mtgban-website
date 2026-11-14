@@ -644,3 +644,117 @@ func TestUploadRowsCarryTheirSortKeys(t *testing.T) {
 		t.Errorf("%d rows carry a tie group, want the 2 grouped ones", strings.Count(out, "data-k-lead="))
 	}
 }
+
+// TestOptimizerListsLeftovers lists, after the stores' sections, a buylist
+// row whose offers the minimum value drops under Filtered out with its best
+// offer and the stores it can be moved to, and one no store buys under Not
+// bought, and neither at retail.
+func TestOptimizerListsLeftovers(t *testing.T) {
+	cards := closeVendors(t)
+	var extra string
+	for _, id := range backend().GetUUIDs() {
+		if !slices.Contains(cards, id) {
+			extra = id
+			break
+		}
+	}
+	inv := mtgban.InventoryRecord{}
+	for k, card := range cards {
+		inv[card] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 5 + float64(k), Quantity: 1}}
+	}
+	withPrices(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inv, sessionInfo("ZZS"))}, currentPrices().vendors)
+
+	// Both vendors pay under 6 for the first card, and ZZS sells it for 5
+	page := func(blMode bool, minval string, stores ...string) string {
+		form := url.Values{}
+		form.Set("mode", fmt.Sprint(blMode))
+		form["stores"] = stores
+		form.Set("minmargin", "true")
+		form.Set("margin", "10")
+		form.Set("lowval", "")
+		form.Set("lowvalabs", "true")
+		form.Set("minval", minval)
+		var rows strings.Builder
+		for _, card := range append(slices.Clone(cards), extra) {
+			fmt.Fprintf(&rows, "%s\t1\t\t0\t\n", card)
+		}
+		form.Set("rows", rows.String())
+		req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		testSite.Upload(rec, req)
+		return rec.Body.String()
+	}
+
+	buylist := page(true, "6", "ZZV", "ZZW")
+	stores, _, _ := strings.Cut(buylist, `id="opt-filtered-out"`)
+	if strings.Contains(stores, `data-opt-id="`+cards[0]+`"`) {
+		t.Error("the first card is in a store's list although its offers are under the minimum")
+	}
+	for _, tc := range []struct {
+		id, card string
+		want     []string
+	}{
+		{"opt-filtered-out", cards[0], []string{"Session ZZW", `<a href="/go/b/ZZW/`, `data-move="ZZW:5.50,ZZV:5.00"`, "opt-move-btn"}},
+		{"opt-not-bought", extra, nil},
+	} {
+		section := leftoverRows(buylist, tc.id)
+		if n := strings.Count(section, "<tr data-opt-id="); n != 1 {
+			t.Errorf("%s lists %d rows, want 1", tc.id, n)
+		}
+		co, err := backend().GetUUID(tc.card)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(section, co.Name) {
+			t.Errorf("%s does not name %s", tc.id, co.Name)
+		}
+		for _, w := range tc.want {
+			if !strings.Contains(section, w) {
+				t.Errorf("%s lacks %s", tc.id, w)
+			}
+		}
+		if tc.want == nil && (strings.Contains(section, "/go/b/") || strings.Contains(section, "data-move=")) {
+			t.Errorf("%s shows an offer or a move for a card no store buys", tc.id)
+		}
+	}
+
+	retail := page(false, "6", "ZZS")
+	if !strings.Contains(retail, `id="panel-optimizer"`) {
+		t.Fatal("no optimizer at retail")
+	}
+	if strings.Contains(retail, `id="opt-not-bought"`) || strings.Contains(retail, `id="opt-filtered-out"`) {
+		t.Error("a leftover section at retail")
+	}
+
+	// With every offer under the minimum the tab still opens, on the leftovers
+	none := page(true, "100", "ZZV", "ZZW")
+	if !strings.Contains(none, "showResTab('optimizer'") || strings.Contains(none, "data-load-idx=") {
+		t.Error("no Optimizer tab, or a store's list, when the filters drop every row")
+	}
+	for id, want := range map[string]int{"opt-filtered-out": len(cards), "opt-not-bought": 1} {
+		if n := strings.Count(leftoverRows(none, id), "<tr data-opt-id="); n != want {
+			t.Errorf("%s lists %d rows when the filters drop every row, want %d", id, n, want)
+		}
+	}
+}
+
+// leftoverRows is the body of the page's leftover section id, or nothing.
+func leftoverRows(page, id string) string {
+	_, section, _ := strings.Cut(page, `id="`+id+`"`)
+	_, section, _ = strings.Cut(section, "<tbody>")
+	section, _, _ = strings.Cut(section, "</tbody>")
+	return section
+}
+
+// TestLeftoversMergeOpenedCopies lists copies of a card opened from several
+// products as one line, while an uploaded copy stays its own.
+func TestLeftoversMergeOpenedCopies(t *testing.T) {
+	var l leftovers
+	for _, from := range []string{"box-a", "box-b", ""} {
+		l.add(uploadRow{UploadEntry: &UploadEntry{CardID: "card", UnpackedFrom: from}, priceKey: "card", qty: 2}, LeftoverEntry{CardID: "card", Quantity: 2})
+	}
+	if len(l.rows) != 2 || l.rows[0].Quantity != 4 || l.rows[1].Quantity != 2 {
+		t.Errorf("listed %+v, want the opened copies as 4 and the uploaded as 2", l.rows)
+	}
+}
