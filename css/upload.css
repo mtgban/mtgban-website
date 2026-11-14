@@ -1302,6 +1302,35 @@
 .opt-toc-item .toc-store { font-size: var(--text-md); font-weight: 700; color: var(--normal); }
 .opt-toc-item .toc-stats { font-size: var(--text-sm); color: var(--text-dim); }
 .opt-toc-item .toc-total { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-lg); font-weight: 700; color: var(--asuccess); }
+.opt-toc-cell { position: relative; display: flex; }
+.opt-toc-cell .opt-toc-item { flex: 1; padding-right: 28px; }
+.opt-toc-drop {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-dim);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+.opt-toc-drop:hover { color: var(--adanger); background: var(--surface-2); }
+.opt-toc-add {
+    align-self: center;
+    padding: 4px 8px;
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--border-subtle);
+    background: var(--surface-1);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+.opt-toc-add:hover { border-color: var(--accent-border); color: var(--normal); }
 
 .opt-store {
     background: var(--surface-1);
@@ -1715,6 +1744,7 @@ body:not(:has(#panel-optimizer.active)) :is(.res-sort-btn, .res-sort-sep) { disp
     .res-tabs { flex-direction: row; width: 100%; overflow-x: auto; }
     .res-summary-stat .val { font-size: var(--text-lg); }
     .opt-toc { flex-direction: column; }
+    .opt-toc-add { align-self: flex-start; }
     .res-summary { flex-direction: column; align-items: stretch; }
     .res-summary-stat { border-right: none; padding-right: 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; }
     .res-summary-stat:last-child { border-bottom: none; padding-bottom: 0; }

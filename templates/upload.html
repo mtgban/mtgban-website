@@ -868,18 +868,39 @@
 
         <p class="opt-intro">{{len .Optimized}} store splits for a theoretical maximum of <strong>$ {{printf "%.2f" .HighestTotal}}</strong></p>
 
+        {{/* The stores this list was priced against, which dropping or adding
+             one re-posts it with; the custom buylist is in neither. */}}
+        {{$picked := .EnabledSellers}}{{$pickedSealed := .EnabledSealedSellers}}
+        {{if .IsBuylist}}{{$picked = .EnabledVendors}}{{$pickedSealed = .EnabledSealedVendors}}{{end}}
+        {{if .CanChangeStores}}
+            <script>window.BAN_OPT_STORES = {stores: {{$picked}}, sealed: {{$pickedSealed}}};</script>
+        {{end}}
         <div class="opt-toc">
             {{range .AllScraperKeys}}
                 {{$entries := index $.Optimized .}}
                 {{if $entries}}
                     {{$total := index $.OptimizedTotals .}}
+                    <div class="opt-toc-cell">
                     <a class="opt-toc-item" href="#opt-{{.}}" data-track="ui.optimizer" data-track-value="toc_jump">
                         <span class="toc-store"{{with index $.CustomTips .}} title="{{.}}"{{end}}>{{index $.StoreNames .}}</span>
                         {{$qty := index $.OptimizedQuantities .}}
                         <span class="toc-stats">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
                         <span class="toc-total">$ {{printf "%.2f" $total}}</span>
                     </a>
+                    {{if and $.CanChangeStores (or (and (slice_has $picked .) (gt (len $picked) 1)) (and (slice_has $pickedSealed .) (gt (len $pickedSealed) 1)))}}
+                        <button type="button" class="opt-toc-drop" data-store="{{.}}" title="Price this list again without {{index $.StoreNames .}}" aria-label="Drop {{index $.StoreNames .}}" onclick="window.dropOptStore && dropOptStore(this)" data-track="ui.optimizer" data-track-value="store_drop">&times;</button>
+                    {{end}}
+                    </div>
                 {{end}}
+            {{end}}
+            {{if or .OptAddStores .OptAddSealedStores}}
+                <select class="opt-toc-add" aria-label="Price this list again with another store" title="Price this list again with another store" onchange="window.addOptStore && addOptStore(this)">
+                    <option value="" selected>+ Add store</option>
+                    {{if and .OptAddStores .OptAddSealedStores}}<optgroup label="Singles">{{end}}
+                    {{range .OptAddStores}}<option value="{{.}}">{{index $.StoreNames .}}</option>{{end}}
+                    {{if and .OptAddStores .OptAddSealedStores}}</optgroup>{{end}}
+                    {{if .OptAddSealedStores}}<optgroup label="Sealed">{{range .OptAddSealedStores}}<option value="{{.}}" data-sealed>{{index $.StoreNames .}}</option>{{end}}</optgroup>{{end}}
+                </select>
             {{end}}
         </div>
 
