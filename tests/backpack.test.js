@@ -2051,10 +2051,14 @@ describe('sorting the panel', () => {
         expect(ids['backpack-sort-note'].hidden).toBe(true);
     });
 
-    test('one entry shows no sort bar', () => {
-        const p = page({ store: store.slice(0, 1) });
-        p.nav.click();
-        expect(ids['backpack-sort'].hidden).toBe(true);
+    test('an empty backpack or one entry shows the sort disabled', () => {
+        for (const n of [0, 1, 2]) {
+            const p = page({ store: store.slice(0, n) });
+            p.nav.click();
+            expect(ids['backpack-sort'].hidden).toBe(false);
+            expect(ids['backpack-sort-by'].disabled).toBe(n < 2);
+            expect(ids['backpack-sort-dir'].disabled).toBe(n < 2);
+        }
     });
 });
 

@@ -254,7 +254,6 @@ html:has(.backpack-panel.open) { overflow: hidden; }
     gap: 0.25em;
 }
 
-.backpack-sort[hidden],
 .backpack-sort-note[hidden] { display: none; }
 
 .backpack-sort-by,
@@ -269,6 +268,9 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 }
 
 .backpack-sort-dir { display: inline-flex; align-items: center; justify-content: center; min-width: 2.25rem; padding: 0.3em; }
+
+.backpack-sort-by:disabled,
+.backpack-sort-dir:disabled { opacity: 0.5; cursor: default; }
 
 .backpack-sort-note { font-size: 0.85em; opacity: 0.75; }
 

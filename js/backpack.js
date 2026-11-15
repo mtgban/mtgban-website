@@ -1147,13 +1147,14 @@
 
     function setSortNote(s) {
         sortNote.textContent = s;
-        sortNote.hidden = !s || sortBar.hidden;
+        sortNote.hidden = !s || sortSel.disabled;
     }
 
-    // renderSortBar shows the sort picked, while there is more than one
-    // entry to order.
+    // renderSortBar shows the sort picked, disabled until there is more than
+    // one entry to order.
     function renderSortBar(s, n) {
-        sortBar.hidden = n < 2;
+        sortSel.disabled = n < 2;
+        sortDirBtn.disabled = n < 2;
         sortSel.value = s.by;
         icon(sortDirBtn, s.dir === "asc" ? "arrow-up-narrow-wide" : "arrow-down-wide-narrow");
         sortDirBtn.setAttribute("aria-label", SORTS[s.by][s.dir] + ", reverse");
