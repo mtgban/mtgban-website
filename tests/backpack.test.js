@@ -39,9 +39,9 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], results, navMenu = false, sort, fetch, signedIn = false, timers, uploadMode } = {}) {
+function page({ store = [], mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], results, navMenu = false, sort, fetch, signedIn = false, timers, uploadMode } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
-    const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
+    const m = { mtgban_backpack: JSON.stringify(store) };
     if (uploadMode) m.uploadMode = uploadMode;
     if (active) m.mtgban_backpack_active = String(active);
     if (tabList) m.mtgban_backpack_tabs = JSON.stringify(tabList);
@@ -449,8 +449,9 @@ describe('grades', () => {
 
     test('a send to empty after records keys, and Upload clears just those', () => {
         const store = [{ id: 'uuid-1', cond: 'SP', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', qty: 1, t: 1, m: 1 }, { id: 'uuid-2', qty: 1, t: 2, m: 2 }];
-        const p = page({ store, emptyAfter: '1' });
+        const p = page({ store });
         p.nav.click();
+        ids['backpack-empty-after'].checked = true;
         ids['backpack-send'].click();
         expect(p.pendingIds()).toEqual(['uuid-2', 'uuid-1', 'uuid-1|SP']);
         const later = [...store, { id: 'uuid-1', cond: 'HP', qty: 1, t: 3, m: 3 }];
@@ -512,8 +513,9 @@ describe('numbered backpacks', () => {
     });
 
     test('the panel, Clear and a send take only the active backpack', () => {
-        const p = page({ store: two, tabs: 2, active: 2, emptyAfter: '1' });
+        const p = page({ store: two, tabs: 2, active: 2 });
         p.nav.click();
+        ids['backpack-empty-after'].checked = true;
         expect(ids['backpack-panel'].querySelectorAll('.backpack-row-name').map((n) => n.textContent)).toEqual(['Two B', 'Two']);
         expect(ids['backpack-count'].textContent).toBe('6 copies of 2 products');
         ids['backpack-send'].click();
@@ -1390,9 +1392,9 @@ describe('sending', () => {
     });
 
     test('Optimize after a buylist Upload, with the switch on, keeps the backpack and records the cards sent', () => {
-        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', qty: 1, t: 2, m: 2 }], emptyAfter: '1', uploadMode: 'buylist' });
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', qty: 1, t: 2, m: 2 }], uploadMode: 'buylist' });
         p.nav.click();
-        expect(ids['backpack-empty-after'].checked).toBe(true);
+        ids['backpack-empty-after'].checked = true;
         let liveAtSubmit = null;
         submitHook = () => { liveAtSubmit = p.stored().filter((e) => !e.del).length; };
         ids['backpack-send'].click();
@@ -1412,7 +1414,7 @@ describe('sending', () => {
     });
 
     test('a reader without Upload gets a disabled button and sends nothing', () => {
-        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }], emptyAfter: '1', ban: { canUpload: false } });
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }], ban: { canUpload: false } });
         p.nav.click();
         expect(ids['backpack-send'].disabled).toBe(true);
         expect(ids['backpack-send'].getAttribute('title')).toBe('Upload needs a higher tier');
@@ -1441,13 +1443,19 @@ describe('sending', () => {
         expect(submitted[0].children[0].value).toBe('true');
     });
 
-    test('the switch is remembered locally', () => {
-        const p = page();
+    test('the switch opens unticked every time, whatever it was left at', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
         p.nav.click();
         const sw = ids['backpack-empty-after'];
+        expect(sw.checked).toBe(false);
         sw.checked = true;
         (sw.listeners.change || []).forEach((fn) => fn());
-        expect(p.m.mtgban_backpack_empty_after).toBe('1');
+        ids['backpack-close'].click();
+        p.nav.click();
+        expect(sw.checked).toBe(false);
+        ids['backpack-send'].click();
+        expect(p.pendingIds()).toBeUndefined();
+        expect(Object.keys(p.m).filter((k) => k.includes('empty'))).toEqual([]);
     });
 });
 
@@ -1492,8 +1500,9 @@ describe('on the Upload page', () => {
     });
 
     test('Back to a cached search page shows the backpack Upload emptied', () => {
-        const p = page({ store, emptyAfter: '1' });
+        const p = page({ store });
         p.nav.click();
+        ids['backpack-empty-after'].checked = true;
         ids['backpack-send'].click();
         // The Upload page empties the shared store while this one sits in the cache.
         p.m.mtgban_backpack = JSON.stringify(store.map((e) => ({ ...e, del: 9, m: 9 })));

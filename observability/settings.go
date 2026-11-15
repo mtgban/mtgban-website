@@ -86,7 +86,6 @@ var settings = []Setting{
 	{Name: "BANChartSealed", Storage: "local", Path: "root", Kind: "list", Class: "preference", Area: "chart"},
 	{Name: "mtgban_saved_commands", Storage: "local", Path: "root", Kind: "blob", Class: "preference", Area: "palette"},
 	{Name: "alertsSort", Storage: "local", Path: "root", Kind: "enum", Enum: []string{"created:asc", "created:desc", "name:asc", "name:desc", "now:asc", "now:desc", "fired:asc", "fired:desc", "status:asc", "status:desc", "side:asc", "side:desc"}, Default: "created:desc", Class: "preference", Area: "alerts"},
-	{Name: "mtgban_backpack_empty_after", Storage: "local", Path: "root", Kind: "flag", Default: "off", Class: "preference", Area: "backpack"},
 
 	// Upload page, preference.
 	{Name: "UploadOptimizerOpts.lowval", Storage: "cookie", Path: "upload", Kind: "flag", Default: "on", Class: "preference", Area: "upload", Fact: "upload.option", FactValue: "lowval"},

@@ -5,7 +5,6 @@
     "use strict";
 
     var KEY = "mtgban_backpack";
-    var EMPTY_AFTER_KEY = "mtgban_backpack_empty_after";
     var PENDING_KEY = "mtgban_backpack_pending_clear";
     var SENT_KEY = "mtgban_backpack_sent";
     var UNDO_KEY = "mtgban_backpack_undo";
@@ -419,9 +418,6 @@
         save(list);
     }
 
-    function emptyAfter() { try { return localStorage.getItem(EMPTY_AFTER_KEY) === "1"; } catch (e) { return false; } }
-    function setEmptyAfter(on) { try { localStorage.setItem(EMPTY_AFTER_KEY, on ? "1" : "0"); } catch (e) {} }
-
     // The entries a send asked to empty after, by key, held in this tab
     // until Upload shows their results; every send replaces or removes them.
     function setPending(keys) {
@@ -498,7 +494,7 @@
     function send(mode) {
         if (!canUpload() || !ordered().length) return;
         var form = sendForm(mode);
-        setPending(emptyAfter() ? ordered().map(key) : null);
+        setPending(emptySwitch && emptySwitch.checked ? ordered().map(key) : null);
         try { sessionStorage.setItem(SENT_KEY, JSON.stringify({ pack: active(), ids: ordered().map(function (e) { return e.id; }) })); } catch (e) {}
         document.body.appendChild(form);
         if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.upload", mode === "buylist" ? "buylist" : "retail");
@@ -1049,10 +1045,8 @@
         emptySwitch = document.createElement("input");
         emptySwitch.type = "checkbox";
         emptySwitch.setAttribute("id", "backpack-empty-after");
-        emptySwitch.checked = emptyAfter();
         emptySwitch.addEventListener("change", function () {
             if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack", emptySwitch.checked ? "empty_after_on" : "empty_after_off");
-            setEmptyAfter(emptySwitch.checked);
         });
         label.append(emptySwitch, text("span", null, "Empty the backpack after sending"));
 
@@ -1540,6 +1534,8 @@
         build();
         if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.panel", "open");
         priceRefusal = "";
+        // Each opening asks again whether a send empties the backpack
+        emptySwitch.checked = false;
         overlay.classList.add("open");
         panel.classList.add("open");
         renderPanel();
