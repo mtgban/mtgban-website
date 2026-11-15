@@ -286,9 +286,13 @@ type OptimizedUploadEntry struct {
 	// The UUID of the card
 	CardID string
 
-	// Sends is the row's send menu on the buylist page: the splits whose
-	// cart takes the card, with each one's offer
-	Sends []cartSend
+	// Moved is set when the reader put the row in this store, whatever the
+	// optimizer's rules said
+	Moved bool
+
+	// MoveTo is the page's other stores that offer for the row, best offer
+	// first, as "store:offer" pairs joined by commas
+	MoveTo string
 
 	// Condition as found in the source data
 	Condition mtgban.Condition
@@ -969,25 +973,46 @@ func uploadSortKeys(b *matcher.Backend, uploadedData []UploadEntry) map[string]u
 	return keys
 }
 
-// fillUploadResults sorts the rows and the optimizer's picks, and lays them
-// out on the page: the tabs, the opened products' sections, the totals row
-// and the optimizer's sections.
-// fillCarts gives each split its cart button and, on the buylist page, each
-// row its send menu over keys, the page's stores in their order.
-func (v *UploadVars) fillCarts(p *prices, keys []string) {
+// fillCarts gives each split its cart button and each row the stores it can
+// be moved to, among stores, the page's stores in their order.
+func (v *UploadVars) fillCarts(p *prices, stores []string) {
 	v.CartLoads = map[string]cartLoad{}
 	for key, entries := range v.Optimized {
 		v.CartLoads[key] = cartLoadFor(p, key, v.IsBuylist, entries)
-		if !v.IsBuylist {
-			continue
-		}
 		for i := range entries {
 			offerKey := entries[i].CardID + string(entries[i].Condition)
-			entries[i].Sends = cartSendsFor(p, keys, v.ResultPrices[offerKey], entries[i])
+			entries[i].MoveTo = moveOptions(stores, key, v.ResultPrices[offerKey], v.IsBuylist)
 		}
 	}
 }
 
+// moveOptions lists the stores other than from that offer in prices, best
+// first in the page's direction and in their order on a tie, as
+// "store:offer" pairs joined by commas.
+func moveOptions(stores []string, from string, prices map[string]float64, blMode bool) string {
+	var picks []string
+	for _, store := range stores {
+		if store != from && prices[store] > 0 && !slices.Contains(picks, store) {
+			picks = append(picks, store)
+		}
+	}
+	slices.SortStableFunc(picks, func(a, b string) int {
+		c := cmp.Compare(prices[a], prices[b])
+		if blMode {
+			return -c
+		}
+		return c
+	})
+	pairs := make([]string, len(picks))
+	for i, store := range picks {
+		pairs[i] = store + ":" + strconv.FormatFloat(prices[store], 'f', 2, 64)
+	}
+	return strings.Join(pairs, ",")
+}
+
+// fillUploadResults sorts the rows and the optimizer's picks, and lays them
+// out on the page: the tabs, the opened products' sections, the totals row
+// and the optimizer's sections.
 func fillUploadResults(pageVars *UploadVars, b *matcher.Backend, p *prices, reprintParents map[string]string, st uploadSettings, ids uploadIDs, prices uploadPrices, rows uploadRows, uploadedData []UploadEntry) {
 	sortResults(b, reprintParents, uploadedData, rows.optimizedResults, st.sorting)
 	numberSortTies(uploadedData, rows.optimizedResults, st.sorting)
@@ -1029,7 +1054,7 @@ func fillUploadResults(pageVars *UploadVars, b *matcher.Backend, p *prices, repr
 		// and only a separate symbol should link out to the alternate source.
 		pageVars.IgnorePrices = st.skipPrices
 		pageVars.Optimized = rows.optimizedResults
-		pageVars.fillCarts(p, prices.enabledStores)
+		pageVars.fillCarts(p, slices.Concat(prices.enabledStores, prices.enabledSealedStores))
 		// Only the stores that render a results section, in display order,
 		// so that the template can link each section to the previous/next one
 		for _, key := range activeTotalStores {
@@ -1129,6 +1154,13 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 			continue
 		}
 
+		// A row the reader moved goes to their store alone, while that
+		// store still offers for it
+		moved := st.moves[row.priceKey]
+		if offers[moved] > 0 {
+			bestStores = []string{moved}
+		}
+
 		rows.optimizeRow(row, offers, bestStores, st, indexes)
 		rows.anyCounted = true
 	}
@@ -1200,11 +1232,12 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 		// Load the single item priceprice
 		price := rows.resultPrices[row.priceKey][bestStore]
 
-		// Skip if needed
-		if st.skipLowValueAbs && price < st.minLowVal {
+		// Skip if needed, unless the reader put the row here
+		moved := st.moves[row.priceKey] == bestStore
+		if !moved && st.skipLowValueAbs && price < st.minLowVal {
 			continue
 		}
-		if st.skipHighValueAbs && st.maxHighVal != 0 && price >= st.maxHighVal {
+		if !moved && st.skipHighValueAbs && st.maxHighVal != 0 && price >= st.maxHighVal {
 			continue
 		}
 
@@ -1213,10 +1246,10 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 		if comparePrice != 0 {
 			factor = price / comparePrice * 100
 
-			if st.skipLowValue && factor < st.percSpread {
+			if !moved && st.skipLowValue && factor < st.percSpread {
 				continue
 			}
-			if st.skipHighValue && st.percSpreadMax != 0 && factor >= st.percSpreadMax {
+			if !moved && st.skipHighValue && st.percSpreadMax != 0 && factor >= st.percSpreadMax {
 				continue
 			}
 		}
@@ -1248,6 +1281,7 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 				LoadedPrice:     row.OriginalPrice,
 				LoadedCondition: cmp.Or(row.OriginalCondition, row.IgnoredCondition),
 				CompareSource:   st.altPriceSource,
+				Moved:           moved,
 				Spread:          factor,
 				BestPrice:       price,
 				Quantity:        row.qty,
@@ -1626,6 +1660,9 @@ type uploadSettings struct {
 	// the stores that win it under the Custom rule, first one first
 	tiebreak string
 	tieOrder []string
+	// The optimizer rows the reader moved, their store by price key
+	// (readOptMoves)
+	moves map[string]string
 }
 
 // readUploadSettings parses the upload page's settings from the request. The
@@ -1767,11 +1804,44 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 		preferFlavor:     preferFlavor,
 		tiebreak:         tiebreak,
 		tieOrder:         tieOrder,
+		moves:            readOptMoves(r, blMode),
 	}
 }
 
 // maxTieOrder is how many stores the Custom tiebreak names.
 const maxTieOrder = 3
+
+// readOptMoves reads the optimizer rows the reader moved to a store of their
+// choosing, the store by price key (card id and condition). Only a results
+// page pricing its own rows again sends them, as a first line naming the
+// mode and one "id<TAB>condition<TAB>store" line a row; a store's shorthand
+// names its buylist and its retail alike, so a move made in the other mode
+// is dropped.
+func readOptMoves(r *http.Request, blMode bool) map[string]string {
+	if r.FormValue("rows") == "" {
+		return nil
+	}
+	mode, lines, _ := strings.Cut(r.FormValue("opt_moves"), "\n")
+	want := "retail"
+	if blMode {
+		want = "buylist"
+	}
+	if strings.TrimSpace(mode) != want {
+		return nil
+	}
+	moves := map[string]string{}
+	for line := range strings.SplitSeq(lines, "\n") {
+		if len(moves) >= maxPackedRows {
+			break
+		}
+		fields := strings.Split(strings.TrimSuffix(line, "\r"), "\t")
+		if len(fields) != 3 || fields[0] == "" || fields[2] == "" {
+			continue
+		}
+		moves[fields[0]+fields[1]] = fields[2]
+	}
+	return moves
+}
 
 // uploadStores are the stores and index prices an upload is priced against,
 // the store lists the page offers, and the ones it shows ticked.

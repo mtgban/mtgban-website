@@ -77,14 +77,16 @@ document.addEventListener('change', function(e) {
 
 wireLoadLists({section: '.opt-store', removed: 'opt-removed'});
 
-// A row's send menu opens under its button, or over it in the lower part of
-// the window, and closes on a pick, before the cart panel can open, or on a
-// scroll, which would leave it behind its row.
+// A row's Move to menu is built when it opens, from the row's data-move:
+// the page's other stores that offer for the card, best first. It opens
+// under its button, or over it in the lower part of the window, and closes
+// on a pick or on a scroll, which would leave it behind its row.
 document.addEventListener('beforetoggle', function(e) {
     var menu = e.target;
-    if (!menu.classList || !menu.classList.contains('opt-send-menu') || e.newState !== 'open') return;
+    if (!menu.classList || !menu.classList.contains('opt-move-menu') || e.newState !== 'open') return;
     var btn = document.querySelector('[popovertarget="' + menu.id + '"]');
     if (!btn) return;
+    fillMoveMenu(menu, btn.closest('tr'));
     var r = btn.getBoundingClientRect();
     menu.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
     if (r.bottom > window.innerHeight * 0.6) {
@@ -96,9 +98,69 @@ document.addEventListener('beforetoggle', function(e) {
     }
 }, true);
 
+function fillMoveMenu(menu, row) {
+    var names = window.BAN_OPT_STORE_NAMES || {};
+    menu.textContent = '';
+    var title = document.createElement('div');
+    title.className = 'opt-move-title';
+    title.textContent = 'Move to';
+    menu.appendChild(title);
+    (row.dataset.move || '').split(',').forEach(function(pair) {
+        var at = pair.lastIndexOf(':');
+        if (at <= 0) return;
+        var store = pair.slice(0, at);
+        menu.appendChild(moveMenuItem(names[store] || store, '$ ' + pair.slice(at + 1), store));
+    });
+    if (row.hasAttribute('data-opt-moved')) {
+        menu.appendChild(moveMenuItem('Let the optimizer place it', '', ''));
+    }
+}
+
+function moveMenuItem(label, price, store) {
+    var item = document.createElement('button');
+    item.type = 'button';
+    item.dataset.store = store;
+    item.appendChild(document.createTextNode(label));
+    if (price) {
+        var span = document.createElement('span');
+        span.textContent = price;
+        item.appendChild(span);
+    }
+    return item;
+}
+
+// moveOptRow puts the row's card in store whatever the optimizer's rules
+// say, or back in the optimizer's hands when store is empty, and prices the
+// list again, landing back on the card. The move is the page's alone: the
+// next re-post carries it (ensureHashesLoaded) and nothing stores it.
+function moveOptRow(row, store) {
+    var id = row.dataset.optId;
+    var cond = row.dataset.optCond || '';
+    document.querySelectorAll('.opt-store tr[data-opt-moved]').forEach(function(tr) {
+        if (tr.dataset.optId === id && (tr.dataset.optCond || '') === cond) {
+            tr.removeAttribute('data-opt-moved');
+        }
+    });
+    if (store) row.setAttribute('data-opt-moved', store);
+    if (window.BAN && window.BAN.track) {
+        if (store) window.BAN.track('ui.optimizer', 'row_move');
+        else window.BAN.track('ui.optimizer', 'row_unmove');
+    }
+    try {
+        sessionStorage.setItem('uploadOptFocus', id + '\t' + cond);
+        sessionStorage.setItem('uploadResView', 'optimizer');
+    } catch (e) {}
+    if (window.reprocessUploadResults) reprocessUploadResults();
+}
+
 document.addEventListener('click', function(e) {
-    var menu = e.target.closest && e.target.closest('.opt-send-menu');
-    if (menu && e.target.closest('a')) menu.hidePopover();
+    var pick = e.target.closest && e.target.closest('.opt-move-menu button');
+    if (pick) {
+        var menu = pick.closest('.opt-move-menu');
+        var btn = document.querySelector('[popovertarget="' + menu.id + '"]');
+        menu.hidePopover();
+        if (btn) moveOptRow(btn.closest('tr'), pick.dataset.store);
+    }
     if (e.target.closest && e.target.closest('.opt-copy')) {
         if (window.BAN && window.BAN.track) window.BAN.track('ui.optimizer', 'copy_name');
     }
@@ -106,10 +168,30 @@ document.addEventListener('click', function(e) {
 
 // Captured, so a scroll inside any container closes it too
 document.addEventListener('scroll', function() {
-    document.querySelectorAll('.opt-send-menu:popover-open').forEach(function(menu) {
+    document.querySelectorAll('.opt-move-menu:popover-open').forEach(function(menu) {
         menu.hidePopover();
     });
 }, {capture: true, passive: true});
+
+// After a move the page lands back on the card, in the store it went to.
+// Run after upload-tabs.js has opened the optimizer.
+document.addEventListener('DOMContentLoaded', function() {
+    var key = null;
+    try {
+        key = sessionStorage.getItem('uploadOptFocus');
+        sessionStorage.removeItem('uploadOptFocus');
+    } catch (e) {}
+    if (!key) return;
+    var parts = key.split('\t');
+    var rows = document.querySelectorAll('.opt-store tr[data-opt-id]');
+    for (var i = 0; i < rows.length; i++) {
+        if (rows[i].dataset.optId === parts[0] && (rows[i].dataset.optCond || '') === parts[1]) {
+            rows[i].scrollIntoView({block: 'center'});
+            rows[i].classList.add('opt-move-landed');
+            return;
+        }
+    }
+});
 
 // resubmitOptStores prices the rows on the page again against these stores,
 // back on the optimizer. The list goes the way the exports send it.
