@@ -841,6 +841,8 @@ type EntryRule struct {
 	// SkipSets holds the set codes whose cards the rule never prices; their
 	// sealed products are still priced
 	SkipSets []string
+	// SkipOversized leaves every oversized card unpriced
+	SkipOversized bool
 	// ReleasedBy, when set, is the latest release date the rule prices,
 	// sealed products included; one with no known date is not priced
 	ReleasedBy time.Time
@@ -978,9 +980,13 @@ func processEntry[T mtgban.GenericEntry](b *matcher.Backend, p *prices, out map[
 }
 
 // skips reports whether the rule leaves co unpriced: a card of SkipSets,
-// or, with ReleasedBy set, anything not known to be out by then.
+// an oversized card with SkipOversized set, or, with ReleasedBy set,
+// anything not known to be out by then.
 func (rule EntryRule) skips(b *matcher.Backend, co *matcher.CardObject) bool {
 	if !co.Sealed && slices.Contains(rule.SkipSets, co.SetCode) {
+		return true
+	}
+	if rule.SkipOversized && co.IsOversized {
 		return true
 	}
 	if rule.ReleasedBy.IsZero() {

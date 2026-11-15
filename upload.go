@@ -2525,7 +2525,7 @@ func uploadCustomBuylistRules(r *http.Request) []customBuylistRule {
 // takes it: one rule a call, since processEntry ANDs the rules it is
 // given and keeps the lowest of the inventory prices it is handed again.
 func uploadCustomBuylistEntries(refs []customBuylistRef, cardID string, sealed bool) ([]mtgban.InventoryEntry, EntryRule) {
-	rule := EntryRule{SkipSets: customBuylistSkipSets, ReleasedBy: time.Now().Add(-customBuylistMinAge)}
+	rule := EntryRule{SkipSets: customBuylistSkipSets, SkipOversized: true, ReleasedBy: time.Now().Add(-customBuylistMinAge)}
 	for _, ref := range refs {
 		entries := ref.reference(cardID, sealed)
 		// The rule applies to the first priced listing, as processEntry reads it
