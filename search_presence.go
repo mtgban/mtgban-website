@@ -84,7 +84,7 @@ func newPostStores(b *matcher.Backend, p *prices, r *http.Request, cardIDs []str
 
 	if config.CustomBuylist && !config.SkipBuylist && asksCustom(config.PostFilters) {
 		s.custom = map[string][]mtgban.Condition{}
-		for _, offer := range customBuylistOffers(b, p, r, cardIDs) {
+		for _, offer := range customBuylistOffers(b, p, readCustomBuylistRules(r), cardIDs) {
 			s.custom[offer.cardID] = append(s.custom[offer.cardID], offer.condition)
 		}
 	}

@@ -2430,53 +2430,28 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 		}
 
 		// Build the custom buylist if requested
-		customBuylist, _ := strconv.ParseBool(r.FormValue("custombuylist"))
-		customFallback := r.FormValue("customfallback")
-		customSealedFallback := r.FormValue("customsealedfallback")
-		if !r.Form.Has("custombuylist") {
-			customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
-			customBuylist = slices.Contains(customOpts, "enabled")
-			customFallback = readCookie(r, "UploadCustomSinglesFallback")
-			customSealedFallback = readCookie(r, "UploadCustomSealedFallback")
-		}
-		// A rate that is not a positive number means no custom buylist, as
-		// on search and arbit
-		rate := customBuylistSetting(getUploadSetting(r, "customrate", "UploadCustomRate"))
-		if st.canUploadCustom && customBuylist && rate != 0 {
-			custom := customBuylistRule{
-				rate:           rate,
-				minPrice:       customBuylistSetting(getUploadSetting(r, "customminprice", "UploadCustomMinPrice")),
-				seller:         getUploadSetting(r, "customseller", "UploadCustomBuyer"),
-				sealedSeller:   getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer"),
-				fallback:       customFallback,
-				sealedFallback: customSealedFallback,
-			}
-			rule := EntryRule{SkipSets: customBuylistSkipSets, ReleasedBy: time.Now().Add(-customBuylistMinAge)}
-			rule.MinPrice = custom.minPrice
-			rule.Rate = custom.rate
+		rules := uploadCustomBuylistRules(r)
+		if st.canUploadCustom && len(rules) > 0 {
+			refs := customBuylistRefs(p, rules)
 			customTips = map[string]string{}
 
-			if custom.seller != "" {
-				ref, _ := p.sellerInventory(custom.seller)
-				fallback := customBuylistFallback(p, custom.fallback)
-				isIndex := slices.Contains(UploadIndexComparePriceList, custom.seller)
+			if slices.ContainsFunc(rules, func(rule customBuylistRule) bool { return rule.seller != "" }) {
 				for _, cardID := range ids.cardIDs {
-					entries := customBuylistReference(ref[cardID], fallback[cardID], isIndex)
+					entries, rule := uploadCustomBuylistEntries(refs, cardID, false)
 					processEntry(b, p, results, entries, "", cardID, customStore, false, ids.shouldCheckForConditions, false, rule)
 				}
 				enabledStores = append(enabledStores, customStore)
-				customTips[customStore] = custom.tip(p, false)
+				customTips[customStore] = customBuylistTips(p, rules, false)
 			}
 
-			if custom.sealedSeller != "" && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-				ref, _ := p.sellerInventory(custom.sealedSeller)
-				fallback := customBuylistSealedFallback(p, custom.sealedFallback)
+			hasSealed := slices.ContainsFunc(rules, func(rule customBuylistRule) bool { return rule.sealedSeller != "" })
+			if hasSealed && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
 				for _, productID := range ids.sealedProductIDs {
-					entries := customBuylistReference(ref[productID], fallback[productID], true)
+					entries, rule := uploadCustomBuylistEntries(refs, productID, true)
 					processEntry(b, p, results, entries, "", productID, customSealedStore, false, false, false, rule)
 				}
 				enabledSealedStores = append(enabledSealedStores, customSealedStore)
-				customTips[customSealedStore] = custom.tip(p, true)
+				customTips[customSealedStore] = customBuylistTips(p, rules, true)
 			}
 		}
 
@@ -2513,6 +2488,56 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 		enabledSealedStores: enabledSealedStores,
 		customTips:          customTips,
 	}
+}
+
+// uploadCustomBuylistRules reads the custom buylist rules the upload asks
+// for: the form's for a re-post, which says whether it has one, the
+// cookies otherwise. A rate that is not a positive number drops its rule,
+// as on search and arbit.
+func uploadCustomBuylistRules(r *http.Request) []customBuylistRule {
+	customBuylist, _ := strconv.ParseBool(r.FormValue("custombuylist"))
+	fallback := r.FormValue("customfallback")
+	sealedFallback := r.FormValue("customsealedfallback")
+	extra := r.FormValue("customrules")
+	if !r.Form.Has("custombuylist") {
+		customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
+		customBuylist = slices.Contains(customOpts, "enabled")
+		fallback = readCookie(r, "UploadCustomSinglesFallback")
+		sealedFallback = readCookie(r, "UploadCustomSealedFallback")
+		extra = readCookie(r, "UploadCustomRules")
+	}
+	if !customBuylist {
+		return nil
+	}
+	first := [6]string{
+		getUploadSetting(r, "customrate", "UploadCustomRate"),
+		getUploadSetting(r, "customminprice", "UploadCustomMinPrice"),
+		getUploadSetting(r, "customseller", "UploadCustomBuyer"),
+		fallback,
+		getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer"),
+		sealedFallback,
+	}
+	return parseCustomBuylistRules(first, extra)
+}
+
+// uploadCustomBuylistEntries is what the first rule that applies to one
+// card or sealed product prices it off, and that rule as processEntry
+// takes it: one rule a call, since processEntry ANDs the rules it is
+// given and keeps the lowest of the inventory prices it is handed again.
+func uploadCustomBuylistEntries(refs []customBuylistRef, cardID string, sealed bool) ([]mtgban.InventoryEntry, EntryRule) {
+	rule := EntryRule{SkipSets: customBuylistSkipSets, ReleasedBy: time.Now().Add(-customBuylistMinAge)}
+	for _, ref := range refs {
+		entries := ref.reference(cardID, sealed)
+		// The rule applies to the first priced listing, as processEntry reads it
+		first := slices.IndexFunc(entries, func(e mtgban.InventoryEntry) bool { return !unpriced(e.Price) })
+		if first < 0 || entries[first].Price < ref.rule.minPrice {
+			continue
+		}
+		rule.MinPrice = ref.rule.minPrice
+		rule.Rate = ref.rule.rate
+		return entries, rule
+	}
+	return nil, rule
 }
 
 // writePricesCSV answers with the upload's prices as a CSV, adding to them in

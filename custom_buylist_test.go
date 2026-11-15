@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -124,7 +125,11 @@ func TestCustomBuylistRefusesABadRate(t *testing.T) {
 			r.AddCookie(&http.Cookie{Name: "UploadCustomOpts", Value: "enabled"})
 			r.AddCookie(&http.Cookie{Name: "UploadCustomRate", Value: rate})
 			r.AddCookie(&http.Cookie{Name: "UploadCustomMinPrice", Value: minPrice})
-			return readCustomBuylistRule(r)
+			rules := readCustomBuylistRules(r)
+			if len(rules) == 0 {
+				return customBuylistRule{}
+			}
+			return rules[0]
 		}
 		rate := read(tt.value, "").rate
 		if rate != tt.want {
@@ -337,7 +342,7 @@ func TestCustomBuylistFallbackFollowsTheSetting(t *testing.T) {
 			source := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
 				cardID: {{Conditions: "NM", Price: 10, Quantity: 1}},
 			}, mtgban.ScraperInfo{Shorthand: "SRC"})
-			vendor := newCustomBuylistVendor(backend(), currentPrices(), readCustomBuylistRule(r), source)
+			vendor := newCustomBuylistVendor(backend(), currentPrices(), readCustomBuylistRules(r), source)
 			got = 0
 			for _, entry := range vendor.Buylist()[cardID] {
 				if entry.Conditions == "SP" {
@@ -391,7 +396,7 @@ func TestCustomBuylistSealedFallback(t *testing.T) {
 			}
 
 			prices := map[string]float64{}
-			for _, offer := range customBuylistOffers(backend(), currentPrices(), r, []string{listed, missing}) {
+			for _, offer := range customBuylistOffers(backend(), currentPrices(), readCustomBuylistRules(r), []string{listed, missing}) {
 				prices[offer.cardID] = offer.price
 			}
 			if prices[listed] != 5 || prices[missing] != tt.wantMissing {
@@ -402,7 +407,7 @@ func TestCustomBuylistSealedFallback(t *testing.T) {
 				listed:  {{Conditions: "NM", Price: 10, Quantity: 1}},
 				missing: {{Conditions: "NM", Price: 10, Quantity: 1}},
 			}, mtgban.ScraperInfo{Shorthand: "SRC", SealedMode: true})
-			buylist := newCustomBuylistVendor(backend(), currentPrices(), readCustomBuylistRule(r), source).Buylist()
+			buylist := newCustomBuylistVendor(backend(), currentPrices(), readCustomBuylistRules(r), source).Buylist()
 			var got float64
 			if len(buylist[missing]) > 0 {
 				got = buylist[missing][0].BuyPrice
@@ -521,5 +526,124 @@ func TestSearchSpellsTheCustomBuylistRule(t *testing.T) {
 				t.Errorf("no %q on the %d byte page", tt.want, len(page))
 			}
 		})
+	}
+}
+
+// The rules after the first come from one cookie, rate:min:seller:fallback:
+// sealed:sealedfallback items joined by commas: an item that is not six
+// fields or has no valid rate is dropped alone, and the chain stops at five.
+func TestParseCustomBuylistRules(t *testing.T) {
+	first := [6]string{"0.8", "7", "CK", "TCGLow", "TCGSealed", ""}
+	one := customBuylistRule{rate: 0.8, minPrice: 7, seller: "CK", fallback: "TCGLow", sealedSeller: "TCGSealed"}
+	two := customBuylistRule{rate: 0.6, minPrice: 2, seller: "TCGLow", sealedSeller: "TCGSealed"}
+	for _, tt := range []struct {
+		name  string
+		first [6]string
+		extra string
+		want  []customBuylistRule
+	}{
+		{"the first rule alone", first, "", []customBuylistRule{one}},
+		{"a second rule", first, "0.6:2:TCGLow::TCGSealed:", []customBuylistRule{one, two}},
+		{"a bad first rate keeps the rest", [6]string{"NaN"}, "0.6:2:TCGLow::TCGSealed:", []customBuylistRule{two}},
+		{"a bad rate drops its item", first, "half:2:TCGLow::TCGSealed:,0.6:2:TCGLow::TCGSealed:", []customBuylistRule{one, two}},
+		{"a short item is dropped", first, "0.6:2:TCGLow,0.6:2:TCGLow::TCGSealed:", []customBuylistRule{one, two}},
+		{"a long item is dropped", first, "0.6:2:TCGLow::TCGSealed::x", []customBuylistRule{one}},
+		{"five at most", first, strings.Repeat("0.6:2:TCGLow::TCGSealed:,", 6), []customBuylistRule{one, two, two, two, two}},
+		{"none", [6]string{}, "", nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseCustomBuylistRules(tt.first, tt.extra)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("got %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+// plainCards returns n nonfoil singles the custom buylist prices.
+func plainCards(t *testing.T, n int) []string {
+	t.Helper()
+	var ids []string
+	for _, id := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(id)
+		if err == nil && !co.Sealed && !co.Foil && !co.Etched && !customBuylistSkips(backend(), co, time.Now().Add(-customBuylistMinAge)) {
+			ids = append(ids, id)
+			if len(ids) == n {
+				return ids
+			}
+		}
+	}
+	t.Skip("no datastore")
+	return nil
+}
+
+// Each card is priced by the first rule that applies to it, by each page's
+// own reading of applies: a card a rule leaves unpriced, or prices under its
+// minimum, falls through to the next rule. Arbit, which buys from NM only,
+// falls through on a reference with no NM copy where search takes it.
+func TestCustomBuylistChain(t *testing.T) {
+	ids := plainCards(t, 4)
+	high, low, cheap, spOnly := ids[0], ids[1], ids[2], ids[3]
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			high:   {{Conditions: "NM", Price: 30, Quantity: 1}},
+			low:    {{Conditions: "NM", Price: 10, Quantity: 1}},
+			spOnly: {{Conditions: "SP", Price: 60, Quantity: 1}},
+		}, mtgban.ScraperInfo{Shorthand: "REF"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			high:   {{Conditions: "NM", Price: 25, Quantity: 1}},
+			low:    {{Conditions: "NM", Price: 8, Quantity: 1}},
+			cheap:  {{Conditions: "NM", Price: 3, Quantity: 1}},
+			spOnly: {{Conditions: "NM", Price: 40, Quantity: 1}},
+		}, mtgban.ScraperInfo{Shorthand: "TCGLow", Name: "TCG Low", MetadataOnly: true}),
+	}, []mtgban.Vendor{})
+
+	r := httptest.NewRequest(http.MethodGet, "/search", nil)
+	for name, value := range map[string]string{
+		"UploadCustomOpts": "enabled", "UploadCustomRate": "0.8", "UploadCustomMinPrice": "20",
+		"UploadCustomBuyer": "REF", "UploadCustomRules": "0.5:5:TCGLow:::",
+	} {
+		r.AddCookie(&http.Cookie{Name: name, Value: value})
+	}
+
+	found := map[string]map[mtgban.Condition][]SearchEntry{}
+	searchCustomBuylist(backend(), currentPrices(), r, ids, found)
+	for _, tt := range []struct {
+		id        string
+		condition mtgban.Condition
+		price     float64
+		tip       string
+	}{
+		{high, "NM", 24, "80% of REF if ≥ $20.00"},
+		{low, "INDEX", 4, "50% of TCG Low if ≥ $5.00"},
+		{spOnly, "SP", 48, "80% of REF if ≥ $20.00"},
+	} {
+		entries := found[tt.id][tt.condition]
+		if len(found[tt.id]) != 1 || len(entries) != 1 || entries[0].Price != tt.price || entries[0].RuleTip != tt.tip {
+			t.Errorf("search pays %+v on %s, want %v at %s by %q", found[tt.id], tt.id, tt.price, tt.condition, tt.tip)
+		}
+	}
+	if found[cheap] != nil {
+		t.Errorf("search pays %+v on %s, under every rule's minimum", found[cheap], cheap)
+	}
+
+	source := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		high: {{Conditions: "NM", Price: 1, Quantity: 1}}, low: {{Conditions: "NM", Price: 1, Quantity: 1}},
+		cheap: {{Conditions: "NM", Price: 1, Quantity: 1}}, spOnly: {{Conditions: "NM", Price: 1, Quantity: 1}},
+	}, mtgban.ScraperInfo{Shorthand: "SRC"})
+	buylist := newCustomBuylistVendor(backend(), currentPrices(), readCustomBuylistRules(r), source).Buylist()
+	got := map[string]float64{}
+	for id, entries := range buylist {
+		if len(entries) != 1 || entries[0].Conditions != "NM" {
+			t.Errorf("arbit pays %+v on %s, want one NM price", entries, id)
+		}
+		got[id] = entries[0].BuyPrice
+	}
+	if want := map[string]float64{high: 24, low: 4, spOnly: 20}; !maps.Equal(got, want) {
+		t.Errorf("arbit pays %v, want %v", got, want)
+	}
+
+	if tip := customBuylistTips(currentPrices(), readCustomBuylistRules(r), false); tip != "80% of REF if ≥ $20.00\n50% of TCG Low if ≥ $5.00" {
+		t.Errorf("the chain's tip is %q", tip)
 	}
 }
