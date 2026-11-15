@@ -469,6 +469,57 @@
     .guide-section {
         padding: 1em;
     }
+    /* Nothing scrolls sideways on a phone: long queries, table cells
+       and code blocks wrap, and an example's description gets its own line. */
+    .guide-example {
+        flex-wrap: wrap;
+        row-gap: 2px;
+    }
+    .guide-example-query {
+        flex: 1;
+        min-width: 0;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    .guide-example-desc {
+        order: 1;
+        flex-basis: 100%;
+    }
+    .guide-table thead {
+        display: none;
+    }
+    .guide-table,
+    .guide-table tbody,
+    .guide-table tr,
+    .guide-table td {
+        display: block;
+    }
+    .guide-table tr {
+        padding: 7px 12px;
+        border-bottom: 1px solid var(--border-subtle, rgba(0,0,0,0.04));
+    }
+    .guide-table tr:last-child {
+        border-bottom: none;
+    }
+    .guide-table td {
+        padding: 0;
+        border-bottom: none;
+        overflow-wrap: break-word;
+    }
+    .guide-table td + td {
+        margin-top: 3px;
+    }
+    .guide-table td[data-label]::before {
+        content: attr(data-label) ": ";
+        color: var(--greytext, #888);
+    }
+    .guide-section-desc pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+    .guide-section-desc code {
+        overflow-wrap: anywhere;
+    }
 }
 
 /* Code blocks in API sections. */

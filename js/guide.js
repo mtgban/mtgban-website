@@ -576,8 +576,8 @@
             if (s.index) roles.push('index');
             if (s.sealed) roles.push('sealed');
             html += '<tr><td>' + escapeHtml(s.name) + '</td>' +
-                '<td><code>' + escapeHtml(s.code) + '</code></td>' +
-                '<td>' + escapeHtml(roles.join(', ')) + '</td></tr>';
+                '<td data-label="Shorthand"><code>' + escapeHtml(s.code) + '</code></td>' +
+                '<td data-label="Available for">' + escapeHtml(roles.join(', ')) + '</td></tr>';
         }
         html += '</tbody></table>';
         return html;
