@@ -36,6 +36,7 @@ var SHELL_URLS = [
     '/js/cookies.js?hash=' + BUILD,
     '/js/editions-picker.js?hash=' + BUILD,
     '/js/store-factors.js?hash=' + BUILD,
+    '/js/custom-rules.js?hash=' + BUILD,
     '/js/settings-shell.js?hash=' + BUILD,
     '/js/settings-changes.js?hash=' + BUILD,
     '/js/settings.js?hash=' + BUILD,

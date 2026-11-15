@@ -55,7 +55,7 @@
     // ─── DOM glue ──────────────────────────────────────────────
     var TEXT_SELECTOR = 'h3, .section-desc, label, .settings-pill, option, .settings-field-row > span, h4, h5';
     // Elements whose text nodes get a <mark>; <option> text cannot hold one
-    var MARK_SELECTOR = 'h3, .section-desc, .settings-pill, .settings-toggle > span:last-child, .settings-field-row > span, .settings-grid label, h4, h5';
+    var MARK_SELECTOR = 'h3, .section-desc, .settings-pill, .settings-toggle > span:last-child, .settings-field-row > span, .settings-grid label, .custom-rules-head > span, .custom-rule-field > span, h4, h5';
 
     function indexSections(root) {
         var entries = [];

@@ -57,6 +57,7 @@ var settings = []Setting{
 	{Name: "UploadCustomSealedFallback", Storage: "cookie", Path: "root", Kind: "blob", Class: "preference", Area: "upload"},
 	{Name: "UploadCustomMinPrice", Storage: "cookie", Path: "root", Kind: "number", Default: "7", Class: "preference", Area: "upload"},
 	{Name: "UploadCustomRate", Storage: "cookie", Path: "root", Kind: "number", Default: "0.8", Class: "preference", Area: "upload"},
+	{Name: "UploadCustomRules", Storage: "cookie", Path: "root", Kind: "blob", Class: "preference", Area: "upload"},
 	{Name: "UploadCustomPercMax", Storage: "cookie", Path: "root", Kind: "number", Default: "100", Class: "preference", Area: "upload", Fact: "upload.value_set", FactValue: "custompercmax"},
 	{Name: "ArbitFilters", Storage: "both", Mirror: "mtgban_arbit_filters", Path: "root", Kind: "query", Class: "preference", Area: "arbit"},
 	{Name: "GlobalFilters", Storage: "both", Mirror: "mtgban_arbit_filters", Path: "root", Kind: "query", Class: "preference", Area: "arbit"},

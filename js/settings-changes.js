@@ -45,7 +45,7 @@
         'SearchSellersList', 'SearchVendorsList', 'SearchSellersPriority', 'SearchVendorsPriority', 'SearchStoreFactors',
         'UploadAltPrice', 'UploadCustomBuyer', 'UploadCustomSealedBuyer', 'UploadCustomSinglesFallback', 'UploadCustomSealedFallback',
         'UploadPercSpread', 'UploadPercSpreadMax', 'UploadMinVal', 'UploadMaxVal', 'UploadMargin', 'UploadCustomPercMax',
-        'UploadMultiplier', 'UploadMaxQty', 'UploadCustomMinPrice', 'UploadCustomRate', 'UploadTiebreakOrder',
+        'UploadMultiplier', 'UploadMaxQty', 'UploadCustomMinPrice', 'UploadCustomRate', 'UploadCustomRules', 'UploadTiebreakOrder',
         'SleepersSellersList', 'SleepersVendorsList', 'SleepersEditionList', 'NewspaperList',
         'ArbitVendorsList', 'GlobalVendorsList', 'ReverseVendorsList'
     ];

@@ -15,8 +15,9 @@
         ['customseller', 'UploadCustomBuyer', 'TCGLow'], ['customsealedseller', 'UploadCustomSealedBuyer', 'TCGSealed'],
         ['customminprice', 'UploadCustomMinPrice', '7'], ['customrate', 'UploadCustomRate', '0.8'],
     ];
-    // A fallback is in a preset only when one is set, None being no key.
-    var FALLBACKS = [['customfallback', 'UploadCustomSinglesFallback'], ['customsealedfallback', 'UploadCustomSealedFallback']];
+    // A fallback, or the rules after the first, is in a preset only when
+    // set, None being no key.
+    var FALLBACKS = [['customfallback', 'UploadCustomSinglesFallback'], ['customsealedfallback', 'UploadCustomSealedFallback'], ['customrules', 'UploadCustomRules']];
     var NUMERIC = ['percspread', 'percspreadmax', 'minval', 'maxval', 'margin', 'custompercmax', 'multiplier', 'maxqty', 'customminprice', 'customrate'];
     var STORE_LISTS = ['stores', 'sealed_stores', 'index_stores', 'sealed_index_stores'];
     var OPTION_DEFAULTS = {};

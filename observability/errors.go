@@ -19,7 +19,7 @@ var scripts = []string{
 	"admin-metrics.js", "admin-people.js", "alerts.js", "api-plans.js", "arbit-filters.js", "arbit-presets.js",
 	"arbit-rows.js", "autocomplete.js", "backpack.js", "ban-to-cart.js", "card-art-fallback.js", "card-row.js",
 	"cart-prompt.js", "chart-range.js", "chartopts.js", "command-palette.js", "confirm-dialog.js", "cookies.js",
-	"copy2clip.js", "edition-combobox.js", "editions-picker.js", "favorites-shared.js", "favorites.js",
+	"copy2clip.js", "custom-rules.js", "edition-combobox.js", "editions-picker.js", "favorites-shared.js", "favorites.js",
 	"fetchnames.js", "fflate.min.js", "filtering.js", "followmouse.js", "guide-data.js", "guide.js", "icons.js",
 	"list-storage.js", "load-lists.js", "metrics.js", "mobile-chart.js", "navbar.js", "news-filters.js",
 	"nightmode.js", "offline-age.js", "offline-banner.js", "offline-db.js", "offline-format.js",

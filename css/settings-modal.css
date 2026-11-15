@@ -638,8 +638,7 @@ body.settings-open {
     justify-content: start;
 }
 .settings-field-row > span,
-.settings-field-row > label,
-.settings-field-beside > span {
+.settings-field-row > label {
     font-size: var(--text-md);
     color: var(--normal);
     opacity: 0.78;
@@ -648,27 +647,73 @@ body.settings-open {
     width: 14em;
     min-width: 0;
 }
-/* A second field on the row, beside the first */
-.settings-field-row:has(> .settings-field-beside) {
-    grid-template-columns: 12em auto auto;
-}
-.settings-field-beside {
-    display: flex;
+/* Custom buylist rules: one row a rule under one row of column names */
+.custom-rules {
+    display: grid;
+    grid-template-columns: 4.5em 6em repeat(4, minmax(0, 11em)) 1.75em;
+    gap: 0.5em;
     align-items: center;
-    gap: 0.75em;
-    cursor: pointer;
+    justify-content: start;
 }
-.settings-field-beside > select {
-    width: 10em;
+.custom-rules-head,
+.custom-rule,
+.custom-rule-field {
+    display: contents;
+}
+.custom-rules-head > span,
+.custom-rule-field > span {
+    font-size: var(--text-sm);
+    color: var(--normal);
+    opacity: 0.78;
+}
+/* The column names say it once on a wide screen */
+.custom-rule-field > span {
+    display: none;
+}
+.custom-rule .settings-inline-num {
+    width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+}
+.custom-rule select {
+    width: 100%;
     min-width: 0;
 }
-/* No room beside on a phone: the second field takes a row of its own */
+.custom-rule-field:first-child > .settings-inline-num {
+    grid-column: 1;
+}
+.custom-rule [aria-invalid="true"] {
+    border-color: var(--adanger);
+}
+.custom-rules-add {
+    grid-column: 1 / span 2;
+    justify-self: start;
+}
+/* No room for a row on a phone: each rule takes three, rate and minimum,
+   then the singles reference and fallback, then the sealed ones, each
+   field under its own name */
 @media (max-width: 720px) {
-    .settings-field-row:has(> .settings-field-beside) {
-        grid-template-columns: 12em auto;
-        row-gap: 0.6em;
+    .custom-rules {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) 1.75em;
     }
-    .settings-field-beside { display: contents; }
+    .custom-rules-head { display: none; }
+    .custom-rule {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-template-columns: subgrid;
+        row-gap: 0.4em;
+        padding-bottom: 0.75em;
+    }
+    .custom-rule-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15em;
+        min-width: 0;
+    }
+    .custom-rule-field > span { display: block; }
+    .custom-rule-field:nth-child(odd) { grid-column: 1; }
+    .custom-rule-field:nth-child(even) { grid-column: 2; }
+    .custom-rule-remove { grid-row: 1; grid-column: 3; align-self: end; }
 }
 .settings-field-row > .settings-inline-num {
     margin: 0;

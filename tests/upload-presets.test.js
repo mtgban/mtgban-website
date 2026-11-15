@@ -672,3 +672,21 @@ test('a tombstone outlives other writes for 30 days, then goes', () => {
         Date.now = realNow;
     }
 });
+
+test('the custom buylist rules after the first travel with a preset only when set', () => {
+    const rules = '0.6:2:TCGLow::TCGSealed:';
+    const on = { UploadCustomOpts: 'enabled,', UploadCustomRules: rules };
+    const { P } = loadPresets();
+    expect(P.fromState({ mode: 'true', tab: 'singles' }, n => on[n] ?? null).customrules).toBe(rules);
+    const none = P.fromState({ mode: 'true', tab: 'singles' }, n => ({ UploadCustomOpts: 'enabled,' })[n] ?? null);
+    expect(none.customrules).toBeUndefined();
+
+    const doc = fakeDoc({ mode: 'true', tab: 'singles' });
+    const win = { reloadSelect() {}, selectTab() {} };
+    const applied = loadPresets({ win });
+    applied.P.apply({ id: 'p', name: 'n', opts: applied.P.canonical({ mode: 'true', tab: 'singles', custombuylist: 'true', customrules: rules, stores: [] }) }, doc);
+    expect(applied.cookies.UploadCustomRules).toBe(rules);
+    // A preset saved with one rule leaves one rule
+    applied.P.apply({ id: 'q', name: 'n', opts: applied.P.canonical({ mode: 'true', tab: 'singles', custombuylist: 'true', stores: [] }) }, doc);
+    expect(applied.cookies.UploadCustomRules).toBe('');
+});

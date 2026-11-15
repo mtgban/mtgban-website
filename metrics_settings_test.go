@@ -235,7 +235,8 @@ func TestSettingsChangesTablesAreTheRegistry(t *testing.T) {
 
 	// Every cookie a save writes is in a table, and every table entry is one a save writes.
 	plain, packed := boundSettings(t)
-	plain = append(plain, "SearchStoreFactors")
+	// Saved by the editors settings.js wires but does not list
+	plain = append(plain, "SearchStoreFactors", "UploadCustomRules")
 	for _, name := range plain {
 		if enums[name] == nil && !slices.Contains(others, name) {
 			t.Errorf("%s is saved but in no closed table, so its change is never counted", name)
