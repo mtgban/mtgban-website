@@ -1220,15 +1220,18 @@
             }
             render();
             // The list was rebuilt; keep the keyboard on this entry's grade.
-            focusCond(adding ? key(e) : key({ id: e.id, cond: v, pack: e.pack }));
+            focusCtl(adding ? key(e) : key({ id: e.id, cond: v, pack: e.pack }), ".backpack-cond");
         });
         return sel;
     }
 
-    function focusCond(k) {
-        Array.prototype.forEach.call(listEl.children, function (r) {
-            var sel = r.getAttribute("data-key") === k && r.querySelector(".backpack-cond");
+    // focusCtl puts focus back on control cls of the row k names, and says
+    // whether that row is still there.
+    function focusCtl(k, cls) {
+        return Array.prototype.some.call(listEl.children, function (r) {
+            var sel = r.getAttribute("data-key") === k && r.querySelector(cls);
             if (sel) sel.focus();
+            return !!sel;
         });
     }
 
@@ -1283,8 +1286,16 @@
         minus.setAttribute("aria-label", (e.qty || 1) > 1 ? "One fewer" : "Remove");
         minus.addEventListener("click", function () {
             if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.card", (e.qty || 1) > 1 ? "qty_down" : "remove");
+            var focused = document.activeElement === minus;
+            var at = Array.prototype.indexOf.call(listEl.children, r);
             setQty(key(e), (e.qty || 1) - 1);
             render();
+            if (!focused || focusCtl(key(e), ".backpack-minus")) return;
+            // The last copy went with its row: the row now in its place, or
+            // the one above, or the close button once the list is empty.
+            var next = listEl.children[at] || listEl.children[at - 1];
+            var to = next ? next.querySelector(".backpack-minus") : document.getElementById("backpack-close");
+            if (to) to.focus();
         });
         var qty = text("span", "backpack-qty", String(e.qty || 1));
         var plus = text("button", "backpack-plus", "+");
@@ -1292,8 +1303,10 @@
         plus.setAttribute("aria-label", "One more");
         plus.addEventListener("click", function () {
             if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.card", "qty_up");
+            var focused = document.activeElement === plus;
             setQty(key(e), (e.qty || 1) + 1);
             render();
+            if (focused) focusCtl(key(e), ".backpack-plus");
         });
         ctl.append(condSelect(e, held, others), minus, qty, plus);
 
@@ -1500,6 +1513,9 @@
         if (!panel) return;
         var s = sortPref();
         var entries = viewOrder(ordered(), s);
+        // Removing a focused row lays the list out empty, which scrolls it
+        // to the top; the rebuilt list goes back where it was.
+        var top = listEl.scrollTop;
         while (listEl.children.length) listEl.children[0].remove();
         var grades = {};
         entries.forEach(function (e) { (grades[e.id] = grades[e.id] || []).push(e.cond); });
@@ -1509,6 +1525,7 @@
         entries.forEach(function (e) {
             listEl.appendChild(row(e, grades[e.id].filter(function (c) { return c !== e.cond; }), others, p && priceLine(e, s.by, p)));
         });
+        listEl.scrollTop = top;
         renderTabs();
         renderSortBar(s, entries.length);
         if (entries.length > 1) loadPrices();
