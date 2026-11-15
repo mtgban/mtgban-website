@@ -968,7 +968,7 @@
     // ---- the panel ----
 
     var panel = null, overlay = null, stripEl = null, listEl = null, countEl = null, emptyEl = null;
-    var sendBtn = null, emptySwitch = null, undoBtn = null, searchBtn = null;
+    var sendBtn = null, emptySwitch = null, undoBtn = null, clearBtn = null, searchBtn = null;
     var sortBar = null, sortSel = null, sortDirBtn = null, sortNote = null;
     // draggedTab is the backpack whose tab is being dragged along the strip.
     var draggedTab = 0;
@@ -1065,7 +1065,7 @@
                 render();
             }
         });
-        var clearBtn = text("button", "backpack-btn backpack-btn-plain backpack-btn-icon");
+        clearBtn = text("button", "backpack-btn backpack-btn-plain backpack-btn-icon");
         clearBtn.setAttribute("id", "backpack-clear");
         clearBtn.setAttribute("aria-label", "Empty the backpack");
         clearBtn.setAttribute("title", "Empty the backpack");
@@ -1518,6 +1518,7 @@
         sendBtn.disabled = entries.length === 0 || !canUpload();
         if (canUpload()) sendBtn.setAttribute("title", lastMode() === "buylist" ? "Buylist, as last picked on Upload" : "Retail, as last picked on Upload");
         undoBtn.disabled = undoSteps().length === 0;
+        clearBtn.disabled = entries.length === 0;
         searchBtn.disabled = entries.length === 0;
     }
 
