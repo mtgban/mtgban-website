@@ -2517,7 +2517,7 @@ func uploadCustomBuylistRules(r *http.Request) []customBuylistRule {
 		getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer"),
 		sealedFallback,
 	}
-	return parseCustomBuylistRules(first, extra)
+	return parseCustomBuylistRules(first, extra, customBuylistRulesMax(verifiedSignature(r)))
 }
 
 // uploadCustomBuylistEntries is what the first rule that applies to one

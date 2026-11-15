@@ -6,8 +6,8 @@
     'use strict';
 
     var COOKIE = 'UploadCustomRules';
-    // The first rule included, as maxCustomBuylistRules in search.go
-    var MAX = 5;
+    // The most a tier can set, as maxCustomBuylistRules in search.go
+    var MAX = 10;
     var FIELDS = ['rate', 'min', 'seller', 'fallback', 'sealed', 'sealedfallback'];
 
     function validRate(v) {
@@ -15,14 +15,22 @@
         return v !== '' && isFinite(n) && n > 0;
     }
 
-    // parse reads the cookie into rules of six strings, dropping what the
-    // server drops: an item that is not six fields or has no valid rate.
-    function parse(raw) {
+    // limit is how many rules the reader's tier allows, the first included:
+    // the container's data-max, which the server fills from UploadCustomMax.
+    function limit(container) {
+        var n = parseInt(container.getAttribute('data-max'), 10);
+        return n >= 1 ? Math.min(n, MAX) : 1;
+    }
+
+    // parse reads the cookie into rules of six strings, as many as follow
+    // the first within max, dropping what the server drops: an item that is
+    // not six fields or has no valid rate.
+    function parse(raw, max) {
         var out = [];
         String(raw || '').split(',').forEach(function (item) {
             var parts = item.split(':');
             if (parts.length !== FIELDS.length || !validRate(parts[0])) return;
-            if (out.length < MAX - 1) out.push(parts);
+            if (out.length < max - 1) out.push(parts);
         });
         return out;
     }
@@ -45,7 +53,7 @@
 
     function syncAdd(container) {
         var add = container.querySelector('.custom-rules-add');
-        if (add) add.hidden = container.querySelectorAll('.custom-rule').length >= MAX;
+        if (add) add.hidden = container.querySelectorAll('.custom-rule').length >= limit(container);
     }
 
     function markRate(row) {
@@ -107,14 +115,14 @@
             add.dataset.wired = '1';
             add.addEventListener('click', function () {
                 var rows = container.querySelectorAll('.custom-rule');
-                if (rows.length >= MAX) return;
+                if (rows.length >= limit(container)) return;
                 container.insertBefore(rowFrom(container, values(rows[rows.length - 1])), add);
                 syncAdd(container);
                 changed(container);
             });
         }
         return {
-            load: function () { render(container, parse(getCookie(COOKIE))); },
+            load: function () { render(container, parse(getCookie(COOKIE), limit(container))); },
             save: function () { setCookie(COOKIE, format(collect(container)), 1000); },
             serialize: function () { return COOKIE + '=' + format(collect(container)); },
         };
