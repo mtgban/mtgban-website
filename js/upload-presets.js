@@ -233,7 +233,9 @@
     }
     function current(doc) { return fromState(readState(doc), getCookie, readCtx(doc)); }
 
-    // persistStores writes the store cookies the upload handler reads (#213).
+    // persistStores writes the store cookies the upload handler reads (#213),
+    // a lone bar for a grid with nothing ticked, since an empty cookie means
+    // the defaults; a grid that offers no store keeps them.
     // only, when given, limits the write to those STORE_LISTS keys.
     function persistStores(doc, only) {
         var ctx = readCtx(doc);
@@ -248,7 +250,7 @@
         var keys = only || STORE_LISTS;
         var state = readState(doc), out = {};
         keys.forEach(function (k) {
-            out[names[k]] = state[k].join('|');
+            out[names[k]] = state[k].join('|') || (ctx.offered[k].length ? '|' : '');
             setCookie(names[k], out[names[k]], 3650);
         });
         return out;
