@@ -29,7 +29,7 @@ var scripts = []string{
 	"offline-settings-mobile.js", "offline-sync.js", "offline-util.js", "offline-watch.js", "palette-chips.js",
 	"palette-loader.js", "palette-providers.js", "printings-panel.js", "recent-searches.js", "scope.js",
 	"screener.js", "sealed.js", "search-chart.js", "search-modal.js", "search-quick-icons.js",
-	"search-result-nav.js", "search-sidebar.js", "search-track.js", "search-type-focus.js", "section-fold.js",
+	"search-result-nav.js", "search-sidebar.js", "search-track.js", "search-type-focus.js", "search-velocity.js", "section-fold.js",
 	"settings-changes.js", "settings-loader.js", "settings-shell.js", "settings.js", "store-factors.js",
 	"store-picker.js", "tooltips.js", "upload-exports.js", "upload-form.js", "upload-handoff.js",
 	"upload-optimizer.js", "upload-options.js", "upload-presets.js", "upload-printings.js",

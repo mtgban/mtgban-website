@@ -593,6 +593,7 @@ type SearchVars struct {
 	DefaultTab         string
 	DefaultView        mtgban.Condition
 	MobileSearchLayout string
+	VelocityOpen       bool
 	OfflineModeAllowed bool
 	MaxLookbackDays    int
 	// ChartLoadedDays is how much history the page actually rendered inline:
@@ -1052,6 +1053,7 @@ func fillSearchPrefs(pageVars *SearchVars, r *http.Request) {
 	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
 	pageVars.DefaultView = mtgban.Condition(readCookie(r, "SearchDefaultView"))
 	pageVars.MobileSearchLayout = readCookie(r, "MobileSearchLayout")
+	pageVars.VelocityOpen = readCookie(r, "SearchVelocityOpen") == "open"
 
 	// The Alphabetical button asks for the sort grouped by set where that is
 	// the reader's saved default, and for plain alpha otherwise

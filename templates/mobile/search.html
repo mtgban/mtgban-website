@@ -491,7 +491,7 @@
                 {{$headed := false}}
                 {{if $salesRow}}
                     {{if $.CanVelocity}}
-                    <details class="m-vendor-row sales-velocity">
+                    <details class="m-vendor-row sales-velocity"{{if $.VelocityOpen}} open{{end}}>
                         <summary>
                             <span class="m-vendor-name">TCGplayer sales</span>
                             <span class="m-vendor-right">
@@ -1019,6 +1019,7 @@
 {{define "extra-scripts"}}
 {{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}" defer></script>{{end}}
 <script type="text/javascript" src="/js/search-track.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/search-velocity.js?hash={{.Hash}}" defer></script>
 {{if not .DisableChart}}
 <script type="text/javascript" src="/js/mobile-chart.js?hash={{.Hash}}" defer></script>
 {{end}}
