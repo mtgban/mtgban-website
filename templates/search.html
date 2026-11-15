@@ -672,7 +672,7 @@
                                     <div class="result-col-header">Buyers</div>
                                     {{if $card.Velocity}}
                                         {{if $.CanVelocity}}
-                                            <details class="sales-velocity">
+                                            <details class="sales-velocity"{{if $.VelocityOpen}} open{{end}}>
                                                 <summary class="price-row">
                                                     <span class="store-name dim">TCGplayer sales</span>
                                                     <span class="price"><span class="amt">{{$card.Velocity}}</span></span>
@@ -822,6 +822,7 @@
 {{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}" defer></script>{{end}}
 <script type="text/javascript" src="/js/search-quick-icons.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-track.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/search-velocity.js?hash={{.Hash}}" defer></script>
 
 <!-- Lightbox for the card image, used when the screen is too narrow to show
      the sidebar preview (see .qi-view-image / .card-image-modal). -->

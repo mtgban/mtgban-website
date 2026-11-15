@@ -92,10 +92,10 @@ func TestSettingsCounts(t *testing.T) {
 			byPath[s.Path]++
 		}
 	}
-	if byClass["preference"] != 89 || byClass["transient"] != 17 || byClass["admin"] != 1 {
-		t.Errorf("classes = %v, want 89 preference, 17 transient, 1 admin", byClass)
+	if byClass["preference"] != 90 || byClass["transient"] != 17 || byClass["admin"] != 1 {
+		t.Errorf("classes = %v, want 90 preference, 17 transient, 1 admin", byClass)
 	}
-	want := map[string]int{"root": 58, "upload": 23, "arbit": 1, "reverse": 1, "global": 1, "sleepers": 3, "newspaper": 2}
+	want := map[string]int{"root": 59, "upload": 23, "arbit": 1, "reverse": 1, "global": 1, "sleepers": 3, "newspaper": 2}
 	if !maps.Equal(byPath, want) {
 		t.Errorf("preference entries by path = %v, want %v", byPath, want)
 	}
@@ -256,8 +256,8 @@ func TestSettingsJSONServesPreferencesOnly(t *testing.T) {
 	if err := json.Unmarshal(SettingsJSON(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Settings) != 89 {
-		t.Fatalf("served %d entries, want 89", len(got.Settings))
+	if len(got.Settings) != 90 {
+		t.Fatalf("served %d entries, want 90", len(got.Settings))
 	}
 	raw := string(SettingsJSON())
 	for _, leak := range []string{"uploadTab", "adminFixMode", "mtgban_metrics_snap", "mtgban_metrics_queue", "mtgban_search_layout", "upload.value_set", "\"class\"", "\"area\""} {
