@@ -247,7 +247,28 @@ test('persistStores writes the vendor cookies in buylist mode', () => {
     const { P } = loadPresets();
     const out = P.persistStores(fakeDoc({ mode: 'true' }));
     expect(out.enabledVendors).toBe('SCG');
-    expect(out.enabledSealedVendors).toBe('');
+    expect(out.enabledSealedVendors).toBe('|');
+});
+
+test('persistStores writes a lone bar for a list with nothing ticked, not an unset cookie', () => {
+    const { P, cookies } = loadPresets();
+    const doc = fakeDoc({ mode: 'false' });
+    doc._boxes.singlesBox.forEach(b => { b.checked = false; });
+    doc._boxes.singlesIndexRow.forEach(b => { b.checked = false; });
+    P.persistStores(doc);
+    expect(cookies.enabledSellers).toBe('|');
+    expect(cookies.enabledSealedSellers).toBe('|');
+    expect(cookies.enabledIndexes).toBe('|');
+    expect(cookies.enabledSealedIndexes).toBe('|');
+});
+
+test('persistStores leaves the defaults to a grid that offers no store', () => {
+    const { P, cookies } = loadPresets();
+    const doc = fakeDoc({ mode: 'false' });
+    doc._boxes.sealedBox.length = 0;
+    P.persistStores(doc);
+    expect(cookies.enabledSealedSellers).toBe('');
+    expect(cookies.enabledSealedIndexes).toBe('|');
 });
 
 test('apply writes the settings cookies, sets mode and tab, ticks stores and reports unknown ones', () => {

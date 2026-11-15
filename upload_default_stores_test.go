@@ -128,6 +128,59 @@ func TestUploadWithoutStoresDropsAGoneVendor(t *testing.T) {
 	}
 }
 
+// A lone bar is a list the reader cleared: no store is priced and none is
+// what gets saved back, where an empty cookie would bring the defaults back.
+// A list that comes out empty because every store it named has gone was not
+// cleared, so it saves an empty cookie and the defaults return.
+func TestUploadWithoutStoresKeepsAClearedList(t *testing.T) {
+	_, product := storesOfBothKinds(t, sessionstore.Retail)
+
+	for _, tc := range []struct{ cookie, want string }{
+		{"|", "|"},
+		{"ZZGone", ""},
+	} {
+		form := url.Values{}
+		form.Set("rows", product+"\t1\t\t0\t\n")
+		req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "enabledSealedSellers", Value: tc.cookie})
+		rec := httptest.NewRecorder()
+		testSite.Upload(rec, req)
+
+		if strings.Contains(rec.Body.String(), "Session ZZT") {
+			t.Errorf("cookie %q: the sealed store is priced", tc.cookie)
+		}
+		saved := "unset"
+		for _, cookie := range rec.Result().Cookies() {
+			if cookie.Name == "enabledSealedSellers" && cookie.Path == "/upload" {
+				saved = cookie.Value
+			}
+		}
+		if saved != tc.want {
+			t.Errorf("cookie %q is saved back as %q, want %q", tc.cookie, saved, tc.want)
+		}
+	}
+}
+
+// A list with nothing picked is saved as none only when the reader said none;
+// otherwise it keeps the defaults.
+func TestStoreListCookie(t *testing.T) {
+	for _, tc := range []struct {
+		picked   []string
+		saidNone bool
+		want     string
+	}{
+		{[]string{"CK", "SCG"}, false, "CK|SCG"},
+		{nil, true, "|"},
+		{nil, false, ""},
+	} {
+		got := storeListCookie(tc.picked, tc.saidNone)
+		if got != tc.want {
+			t.Errorf("storeListCookie(%q, %v) = %q, want %q", tc.picked, tc.saidNone, got, tc.want)
+		}
+	}
+}
+
 // The optimizer's + Add store menu offers the stores this mode could price
 // against that were not picked, in the picker's order: sealed ones only for
 // a list with sealed products, and none to a reader who may not change stores.

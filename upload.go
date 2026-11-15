@@ -706,15 +706,17 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.RemoteLinkURL = in.remoteURL
 	}
 
-	// Save user preferred stores in cookies and make sure the page is updated with those
+	// Save user preferred stores in cookies and make sure the page is updated with those.
+	// A list comes out empty either because the reader cleared it, which the
+	// page saved already, or because every store its cookie named has gone.
 	if blMode {
-		setForeverCookie(w, r, "enabledVendors", strings.Join(selected.enabledStores, "|"))
-		setForeverCookie(w, r, "enabledSealedVendors", strings.Join(selected.enabledSealedStores, "|"))
+		setForeverCookie(w, r, "enabledVendors", storeListCookie(selected.enabledStores, readCookie(r, "enabledVendors") == noStores))
+		setForeverCookie(w, r, "enabledSealedVendors", storeListCookie(selected.enabledSealedStores, readCookie(r, "enabledSealedVendors") == noStores))
 		pageVars.EnabledVendors = selected.enabledStores
 		pageVars.EnabledSealedVendors = selected.enabledSealedStores
 	} else {
-		setForeverCookie(w, r, "enabledSellers", strings.Join(selected.enabledStores, "|"))
-		setForeverCookie(w, r, "enabledSealedSellers", strings.Join(selected.enabledSealedStores, "|"))
+		setForeverCookie(w, r, "enabledSellers", storeListCookie(selected.enabledStores, readCookie(r, "enabledSellers") == noStores))
+		setForeverCookie(w, r, "enabledSealedSellers", storeListCookie(selected.enabledSealedStores, readCookie(r, "enabledSealedSellers") == noStores))
 		pageVars.EnabledSellers = selected.enabledStores
 		pageVars.EnabledSealedSellers = selected.enabledSealedStores
 	}
@@ -1970,8 +1972,16 @@ func selectUploadStores(w http.ResponseWriter, r *http.Request, p *prices, blMod
 	if r.Form.Has("index_pref") {
 		enabledIndexes = r.Form["index_stores"]
 		enabledSealedIndexes = r.Form["sealed_index_stores"]
-		setForeverCookie(w, r, "enabledIndexes", strings.Join(enabledIndexes, "|"))
-		setForeverCookie(w, r, "enabledSealedIndexes", strings.Join(enabledSealedIndexes, "|"))
+		// The page lists only the index prices with a store name
+		names := p.storeNames()
+		var offeredIndexes []string
+		for _, key := range UploadIndexKeysPublic {
+			if names[key] != "" {
+				offeredIndexes = append(offeredIndexes, key)
+			}
+		}
+		setForeverCookie(w, r, "enabledIndexes", storeListCookie(enabledIndexes, len(offeredIndexes) > 0))
+		setForeverCookie(w, r, "enabledSealedIndexes", storeListCookie(enabledSealedIndexes, len(sealedIndexes) > 0))
 	} else {
 		if raw := readCookie(r, "enabledIndexes"); raw != "" {
 			enabledIndexes = strings.Split(raw, "|")
@@ -2061,13 +2071,27 @@ func selectUploadStores(w http.ResponseWriter, r *http.Request, p *prices, blMod
 }
 
 // tickedStores reads the stores the named cookie keeps ticked, or fallback
-// when it keeps none or the reader may not change stores.
+// when it was never saved or the reader may not change stores.
 func tickedStores(r *http.Request, cookie string, fallback []string, canChangeStores bool) []string {
 	saved := readCookie(r, cookie)
 	if len(saved) == 0 || !canChangeStores {
 		return fallback
 	}
 	return strings.Split(saved, "|")
+}
+
+// noStores is the store list cookie of a reader who ticked none, since an
+// empty cookie means the defaults.
+const noStores = "|"
+
+// storeListCookie is the value the stores picked are saved as: their names
+// joined with a bar, or noStores when none were picked and the reader said
+// none. Otherwise an empty list saves an empty cookie, and the defaults stay.
+func storeListCookie(picked []string, saidNone bool) string {
+	if len(picked) == 0 && saidNone {
+		return noStores
+	}
+	return strings.Join(picked, "|")
 }
 
 // uploadInput is the list a request carries: the rows a page of results posts
