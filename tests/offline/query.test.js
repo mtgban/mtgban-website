@@ -796,6 +796,8 @@ test('a set code and a number are that printing', () => {
     expect(ps('plst c16-177')).toMatchObject({names: [], set: ['PLST'], number: [{values: ['c16-177'], strict: true}]});
     expect(ps('neo 17a')).toMatchObject({names: [], set: ['NEO'], number: [{values: ['17a'], strict: true}]});
     expect(ps('spm 66 f:foil')).toMatchObject({set: ['SPM'], finish: [['foil']]});
+    expect(ps('66 spm')).toMatchObject({names: [], set: ['SPM'], number: [{values: ['66'], strict: false}]});
+    expect(ps('c16-177 plst')).toMatchObject({names: [], set: ['PLST'], number: [{values: ['c16-177'], strict: true}]});
 });
 
 // A set filter's own list must not take the place of the catalog's sets.
@@ -809,6 +811,8 @@ test('a negated set filter leaves the shortcuts working', () => {
 
 test('words that are not a set and a number stay a name', () => {
     expect(ps('neo 10e')).toMatchObject({names: ['neo', '10e'], set: [], number: []});
+    expect(ps('10e neo')).toMatchObject({names: ['10e', 'neo'], set: [], number: []});
+    expect(ps('30a 10e')).toMatchObject({names: ['30a', '10e'], set: [], number: []});
     expect(ps('neo may').names).toEqual(['neo', 'may']);
     expect(ps('neo 1st').names).toEqual(['neo', '1st']);
     expect(ps('sol ring').set).toEqual([]);
