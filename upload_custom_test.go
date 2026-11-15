@@ -255,3 +255,59 @@ func TestUploadSpellsTheCustomBuylistRule(t *testing.T) {
 		t.Error("another store's column has lost its plain header")
 	}
 }
+
+// On upload each row is priced by the first custom buylist rule that
+// applies, the rules after the first coming from the form's customrules,
+// and the column spells every rule, one a line.
+func TestUploadCustomBuylistChain(t *testing.T) {
+	cards := closeVendors(t)
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[0]: {{Conditions: "NM", Price: 20}},
+			cards[1]: {{Conditions: "NM", Price: 10}},
+		}, sessionInfo("ZZA")),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[0]: {{Conditions: "NM", Price: 40}},
+			cards[1]: {{Conditions: "NM", Price: 8}},
+		}, sessionInfo("ZZB")),
+	}, currentPrices().vendors)
+	withConfigCopy(t)
+	Config().ScraperConfig.NameOverride = map[string]string{customStore: "Custom Buylist"}
+
+	var rows strings.Builder
+	for _, card := range cards[:3] {
+		fmt.Fprintf(&rows, "%s\t1\t\t0\t\n", card)
+	}
+	form := url.Values{
+		"mode":           {"true"},
+		"stores":         {"ZZV"},
+		"rows":           {rows.String()},
+		"custombuylist":  {"true"},
+		"customseller":   {"ZZA"},
+		"customrate":     {"0.5"},
+		"customminprice": {"15"},
+		"customrules":    {"0.25:0:ZZB:::"},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	testSite.Upload(rec, req)
+	page := rec.Body.String()
+
+	for card, want := range map[string]string{cards[0]: "10.00", cards[1]: "2.00", cards[2]: ""} {
+		offer := regexp.MustCompile(`/go/b/CUSTOM/` + regexp.QuoteMeta(card) + `" target="_blank">\$ ([^<]+)</a>`)
+		var got string
+		m := offer.FindStringSubmatch(page)
+		if m != nil {
+			got = m[1]
+		}
+		if got != want {
+			t.Errorf("custom offer for %s is $%s, want $%s", card, got, want)
+		}
+	}
+	const title = ` title="50% of ZZA if ≥ $15.00` + "\n" + `25% of ZZB">Custom Buylist<`
+	if !strings.Contains(page, `<th class="r" data-sort-method="number" data-sort-descending`+title) {
+		i := strings.Index(page, ">Custom Buylist<")
+		t.Errorf("the column does not spell the chain: %q", page[max(0, i-120):max(0, i+20)])
+	}
+}

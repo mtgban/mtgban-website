@@ -373,7 +373,7 @@ func readSearchRun(r *http.Request, b *matcher.Backend, config SearchConfig, pin
 		Chart:      searchChartKind(roster),
 		Misc:       readSearchMiscOpts(r),
 		Factors:    len(readStoreFactors(r)) > 0,
-		Custom:     config.CustomBuylist && !config.SkipBuylist && readCustomBuylistRule(r).rate != 0,
+		Custom:     config.CustomBuylist && !config.SkipBuylist && len(readCustomBuylistRules(r)) > 0,
 		Packs:      packs,
 		PromoTypes: b.AllPromoTypes,
 	}

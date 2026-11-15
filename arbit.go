@@ -425,10 +425,10 @@ func arbit(s *site, w http.ResponseWriter, r *http.Request, reverse bool) {
 	blocklistVendors := arbitBlockedVendors(sig)
 
 	// The reader's custom buylist is one more vendor to sell to
-	var customRule customBuylistRule
+	var customRules []customBuylistRule
 	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
 	if !reverse && (canUploadCustom || (DevMode && !SigCheck)) {
-		customRule = readCustomBuylistRule(r)
+		customRules = readCustomBuylistRules(r)
 	}
 
 	if r.FormValue("page") == "options" {
@@ -451,7 +451,7 @@ func arbit(s *site, w http.ResponseWriter, r *http.Request, reverse bool) {
 
 	s.scraperCompare(w, r, p, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults:      true,
-		CustomBuylist:   customRule,
+		CustomBuylist:   customRules,
 		ExcludedVendors: nonEmpty(filters),
 	})
 
@@ -534,9 +534,9 @@ type scraperCompareOpts struct {
 	AllResults bool // false caps the result list (MaxArbitResults, or MaxResultsGlobalLimit in global mode)
 	AnySpread  bool // lower Global's spread floor to MinSpreadGlobalPro
 
-	// The reader's custom buylist, compared against as a vendor; none at
-	// a zero rate
-	CustomBuylist customBuylistRule
+	// The reader's custom buylist rules, compared against as a vendor;
+	// none without a rule
+	CustomBuylist []customBuylistRule
 
 	// Stores the reader's hidden-stores cookie names, for the count
 	ExcludedVendors int
@@ -606,9 +606,9 @@ func comparableSeller(info mtgban.ScraperInfo) bool {
 	return !info.SealedMode || !info.MetadataOnly
 }
 
-// customBuylistVendor is the reader's custom buylist as a vendor: the
-// reference seller's prices at the rule's rate, for the cards one seller
-// sells, built for one request.
+// customBuylistVendor is the reader's custom buylist as a vendor: each
+// card at the first rule's rate whose reference prices it, for the cards
+// one seller sells, built for one request.
 type customBuylistVendor struct {
 	info    mtgban.ScraperInfo
 	buylist mtgban.BuylistRecord
@@ -618,23 +618,26 @@ func (v *customBuylistVendor) Load(context.Context) error    { return nil }
 func (v *customBuylistVendor) Info() mtgban.ScraperInfo      { return v.info }
 func (v *customBuylistVendor) Buylist() mtgban.BuylistRecord { return v.buylist }
 
-// newCustomBuylistVendor prices the cards seller sells by the rule, against
-// the sealed reference when seller trades sealed, or nil without a reference.
-func newCustomBuylistVendor(b *matcher.Backend, p *prices, rule customBuylistRule, seller mtgban.Seller) *customBuylistVendor {
+// newCustomBuylistVendor prices the cards seller sells by the first rule
+// that pays for each, against the sealed references when seller trades
+// sealed, or nil when no rule's reference is loaded.
+func newCustomBuylistVendor(b *matcher.Backend, p *prices, rules []customBuylistRule, seller mtgban.Seller) *customBuylistVendor {
 	sealed := seller.Info().SealedMode
-	refName, shorthand := rule.seller, customStore
-	fallback := customBuylistFallback(p, rule.fallback)
+	shorthand := customStore
 	if sealed {
-		refName, shorthand = rule.sealedSeller, customSealedStore
-		fallback = customBuylistSealedFallback(p, rule.sealedFallback)
+		shorthand = customSealedStore
 	}
-	ref, err := p.sellerInventory(refName)
-	if err != nil {
+	refs := slices.DeleteFunc(customBuylistRefs(p, rules), func(ref customBuylistRef) bool {
+		refName := ref.rule.seller
+		if sealed {
+			refName = ref.rule.sealedSeller
+		}
+		_, err := p.sellerInventory(refName)
+		return err != nil
+	})
+	if len(refs) == 0 {
 		return nil
 	}
-	// An index files its one price under whatever grade its scraper uses,
-	// so it buys at NM only
-	isIndex := slices.Contains(UploadIndexComparePriceList, refName)
 
 	buylist := mtgban.BuylistRecord{}
 	releasedBy := time.Now().Add(-customBuylistMinAge)
@@ -643,9 +646,18 @@ func newCustomBuylistVendor(b *matcher.Backend, p *prices, rule customBuylistRul
 		if err != nil || customBuylistSkips(b, co, releasedBy) {
 			continue
 		}
-		entries := customBuylistEntries(customBuylistReference(ref[cardID], fallback[cardID], isIndex || sealed), rule, isIndex)
-		if len(entries) > 0 {
-			buylist[cardID] = entries
+		for _, ref := range refs {
+			// An index files its one price under whatever grade its scraper
+			// uses, so it buys at NM only
+			isIndex := ref.isIndex
+			if sealed {
+				isIndex = slices.Contains(UploadIndexComparePriceList, ref.rule.sealedSeller)
+			}
+			entries := customBuylistEntries(ref.reference(cardID, sealed), ref.rule, isIndex)
+			if len(entries) > 0 {
+				buylist[cardID] = entries
+				break
+			}
 		}
 	}
 
@@ -898,7 +910,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 			scrapers = append(scrapers, vendor)
 		}
 
-		if cmp.CustomBuylist.rate > 0 {
+		if len(cmp.CustomBuylist) > 0 {
 			custom := newCustomBuylistVendor(b, p, cmp.CustomBuylist, source.(mtgban.Seller))
 			if custom != nil {
 				scrapers = append(scrapers, custom)
@@ -1052,7 +1064,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 		}
 		_, isCustom := scraper.(*customBuylistVendor)
 		if isCustom {
-			entry.RuleTip = cmp.CustomBuylist.tip(p, scraper.Info().SealedMode)
+			entry.RuleTip = customBuylistTips(p, cmp.CustomBuylist, scraper.Info().SealedMode)
 		}
 		if pageVars.GlobalMode {
 			entry.HasNoCredit = true
