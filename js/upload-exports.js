@@ -30,11 +30,27 @@ function packRows(category) {
     return lines.join('\n');
 }
 
+// The optimizer rows the reader moved, as the server reads them: the mode
+// they were made in, then one line a card naming the store it goes to.
+function packOptMoves() {
+    var seen = {};
+    var lines = [];
+    document.querySelectorAll('.opt-store tr[data-opt-moved]').forEach(function(tr) {
+        var key = tr.dataset.optId + '\t' + (tr.dataset.optCond || '');
+        if (seen[key]) return;
+        seen[key] = true;
+        lines.push(key + '\t' + tr.dataset.optMoved);
+    });
+    if (!lines.length) return '';
+    var mode = document.getElementById('res_mode');
+    return (mode && mode.value === 'true' ? 'buylist' : 'retail') + '\n' + lines.join('\n');
+}
+
 function ensureHashesLoaded(category) {
     var form = document.getElementById("upload_form");
 
     // Always rebuild from current row state so removed/picked rows take effect.
-    form.querySelectorAll('input[name="rows"], input[name="hashes"], input[name="hashesQtys"], input[name="hashesCond"], input[name="hashesPrice"], input[name="hashesNotes"]').forEach(function(el) {
+    form.querySelectorAll('input[name="rows"], input[name="hashes"], input[name="hashesQtys"], input[name="hashesCond"], input[name="hashesPrice"], input[name="hashesNotes"], input[name="opt_moves"]').forEach(function(el) {
         el.remove();
     });
 
@@ -49,6 +65,15 @@ function ensureHashesLoaded(category) {
     input.name = "rows";
     input.value = packRows(category);
     form.appendChild(input);
+
+    var moves = packOptMoves();
+    if (moves) {
+        var movesInput = document.createElement("input");
+        movesInput.type = "hidden";
+        movesInput.name = "opt_moves";
+        movesInput.value = moves;
+        form.appendChild(movesInput);
+    }
 }
 
 // Active result view: 'all' | 'singles' | 'sealed' | 'notfound'. Falls back

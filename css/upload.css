@@ -1412,30 +1412,33 @@
    stay under the header however tall it wraps */
 .opt-table thead { position: sticky; top: var(--nav-height); z-index: 5; }
 /* Widths on the cols: the first row is the store header, spanning them all */
-.opt-table col:nth-child(1) { width: 34%; }
+.opt-table col:nth-child(1) { width: 31%; }
 .opt-table col:nth-child(2) { width: 14%; }
 .opt-table col:nth-child(3) { width: 11%; }
 .opt-table col:nth-child(4) { width: 11%; }
 .opt-table col:nth-child(5) { width: 12%; }
 .opt-table col:nth-child(6) { width: 14%; }
-.opt-table col:nth-child(7) { width: 4%; }
-/* A buylist row's send menu sits beside its box */
-.opt-table[data-sends] col:nth-child(1) { width: 31%; }
-.opt-table[data-sends] col:nth-child(7) { width: 7%; }
+/* Wide enough for a row's Move to button beside its box */
+.opt-table col:nth-child(7) { width: 7%; }
 .opt-table td { padding: 7px 12px; border-bottom: 1px solid var(--border-subtle); font-size: var(--text-base); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
 .opt-table td:nth-child(3) { text-align: left; }
 .opt-table td:nth-child(7) { text-align: center; }
 .opt-table td:nth-child(7) { white-space: nowrap; }
-.opt-send-btn { padding: 2px; margin-right: 6px; border: none; background: none; color: var(--text-dim); cursor: pointer; vertical-align: middle; line-height: 0; border-radius: var(--radius-sm); }
-.opt-send-btn:hover, .opt-send-btn:focus-visible { color: var(--activetext); background: var(--surface-3); }
-.opt-send-btn svg { width: 15px; height: 15px; }
+.opt-move-btn { padding: 2px; margin-right: 6px; border: none; background: none; color: var(--text-dim); cursor: pointer; vertical-align: middle; line-height: 0; border-radius: var(--radius-sm); }
+.opt-move-btn:hover, .opt-move-btn:focus-visible { color: var(--activetext); background: var(--surface-3); }
+.opt-move-btn svg { width: 15px; height: 15px; }
 /* A popover, so the cell's overflow cannot clip it; upload-optimizer.js
    places it under its button */
-.opt-send-menu { position: fixed; inset: auto; margin: 0; padding: 4px; min-width: 180px; background: var(--surface-1); color: var(--normal); border: 1px solid var(--border-moderate); border-radius: var(--radius-sm); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
-.opt-send-title { padding: 4px 10px 6px; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
-.opt-send-menu a { display: flex; justify-content: space-between; gap: 16px; padding: 6px 10px; border-radius: var(--radius-sm); color: var(--normal); font-size: var(--text-sm); text-decoration: none; }
-.opt-send-menu a:hover, .opt-send-menu a:focus-visible { background: var(--row-hover); }
-.opt-send-menu a span { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--asuccess); }
+.opt-move-menu { position: fixed; inset: auto; margin: 0; padding: 4px; min-width: 180px; background: var(--surface-1); color: var(--normal); border: 1px solid var(--border-moderate); border-radius: var(--radius-sm); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+.opt-move-title { padding: 4px 10px 6px; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
+.opt-move-menu button { display: flex; width: 100%; border: none; background: none; cursor: pointer; text-align: left; justify-content: space-between; gap: 16px; padding: 6px 10px; border-radius: var(--radius-sm); color: var(--normal); font-size: var(--text-sm); text-decoration: none; }
+.opt-move-menu button:hover, .opt-move-menu button:focus-visible { background: var(--row-hover); }
+.opt-move-menu button span { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--asuccess); }
+/* A row the reader moved, and the one a move lands back on */
+.opt-moved > td { background: var(--accent-muted); }
+.opt-moved .opt-move-btn { color: var(--activetext); }
+.opt-move-landed > td { animation: opt-move-landed 1.6s ease-out; }
+@keyframes opt-move-landed { from { background: var(--row-hover); } }
 /* The Card header's tie-breaker menu (upload-sort.js), a popover the
    sticky headers cannot clip */
 .sort-ties-btn { float: right; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-left: 4px; padding: 0; vertical-align: middle; background: none; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--text-dim); cursor: pointer; }

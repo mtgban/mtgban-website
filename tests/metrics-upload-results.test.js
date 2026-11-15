@@ -28,7 +28,7 @@ test.each([
     ['>Load buylist at {{$scraperKey}}', 'ui.optimizer.send', 'sellcart', '{{$scraperKey}}'],
     ['>Download {{$scraperKey}} CSV</a>', 'ui.optimizer.send', 'csv', '{{$scraperKey}}'],
     ['>Remove from TCG CSV</a>', 'ui.optimizer.send', 'tcg_csv', '{{$scraperKey}}'],
-    ['class="opt-send-btn"', 'ui.optimizer.send', 'row_popover', '{{$scraperKey}}'],
+    ['class="opt-move-btn"', 'ui.optimizer', 'move_menu', undefined],
     ['>Mass entry at TCGplayer</a>', 'ui.optimizer.send', 'mass_entry', '{{$sourceKey}}'],
     ['>Mass entry at Mana Pool</a>', 'ui.optimizer.send', 'mass_entry', '{{$sourceKey}}'],
     ['>Load at {{$sourceKey}}</a>', 'ui.optimizer.send', 'load_at', '{{$sourceKey}}'],

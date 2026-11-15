@@ -98,7 +98,6 @@ test.each([
 
 test.each([
     ['templates/upload.html', 'data-store="{{$cart.Store}}" data-cart="{{$cart.Prefix}}"'],
-    ['templates/upload.html', 'data-store="{{.Store}}" data-cart="{{.Prefix}}"'],
     ['templates/arbit.html', 'data-store="{{$buyCart.Store}}" data-cart="{{$buyCart.Prefix}}"'],
     ['templates/arbit.html', 'data-store="{{$sellCart.Store}}" data-cart="{{$sellCart.Prefix}}"'],
 ])('%s carries the cart prefix after the store: %s', (file, run) => {
