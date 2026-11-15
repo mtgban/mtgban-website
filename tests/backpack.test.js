@@ -20,7 +20,16 @@ function el(tag) {
         removeAttribute(n) { delete this.attrs[n]; },
         appendChild(c) { c.parentNode = this; this.children.push(c); return c; },
         append(...cs) { cs.forEach((c) => this.appendChild(c)); },
-        remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((c) => c !== this); },
+        // Removing the focused node blurs it and, as Chrome does, lays out
+        // its scrollers then, which loses their scroll.
+        remove() {
+            if (currentDoc && currentDoc.activeElement && this.contains(currentDoc.activeElement)) {
+                currentDoc.activeElement = currentDoc.body;
+                for (let n = this.parentNode; n; n = n.parentNode) if (n.scrollTop) n.scrollTop = 0;
+            }
+            if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((c) => c !== this);
+        },
+        contains(n) { while (n) { if (n === this) return true; n = n.parentNode; } return false; },
         replaceWith(n) { const p = this.parentNode; if (!p) return; n.parentNode = p; p.children[p.children.indexOf(this)] = n; this.parentNode = null; },
         addEventListener(ev, fn) { (this.listeners[ev] = this.listeners[ev] || []).push(fn); },
         click() { (this.listeners.click || []).forEach((fn) => fn({ preventDefault() {}, stopPropagation() {} })); },
@@ -1151,6 +1160,50 @@ describe('the panel', () => {
         expect(ids['backpack-list'].querySelectorAll('.backpack-row').length).toBe(0);
         expect(ids['backpack-send'].disabled).toBe(true);
         expect(ids['backpack-empty'].textContent).toBe('Add products from any search with the backpack button.');
+    });
+
+    test('plus and minus keep the list scrolled and focus on the button pressed', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', qty: 2, t: 2, m: 2 }] });
+        const panel = open(p);
+        const list = ids['backpack-list'];
+        list.scrollTop = 600;
+        const plus = () => panel.querySelectorAll('.backpack-plus')[1];
+        const minus = () => panel.querySelectorAll('.backpack-minus')[1];
+        plus().focus();
+        plus().click();
+        expect(p.stored().find((e) => e.id === 'uuid-1').qty).toBe(3);
+        expect(list.scrollTop).toBe(600);
+        expect(p.document.activeElement).toBe(plus());
+        minus().focus();
+        minus().click();
+        expect(list.scrollTop).toBe(600);
+        expect(p.document.activeElement).toBe(minus());
+    });
+
+    test('the minus taking a row hands focus to the row in its place, then the one above, then Close', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 1, t: 3, m: 3 }, { id: 'uuid-2', name: 'B', qty: 1, t: 2, m: 2 }, { id: 'uuid-3', name: 'C', qty: 1, t: 1, m: 1 }] });
+        const panel = open(p);
+        const minus = () => panel.querySelectorAll('.backpack-minus');
+        const names = () => panel.querySelectorAll('.backpack-row-name').map((n) => n.textContent);
+        minus()[1].focus();
+        minus()[1].click();
+        expect(names()).toEqual(['A', 'C']);
+        expect(p.document.activeElement).toBe(minus()[1]);
+        minus()[1].click();
+        expect(names()).toEqual(['A']);
+        expect(p.document.activeElement).toBe(minus()[0]);
+        minus()[0].click();
+        expect(names()).toEqual([]);
+        expect(p.document.activeElement).toBe(ids['backpack-close']);
+    });
+
+    test('a clicked minus or plus that had no focus takes none', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 2, m: 2 }, { id: 'uuid-2', name: 'B', qty: 1, t: 1, m: 1 }] });
+        const panel = open(p);
+        const field = el('input'); p.document.body.appendChild(field); field.focus();
+        panel.querySelectorAll('.backpack-plus')[0].click();
+        panel.querySelectorAll('.backpack-minus')[1].click();
+        expect(p.document.activeElement).toBe(field);
     });
 
     test('the minus is named Remove when it would take the last copy', () => {
