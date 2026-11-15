@@ -307,6 +307,13 @@
         addBinding(window.StoreFactors.binding(el));
     }
 
+    // ─── Custom buylist rules after the first (js/custom-rules.js) ──
+    function bindCustomRules(elementId) {
+        const el = document.getElementById(elementId);
+        if (!el || !window.CustomBuylistRules) return;
+        addBinding(window.CustomBuylistRules.binding(el));
+    }
+
     // ─── Misc bitmap (many [data-misc] checkboxes → CSV cookie) ──
     function readMisc(container) {
         const names = [];
@@ -372,6 +379,7 @@
         Object.entries(BINDINGS.texts || {}).forEach(function (e) { bindText(e[0], e[1]); });
         Object.entries(BINDINGS.orders || {}).forEach(function (e) { bindOrder(e[0], e[1]); });
         bindStoreFactors('settings-store-factors');
+        bindCustomRules('settings-custom-rules');
         Object.entries(BINDINGS.misc || {}).forEach(function (e) {
             const defaults = (BINDINGS.miscDefaults || {})[e[0]];
             bindMiscBitmap(e[0], e[1], defaults);

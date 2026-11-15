@@ -47,5 +47,6 @@ function syncUploadOptionsFromSettings() {
         add('customrate',         getCookie('UploadCustomRate')        || '0.8');
         add('customfallback',       getCookie('UploadCustomSinglesFallback')       || '');
         add('customsealedfallback', getCookie('UploadCustomSealedFallback') || '');
+        add('customrules',          getCookie('UploadCustomRules')          || '');
     }
 }
