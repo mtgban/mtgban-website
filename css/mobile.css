@@ -133,12 +133,16 @@
     right: 0;
     width: 280px;
     transform: translateX(100%);
-    height: 100%;
+    /* The visible height less the padding, so the view toggle at the end
+       scrolls into view above Safari's toolbar and the home indicator. */
+    height: calc(100% - 2em);
+    height: calc(100dvh - 2em - env(safe-area-inset-bottom));
     background: var(--background);
     z-index: 300;
     transition: transform 200ms ease;
     overflow-y: auto;
     padding: 1em;
+    padding-bottom: calc(1em + env(safe-area-inset-bottom));
 }
 
 .m-menu.open {
