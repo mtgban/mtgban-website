@@ -1181,6 +1181,17 @@ describe('the panel', () => {
         expect(p.navCount.hidden).toBe(true);
     });
 
+    test('Clear is greyed out on an empty backpack', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        open(p);
+        expect(ids['backpack-clear'].disabled).toBe(false);
+        ids['backpack-clear'].click();
+        expect(ids['backpack-clear'].disabled).toBe(true);
+        const q = page();
+        open(q);
+        expect(ids['backpack-clear'].disabled).toBe(true);
+    });
+
     test('a declined confirm leaves the store untouched', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
         p.window.confirm = (msg) => { confirms.push(msg); return false; };
