@@ -113,6 +113,7 @@ var OptionalFields = []string{
 	"UploadOptimizer",
 	"UploadNoLimit",
 	"UploadCustom",
+	"UploadCustomMax",
 	"UploadPublish",
 	"AnyEnabled",
 	"AnyExperimentsEnabled",

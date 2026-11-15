@@ -123,6 +123,7 @@ type uploadModalKeys struct {
 	SellerKeys       []string
 	SealedSellerKeys []string
 	CanUploadCustom  bool
+	CustomRulesMax   int
 	VendorKeys       []string
 	SealedVendorKeys []string
 }
@@ -138,6 +139,7 @@ func uploadSettingsKeys(p *prices, sig string) uploadModalKeys {
 		SellerKeys:       singlesSellers,
 		SealedSellerKeys: sealedSellers,
 		CanUploadCustom:  canUploadCustom,
+		CustomRulesMax:   customBuylistRulesMax(sig),
 		VendorKeys:       singlesVendors,
 		SealedVendorKeys: sealedVendors,
 	}
@@ -204,6 +206,7 @@ type settingsModalVars struct {
 	UploadSellerKeys       []string
 	UploadSealedSellerKeys []string
 	CanUploadCustom        bool
+	UploadCustomRulesMax   int
 	UploadVendorKeys       []string
 	UploadSealedVendorKeys []string
 
@@ -272,6 +275,7 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 	v.UploadSellerKeys = up.SellerKeys
 	v.UploadSealedSellerKeys = up.SealedSellerKeys
 	v.CanUploadCustom = up.CanUploadCustom
+	v.UploadCustomRulesMax = up.CustomRulesMax
 	v.UploadVendorKeys = up.VendorKeys
 	v.UploadSealedVendorKeys = up.SealedVendorKeys
 

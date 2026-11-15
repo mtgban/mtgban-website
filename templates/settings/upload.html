@@ -140,7 +140,7 @@
                 <span>Enable the custom buylist</span>
             </label>
         </div>
-        <div class="custom-rules" id="settings-custom-rules">
+        <div class="custom-rules" id="settings-custom-rules" data-max="{{.UploadCustomRulesMax}}">
             <div class="custom-rules-head" aria-hidden="true">
                 <span>Buy rate</span><span>Minimum price</span><span>Singles reference</span><span>Fallback</span><span>Sealed reference</span><span>Fallback</span>
             </div>
@@ -181,7 +181,7 @@
                     {{end}}{{end}}
                 </select></label>
             </div>
-            <button type="button" class="custom-rules-add" data-track="ui.settings.custom_rule" data-track-value="add" title="A card the rules above leave unpriced, or price under their minimum, is priced by the next">Add rule</button>
+            {{if gt .UploadCustomRulesMax 1}}<button type="button" class="custom-rules-add" data-track="ui.settings.custom_rule" data-track-value="add" title="A card the rules above leave unpriced, or price under their minimum, is priced by the next">Add rule</button>{{end}}
         </div>
         {{else}}
         <p class="section-desc">

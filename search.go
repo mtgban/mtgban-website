@@ -2362,12 +2362,28 @@ type customBuylistRule struct {
 	fallback, sealedFallback string
 }
 
-// maxCustomBuylistRules caps the chain: the six UploadCustom cookies hold
-// the first rule, UploadCustomRules the rest.
-const maxCustomBuylistRules = 5
+// maxCustomBuylistRules caps the chain whatever a tier's UploadCustomMax
+// says: the six UploadCustom cookies hold the first rule, UploadCustomRules
+// the rest.
+const maxCustomBuylistRules = 10
+
+// customBuylistRulesMax is how many custom buylist rules a verified sig
+// allows: its UploadCustomMax, one where it sets none, and every rule in
+// dev without signing.
+func customBuylistRulesMax(sig string) int {
+	if DevMode && !SigCheck {
+		return maxCustomBuylistRules
+	}
+	n, err := strconv.Atoi(GetParamFromSig(sig, "UploadCustomMax"))
+	if err != nil || n < 1 {
+		return 1
+	}
+	return min(n, maxCustomBuylistRules)
+}
 
 // readCustomBuylistRules reads the reader's custom buylist rules in the
-// order they apply, none when the custom buylist is off.
+// order they apply, as many as their tier allows, none when the custom
+// buylist is off.
 func readCustomBuylistRules(r *http.Request) []customBuylistRule {
 	customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
 	if !slices.Contains(customOpts, "enabled") {
@@ -2382,24 +2398,24 @@ func readCustomBuylistRules(r *http.Request) []customBuylistRule {
 		readCookie(r, "UploadCustomSealedBuyer"),
 		readCookie(r, "UploadCustomSealedFallback"),
 	}
-	return parseCustomBuylistRules(first, readCookie(r, "UploadCustomRules"))
+	return parseCustomBuylistRules(first, readCookie(r, "UploadCustomRules"), customBuylistRulesMax(verifiedSignature(r)))
 }
 
-// parseCustomBuylistRules is the chain: the first rule, then those extra
-// holds, each "rate:min:seller:fallback:sealed:sealedfallback", joined by
-// commas. A rule at no valid rate is dropped, and so is an item that is not
-// six fields.
-func parseCustomBuylistRules(first [6]string, extra string) []customBuylistRule {
+// parseCustomBuylistRules is the chain, up to limit rules: the first rule,
+// then those extra holds, each "rate:min:seller:fallback:sealed:sealedfallback",
+// joined by commas. A rule at no valid rate is dropped, and so is an item
+// that is not six fields.
+func parseCustomBuylistRules(first [6]string, extra string, limit int) []customBuylistRule {
 	var rules []customBuylistRule
 	rule, ok := newCustomBuylistRule(first)
 	if ok {
 		rules = append(rules, rule)
 	}
-	if extra == "" {
+	if extra == "" || len(rules) >= limit {
 		return rules
 	}
 	for _, item := range strings.SplitN(extra, ",", maxCustomBuylistRules) {
-		if len(rules) == maxCustomBuylistRules {
+		if len(rules) == limit {
 			break
 		}
 		var fields [6]string

@@ -568,3 +568,29 @@ func TestSettingsModalCarriesStoreFactorOptions(t *testing.T) {
 	}
 	t.Errorf("data-stores does not carry ZZFACT:\n%s", gridCells(body, "settings-store-factors"))
 }
+
+// The custom buylist editor carries the reader's rule allowance, and a tier
+// of one rule gets no Add rule button.
+func TestSettingsBodyDrawsCustomRulesMax(t *testing.T) {
+	baseName, files := settingsBodyFiles()
+	tmpl, err := tmplparse.ParseFiles(baseName, files, funcMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	render := func(allowed int) string {
+		var buf bytes.Buffer
+		v := settingsModalVars{Tabs: []string{"upload"}, TabNames: settingsTabNames, CanUploadCustom: true, UploadCustomRulesMax: allowed}
+		err := tmpl.ExecuteTemplate(&buf, baseName, v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return buf.String()
+	}
+	one, five := render(1), render(5)
+	if !strings.Contains(one, `data-max="1"`) || strings.Contains(one, `class="custom-rules-add"`) {
+		t.Error("a tier of one rule is offered more")
+	}
+	if !strings.Contains(five, `data-max="5"`) || !strings.Contains(five, `class="custom-rules-add"`) {
+		t.Error("a tier of five rules has no Add rule")
+	}
+}

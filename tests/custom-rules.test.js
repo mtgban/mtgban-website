@@ -21,20 +21,23 @@ function fakeRow(vals) {
     return { querySelector: (sel) => fields[sel.match(/data-field="([^"]+)"/)[1]] };
 }
 
-function fakeContainer(rows) {
+function fakeContainer(rows, max = 5) {
     return {
+        getAttribute: (name) => (name === 'data-max' ? String(max) : null),
         querySelector: () => null,
         querySelectorAll: (sel) => (sel === '.custom-rule' ? rows.map(fakeRow) : []),
     };
 }
 
-test('parse keeps six-field items at a valid rate, four at most', () => {
+test('parse keeps six-field items at a valid rate, as many as follow the first within the tier', () => {
     const { R } = load();
-    expect(R.parse('')).toEqual([]);
-    expect(R.parse('0.6:2:TCGLow::TCGSealed:')).toEqual([['0.6', '2', 'TCGLow', '', 'TCGSealed', '']]);
-    expect(R.parse('0.6:2:TCGLow,half:2:TCGLow::TCGSealed:,0:2:TCGLow::TCGSealed:,0.5::CK:::')).toEqual([['0.5', '', 'CK', '', '', '']]);
-    expect(R.parse(Array(6).fill('0.5::CK:::').join(','))).toHaveLength(R.MAX - 1);
-    expect(R.format(R.parse('0.6:2:TCGLow::TCGSealed:,0.5::CK:::'))).toBe('0.6:2:TCGLow::TCGSealed:,0.5::CK:::');
+    expect(R.parse('', 5)).toEqual([]);
+    expect(R.parse('0.6:2:TCGLow::TCGSealed:', 5)).toEqual([['0.6', '2', 'TCGLow', '', 'TCGSealed', '']]);
+    expect(R.parse('0.6:2:TCGLow,half:2:TCGLow::TCGSealed:,0:2:TCGLow::TCGSealed:,0.5::CK:::', 5)).toEqual([['0.5', '', 'CK', '', '', '']]);
+    expect(R.parse(Array(6).fill('0.5::CK:::').join(','), 5)).toHaveLength(4);
+    expect(R.parse(Array(12).fill('0.5::CK:::').join(','), 10)).toHaveLength(9);
+    expect(R.parse('0.5::CK:::', 1)).toEqual([]);
+    expect(R.format(R.parse('0.6:2:TCGLow::TCGSealed:,0.5::CK:::', 5))).toBe('0.6:2:TCGLow::TCGSealed:,0.5::CK:::');
 });
 
 test('collect skips the first rule, drops a bad rate and writes numbers plainly', () => {
