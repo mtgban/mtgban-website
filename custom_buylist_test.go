@@ -697,3 +697,73 @@ func TestCustomBuylistRulesMax(t *testing.T) {
 		t.Errorf("dev without signing reads %d rules, want every one", got)
 	}
 }
+
+// The custom buylist prices no oversized card, on upload or on search, and
+// still prices a plain card off the same reference.
+func TestCustomBuylistSkipsOversized(t *testing.T) {
+	cards := closeVendors(t)
+	releasedBy := time.Now().Add(-customBuylistMinAge)
+	var oversized string
+	for _, id := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(id)
+		if err == nil && co.IsOversized && !(EntryRule{ReleasedBy: releasedBy}).skips(backend(), co) {
+			oversized = id
+			break
+		}
+	}
+	if oversized == "" {
+		t.Fatal("no oversized card in the datastore")
+	}
+	var plain string
+	for _, id := range cards {
+		co, err := backend().GetUUID(id)
+		if err == nil && !customBuylistSkips(backend(), co, releasedBy) {
+			plain = id
+			break
+		}
+	}
+	if plain == "" {
+		t.Fatalf("every one of %v is skipped by the custom buylist", cards)
+	}
+
+	ref := mtgban.InventoryRecord{}
+	for _, id := range []string{oversized, plain} {
+		ref[id] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 10}}
+	}
+	withPrices(t, []mtgban.Seller{mtgban.NewSellerFromInventory(ref, sessionInfo("ZZA"))}, currentPrices().vendors)
+
+	form := url.Values{
+		"mode":          {"true"},
+		"stores":        {"ZZV"},
+		"rows":          {oversized + "\t1\t\t0\t\n" + plain + "\t1\t\t0\t\n"},
+		"custombuylist": {"true"},
+		"customseller":  {"ZZA"},
+		"customrate":    {"0.5"},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	testSite.Upload(rec, req)
+	page := rec.Body.String()
+	if strings.Contains(page, "/go/b/CUSTOM/"+oversized+`"`) {
+		t.Errorf("upload priced the oversized card %s off the custom buylist", oversized)
+	}
+	if !strings.Contains(page, "/go/b/CUSTOM/"+plain+`"`) {
+		t.Errorf("upload did not price the plain card %s off the custom buylist", plain)
+	}
+
+	r := httptest.NewRequest(http.MethodGet, "/search", nil)
+	for name, value := range map[string]string{
+		"UploadCustomOpts": "enabled", "UploadCustomRate": "0.5", "UploadCustomBuyer": "ZZA",
+	} {
+		r.AddCookie(&http.Cookie{Name: name, Value: value})
+	}
+	found := map[string]map[mtgban.Condition][]SearchEntry{}
+	searchCustomBuylist(backend(), currentPrices(), r, []string{oversized, plain}, found)
+	if found[oversized] != nil {
+		t.Errorf("search priced the oversized card %s off the custom buylist", oversized)
+	}
+	if found[plain] == nil {
+		t.Errorf("search did not price the plain card %s off the custom buylist", plain)
+	}
+}

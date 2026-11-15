@@ -2344,10 +2344,10 @@ var customBuylistSkipSets = append([]string{"CED", "CEI", "30A"}, wcSets...)
 const customBuylistMinAge = 14 * 24 * time.Hour
 
 // customBuylistSkips reports whether the custom buylist leaves co unpriced:
-// a card of customBuylistSkipSets, or anything not known to be out by
-// releasedBy.
+// a card of customBuylistSkipSets, an oversized card, or anything not known
+// to be out by releasedBy.
 func customBuylistSkips(b *matcher.Backend, co *matcher.CardObject, releasedBy time.Time) bool {
-	return EntryRule{SkipSets: customBuylistSkipSets, ReleasedBy: releasedBy}.skips(b, co)
+	return EntryRule{SkipSets: customBuylistSkipSets, SkipOversized: true, ReleasedBy: releasedBy}.skips(b, co)
 }
 
 // customBuylistRule is one rule of the reader's custom buylist as the
