@@ -1991,7 +1991,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 	}
 
 	// Rewrite bare "<set code> <number>" queries, eg "neo 234" or
-	// "plst c16-177", to the equivalent s:CODE cn:NUMBER filters - cns:
+	// "plst c16-177", either way round, to the equivalent s:CODE cn:NUMBER filters - cns:
 	// where the number is spelled with more than digits.
 	// ExtractNumberAny doubles as validator and normalizer: it strips
 	// leading # and zeroes, keeps dashed and starred numbers whole, and
@@ -2035,9 +2035,16 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 			}
 		}
 		if len(tokens) == 2 {
-			term := numberTerm(b, tokens[1])
+			// "234 neo" is "neo 234" typed the other way round, unless the
+			// first word is a set code too.
+			code, number := tokens[0], tokens[1]
+			_, err := b.GetSet(code)
+			if err != nil {
+				code, number = number, code
+			}
+			term := numberTerm(b, number)
 			if term != "" {
-				set, err := b.GetSet(tokens[0])
+				set, err := b.GetSet(code)
 				if err == nil {
 					config.NumberTerms = "s:" + set.Code + " " + term
 					config.Syntax = append(config.Syntax, "set_number")

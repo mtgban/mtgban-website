@@ -205,6 +205,23 @@ func TestSetNumberShorthand(t *testing.T) {
 		}
 	})
 
+	t.Run("number then set code reads the same", func(t *testing.T) {
+		config := parseSearchOptionsNG(backend(), currentPrices(), "234 neo", nil, nil, nil)
+		checkValues(t, findFilter(config, "edition"), "edition", "NEO")
+		checkValues(t, findFilter(config, "number"), "number", "234")
+		if config.CleanQuery != "" {
+			t.Errorf("CleanQuery = %q, want empty", config.CleanQuery)
+		}
+		config = parseSearchOptionsNG(backend(), currentPrices(), "c16-177 plst", nil, nil, nil)
+		checkValues(t, findFilter(config, "edition"), "edition", "PLST")
+		checkValues(t, findFilter(config, "number_strict"), "number_strict", "c16-177")
+	})
+
+	t.Run("two set codes keep the name search either way round", func(t *testing.T) {
+		checkNameSearch(t, "10e neo")
+		checkNameSearch(t, "30a 10e")
+	})
+
 	// The number survives whole either way; what the set code in front of
 	// it decides is that the query is asked as written.
 	t.Run("PLST prefixed numbers stay in one piece", func(t *testing.T) {

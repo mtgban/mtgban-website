@@ -152,10 +152,10 @@
 
     // readShortcut reads the free words of a query the way online's
     // parseSearchOptionsDepth does, reporting whether they were all taken:
-    // "neo 234" and "plst c16-177" are a set and a number, "info-en067" a
-    // number as Yu-Gi-Oh prints it, "222/236" a number with its set total, and
-    // "123" or "17a" a number alone. A number after a name is left in the
-    // name, for execute to take if the whole name finds nothing.
+    // "neo 234", "234 neo" and "plst c16-177" are a set and a number,
+    // "info-en067" a number as Yu-Gi-Oh prints it, "222/236" a number with its
+    // set total, and "123" or "17a" a number alone. A number after a name is
+    // left in the name, for execute to take if the whole name finds nothing.
     function readShortcut(out, words, sets) {
         var last = words[words.length - 1];
         var filter;
@@ -171,10 +171,16 @@
                 return true;
             }
         }
-        if (words.length === 2 && !out.set.length && sets[words[0].toUpperCase()]) {
-            filter = wordNumber(last, sets);
+        // "66 spm" is "spm 66" the other way round, unless 66 is a set too.
+        var code = words[0], number = last;
+        if (words.length === 2 && !sets[code.toUpperCase()]) {
+            code = last;
+            number = words[0];
+        }
+        if (words.length === 2 && !out.set.length && sets[code.toUpperCase()]) {
+            filter = wordNumber(number, sets);
             if (filter) {
-                out.set = [words[0].toUpperCase()];
+                out.set = [code.toUpperCase()];
                 out.number.push(filter);
                 out.names = [];
                 return true;
