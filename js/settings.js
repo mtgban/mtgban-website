@@ -19,14 +19,16 @@
     // Comments mark which page each grouping originates from so the
     // bindings stay easy to navigate.
     const BINDINGS = {
-        lists: {
+        // Store grids: a tick means the store is used, and the cookie holds
+        // the unticked ones. Each list's grids carry data-skip-cookie="<cookie>".
+        stores: [
+            // search
+            'SearchSellersList', 'SearchVendorsList',
+            // arbit, global, reverse
+            'ArbitVendorsList', 'GlobalVendorsList', 'ReverseVendorsList',
             // sleep
-            'settings-sleep-sellers': 'SleepersSellersList',
-            'settings-sleep-vendors': 'SleepersVendorsList',
-        },
-        // search — Singles + Sealed grids share one cookie list via
-        // a data-cookie attribute rather than a single element id.
-        cookieLists: ['SearchSellersList', 'SearchVendorsList'],
+            'SleepersSellersList', 'SleepersVendorsList',
+        ],
         pills: {
             // search
             'settings-search-contents': 'SearchSealedContents',
@@ -75,13 +77,6 @@
             'opt-customminprice': 'UploadCustomMinPrice',
             'opt-customrate': 'UploadCustomRate',
         },
-        // arbit, global, reverse: each grid's cookie is read from its
-        // data-cookie attribute
-        dynamicLists: [
-            'settings-arbit-vendors',
-            'settings-global-vendors',
-            'settings-reverse-vendors',
-        ],
         editions: {
             // sleep
             'sleep-editions-picker': 'SleepersEditionList',
@@ -151,73 +146,41 @@
         }));
     }
 
-    // ─── List (checkbox grid → comma-separated cookie) ───────────
-    function readList(containerId) {
-        const c = document.getElementById(containerId);
-        if (!c) return '';
-        const names = [];
-        c.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
-            names.push(cb.name);
-        });
-        return names.join(',') + (names.length ? ',' : '');
-    }
-    function bindList(containerId, cookieName) {
-        const c = document.getElementById(containerId);
-        if (!c) return;
-        const owner = claim(cookieName, c);
-        addBinding({
-            load: function () {
-                const items = (readSetting(cookieName) || '').split(',').filter(Boolean);
-                c.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
-                    cb.checked = items.indexOf(cb.name) >= 0;
-                });
-            },
-            save: function () { writeSetting(cookieName, readList(containerId), owner); },
-            serialize: function () { return cookieName + '=' + readList(containerId); },
-        });
-    }
-    // bindListByCookie collects checkboxes across all grids sharing a data-cookie value.
-    // Used when one logical list is split into multiple grid elements (e.g. Singles + Sealed).
-    function readListByCookie(cookieName) {
-        const grids = document.querySelectorAll('[data-cookie="' + cookieName + '"]');
-        if (!grids.length) return '';
+    // ─── Stores (checkbox grids → comma-separated skip list) ─────
+    // The cookie lists the stores to skip, so a box is ticked when its store
+    // is not in it. Entries with no box in any grid (a store missing from this
+    // load) are kept, so saving over a partial grid cannot clear them.
+    function readStores(grids, saved) {
+        const shown = {};
         const names = [];
         grids.forEach(function (grid) {
-            grid.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
-                names.push(cb.name);
+            grid.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+                shown[cb.name] = true;
+                if (!cb.checked && names.indexOf(cb.name) < 0) names.push(cb.name);
             });
+        });
+        (saved || '').split(',').forEach(function (n) {
+            if (n && !shown[n] && names.indexOf(n) < 0) names.push(n);
         });
         return names.join(',') + (names.length ? ',' : '');
     }
-    function bindListByCookie(cookieName) {
-        const grids = document.querySelectorAll('[data-cookie="' + cookieName + '"]');
+    function bindStores(cookieName) {
+        const grids = document.querySelectorAll('[data-skip-cookie="' + cookieName + '"]');
         if (!grids.length) return;
         const owner = claim(cookieName, grids[0]);
+        const read = function () { return readStores(grids, readSetting(cookieName)); };
         addBinding({
             load: function () {
                 const items = (readSetting(cookieName) || '').split(',').filter(Boolean);
                 grids.forEach(function (grid) {
                     grid.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
-                        cb.checked = items.indexOf(cb.name) >= 0;
+                        cb.checked = items.indexOf(cb.name) < 0;
                     });
                 });
             },
-            save: function () { writeSetting(cookieName, readListByCookie(cookieName), owner); },
-            serialize: function () { return cookieName + '=' + readListByCookie(cookieName); },
+            save: function () { writeSetting(cookieName, read(), owner); },
+            serialize: function () { return cookieName + '=' + read(); },
         });
-    }
-    function bindDynamicList(containerId) {
-        const c = document.getElementById(containerId);
-        if (c && c.dataset.cookie) {
-            bindList(containerId, c.dataset.cookie);
-            return;
-        }
-        // Fall back to split-grid: find any grid whose id starts with containerId
-        // and read the shared data-cookie from it, then bind across all such grids.
-        const first = document.querySelector('[id^="' + containerId + '"][data-cookie]');
-        if (first && first.dataset.cookie) {
-            bindListByCookie(first.dataset.cookie);
-        }
     }
 
     // ─── Pills (radio-like, one .active at a time) ───────────────
@@ -370,8 +333,7 @@
             const p = pane.dataset.path;
             if (p && tabPaths.indexOf(p) < 0) tabPaths.push(p);
         });
-        Object.entries(BINDINGS.lists || {}).forEach(function (e) { bindList(e[0], e[1]); });
-        (BINDINGS.cookieLists || []).forEach(bindListByCookie);
+        (BINDINGS.stores || []).forEach(bindStores);
         Object.entries(BINDINGS.pills || {}).forEach(function (e) {
             bindPills(e[0], e[1], (BINDINGS.pillDefaults || {})[e[0]]);
         });
@@ -384,7 +346,6 @@
             const defaults = (BINDINGS.miscDefaults || {})[e[0]];
             bindMiscBitmap(e[0], e[1], defaults);
         });
-        (BINDINGS.dynamicLists || []).forEach(bindDynamicList);
         Object.entries(BINDINGS.editions || {}).forEach(function (e) { bindEditions(e[0], e[1]); });
     }
 
