@@ -509,7 +509,8 @@
         if (!ban || !("priced" in ban)) return;
         var sent = null;
         try { sent = JSON.parse(sessionStorage.getItem(SENT_KEY) || "null"); } catch (e) {}
-        if (sent && Array.isArray(sent.ids) && Array.isArray(ban.priced) && sent.ids.join(",") === ban.priced.join(",")) sentPack = ListStorage.backpackPack(sent);
+        // A re-price posts the rows in the table's order, so the order may differ
+        if (sent && Array.isArray(sent.ids) && Array.isArray(ban.priced) && sent.ids.slice().sort().join(",") === ban.priced.slice().sort().join(",")) sentPack = ListStorage.backpackPack(sent);
         var pending = takePending();
         if (!Array.isArray(pending) || !Array.isArray(ban.priced)) return;
         var ids = pending.map(idOf);
