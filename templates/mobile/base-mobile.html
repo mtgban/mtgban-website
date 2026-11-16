@@ -23,7 +23,7 @@
     <script>window.BAN_METRICS = {on: {{if .MetricsOn}}true{{else}}false{{end}}, page: "{{if not (or .ModalMode .ErrorMessage)}}{{.MetricsPage}}{{end}}", build: "{{.MetricsBuild}}"};</script>
     <script type="text/javascript" src="/js/metrics.js?hash={{.Hash}}" defer></script>
     {{if not .NoBackpack}}
-    <script>window.BAN_BACKPACK = {canUpload: {{if .CanUpload}}true{{else}}false{{end}}};</script>
+    <script>window.BAN_BACKPACK = {canUpload: {{if .CanUpload}}true{{else}}false{{end}}, canOptimize: {{if .CanOptimize}}true{{else}}false{{end}}};</script>
     <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}" defer></script>

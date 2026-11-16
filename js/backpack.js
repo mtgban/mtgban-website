@@ -483,6 +483,9 @@
     // The base template says whether the navbar offers Upload, and Upload
     // checks its own grant too.
     function canUpload() { return !(window.BAN_BACKPACK && window.BAN_BACKPACK.canUpload === false); }
+    // canOptimize says the reader's tier also has the Optimizer, which the
+    // backpack's send opens on.
+    function canOptimize() { return canUpload() && !(window.BAN_BACKPACK && window.BAN_BACKPACK.canOptimize === false); }
     // onUpload says whether this is Upload, the one page naming what it priced.
     function onUpload() { return !!window.BAN_BACKPACK && "priced" in window.BAN_BACKPACK; }
 
@@ -492,7 +495,7 @@
     }
 
     function send(mode) {
-        if (!canUpload() || !ordered().length) return;
+        if (!canOptimize() || !ordered().length) return;
         var form = sendForm(mode);
         setPending(emptySwitch && emptySwitch.checked ? ordered().map(key) : null);
         try { sessionStorage.setItem(SENT_KEY, JSON.stringify({ pack: active(), ids: ordered().map(function (e) { return e.id; }) })); } catch (e) {}
@@ -1088,8 +1091,8 @@
         sendBtn.setAttribute("type", "button");
         sendBtn.addEventListener("click", function () { send(lastMode()); });
         actions.append(sortBar, undoBtn, clearBtn, sendBtn);
-        if (!canUpload()) {
-            sendBtn.setAttribute("title", "Upload needs a higher tier");
+        if (!canOptimize()) {
+            sendBtn.setAttribute("title", canUpload() ? "The Optimizer needs a higher tier" : "Upload needs a higher tier");
             emptySwitch.disabled = true;
         }
         footer.append(label, sortNote, actions);
@@ -1532,8 +1535,8 @@
         var c = count();
         countEl.textContent = countLine(c);
         emptyEl.hidden = entries.length > 0;
-        sendBtn.disabled = entries.length === 0 || !canUpload();
-        if (canUpload()) sendBtn.setAttribute("title", lastMode() === "buylist" ? "Buylist, as last picked on Upload" : "Retail, as last picked on Upload");
+        sendBtn.disabled = entries.length === 0 || !canOptimize();
+        if (canOptimize()) sendBtn.setAttribute("title", lastMode() === "buylist" ? "Buylist, as last picked on Upload" : "Retail, as last picked on Upload");
         undoBtn.disabled = undoSteps().length === 0;
         clearBtn.disabled = entries.length === 0;
         searchBtn.disabled = entries.length === 0;

@@ -79,7 +79,7 @@
     <script type="text/javascript" src="/js/upload-presets.js?hash={{.Hash}}" defer></script>
     {{/* priced is the cards a send from the backpack got results for, which
          empties it when the send asked to; null when nothing was priced. */}}
-    <script>window.BAN_BACKPACK = {canUpload: true, priced: {{if and .CardHashes (or .UploadEntries .Optimized)}}{{.CardHashes}}{{else}}null{{end}}};</script>
+    <script>window.BAN_BACKPACK = {canUpload: true, canOptimize: {{if .CanOptimize}}true{{else}}false{{end}}, priced: {{if and .CardHashes (or .UploadEntries .Optimized)}}{{.CardHashes}}{{else}}null{{end}}};</script>
     {{if or .UploadEntries .Optimized}}
         <div class="page-standard upload-wide">
             <a class="back-link" href="/upload" data-track="ui.upload.result" data-track-value="back">&larr; Back to Uploader</a>

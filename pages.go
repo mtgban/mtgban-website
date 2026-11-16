@@ -346,11 +346,13 @@ type PageVars struct {
 
 	// BackpackMax is how many cards each of the reader's backpacks holds,
 	// and BackpackTabs how many backpacks they may keep, for js/backpack.js
-	// and js/user-state.js. CanUpload says the navbar offers Upload, so the
-	// backpack may send to it. NoBackpack leaves the backpack off the page.
+	// and js/user-state.js. CanUpload says the navbar offers Upload, and
+	// CanOptimize that the tier has its Optimizer too, which the backpack's
+	// Optimize button sends to. NoBackpack leaves the backpack off the page.
 	BackpackMax  int
 	BackpackTabs int
 	CanUpload    bool
+	CanOptimize  bool
 	NoBackpack   bool
 	// OfflineShell marks the offline search shell, which the service worker
 	// also serves at other URLs when a navigation fails.
@@ -490,6 +492,8 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 	if origin != "" {
 		patreonURL = origin + "/auth"
 	}
+	canUpload := navOffers(s, sigParams, "Upload")
+	optimizer, _ := strconv.ParseBool(sigParams.Get("UploadOptimizer"))
 	pageVars := PageVars{
 		Title:        "BAN " + activeTab,
 		ErrorMessage: msg,
@@ -506,7 +510,8 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 
 		BackpackMax:  backpackMaxFromValues(sigParams),
 		BackpackTabs: backpackTabsFromValues(sigParams),
-		CanUpload:    navOffers(s, sigParams, "Upload"),
+		CanUpload:    canUpload,
+		CanOptimize:  canUpload && (optimizer || (DevMode && !SigCheck)),
 
 		ScriptSignedIn:    cookie != "",
 		ScriptOfflineMode: cookieParams.Get("SearchOfflineMode") == "true" || (DevMode && !SigCheck),

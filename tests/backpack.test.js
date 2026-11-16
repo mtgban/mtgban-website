@@ -1488,6 +1488,16 @@ describe('sending', () => {
         expect(p.stored().filter((e) => !e.del).length).toBe(1);
     });
 
+    test('a reader with Upload but not the Optimizer gets a disabled button and sends nothing', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }], ban: { canUpload: true, canOptimize: false } });
+        p.nav.click();
+        expect(ids['backpack-send'].disabled).toBe(true);
+        expect(ids['backpack-send'].getAttribute('title')).toBe('The Optimizer needs a higher tier');
+        ids['backpack-send'].click();
+        expect(ids['backpack-empty-after'].disabled).toBe(true);
+        expect(submitted).toEqual([]);
+    });
+
     test('a reader with Upload sends as without BAN_BACKPACK', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }], ban: { canUpload: true } });
         p.nav.click();

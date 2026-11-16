@@ -42,9 +42,9 @@ func TestSearchCarriesTheBackpack(t *testing.T) {
 	}
 	for _, mobile := range []bool{false, true} {
 		for _, can := range []bool{false, true} {
-			pv := PageVars{UserNav: &NavElem{Short: "b"}, CanUpload: can}
+			pv := PageVars{UserNav: &NavElem{Short: "b"}, CanUpload: can, CanOptimize: !can}
 			page := renderPage(t, "search.html", mobile, pv)
-			want := `window.BAN_BACKPACK = {canUpload: ` + strconv.FormatBool(can) + `};`
+			want := `window.BAN_BACKPACK = {canUpload: ` + strconv.FormatBool(can) + `, canOptimize: ` + strconv.FormatBool(!can) + `};`
 			gate := strings.Index(page, want)
 			if gate < 0 || gate > strings.Index(page, `src="/js/backpack.js?`) {
 				t.Errorf("mobile=%v: %s is missing or after backpack.js", mobile, want)
@@ -110,24 +110,28 @@ func TestEveryPageWithANavbarLoadsTheBackpack(t *testing.T) {
 }
 
 // TestPagesSayWhetherTheBackpackMaySendToUpload reads the grant the navbar
-// reads, on any page rather than search's alone.
+// reads, on any page rather than search's alone, and the Optimizer's beside
+// it, which the backpack's Optimize button needs.
 func TestPagesSayWhetherTheBackpackMaySendToUpload(t *testing.T) {
 	oldCheck := SigCheck
 	SigCheck = true
 	t.Cleanup(func() { SigCheck = oldCheck })
 
 	for _, tc := range []struct {
-		name string
-		sig  string
-		want bool
+		name                string
+		sig                 string
+		upload, canOptimize bool
 	}{
-		{"signed out", "", false},
-		{"without the grant", testSig(map[string]string{"Search": "true"}), false},
-		{"with the grant", testSig(map[string]string{"Upload": "true"}), true},
+		{"signed out", "", false, false},
+		{"without the grant", testSig(map[string]string{"Search": "true"}), false, false},
+		{"with Upload alone", testSig(map[string]string{"Upload": "true"}), true, false},
+		{"with the Optimizer alone", testSig(map[string]string{"UploadOptimizer": "true"}), false, false},
+		{"with both", testSig(map[string]string{"Upload": "true", "UploadOptimizer": "true"}), true, true},
 	} {
 		r := httptest.NewRequest(http.MethodGet, "/guide", nil)
-		if got := genPageNav(testSite, r, "Guide", tc.sig).CanUpload; got != tc.want {
-			t.Errorf("%s: CanUpload = %v, want %v", tc.name, got, tc.want)
+		pv := genPageNav(testSite, r, "Guide", tc.sig)
+		if pv.CanUpload != tc.upload || pv.CanOptimize != tc.canOptimize {
+			t.Errorf("%s: CanUpload %v, CanOptimize %v, want %v, %v", tc.name, pv.CanUpload, pv.CanOptimize, tc.upload, tc.canOptimize)
 		}
 	}
 }
@@ -175,7 +179,7 @@ func TestUploadHandsTheBackpackItsResults(t *testing.T) {
 		tc.pv.UserNav = &NavElem{Short: "b"}
 		tc.pv.Metadata = map[string]GenericCard{"a": {}, "b": {}}
 		page := renderPage(t, "upload.html", false, tc.pv)
-		want := `window.BAN_BACKPACK = {canUpload: true, ` + tc.want + `};`
+		want := `window.BAN_BACKPACK = {canUpload: true, canOptimize: false, ` + tc.want + `};`
 		gate := strings.Index(page, want)
 		if gate < 0 || gate > strings.Index(page, `src="/js/backpack.js?`) {
 			t.Errorf("%s: %s is missing or after backpack.js", tc.name, want)
