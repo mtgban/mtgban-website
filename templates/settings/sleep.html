@@ -5,11 +5,11 @@
         <i class="settings-section-chevron" data-lucide="chevron-right"></i>
     </div>
     <div class="settings-section-body">
-        <p class="section-desc">Checked stores will be <strong>hidden</strong> from your Sleepers.</p>
+        <p class="section-desc">Display the selected stores.</p>
         <div class="settings-vendor-columns">
             <div>
                 <h4>Retail</h4>
-                <div class="settings-grid" id="settings-sleep-sellers">
+                <div class="settings-grid" id="settings-sleep-retail" data-skip-cookie="SleepersSellersList">
                     {{range $key := .SleepSellerKeys}}
                     <label><input type="checkbox" name="{{$key}}"> {{index $.StoreNames $key}}</label>
                     {{end}}
@@ -17,7 +17,7 @@
             </div>
             <div>
                 <h4>Buylist</h4>
-                <div class="settings-grid" id="settings-sleep-vendors">
+                <div class="settings-grid" id="settings-sleep-buylist" data-skip-cookie="SleepersVendorsList">
                     {{range $key := .SleepVendorKeys}}
                     <label><input type="checkbox" name="{{$key}}"> {{index $.StoreNames $key}}</label>
                     {{end}}
@@ -33,7 +33,7 @@
         <i class="settings-section-chevron" data-lucide="chevron-right"></i>
     </div>
     <div class="settings-section-body">
-        <p class="section-desc">Checked editions will be <strong>hidden</strong> from results.</p>
+        <p class="section-desc">Tick an edition to <strong>hide</strong> it from results.</p>
         {{template "editions-picker" (dict "PickerID" "sleep-editions-picker" "EditionsCategories" .EditionsCategories "EditionsByCategory" .EditionsByCategory)}}
     </div>
 </section>

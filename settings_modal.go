@@ -78,7 +78,7 @@ func sleepBlocklists(sig string) (retail, buylist []string) {
 }
 
 // sleepModalKeys is the Sleepers tab's store grids, before the reader's own
-// hide cookie is applied, so a hidden store still shows, ticked.
+// hide cookie is applied, so a hidden store still shows, unticked.
 func sleepModalKeys(p *prices, blocklistRetail, blocklistBuylist []string) (sellers, vendors []string) {
 	sellers = p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		return info.CountryFlag == "" && !info.SealedMode && !info.MetadataOnly &&

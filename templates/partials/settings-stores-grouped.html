@@ -9,7 +9,7 @@
             "Keys":       []string,  // shorthands to render
             "Sealed":     map[string]bool, // the sealed ones among them
             "GridId":     string,    // id prefix; final id is "{GridId}-{Section}"
-            "CookieName": string,    // data-cookie="..." for the grid
+            "CookieName": string,    // data-skip-cookie="..." for the grid: the cookie of stores to skip
             "Section":    string,    // "singles" | "sealed"
         }
 */}}
@@ -18,7 +18,7 @@
 {{$wantSealed := eq .Section "sealed"}}
 {{/* Always emit the grid container (even if empty) so multi-column grid layouts
     don't shift cells when one column has no entries for this section. */}}
-<div class="settings-grid" id="{{.GridId}}-{{.Section}}" data-cookie="{{.CookieName}}">
+<div class="settings-grid" id="{{.GridId}}-{{.Section}}" data-skip-cookie="{{.CookieName}}">
     {{range $key := $keys}}
         {{if and $wantSealed (index $.Sealed $key)}}
         <label><input type="checkbox" name="{{$key}}"> {{index $.Names $key}}</label>

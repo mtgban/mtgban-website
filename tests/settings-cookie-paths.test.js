@@ -86,7 +86,8 @@ function bodyFixture() {
             el('select', { 'data-cookie': 'UploadCustomBuyer', value: 'TCGLow' }),
         ]),
         el('section', { class: 'settings-pane', 'data-tab': 'arbit', 'data-path': '/arbit' }, [
-            el('div', { id: 'settings-arbit-vendors', 'data-cookie': 'ArbitVendorsList' }, [checkbox('CK'), checkbox('SCG')]),
+            el('div', { id: 'settings-arbit-vendors-singles', 'data-skip-cookie': 'ArbitVendorsList' }, [checkbox('CK'), checkbox('SCG')]),
+            el('div', { id: 'settings-arbit-vendors-sealed', 'data-skip-cookie': 'ArbitVendorsList' }, [checkbox('TCGSealed')]),
         ]),
     ];
 }
@@ -167,8 +168,8 @@ test('a tab opened on another page loads the values its own page reads', async (
         '/arbit/settings-values?name=ArbitVendorsList',
         '/upload/settings-values?name=UploadMargin&name=UploadOptimizerOpts',
     ]);
-    expect(m.find('input[name="CK"]').checked).toBe(true);
-    expect(m.find('input[name="SCG"]').checked).toBe(false);
+    expect(m.find('input[name="CK"]').checked).toBe(false);
+    expect(m.find('input[name="SCG"]').checked).toBe(true);
     expect(m.find('#opt-margin').value).toBe('15');
     expect(m.find('select').value).toBe('CKBuylist');
 });
@@ -179,7 +180,7 @@ test('saving on another page writes each cookie where its page reads it', async 
         cookie: '',
         values: { '/arbit': { ArbitVendorsList: 'CK,' }, '/upload': {} },
     });
-    m.find('input[name="SCG"]').checked = true;
+    m.find('input[name="SCG"]').checked = false;
     await m.save();
 
     const set = name => m.writes.filter(w => w.startsWith(name + '=') && !w.startsWith(name + '=;'));
@@ -205,7 +206,37 @@ test('on its own page a tab reads its cookies there and fetches nothing', async 
     });
 
     expect(m.fetches.sort()).toEqual(['/api/settings/modal', '/upload/settings-values?name=UploadMargin&name=UploadOptimizerOpts']);
-    expect(m.find('input[name="SCG"]').checked).toBe(true);
+    expect(m.find('input[name="SCG"]').checked).toBe(false);
+    expect(m.find('input[name="CK"]').checked).toBe(true);
+});
+
+// A store grid ticks the stores used; its cookie keeps naming the ones to skip.
+const savedArbit = m => m.writes.find(w => w.startsWith('ArbitVendorsList=') && w.includes('path=/arbit;'));
+
+test('a store grid saves its unticked stores, across its singles and sealed grids', async () => {
+    const m = await openModal({ pathname: '/arbit', cookie: '', values: { '/upload': {} } });
+    expect(['CK', 'SCG', 'TCGSealed'].map(n => m.find('input[name="' + n + '"]').checked)).toEqual([true, true, true]);
+    m.find('input[name="CK"]').checked = false;
+    m.find('input[name="TCGSealed"]').checked = false;
+    await m.save();
+    expect(savedArbit(m)).toStartWith('ArbitVendorsList=CK,TCGSealed,;');
+});
+
+test('ticking every store saves an empty skip list', async () => {
+    const m = await openModal({ pathname: '/arbit', cookie: 'ArbitVendorsList=CK,SCG', values: { '/upload': {} } });
+    m.find('input[name="CK"]').checked = true;
+    m.find('input[name="SCG"]').checked = true;
+    await m.save();
+    expect(savedArbit(m)).toStartWith('ArbitVendorsList=;');
+});
+
+// A store missing from this load has no box; saving must not un-skip it.
+test('a skipped store with no box survives a save', async () => {
+    const m = await openModal({ pathname: '/arbit', cookie: 'ArbitVendorsList=GONE,,SCG', values: { '/upload': {} } });
+    expect(m.find('input[name="SCG"]').checked).toBe(false);
+    m.find('input[name="CK"]').checked = false;
+    await m.save();
+    expect(savedArbit(m)).toStartWith('ArbitVendorsList=CK,SCG,GONE,;');
 });
 
 // Saving a tab shown blank would erase what its page reads
