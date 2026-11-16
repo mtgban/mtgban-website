@@ -904,7 +904,8 @@ func TestUnpackedResultsIgnoreTheOptimizerPreference(t *testing.T) {
 		Missing:  map[string]int{},
 	}}
 
-	if out := renderUpload(t, pageVars); !strings.Contains(out, "window.BAN_UPLOAD_TABS = {unpacked: true}") {
+	out := renderUpload(t, pageVars)
+	if strings.Contains(out, "opts.indexOf('noresults')") || !strings.Contains(out, "sessionStorage.getItem('uploadResView') : 'results';") {
 		t.Error("an unpacked page still follows the preference for the optimizer")
 	}
 
@@ -913,7 +914,7 @@ func TestUnpackedResultsIgnoreTheOptimizerPreference(t *testing.T) {
 	flat.UnpackedSections = nil
 	flat.UnpackedFrom = 0
 	flat.SinglesEntries = entries[1:]
-	if out := renderUpload(t, flat); !strings.Contains(out, "window.BAN_UPLOAD_TABS = {unpacked: false}") {
+	if out := renderUpload(t, flat); !strings.Contains(out, "opts.indexOf('noresults')") {
 		t.Error("an ordinary result no longer follows the preference")
 	}
 }
