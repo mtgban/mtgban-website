@@ -1011,6 +1011,9 @@
 
 .res-panel { display: none; }
 .res-panel.active { display: block; }
+/* Set by upload.html's start-view guard until upload-tabs.js makes the optimizer active */
+.res-start-optimizer > #panel-results { display: none; }
+.res-start-optimizer > #panel-optimizer { display: block; }
 
 /* ── Results sub-tabs (singles / sealed / all) ── */
 .ures-subtabs {

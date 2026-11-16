@@ -47,35 +47,13 @@ document.addEventListener('DOMContentLoaded', function migrateUploadPrefs() {
     var allKeys = Object.keys(textMap).concat(['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults']);
     allKeys.forEach(function (k) { localStorage.removeItem(k); });
 });
-// Jump to the optimizer only on a fresh submission (from the main page
-// or elsewhere). On a reload — page refresh or the Reload button — keep
-// the view the user was in instead of forcing the optimizer.
-//
-// Unpacking is the exception to the preference: it was asked in order to
-// read what is inside these products, and the optimizer answers a
-// different question - what to buy and where - so a standing preference
-// for it does not carry to a view that exists to be read. A reload still
-// keeps whichever view was open, including the optimizer if it was picked
-// by hand: that is an answer to what the reader just did, not a setting.
-var uploadIsUnpacked = window.BAN_UPLOAD_TABS.unpacked;
-document.addEventListener('DOMContentLoaded', function () {
-    var nav = performance.getEntriesByType('navigation')[0];
-    var navType = nav ? nav.type : 'navigate';
-    var isReload = navType !== 'navigate' || sessionStorage.getItem('uploadReload') === '1';
-    sessionStorage.removeItem('uploadReload');
-
-    var panel;
-    if (isReload) {
-        panel = sessionStorage.getItem('uploadResView') || 'results';
-    } else if (uploadIsUnpacked) {
-        panel = 'results';
-    } else {
-        var opts = (getCookie('UploadOptimizerOpts') || '').split(',').filter(Boolean);
-        panel = opts.indexOf('noresults') >= 0 ? 'optimizer' : 'results';
-    }
-    // 'results' is already the active panel; only act for the optimizer
-    if (panel === 'optimizer') {
-        var optBtn = document.querySelector('.res-tab:nth-child(2)');
-        if (optBtn) showResTab('optimizer', optBtn);
-    }
-});
+// The inline guard before the panels picks the start view, so that a page
+// starting on the optimizer never paints the results first; this makes it
+// the active panel for good.
+(function () {
+    var holder = document.querySelector('.res-start-optimizer');
+    var optBtn = document.querySelector('.res-tab:nth-child(2)');
+    if (!holder || !optBtn) return;
+    showResTab('optimizer', optBtn);
+    holder.classList.remove('res-start-optimizer');
+})();
