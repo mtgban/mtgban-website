@@ -812,6 +812,18 @@ describe('taking from the backpack a send came from', () => {
         expect(live(p)).toEqual([[1, 'uuid-1', 2], [2, 'uuid-1', 2]]);
     });
 
+    test('a re-price posting the rows in another order still takes from the backpack sent', () => {
+        const more = [...store, { id: 'uuid-2', pack: 2, qty: 1, t: 3, m: 3 }];
+        const s = page({ store: more, tabs: 2, active: 2, tabList });
+        s.nav.click();
+        ids['backpack-send'].click();
+        const priced = JSON.parse(s.sm.mtgban_backpack_sent).ids.slice().reverse();
+        expect(priced).toEqual(['uuid-1', 'uuid-2']);
+        const p = page({ store: more, tabs: 2, active: 1, tabList, session: s.sm, ban: { canUpload: true, priced }, sections: [[['uuid-1', 1, false, 'NM']]] });
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(live(p)).toEqual([[1, 'uuid-1', 2], [2, 'uuid-1', 2], [2, 'uuid-2', 1]]);
+    });
+
     test('an Upload page of other cards takes from the open backpack', () => {
         const session = sent();
         const p = page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1', 'uuid-9'] }, sections: [[['uuid-1', 1, false, 'NM']]] });
