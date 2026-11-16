@@ -73,7 +73,8 @@ type Store struct {
 	Sealed    bool   `json:"sealed,omitempty"`
 
 	// Index marks a store whose prices index a market rather than list its
-	// own stock, which v2 gives no condition.
+	// own stock. Its entries carry a condition only where only the API serves
+	// it, so a client reads Condition per entry.
 	Index bool `json:"index,omitempty"`
 
 	// Quantities marks a store whose prices carry a qty.

@@ -907,12 +907,15 @@ Direct's stock, or TCGplayer's listed copies, the last two from the
 newspaper scrape while it is a day old at most and TCGplayer's none for a
 printing the scrape capped. An absent `qty` or `available` is unknown,
 never zero, and an absent `qty` on a buylist is no limit. `condition` is
-absent for an index store and for sealed. A printing's whole stock is the
-sum of `available` over its conditions, where every condition has one.
+absent for sealed, and for an index store unless `api_only_stores` names
+it, so a client reads it per entry rather than from `index`. A printing's
+whole stock is the sum of `available` over its conditions, where every
+condition has one.
 `qty` and `conds` do not apply as options: the list always carries both.
 v2's `stores.json` lists the caller's stores as objects, sellers and
 vendors apart (`banprice.Stores`): shorthand, name, country, and whether a
-store is sealed, an index (its prices carry no condition) or carries `qty`,
+store is sealed, an index (its prices quote a market, with or without a
+`condition`) or carries `qty`,
 a vendor's credit multiplier, and when its prices were collected.
 `finishes.json` (v2 only) lists the finish keys the game's prices use with
 a label and a count, commonest first; `filter=singles|sealed` narrows both.
