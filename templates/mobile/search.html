@@ -876,10 +876,10 @@
                 </div>
             </div>
 
-            {{/* Exclude Sellers */}}
+            {{/* Show Sellers: a tick shows the store, SearchSellersList holds the unticked */}}
             <div class="m-settings-section">
                 <div class="m-settings-collapse" onclick="this.classList.toggle('expanded'); this.nextElementSibling.classList.toggle('expanded');">
-                    <span class="m-settings-label">Exclude Sellers</span>
+                    <span class="m-settings-label">Show Sellers</span>
                     <i data-lucide="chevron-right" class="m-settings-chevron"></i>
                 </div>
                 <div class="m-settings-collapse-body" id="m-set-sellers">
@@ -911,10 +911,10 @@
                 </div>
             </div>
 
-            {{/* Exclude Vendors */}}
+            {{/* Show Vendors: a tick shows the store, SearchVendorsList holds the unticked */}}
             <div class="m-settings-section">
                 <div class="m-settings-collapse" onclick="this.classList.toggle('expanded'); this.nextElementSibling.classList.toggle('expanded');">
-                    <span class="m-settings-label">Exclude Vendors</span>
+                    <span class="m-settings-label">Show Vendors</span>
                     <i data-lucide="chevron-right" class="m-settings-chevron"></i>
                 </div>
                 <div class="m-settings-collapse-body" id="m-set-vendors">
@@ -1360,19 +1360,9 @@ function loadSettings() {
         }
     });
 
-    // Exclude Sellers
-    var sellers = getCookie('SearchSellersList');
-    var sellerList = sellers ? sellers.split(',') : [];
-    document.querySelectorAll('#m-set-sellers input[type="checkbox"]').forEach(function(cb) {
-        cb.checked = sellerList.indexOf(cb.name) !== -1;
-    });
-
-    // Exclude Vendors
-    var vendors = getCookie('SearchVendorsList');
-    var vendorList = vendors ? vendors.split(',') : [];
-    document.querySelectorAll('#m-set-vendors input[type="checkbox"]').forEach(function(cb) {
-        cb.checked = vendorList.indexOf(cb.name) !== -1;
-    });
+    // Show Sellers / Vendors: ticked unless the cookie skips the store
+    tickShown('m-set-sellers', getCookie('SearchSellersList'));
+    tickShown('m-set-vendors', getCookie('SearchVendorsList'));
 
     var factors = document.getElementById('m-set-store-factors');
     if (factors && window.StoreFactors) window.StoreFactors.render(factors, window.StoreFactors.read());
@@ -1413,19 +1403,32 @@ function writeDrawer(set) {
     });
     set('SearchMiscOpts', miscList);
 
-    // Exclude Sellers
-    var sellersList = '';
-    document.querySelectorAll('#m-set-sellers input[type="checkbox"]:checked').forEach(function(cb) {
-        sellersList += cb.name + ',';
-    });
-    set('SearchSellersList', sellersList);
+    // Show Sellers / Vendors: the cookie holds the unticked stores
+    set('SearchSellersList', unticked('m-set-sellers', getCookie('SearchSellersList')));
+    set('SearchVendorsList', unticked('m-set-vendors', getCookie('SearchVendorsList')));
+}
 
-    // Exclude Vendors
-    var vendorsList = '';
-    document.querySelectorAll('#m-set-vendors input[type="checkbox"]:checked').forEach(function(cb) {
-        vendorsList += cb.name + ',';
+// tickShown ticks each store box the skip list saved does not name.
+function tickShown(containerId, saved) {
+    var skip = saved ? saved.split(',') : [];
+    document.querySelectorAll('#' + containerId + ' input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = skip.indexOf(cb.name) === -1;
     });
-    set('SearchVendorsList', vendorsList);
+}
+
+// unticked is the skip list a store grid holds: its unticked boxes, plus the
+// saved entries with no box, so a store missing from this load stays skipped.
+function unticked(containerId, saved) {
+    var shown = {};
+    var names = [];
+    document.querySelectorAll('#' + containerId + ' input[type="checkbox"]').forEach(function(cb) {
+        shown[cb.name] = true;
+        if (!cb.checked && names.indexOf(cb.name) === -1) names.push(cb.name);
+    });
+    (saved || '').split(',').forEach(function(n) {
+        if (n && !shown[n] && names.indexOf(n) === -1) names.push(n);
+    });
+    return names.length ? names.join(',') + ',' : '';
 }
 
 // What the drawer's controls held when it opened, so a save counts only what the reader moved.

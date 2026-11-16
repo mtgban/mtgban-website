@@ -152,8 +152,9 @@ test('snapshot reads exactly the drawer cookies', () => {
 });
 
 // runDrawer opens the mobile drawer over a cookie jar with the controls at open, then saves
-// with the controls at save. Controls map a pill group's id to its active value, the toggle and
-// checkbox groups to arrays; opened null saves with no open recorded.
+// with the controls at save. Controls map a pill group's id to its active value, a toggle group
+// to the array of those on, and a store grid to {name: ticked}; opened null saves with no open
+// recorded.
 function runDrawer({ jar = {}, listing = true, factors = null, BAN, loaded = true, opened, controls = {} } = {}) {
     const page = read('templates/mobile/search.html');
     const start = page.indexOf('function writeDrawer(');
@@ -173,7 +174,9 @@ function runDrawer({ jar = {}, listing = true, factors = null, BAN, loaded = tru
         },
         querySelectorAll: (sel) => {
             const id = sel.match(/^#([\w-]+) /)[1];
-            return (state.c[id] || []).map((v) => ({ name: v, getAttribute: () => v }));
+            const c = state.c[id] || [];
+            if (!Array.isArray(c)) return Object.entries(c).map(([name, checked]) => ({ name, checked }));
+            return c.map((v) => ({ name: v, getAttribute: () => v }));
         },
         getElementById: (id) => (id === 'm-set-sellers-priority' || id === 'm-set-vendors-priority' ? { value: state.c[id] || '' }
             : id === 'm-set-listing-priority' ? (listing ? {} : null)
@@ -219,18 +222,40 @@ test('opening the drawer records its controls after it loads them from the cooki
 
 test('a control left where it opened is not a change', () => {
     const { BAN, calls } = fakeBAN();
-    const controls = { 'm-set-misc-opts': ['noSussy'], 'm-set-sellers': ['CK'] };
-    runDrawer({ BAN, jar: { SearchMiscOpts: 'noSussy,', SearchSellersList: 'CK,' }, opened: { 'm-set-misc-opts': ['noSussy'], 'm-set-sellers': ['CK'] }, controls });
+    const controls = { 'm-set-misc-opts': ['noSussy'], 'm-set-sellers': { CK: false, TCG: true } };
+    runDrawer({ BAN, jar: { SearchMiscOpts: 'noSussy,', SearchSellersList: 'CK,' }, opened: { 'm-set-misc-opts': ['noSussy'], 'm-set-sellers': { CK: false, TCG: true } }, controls });
     expect(calls).toEqual([['ui.settings.save', 'mobile_drawer', undefined]]);
 });
 
 test('a toggle and a store list the reader changed are counted', () => {
     const { BAN, calls } = fakeBAN();
-    runDrawer({ BAN, opened: {}, controls: { 'm-set-misc-opts': ['hidePromos'], 'm-set-sellers': ['CK'] } });
+    runDrawer({ BAN, opened: {}, controls: { 'm-set-misc-opts': ['hidePromos'], 'm-set-sellers': { CK: false, TCG: true } } });
     expect(calls).toEqual([
         ['ui.settings.change', 'on', 'SearchMiscOpts.hidePromos'],
         ['ui.settings.change', 'set', 'SearchSellersList'],
         ['ui.settings.save', 'mobile_drawer', undefined]]);
+});
+
+// The drawer's store grids tick the stores shown; the cookie keeps skipping the unticked ones.
+test('the drawer writes its unticked stores as the skip list', () => {
+    const cookies = runDrawer({ controls: { 'm-set-sellers': { CK: false, SCG: true, TCG: false }, 'm-set-vendors': { CK: true } } });
+    expect(cookies.get('SearchSellersList')).toBe('CK,TCG,');
+    expect(cookies.get('SearchVendorsList')).toBe('');
+});
+
+test('the drawer keeps a skipped store it has no box for', () => {
+    const cookies = runDrawer({ jar: { SearchSellersList: 'GONE,,CK' }, controls: { 'm-set-sellers': { CK: true, SCG: false } } });
+    expect(cookies.get('SearchSellersList')).toBe('SCG,GONE,');
+});
+
+test('the drawer ticks every store its skip list does not name', () => {
+    const page = read('templates/mobile/search.html');
+    const start = page.indexOf('function tickShown(');
+    const fn = page.slice(start, page.indexOf('\n}\n', start) + 2);
+    const boxes = [{ name: 'CK' }, { name: 'SCG' }, { name: 'TCG' }];
+    const document = { querySelectorAll: (sel) => (sel === '#m-set-sellers input[type="checkbox"]' ? boxes : []) };
+    new Function('document', fn + '\ntickShown("m-set-sellers", "SCG,");')(document);
+    expect(boxes.map((b) => b.checked)).toEqual([true, false, true]);
 });
 
 test('report with only counts the settings named, by the name before a flag', () => {
