@@ -110,6 +110,10 @@ type SearchEntry struct {
 	OrigCredit float64
 	// DiscountPct is the percent a store discount took off Price; zero otherwise.
 	DiscountPct int
+
+	// Grade is the entry's own condition, which an index row's INDEX
+	// bucket does not show.
+	Grade mtgban.Condition
 }
 
 // marketValue is what a buylist offer is worth on the market: its store
@@ -2256,6 +2260,7 @@ func searchSellers(p *prices, cardIDs []string, config SearchConfig) (foundSelle
 					Country:     Country2flag[info.CountryFlag],
 					ExtraValues: entry.ExtraValues,
 					Restricted:  restricted,
+					Grade:       entry.Conditions,
 				}
 				if info.CreditMultiplier > 0 {
 					res.Credit = entry.Price / info.CreditMultiplier
@@ -2324,6 +2329,7 @@ func searchVendors(p *prices, cardIDs []string, config SearchConfig) (foundVendo
 					PriceUnit:    quantityUnit(info.QuantityPriority),
 					Country:      Country2flag[info.CountryFlag],
 					Restricted:   restricted,
+					Grade:        entry.Conditions,
 				}
 
 				foundVendors[cardID][conditions] = append(foundVendors[cardID][conditions], res)
