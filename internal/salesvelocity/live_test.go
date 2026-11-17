@@ -98,6 +98,7 @@ func TestSalesVelocityLive(t *testing.T) {
 	match := cardMatcher(b)
 	start = time.Now()
 	cards, unmatched := build(rows, last, match)
+	bands := grade(cards)
 	buildTook := time.Since(start)
 	if len(cards) == 0 {
 		t.Fatal("no cards matched")
@@ -147,5 +148,25 @@ func TestSalesVelocityLive(t *testing.T) {
 	fmt.Printf("| last sale over %d days | %d | %d |\n", lookback, lastTook.Milliseconds(), len(last))
 	fmt.Printf("| match and build (cards) | %d | %d |\n\n", buildTook.Milliseconds(), len(cards))
 	fmt.Print("| entries | zero | unmatched pairs | this game's pairs unmatched |\n|---:|---:|---:|---:|\n")
-	fmt.Printf("| %d | %d | %d | %d of %d |\n", len(cards), zero, unmatched, gameUnmatched, gamePairs)
+	fmt.Printf("| %d | %d | %d | %d of %d |\n\n", len(cards), zero, unmatched, gameUnmatched, gamePairs)
+
+	// Each band's cards with a sale in the window, and the slowest rate of each pace.
+	counts := make([]int, len(bands))
+	from := make([][PaceFastest + 1]float64, len(bands))
+	for _, v := range cards {
+		if v.Copies == 0 {
+			continue
+		}
+		counts[v.Band]++
+		rate := v.PerDay(Window)
+		low := &from[v.Band][v.Pace]
+		if *low == 0 || rate < *low {
+			*low = rate
+		}
+	}
+	fmt.Print("| band | cards | fastest from | fast from | steady from |\n|---|---:|---:|---:|---:|\n")
+	for i, band := range bands {
+		fmt.Printf("| %s | %d | %.2f | %.2f | %.2f |\n", cmp.Or(band.String(), "all"), counts[i],
+			from[i][PaceFastest], from[i][PaceFast], from[i][PaceSteady])
+	}
 }

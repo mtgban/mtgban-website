@@ -565,8 +565,12 @@ var funcMap = template.FuncMap{
 		if !card.VelocityNotable {
 			return ""
 		}
-		return template.HTML(fmt.Sprintf(`<span class="bl-velocity" title="%s" data-tip="%s">%s</span>`,
-			html.EscapeString(plainTip(card.VelocityDetail)), html.EscapeString(card.VelocityDetail), html.EscapeString(card.Velocity)))
+		pace := card.VelocityPace.String()
+		if pace != "" {
+			pace = " velocity-" + pace
+		}
+		return template.HTML(fmt.Sprintf(`<span class="bl-velocity%s" title="%s" data-tip="%s">%s</span>`,
+			pace, html.EscapeString(plainTip(card.VelocityDetail)), html.EscapeString(card.VelocityDetail), html.EscapeString(card.Velocity)))
 	},
 	// direct_stock is TCGplayer Direct's stock of a card in a grade, 0 where
 	// the last scrape did not see it.

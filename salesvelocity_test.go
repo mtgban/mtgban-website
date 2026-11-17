@@ -182,7 +182,7 @@ func TestLoadSalesVelocityReadsInOneSnapshot(t *testing.T) {
 		case salesvelocity.DayQuery, salesvelocity.GlobalDayQuery:
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{newest}}}, nil
 		case salesvelocity.WindowQuery:
-			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}}, nil
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price"}}, nil
 		}
 		return &fakeRows{cols: []string{"p", "v", "l"}}, nil
 	}}
@@ -291,8 +291,8 @@ func TestLoadSalesVelocityEndsOnEveryGamesCompleteDay(t *testing.T) {
 		case salesvelocity.GlobalDayQuery:
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{globalNewest}}}, nil
 		case salesvelocity.WindowQuery:
-			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}, vals: [][]driver.Value{
-				{productID, "Normal", int64(3), int64(2), int64(1)},
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price"}, vals: [][]driver.Value{
+				{productID, "Normal", int64(3), int64(2), int64(1), 1.5},
 			}}, nil
 		}
 		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{productID, "Normal", gameNewest}}}, nil
@@ -336,8 +336,8 @@ func TestLoadSalesVelocityAfterADatastoreReload(t *testing.T) {
 		case salesvelocity.DayQuery, salesvelocity.GlobalDayQuery:
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{newest}}}, nil
 		case salesvelocity.WindowQuery:
-			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}, vals: [][]driver.Value{
-				{productID, "Normal", int64(3), int64(2), int64(1)},
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price"}, vals: [][]driver.Value{
+				{productID, "Normal", int64(3), int64(2), int64(1), 1.5},
 			}}, nil
 		}
 		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{productID, "Normal", newest}}}, nil
@@ -519,8 +519,8 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 		case salesvelocity.DayQuery, salesvelocity.GlobalDayQuery:
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{day}}}, nil
 		case salesvelocity.WindowQuery:
-			return &fakeRows{cols: []string{"p", "v", "c", "o", "d"}, vals: [][]driver.Value{
-				{productID, "Normal", int64(69), int64(31), int64(18)},
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price"}, vals: [][]driver.Value{
+				{productID, "Normal", int64(69), int64(31), int64(18), 1.5},
 			}}, nil
 		}
 		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{productID, "Normal", lastSale}}}, nil
@@ -533,7 +533,8 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 		t.Fatalf("got %d queries, want the two days, the window and the lookback", n)
 	}
 	got, found := salesVelocityStore.Snapshot().For(cardID)
-	want := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: lastSale}
+	// The only card outsells none of its band.
+	want := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: lastSale, Price: 1.5, Pace: salesvelocity.PaceSlow}
 	if !found || got != want {
 		t.Errorf("%s: got %+v, %v; want %+v", cardID, got, found, want)
 	}
@@ -558,7 +559,7 @@ func TestSearchMetadataCarriesSalesVelocity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
+	v := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC), Pace: salesvelocity.PaceFast}
 	sales := &salesvelocity.Snapshot{Cards: map[string]*salesvelocity.Sales{co.UUID: &v}, Window: salesvelocity.Window}
 	wantRate, wantDetail, _ := sales.View(co.UUID)
 	if wantRate == "" {
@@ -568,6 +569,9 @@ func TestSearchMetadataCarriesSalesVelocity(t *testing.T) {
 	card := metadata[cardID]
 	if card.Velocity != wantRate || card.VelocityDetail != wantDetail {
 		t.Errorf("got %q, %q; want %q, %q", card.Velocity, card.VelocityDetail, wantRate, wantDetail)
+	}
+	if card.VelocityPace != v.Pace {
+		t.Errorf("pace: got %v, want %v", card.VelocityPace, v.Pace)
 	}
 
 	metadata, _ = searchMetadata(ds, currentPrices(), nil, []string{cardID}, false)
@@ -580,7 +584,8 @@ func TestSearchMetadataCarriesSalesVelocity(t *testing.T) {
 // velocityPageVars is one card on a results page, its velocity read from the snapshot.
 func velocityPageVars(canVelocity, showUpsell bool) PageVars {
 	const cardID = "velocity-card"
-	rate, detail, _ := salesVelocityStore.Snapshot().View(cardID)
+	sales := salesVelocityStore.Snapshot()
+	rate, detail, _ := sales.View(cardID)
 	return PageVars{
 		ShowUpsell: showUpsell,
 		SearchVars: SearchVars{
@@ -590,7 +595,7 @@ func velocityPageVars(canVelocity, showUpsell bool) PageVars {
 			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
 			CanVelocity:  canVelocity,
 		},
-		Metadata: map[string]GenericCard{cardID: {Name: "Some Card", Edition: "Some Set", Velocity: rate, VelocityDetail: detail}},
+		Metadata: map[string]GenericCard{cardID: {Name: "Some Card", Edition: "Some Set", Velocity: rate, VelocityDetail: detail, VelocityPace: sales.Pace(cardID)}},
 	}
 }
 
@@ -644,6 +649,29 @@ func TestSearchShowsSalesVelocity(t *testing.T) {
 			if strings.Contains(page, "TCGplayer sales") || strings.Contains(page, velocityUpsell) {
 				t.Errorf("%s: row or upsell shown for a card with no sales data", name)
 			}
+		}
+	}
+}
+
+// TestSearchColorsSalesVelocity marks the rate with its pace on both layouts,
+// and leaves a card not graded unmarked.
+func TestSearchColorsSalesVelocity(t *testing.T) {
+	for _, pace := range []salesvelocity.Pace{salesvelocity.PaceFastest, salesvelocity.PaceSlow} {
+		setTestSalesVelocity(t, map[string]*salesvelocity.Sales{"velocity-card": {Copies: 69, Pace: pace}})
+		pages := velocityPages(t, velocityPageVars(true, true))
+		for name, want := range map[string]string{
+			"desktop": `<span class="amt velocity-` + pace.String() + `">2.3/day</span>`,
+			"mobile":  `<span class="m-vendor-price velocity-` + pace.String() + `">2.3/day</span>`,
+		} {
+			if !strings.Contains(pages[name], want) {
+				t.Errorf("%s: want %q, rendered:\n%s", name, want, pages[name])
+			}
+		}
+	}
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{"velocity-card": {Copies: 69}})
+	for name, page := range velocityPages(t, velocityPageVars(true, true)) {
+		if strings.Contains(page, "velocity-slow") || strings.Contains(page, "velocity-\"") {
+			t.Errorf("%s: a card with no pace is marked", name)
 		}
 	}
 }
@@ -1528,5 +1556,18 @@ func TestVelocityRateSitsBesideCKSignal(t *testing.T) {
 	}
 	if !strings.Contains(render(false), `<span class="bl-ck-line">`+signal+`</span>`) {
 		t.Error("a slow card's signal shares its line")
+	}
+}
+
+// TestVelocityRateCarriesPace marks the rate in INFO with its pace.
+func TestVelocityRateCarriesPace(t *testing.T) {
+	vars := reversePageVars()
+	for id, card := range vars.Metadata {
+		card.Velocity, card.VelocityDetail, card.VelocityNotable = "2.3/day", "**Sold**\n|copies|69", true
+		card.VelocityPace = salesvelocity.PaceFast
+		vars.Metadata[id] = card
+	}
+	if !strings.Contains(renderArbit(t, vars), `<span class="bl-velocity velocity-fast" title="`) {
+		t.Error("the rate in INFO has no pace")
 	}
 }

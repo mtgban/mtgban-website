@@ -1,6 +1,8 @@
 package salesvelocity
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -16,14 +18,15 @@ func snapshotOf(cards map[string]*Sales) *Snapshot {
 func TestBuild(t *testing.T) {
 	day := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
 	rows := []salesRow{
-		{ProductID: 1, Variant: "Normal", Copies: 69, Orders: 31, Days: 18},
-		{ProductID: 2, Variant: "Foil", Copies: 12, Orders: 9, Days: 4},
-		// Two products filed under one card: copies and orders add up.
-		{ProductID: 3, Variant: "Normal", Copies: 2, Orders: 2, Days: 2},
-		{ProductID: 4, Variant: "Normal", Copies: 3, Orders: 1, Days: 1},
+		{ProductID: 1, Variant: "Normal", Copies: 69, Orders: 31, Days: 18, Price: 1.5},
+		{ProductID: 2, Variant: "Foil", Copies: 12, Orders: 9, Days: 4, Price: 40},
+		// Two products filed under one card: copies and orders add up, and
+		// the price is their mean weighted by orders.
+		{ProductID: 3, Variant: "Normal", Copies: 2, Orders: 2, Days: 2, Price: 2},
+		{ProductID: 4, Variant: "Normal", Copies: 3, Orders: 1, Days: 1, Price: 5},
 		// Their days keep the larger count, not the sum: the rows can't say which days overlap.
-		{ProductID: 7, Variant: "Normal", Copies: 40, Orders: 40, Days: 12},
-		{ProductID: 8, Variant: "Normal", Copies: 40, Orders: 40, Days: 20},
+		{ProductID: 7, Variant: "Normal", Copies: 40, Orders: 40, Days: 12, Price: 1},
+		{ProductID: 8, Variant: "Normal", Copies: 40, Orders: 40, Days: 20, Price: 1},
 		// No card.
 		{ProductID: 5, Variant: "Normal", Copies: 1, Orders: 1, Days: 1},
 	}
@@ -56,10 +59,10 @@ func TestBuild(t *testing.T) {
 		t.Errorf("unmatched: got %d, want 2", unmatched)
 	}
 	want := map[string]Sales{
-		"steady": {Copies: 69, Orders: 31, Days: 18, LastSale: day(10, 11)},
-		"foil":   {Copies: 12, Orders: 9, Days: 4, LastSale: day(10, 12)},
-		"merged": {Copies: 5, Orders: 3, Days: 2, LastSale: day(10, 12)},
-		"busy":   {Copies: 80, Orders: 80, Days: 20, LastSale: day(10, 12)},
+		"steady": {Copies: 69, Orders: 31, Days: 18, LastSale: day(10, 11), Price: 1.5},
+		"foil":   {Copies: 12, Orders: 9, Days: 4, LastSale: day(10, 12), Price: 40},
+		"merged": {Copies: 5, Orders: 3, Days: 2, LastSale: day(10, 12), Price: 3},
+		"busy":   {Copies: 80, Orders: 80, Days: 20, LastSale: day(10, 12), Price: 1},
 		"zero":   {LastSale: day(8, 2)},
 	}
 	if len(cards) != len(want) {
@@ -74,6 +77,97 @@ func TestBuild(t *testing.T) {
 	for pair, n := range asked {
 		if n != 1 {
 			t.Errorf("%v: matched %d times, want once", pair, n)
+		}
+	}
+}
+
+// pricedCards is n cards at price, selling 1 to n copies, keyed prefix and copies.
+func pricedCards(cards map[string]*Sales, prefix string, n int, price float64) {
+	for k := 1; k <= n; k++ {
+		cards[fmt.Sprintf("%s%d", prefix, k)] = &Sales{Copies: int32(k), Price: price}
+	}
+}
+
+// TestGrade judges each card against its own price band: the fastest tenth,
+// the next three, the bottom quarter, and no sale in the window as slow. A
+// band too small to grade joins the one below it.
+func TestGrade(t *testing.T) {
+	cards := map[string]*Sales{"zero": {}}
+	pricedCards(cards, "cheap", 200, 0.5)
+	// Too few to grade apart, so they join the band below, down to the cheap one.
+	pricedCards(cards, "mid", 10, 50)
+	// A band of their own, selling a tenth as many copies.
+	for k := range 200 {
+		cards[fmt.Sprintf("rare%d-%d", k/10+1, k%10)] = &Sales{Copies: int32(k/10 + 1), Price: 500}
+	}
+
+	bands := grade(cards)
+	want := []Band{{0, 300}, {300, 0}}
+	if !slices.Equal(bands, want) {
+		t.Fatalf("bands: got %v, want %v", bands, want)
+	}
+	for _, tc := range []struct {
+		card string
+		pace Pace
+		band int8
+	}{
+		{"zero", PaceSlow, 0},
+		// 210 cards, the mid ones among them: the fastest 21, the next 63,
+		// down to the slowest 52.
+		{"cheap180", PaceFastest, 0},
+		{"cheap179", PaceFast, 0},
+		{"cheap117", PaceFast, 0},
+		{"cheap116", PaceSteady, 0},
+		{"cheap44", PaceSteady, 0},
+		{"cheap43", PaceSlow, 0},
+		{"cheap1", PaceSlow, 0},
+		{"mid10", PaceSlow, 0},
+		// Twenty copies is slow for a cheap card, the fastest for a $500 one.
+		{"cheap20", PaceSlow, 0},
+		{"rare20-0", PaceFastest, 1},
+		{"rare6-0", PaceSteady, 1},
+		{"rare5-0", PaceSlow, 1},
+	} {
+		v := cards[tc.card]
+		if v.Pace != tc.pace || v.Band != tc.band {
+			t.Errorf("%s: got %v in band %d, want %v in band %d", tc.card, v.Pace, v.Band, tc.pace, tc.band)
+		}
+	}
+	if cards["cheap1"].Outsells != 0 || cards["rare20-0"].Outsells != 95 {
+		t.Errorf("outsells: got %v and %v, want 0 and 95", cards["cheap1"].Outsells, cards["rare20-0"].Outsells)
+	}
+
+	// A lowest band too small joins the one above it.
+	cards = map[string]*Sales{}
+	pricedCards(cards, "cheap", 10, 0.5)
+	pricedCards(cards, "pricey", 200, 50)
+	bands = grade(cards)
+	if !slices.Equal(bands, []Band{{0, 0}}) {
+		t.Errorf("one band: got %v", bands)
+	}
+
+	// Outselling 106 of 200 is 53%, which a float share times 100 puts at 52.99.
+	cards = map[string]*Sales{}
+	pricedCards(cards, "card", 200, 1)
+	grade(cards)
+	got := cards["card107"].Outsells
+	if got != 53 {
+		t.Errorf("card107: outsells %d%%, want 53%%", got)
+	}
+}
+
+// TestBandString names a band's prices for the details.
+func TestBandString(t *testing.T) {
+	for band, want := range map[Band]string{
+		{0, 1}:      "under $1",
+		{10, 30}:    "at $10–30",
+		{300, 0}:    "at $300+",
+		{0.5, 2.25}: "at $0.5–2.25",
+		{0, 0}:      "",
+	} {
+		got := band.String()
+		if got != want {
+			t.Errorf("%v: got %q, want %q", band, got, want)
 		}
 	}
 }
@@ -205,10 +299,44 @@ func TestText(t *testing.T) {
 		{"another window", Sales{Copies: 7, Orders: 7, Days: 5, LastSale: last}, 7, "1.0/day",
 			"**Sold on TCGplayer, last 7 days**\n|copies|7\n|orders|7\n|days with a sale|5\n|last sale|2026-10-11"},
 	} {
-		rate, detail := text(tc.v, tc.window)
+		rate, detail := text(tc.v, tc.window, "")
 		if rate != tc.rate || detail != tc.detail {
 			t.Errorf("%s: got %q, %q; want %q, %q", tc.desc, rate, detail, tc.rate, tc.detail)
 		}
+	}
+}
+
+// TestViewPace words a graded card's band in its details, before the last sale.
+func TestViewPace(t *testing.T) {
+	last := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
+	s := snapshotOf(map[string]*Sales{
+		"fast":    {Copies: 69, Orders: 31, Days: 18, LastSale: last, Pace: PaceFastest, Band: 1, Outsells: 92},
+		"slowest": {Copies: 1, Orders: 1, Days: 1, LastSale: last, Pace: PaceSlow},
+		"all":     {Copies: 1, Orders: 1, Days: 1, LastSale: last, Pace: PaceSlow},
+		"zero":    {LastSale: last, Pace: PaceSlow},
+	})
+	s.Bands = []Band{{0, 30}, {30, 0}}
+	const head = "**Sold on TCGplayer, last 30 days**\n"
+	for card, want := range map[string]string{
+		"fast":    head + "|copies|69\n|orders|31\n|days with a sale|18\n|vs. cards at $30+|faster than 92%\n|last sale|2026-10-11",
+		"slowest": head + "|copies|1\n|orders|1\n|days with a sale|1\n|vs. cards under $30|among the slowest\n|last sale|2026-10-11",
+		"zero":    head + "no sale in the window; last sold 2026-10-11",
+	} {
+		_, detail, _ := s.View(card)
+		if detail != want {
+			t.Errorf("%s: got %q, want %q", card, detail, want)
+		}
+		if s.Pace(card) != s.Cards[card].Pace {
+			t.Errorf("%s: pace %v", card, s.Pace(card))
+		}
+	}
+	s.Bands = []Band{{}}
+	_, detail, _ := s.View("all")
+	if !strings.Contains(detail, "|vs. all cards|among the slowest\n") {
+		t.Errorf("one band: got %q", detail)
+	}
+	if s.Pace("missing") != PaceNone || (*Snapshot)(nil).Pace("card") != PaceNone {
+		t.Error("a card with no data has a pace")
 	}
 }
 
@@ -216,7 +344,7 @@ func TestText(t *testing.T) {
 func TestView(t *testing.T) {
 	v := Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
 	s := snapshotOf(map[string]*Sales{"card": &v})
-	wantRate, wantDetail := text(v, Window)
+	wantRate, wantDetail := text(v, Window, "")
 	rate, detail, _ := s.View("card")
 	if rate != wantRate || detail != wantDetail {
 		t.Errorf("card: got %q, %q; want %q, %q", rate, detail, wantRate, wantDetail)
