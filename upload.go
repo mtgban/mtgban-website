@@ -1900,7 +1900,7 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 		preferFlavor:     preferFlavor,
 		tiebreak:         tiebreak,
 		tieOrder:         tieOrder,
-		moves:            readOptMoves(r, blMode),
+		moves:            readOptMoves(r, blMode, skipConds),
 	}
 }
 
@@ -1913,7 +1913,7 @@ const maxTieOrder = 3
 // mode and one "id<TAB>condition<TAB>store" line a row; a store's shorthand
 // names its buylist and its retail alike, so a move made in the other mode
 // is dropped.
-func readOptMoves(r *http.Request, blMode bool) map[string]string {
+func readOptMoves(r *http.Request, blMode, skipConds bool) map[string]string {
 	if r.FormValue("rows") == "" {
 		return nil
 	}
@@ -1934,7 +1934,17 @@ func readOptMoves(r *http.Request, blMode bool) map[string]string {
 		if len(fields) != 3 || fields[0] == "" || fields[2] == "" {
 			continue
 		}
-		moves[fields[0]+fields[1]] = fields[2]
+		// No row holds a condition once the settings ignore them, and a
+		// card its conditions sent to two stores then moves to neither
+		if skipConds {
+			fields[1] = ""
+		}
+		key := fields[0] + fields[1]
+		store, found := moves[key]
+		if found && store != fields[2] {
+			fields[2] = ""
+		}
+		moves[key] = fields[2]
 	}
 	return moves
 }

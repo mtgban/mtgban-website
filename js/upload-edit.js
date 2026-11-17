@@ -183,18 +183,16 @@
             var was = tr.dataset.cond || '';
             if (was === cond) return;
             remember(tr);
-            var grade = tr.dataset.grade;
-            optRows(tr.dataset.hash, grade || '').forEach(function(opt) {
+            optRows(tr.dataset.hash, tr.dataset.grade || '').forEach(function(opt) {
+                // The page's move keys and later edits read the new grade
+                opt.dataset.optCond = cond;
                 var b = opt.querySelector('.ures-edit-btn[data-edit="cond"]');
-                if (grade !== undefined) {
-                    // The page's move keys and later edits read the new grade
-                    opt.dataset.optCond = cond;
-                    if (b) b.textContent = cond || 'NM';
-                }
-                if (b) b.classList.toggle('edited', cond !== tr.dataset.origCond);
+                if (!b) return;
+                b.textContent = cond || 'NM';
+                b.classList.toggle('edited', cond !== tr.dataset.origCond);
             });
             tr.dataset.cond = cond;
-            if (grade !== undefined) tr.dataset.grade = cond;
+            tr.dataset.grade = cond;
             var rank = cond ? String(CONDS.indexOf(cond)) : '';
             tr.dataset.kCond = rank;
             var b = tr.querySelector('.ures-edit-btn[data-edit="cond"]');
@@ -217,7 +215,7 @@
         tr.dataset.added = '';
         tr.dataset.cond = cond;
         tr.dataset.qtys = '1';
-        if (src.dataset.grade !== undefined) tr.dataset.grade = cond;
+        tr.dataset.grade = cond;
         var rank = String(CONDS.indexOf(cond));
         tr.dataset.kCond = rank;
         var b = tr.querySelector('.ures-edit-btn[data-edit="cond"]');
