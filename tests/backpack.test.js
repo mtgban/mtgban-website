@@ -116,10 +116,11 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
     }
     const storageListeners = [];
     const pageshowListeners = [];
+    const pagehideListeners = [];
     const tracked = [];
     const window = {
         localStorage, sessionStorage, confirm: (msg) => { confirms.push(msg); return true; },
-        addEventListener: (ev, fn) => { if (ev === 'storage') storageListeners.push(fn); if (ev === 'pageshow') pageshowListeners.push(fn); },
+        addEventListener: (ev, fn) => { if (ev === 'storage') storageListeners.push(fn); if (ev === 'pageshow') pageshowListeners.push(fn); if (ev === 'pagehide') pagehideListeners.push(fn); },
         location: { pathname: '/search' },
         BAN: { track: (...a) => tracked.push(a) },
     };
@@ -166,6 +167,7 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
         fireChange: (target) => (docListeners.change || []).forEach((fn) => fn({ target })),
         fireStorage: (key = 'mtgban_backpack') => storageListeners.forEach((fn) => fn({ key })),
         firePageshow: (persisted) => pageshowListeners.forEach((fn) => fn({ persisted })),
+        firePagehide: () => pagehideListeners.forEach((fn) => fn({})),
     };
 }
 
@@ -828,6 +830,55 @@ describe('taking from the backpack a send came from', () => {
         const p = page({ store: more, tabs: 2, active: 1, tabList, session: s.sm, ban: { canUpload: true, priced }, sections: [[['uuid-1', 1, false, 'NM']]] });
         p.window.takeRowsFromBackpack(p.optSections[0].take);
         expect(live(p)).toEqual([[1, 'uuid-1', 2], [2, 'uuid-1', 2], [2, 'uuid-2', 1]]);
+    });
+
+    // reprice leaves the send's page with these result rows and returns the page pricing priced.
+    function reprice(results, priced) {
+        const more = [...store, { id: 'uuid-2', pack: 2, qty: 1, t: 3, m: 3 }];
+        const s = page({ store: more, tabs: 2, active: 2, tabList });
+        s.nav.click();
+        ids['backpack-send'].click();
+        const first = page({ store: more, tabs: 2, active: 1, tabList, session: s.sm, ban: { canUpload: true, priced: ['uuid-2', 'uuid-1'] }, results });
+        expect(first.window.Backpack.sentPack()).toBe(2);
+        first.firePagehide();
+        return page({ store: more, tabs: 2, active: 1, tabList, session: s.sm, ban: { canUpload: true, priced } });
+    }
+
+    test('a re-price after a card was added in a second condition still takes from the backpack sent', () => {
+        const p = reprice([['uuid-2', 1, 'NM'], ['uuid-1', 3, 'NM'], ['uuid-1', 1, 'SP']], ['uuid-2', 'uuid-1', 'uuid-1']);
+        expect(p.window.Backpack.sentPack()).toBe(2);
+    });
+
+    test('a re-price after a row was struck from results still takes from the backpack sent', () => {
+        const p = reprice([['uuid-2', 1, 'NM', true], ['uuid-1', 3, 'NM']], ['uuid-1']);
+        expect(p.window.Backpack.sentPack()).toBe(2);
+    });
+
+    test('a send from the page showing a send keeps the new send', () => {
+        const session = sent();
+        const more = [...store, { id: 'uuid-2', pack: 2, qty: 1, t: 3, m: 3 }];
+        const p = page({ store: more, tabs: 2, active: 2, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, results: [['uuid-1', 3, 'NM']] });
+        expect(p.window.Backpack.sentPack()).toBe(2);
+        p.nav.click();
+        ids['backpack-send'].click();
+        p.firePagehide();
+        expect(JSON.parse(session.mtgban_backpack_sent)).toEqual({ pack: 2, ids: ['uuid-2', 'uuid-1'] });
+    });
+
+    test('a page that is not the send leaves the send as it was', () => {
+        const session = sent();
+        const other = page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-9'] }, results: [['uuid-9', 1, 'NM']] });
+        other.firePagehide();
+        expect(JSON.parse(session.mtgban_backpack_sent).ids).toEqual(['uuid-1']);
+    });
+
+    test('a later upload of some of the cards sent is not the send', () => {
+        const more = [...store, { id: 'uuid-2', pack: 2, qty: 1, t: 3, m: 3 }];
+        const s = page({ store: more, tabs: 2, active: 2, tabList });
+        s.nav.click();
+        ids['backpack-send'].click();
+        const p = page({ store: more, tabs: 2, active: 1, tabList, session: s.sm, ban: { canUpload: true, priced: ['uuid-1'] } });
+        expect(p.window.Backpack.sentPack()).toBe(0);
     });
 
     test('an Upload page of other cards takes from the open backpack', () => {
