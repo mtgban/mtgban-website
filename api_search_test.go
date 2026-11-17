@@ -894,3 +894,21 @@ func TestSearchAPIReadsANumberAfterAName(t *testing.T) {
 		t.Errorf("API command tower 7029 reaches %v, want %v", got, slices.Sorted(maps.Keys(ids)))
 	}
 }
+
+// A condition filter narrows an index the API grades, as it does a store;
+// any other index carries no condition to filter.
+func TestConditionFilterNarrowsAGradedIndex(t *testing.T) {
+	withConfigCopy(t)
+	Config().Stores.APIOnlyStores = []string{"GRADED"}
+	config := parseSearchOptionsWrapper("Forest cond:SP")
+	if len(config.EntryFilters) == 0 {
+		t.Fatal("cond:SP parsed to no entry filter")
+	}
+	entry := mtgban.InventoryEntry{Conditions: "NM", Price: 1}
+	for shorthand, want := range map[string]bool{"GRADED": false, "PLAIN": true} {
+		info := mtgban.ScraperInfo{Shorthand: shorthand, MetadataOnly: true}
+		if got := sellerEntryFound(currentPrices(), info, "id", entry, &config); got != want {
+			t.Errorf("an NM entry of index %s under cond:SP: found = %v, want %v", shorthand, got, want)
+		}
+	}
+}
