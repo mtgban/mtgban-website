@@ -160,7 +160,12 @@
 
 <div class="ban-nav-mobile-overlay" id="mobile-overlay" onclick="this.classList.remove('open'); document.getElementById('mobile-menu').classList.remove('open');"></div>
 <div class="ban-nav-mobile-menu" id="mobile-menu" role="dialog" aria-modal="true" aria-label="Menu">
-    <button class="ban-nav-mobile-close" onclick="this.parentElement.classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open');">&#10005;</button>
+    <div class="ban-nav-mobile-head">
+        {{/* The bar's icons, while the bar is too narrow for them: beside
+             the close button, so the links keep their place. */}}
+        <div class="ban-nav-mobile-util" id="mobile-util"></div>
+        <button class="ban-nav-mobile-close" onclick="document.getElementById('mobile-menu').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open');">&#10005;</button>
+    </div>
     <ul class="ban-nav-mobile-links">
         {{range .Nav}}
         <li>
@@ -203,6 +208,17 @@
             offBtn.classList.toggle('is-active', localStorage.getItem('offline_prefer') === 'true');
         }
     } catch (e) {}
+
+    // A narrow bar hands its icons to the menu, leaving the search the room.
+    // Before the dock below, which only holds while the bar is wide.
+    var util = document.querySelector('.nav2-utility');
+    var menuUtil = document.getElementById('mobile-util');
+    var narrowBar = typeof matchMedia === 'function' && matchMedia('(max-width: 900px)').matches;
+    if (util && menuUtil && narrowBar) {
+        Array.from(util.children).forEach(function(el) {
+            if (!el.classList.contains('ban-nav-hamburger')) menuUtil.appendChild(el);
+        });
+    }
 
     // On /offline the navbar is a Singles/Sealed mode switch: mark it and hide the
     // online section nav inline before first paint, then skip layout restoration.

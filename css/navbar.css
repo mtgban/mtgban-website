@@ -322,14 +322,16 @@ body.light-theme .navbar-v2[data-tier="modern"] {
     background: transparent;
     color: var(--text-dim);
 }
-/* Inside the navbar, and docked in the Tools menu, the 7px padding would
-   blow the hit/hover box up to 50×50, and the accent hover colour would
-   set the gear apart from the other utility icons; both go, so the gear
-   matches the Guide ? icon. */
+/* Inside the navbar, docked in the Tools menu, or atop the hamburger menu,
+   the 7px padding would blow the hit/hover box up to 50×50, and the accent
+   hover colour would set the gear apart from the other utility icons; both
+   go, so the gear matches the Guide ? icon. */
 .nav2-utility .ban-settings-btn,
-.tools-quick-dock .ban-settings-btn { padding: 0; }
+.tools-quick-dock .ban-settings-btn,
+.ban-nav-mobile-util .ban-settings-btn { padding: 0; }
 .nav2-utility .ban-settings-btn:hover,
-.tools-quick-dock .ban-settings-btn:hover { color: var(--normal); }
+.tools-quick-dock .ban-settings-btn:hover,
+.ban-nav-mobile-util .ban-settings-btn:hover { color: var(--normal); }
 
 /* ── Tools dropdown (mega menu) ───────────────────────────── */
 .nav2-tools-wrap {

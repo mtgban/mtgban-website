@@ -509,9 +509,24 @@ body:not([data-theme-pref])    .theme-icon-system {
     width: 32px; height: 32px; border-radius: var(--radius-sm, 6px);
     background: var(--surface-2, var(--navbackground)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     color: var(--activetext); font-size: var(--text-2xl); cursor: pointer;
-    margin-bottom: 16px; margin-left: auto;
+    margin-left: auto;
+    flex-shrink: 0;
     font-family: inherit;
 }
+/* The close button's row, which takes the bar's icons while the bar is
+   narrow. They are drawn at the button's height, so the row, and the links
+   under it, stay where they are. */
+.ban-nav-mobile-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 16px;
+}
+.ban-nav-mobile-util {
+    display: flex; align-items: center; gap: 4px;
+    min-width: 0;
+}
+.ban-nav-mobile-util .nav2-icon-btn { width: 32px; height: 32px; }
+/* The backpack switcher opens rightwards here, inside the menu. */
+.ban-nav-mobile-util .nav2-backpack-menu { left: 0; right: auto; }
 
 .ban-nav-mobile-links {
     list-style: none; display: flex; flex-direction: column; gap: 2px;

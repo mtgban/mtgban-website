@@ -1570,7 +1570,12 @@
         overlay.classList.remove("open");
         panel.classList.remove("open");
         var nav = document.getElementById("nav-backpack");
-        if (nav) { nav.setAttribute("aria-expanded", "false"); if (nav.focus) nav.focus(); }
+        if (!nav) return;
+        nav.setAttribute("aria-expanded", "false");
+        // On a narrow bar the button sits in the shut hamburger menu, which
+        // takes no focus: hand it to the hamburger instead.
+        var back = nav.closest("#mobile-util") ? document.querySelector(".ban-nav-hamburger") : nav;
+        if (back && back.focus) back.focus();
     }
 
     // trapTab keeps Tab and Shift+Tab cycling inside the open panel.
