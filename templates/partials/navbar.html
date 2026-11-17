@@ -134,8 +134,8 @@
         {{/* Bound to the search form by id rather than by nesting, so that
              submitting from either bar sends both fields. */}}
         <div class="nav2-scope-autocomplete autocomplete">
-            <input class="nav2-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
-                   {{if .ScopeIgnored}}title="Nothing here is a filter, so the search ignores it"{{end}}
+            <input class="nav2-scope-box{{if or .ScopeIgnored .ScopeOverridden}} is-ignored{{end}}" id="nav-scopebox" type="text"
+                   {{if .ScopeIgnored}}title="Nothing here is a filter, so the search ignores it"{{else if .ScopeOverridden}}title="The search names a finish, so the pinned one is ignored"{{end}}
                    value="{{.SearchScope}}" placeholder="Extra filters for this session, like s:sos, is:foil or r:mythic"
                    maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
         </div>

@@ -248,33 +248,67 @@ func parseSearchPage(ds *datastore, p *prices, query string, sealed, bareIDs boo
 }
 
 // applySearchScope folds the pinned bar's filters into the search the
-// main bar asked for. Every one of them, whatever the main bar says.
+// main bar asked for, and returns the pinned ones the main bar overrode.
 //
-// Nothing here decides that one of two filters was not meant. Filters
-// are ANDed, so a pinned "s:sos" under a typed "s:mh3" does answer
-// nothing - but that is what the reader asked for twice, and the empty
-// page names the bar that narrowed it and offers to drop it, which is a
-// better answer than quietly searching for something else. Dropping one
-// side is the version with no way back: the results look ordinary and
-// the bar reads as applied while it is not.
+// Filters are ANDed, so a pinned "s:sos" under a typed "s:mh3" does
+// answer nothing - but that is what the reader asked for twice, and the
+// empty page names the bar that narrowed it and offers to drop it.
+// Deciding in general which of two filters wins means knowing whether
+// they share an axis - two editions do, "is foil" and "is promo" do
+// not - and every guess at that was wrong for somebody.
 //
-// It is also the only rule that stays true of filters we do not model.
-// Deciding which of two filters wins means knowing whether they share
-// an axis - two editions do, "is foil" and "is promo" do not, and the
-// site's own links write is: - and every guess at that was wrong for
-// somebody. A reader who hides promos lost every finish they pinned to
-// one such guess.
-func applySearchScope(config *SearchConfig, pinned []FilterElem) {
+// Finish is the one axis known for certain: a finish the main bar names
+// replaces a pinned one, the way the last of "&*" is the one that
+// counts, and the bar is marked as overridden rather than read as applied.
+func applySearchScope(config *SearchConfig, pinned []FilterElem) []FilterElem {
 	if len(pinned) == 0 {
-		return
+		return nil
 	}
 	// A query that names its own cards, or that we hand to another
 	// syntax whole, is not ours to narrow.
 	if config.SearchMode == "hashing" || config.SearchMode == "scryfall" {
-		return
+		return nil
 	}
 
-	config.CardFilters = append(config.CardFilters, pinned...)
+	typedFinish := slices.ContainsFunc(config.CardFilters, asksFinish)
+	var overridden []FilterElem
+	for _, filter := range pinned {
+		if typedFinish && asksFinish(filter) {
+			overridden = append(overridden, filter)
+			continue
+		}
+		config.CardFilters = append(config.CardFilters, filter)
+	}
+	return overridden
+}
+
+// asksFinish is a filter asking for a finish ("*", "f:foil", "is:foil"),
+// not one leaving a finish out ("-f:foil") or an is: that also takes
+// another axis ("is:foil,promo" is foil or promo).
+func asksFinish(filter FilterElem) bool {
+	if filter.Negate {
+		return false
+	}
+	switch filter.Name {
+	case "finish":
+		return true
+	case "is":
+		return !slices.ContainsFunc(filter.Values, func(value string) bool {
+			return value != "foil" && value != "nonfoil"
+		})
+	}
+	return false
+}
+
+// appliedPinnedTokens drops from the pinned bar's tokens the finishes the
+// main bar replaced, read through the same parse and rule as the merge.
+func appliedPinnedTokens(ds *datastore, p *prices, tokens []string, sealed bool) []string {
+	return slices.DeleteFunc(slices.Clone(tokens), func(token string) bool {
+		filters := scopeFilters(ds, p, token, sealed, false)
+		return len(filters) > 0 && !slices.ContainsFunc(filters, func(filter FilterElem) bool {
+			return !asksFinish(filter)
+		})
+	})
 }
 
 // searchSuggestions adapts a parsed search that found nothing into the
@@ -630,6 +664,10 @@ type SearchVars struct {
 	// The bar holds something that parses to no filter at all, so the
 	// search passes over it whole.
 	ScopeIgnored bool
+	// The main bar named a finish, so the one pinned here does not apply;
+	// with ScopeAllOverridden, nothing pinned does.
+	ScopeOverridden    bool
+	ScopeAllOverridden bool
 
 	// The switch between the three readings of a sealed product's contents,
 	// nil unless the search is one of them over a product that has all three
@@ -781,7 +819,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.ShowUpsell = !miscSearchOpts.has("noUpsell")
 
 	config := parseSearchPage(ds, p, query, pageVars.IsSealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
-	applySearchScope(&config, pinned)
+	overridden := applySearchScope(&config, pinned)
+	pageVars.ScopeOverridden = len(overridden) > 0
+	pageVars.ScopeAllOverridden = pageVars.ScopeOverridden && len(overridden) == len(pinned)
 	config.Sales = salesVelocityStore.Snapshot()
 	pageVars.HasVelocity = config.Sales != nil
 	if pageVars.CanVelocity {
@@ -807,7 +847,11 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	counting := FeatureCounter != nil && isPageView(r)
 	var run searchRun
 	if counting {
-		run = buildSearchRun(r, b, config, pinnedConfig.AppliedFilters, scope, pageVars.ScopeIgnored, pageVars.ListingLocked, roster, packs)
+		pinnedTokens := pinnedConfig.AppliedFilters
+		if pageVars.ScopeOverridden {
+			pinnedTokens = appliedPinnedTokens(ds, p, pinnedTokens, pageVars.IsSealed)
+		}
+		run = buildSearchRun(r, b, config, pinnedTokens, scope, pageVars.ScopeIgnored, pageVars.ListingLocked, roster, packs)
 	}
 	// A sort the reader may not use leaves the pills up, its own greyed out.
 	pageVars.NoSort = config.SortMode != "" && config.SortMode == pageVars.SearchSort
@@ -825,7 +869,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 				DidYouMean: len(pageVars.DidYouMean) > 0,
 				TryOneOf:   len(pageVars.AltSearches) > 0,
 				Popular:    len(pageVars.PopularSearches) > 0 && !pageVars.IsMobile,
-				Unpin:      scope != "" && !pageVars.ScopeIgnored,
+				Unpin:      scope != "" && !pageVars.ScopeIgnored && !pageVars.ScopeAllOverridden,
 				Took:       time.Since(start),
 			})
 		}

@@ -749,9 +749,9 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
     font-size: var(--text-sm, 13px);
 }
 .nav2-scope-box::placeholder { color: var(--subtle, #6d6d6d); }
-/* Something is pinned and none of it is a filter, so the search passes
-   over it. Said on the bar itself: the results are the same as an empty
-   bar's, so nothing else on the page can carry the news.
+/* Something is pinned that the search passes over: none of it is a
+   filter, or its finish gave way to the one the main bar named. Said on
+   the bar itself, since the results carry no trace of it.
    
    Warning rather than danger, and dashed rather than solid: nothing has
    gone wrong and nothing failed - the field is simply not in effect, which

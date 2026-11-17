@@ -203,7 +203,7 @@
                  ignores did not empty the page, and saying it did would
                  send the reader to undo the one thing that is blameless.
                  That bar says what it is on the bar itself. */}}
-            {{if and .SearchScope (not .ScopeIgnored)}}
+            {{if and .SearchScope (not .ScopeIgnored) (not .ScopeAllOverridden)}}
                 <div class="search-suggestions">
                     <p class="search-suggestion-label">Pinned filters are narrowing this search:</p>
                     <ul class="search-suggestion-list">
