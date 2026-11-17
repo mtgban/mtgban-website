@@ -2726,13 +2726,14 @@ func customBuylistOffers(b *matcher.Backend, p *prices, rules []customBuylistRul
 
 		for i, ref := range refs {
 			entries := ref.reference(cardID, co.Sealed)
-			// The rule applies to the best available price
-			if len(entries) == 0 || entries[0].Price == 0 || entries[0].Price < ref.rule.minPrice {
+			// The rule applies to the first priced listing, as upload reads it
+			first := slices.IndexFunc(entries, func(e mtgban.InventoryEntry) bool { return !unpriced(e.Price) })
+			if first < 0 || entries[first].Price < ref.rule.minPrice {
 				continue
 			}
 
 			for _, entry := range entries {
-				if entry.Price == 0 {
+				if unpriced(entry.Price) {
 					continue
 				}
 				condition := mtgban.Condition("INDEX")
