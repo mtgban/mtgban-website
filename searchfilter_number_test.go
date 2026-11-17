@@ -207,7 +207,7 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 	typed := func(query, scope string) []string {
 		t.Helper()
 		config := parseSearchQuery(ds, currentPrices(), query, nil, nil, nil)
-		applySearchScope(&config, scopeFilters(ds, currentPrices(), scope, false, false))
+		applySearchScope(&config, scopeConfig(ds, currentPrices(), scope, false, false))
 		return search(config)
 	}
 

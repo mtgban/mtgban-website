@@ -29,7 +29,7 @@ func TestSearchScopeAddsFilters(t *testing.T) {
 
 	for _, typed := range []string{"is:foil", "is:nonfoil"} {
 		config := parseForTest(t, typed)
-		applySearchScope(&config, scopeFilters(currentDatastore(), currentPrices(), "s:sos", false, false))
+		applySearchScope(&config, scopeConfig(currentDatastore(), currentPrices(), "s:sos", false, false))
 
 		names := filterNames(config.CardFilters)
 		if !slices.Contains(names, "edition") {
@@ -58,7 +58,7 @@ func TestSearchScopeKeepsBothSides(t *testing.T) {
 			config := parseForTest(t, tt.typed)
 			before := len(config.CardFilters)
 			pinned := scopeFilters(currentDatastore(), currentPrices(), tt.pinned, false, false)
-			applySearchScope(&config, pinned)
+			applySearchScope(&config, SearchConfig{CardFilters: pinned})
 
 			if len(config.CardFilters) != before+len(pinned) {
 				t.Errorf("a pinned filter went missing: typed %v, pinned %v, merged %v",
@@ -97,7 +97,7 @@ func TestSearchScopeTypedFinishWins(t *testing.T) {
 		t.Run(tt.typed+" + "+tt.pinned, func(t *testing.T) {
 			config := parseForTest(t, tt.typed)
 			pinned := scopeFilters(currentDatastore(), currentPrices(), tt.pinned, false, false)
-			overridden := applySearchScope(&config, pinned)
+			overridden := applySearchScope(&config, SearchConfig{CardFilters: pinned})
 
 			if len(overridden) != tt.overridden {
 				t.Errorf("overrode %d pinned filters, want %d", len(overridden), tt.overridden)
@@ -139,7 +139,7 @@ func TestSearchScopeIgnoresNames(t *testing.T) {
 
 	config := parseForTest(t, "is:foil")
 	before := len(config.CardFilters)
-	applySearchScope(&config, scopeFilters(currentDatastore(), currentPrices(), "abrade", false, false))
+	applySearchScope(&config, scopeConfig(currentDatastore(), currentPrices(), "abrade", false, false))
 
 	if len(config.CardFilters) != before {
 		t.Errorf("a name in the pinned bar changed the search: %v", filterNames(config.CardFilters))
@@ -158,7 +158,7 @@ func TestSearchScopeSkipsPassthroughModes(t *testing.T) {
 		config := parseForTest(t, "is:foil")
 		config.SearchMode = mode
 		before := len(config.CardFilters)
-		applySearchScope(&config, scopeFilters(currentDatastore(), currentPrices(), "s:sos", false, false))
+		applySearchScope(&config, scopeConfig(currentDatastore(), currentPrices(), "s:sos", false, false))
 
 		if len(config.CardFilters) != before {
 			t.Errorf("%s mode was narrowed by the pinned bar: %v", mode, filterNames(config.CardFilters))
@@ -283,7 +283,7 @@ func TestSearchScopeSurvivesReaderOptions(t *testing.T) {
 
 	for _, opts := range [][]string{nil, {"hidePromos"}, {"hidePrelPack"}} {
 		config := parseSearchOptionsNG(backend(), currentPrices(), "s:soa", nil, nil, opts)
-		applySearchScope(&config, scopeFilters(currentDatastore(), currentPrices(), "is:foil", false, false))
+		applySearchScope(&config, scopeConfig(currentDatastore(), currentPrices(), "is:foil", false, false))
 
 		var applied bool
 		for _, filter := range config.CardFilters {
@@ -311,16 +311,69 @@ func TestScopeIgnoredIsWhatTheBarSays(t *testing.T) {
 		{"", false},
 		{"f:foil", false},
 		{"s:soa r:mythic", false},
+		{"seller:HA", false},
+		{"cond:NM", false},
+		{"price>5", false},
+		{"skip:retail", false},
 		{"abrade", true},
 		{"sdfsdfsdf", true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.scope, func(t *testing.T) {
-			got := len(scopeFilters(currentDatastore(), currentPrices(), tt.scope, false, false)) == 0 && tt.scope != ""
+			got := tt.scope != "" && !scopeApplies(scopeConfig(currentDatastore(), currentPrices(), tt.scope, false, false))
 			if got != tt.ignored {
 				t.Errorf("%q: ignored=%v, want %v", tt.scope, got, tt.ignored)
 			}
 		})
+	}
+}
+
+// TestSearchScopeOfferFilters: a pinned store, condition or price filter
+// reaches the search beside the card filters, and a typed finish leaves it be.
+func TestSearchScopeOfferFilters(t *testing.T) {
+	skipWithoutDatastore(t)
+
+	config := parseForTest(t, "sliver overlord*")
+	pinned := scopeConfig(currentDatastore(), currentPrices(), "& seller:HA cond:NM price>5 skip:buylist", false, false)
+	overridden := applySearchScope(&config, pinned)
+
+	if len(overridden) != len(pinned.CardFilters) || !scopeNarrowsOffers(pinned) {
+		t.Errorf("overrode %d of %d card filters, offers narrowed %v", len(overridden), len(pinned.CardFilters), scopeNarrowsOffers(pinned))
+	}
+	if !slices.ContainsFunc(config.PostFilters, func(f FilterPostElem) bool {
+		return f.Name == "any" && f.OnlyForSeller && slices.Equal(f.Values, []string{"ha"})
+	}) {
+		t.Errorf("pinned seller:HA missing from %+v", config.PostFilters)
+	}
+	if !slices.ContainsFunc(config.EntryFilters, func(f FilterEntryElem) bool {
+		return f.Name == "condition" && slices.Equal(f.Values, []string{"NM"})
+	}) {
+		t.Errorf("pinned cond:NM missing from %+v", config.EntryFilters)
+	}
+	if len(config.PriceFilters) != len(pinned.PriceFilters) || len(pinned.PriceFilters) == 0 {
+		t.Errorf("pinned price>5: %d price filters, want %d", len(config.PriceFilters), len(pinned.PriceFilters))
+	}
+	if !config.SkipBuylist {
+		t.Error("pinned skip:buylist did not skip the buylist")
+	}
+}
+
+// TestSearchScopePinnedStoreSeeds: a store pinned under an empty main bar
+// searches that store's cards, as the same filter typed does.
+func TestSearchScopePinnedStoreSeeds(t *testing.T) {
+	s, uuids := fixtureStoreSite(t)
+	registerTestSeller(t, s, "TESTSELL", uuids[:3])
+	ds := s.datastore()
+
+	config := parseSearchOptionsNG(ds.backend, s.prices(), "", nil, nil, nil)
+	applySearchScope(&config, scopeConfig(ds, s.prices(), "seller:TESTSELL", false, false))
+	results, err := searchAndFilter(ds, s.prices(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(results)
+	if !slices.Equal(results, uuids[:3]) {
+		t.Errorf("pinned seller:TESTSELL found %v, want %v", results, uuids[:3])
 	}
 }
