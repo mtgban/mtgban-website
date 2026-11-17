@@ -129,14 +129,14 @@ func TestAlphabeticalSortReadsOneNameInTwoSpellings(t *testing.T) {
 	ds := testSite.newDatastore(b, time.Now())
 
 	for _, sortMode := range []string{"alpha", "hybrid"} {
-		for query, want := range map[string][]string{
-			"":              {"1_nonfoil", "1_holofoil", "2_nonfoil", "2_holofoil"},
-			"?reverse=true": {"2_nonfoil", "2_holofoil", "1_nonfoil", "1_holofoil"},
+		for reversed, want := range map[bool][]string{
+			false: {"1_nonfoil", "1_holofoil", "2_nonfoil", "2_holofoil"},
+			true:  {"2_nonfoil", "2_holofoil", "1_nonfoil", "1_holofoil"},
 		} {
 			sorted := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest(http.MethodGet, "/search"+query, nil), ds, currentPrices(), sorted, nil, nil, sortMode)
+			sortSearchKeys(httptest.NewRequest(http.MethodGet, "/search", nil), ds, currentPrices(), sorted, nil, nil, sortMode, reversed)
 			if !slices.Equal(sorted, want) {
-				t.Errorf("%s%s: sorted %v, want %v", sortMode, query, sorted, want)
+				t.Errorf("%s reversed %v: sorted %v, want %v", sortMode, reversed, sorted, want)
 			}
 		}
 	}

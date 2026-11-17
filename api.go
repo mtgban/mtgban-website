@@ -730,7 +730,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 		if config.SkipSealed {
 			allKeys = withoutSealed(b, allKeys)
 		}
-		sortSearchKeys(r, ds, p, allKeys, dropOdds(b, config), config.Sales, readSearchSort(r, config))
+		sortSearchKeys(r, ds, p, allKeys, dropOdds(b, config), config.Sales, readSearchSort(r, config), readSearchReverse(r, config))
 		if len(allKeys) > MaxAPISearchResults {
 			allKeys = allKeys[:MaxAPISearchResults]
 		}
@@ -834,7 +834,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datastore, p *prices, config SearchConfig, sig string, retail, buylist bool, tagName string) error {
 	b := ds.backend
 	result := runSearch(r, ds, p, config)
-	sortSearchKeys(r, ds, p, result.keys, result.odds, config.Sales, readSearchSort(r, config))
+	sortSearchKeys(r, ds, p, result.keys, result.odds, config.Sales, readSearchSort(r, config), readSearchReverse(r, config))
 	cut := exportCut(result)
 	result.keys = result.keys[:min(len(result.keys), MaxAPISearchResults)]
 	result.sellers, result.vendors = collectOffers(b, p, r, config, result.keys)

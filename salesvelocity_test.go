@@ -1000,12 +1000,8 @@ func TestSearchExportGatesVelocityFilter(t *testing.T) {
 
 // velocitySortKeys sorts keys by velocity, reversed if asked, and returns them.
 func velocitySortKeys(keys []string, reversed bool) []string {
-	target := "/search"
-	if reversed {
-		target += "?reverse=true"
-	}
 	sorted := slices.Clone(keys)
-	sortSearchKeys(httptest.NewRequest(http.MethodGet, target, nil), currentDatastore(), currentPrices(), sorted, nil, salesVelocityStore.Snapshot(), "velocity")
+	sortSearchKeys(httptest.NewRequest(http.MethodGet, "/search", nil), currentDatastore(), currentPrices(), sorted, nil, salesVelocityStore.Snapshot(), "velocity", reversed)
 	return sorted
 }
 
@@ -1065,7 +1061,7 @@ func TestSearchKeepsItsSalesSnapshot(t *testing.T) {
 
 	r := httptest.NewRequest(http.MethodGet, "/search", nil)
 	result := runSearch(r, ds, p, config)
-	keys := orderSearchKeys(r, ds, p, result, config.Sales, "velocity").keys
+	keys := orderSearchKeys(r, ds, p, result, config.Sales, "velocity", false).keys
 	if !slices.Equal(keys, []string{fast, slow}) {
 		t.Fatalf("filtered and sorted %v, want %v", keys, []string{fast, slow})
 	}
@@ -1209,7 +1205,7 @@ func TestSearchGatesVelocitySortByTier(t *testing.T) {
 // velocitySortChrono is keys in the default order.
 func velocitySortChrono(keys []string) []string {
 	sorted := slices.Clone(keys)
-	sortSearchKeys(httptest.NewRequest(http.MethodGet, "/search", nil), currentDatastore(), currentPrices(), sorted, nil, nil, "")
+	sortSearchKeys(httptest.NewRequest(http.MethodGet, "/search", nil), currentDatastore(), currentPrices(), sorted, nil, nil, "", false)
 	return sorted
 }
 
