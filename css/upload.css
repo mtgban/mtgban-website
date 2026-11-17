@@ -1268,6 +1268,27 @@
     color: var(--activetext);
 }
 
+/* A result's grade and copies open a menu on click (upload-edit.js) */
+.ures-edit-btn { border: none; cursor: pointer; font: inherit; color: inherit; line-height: inherit; }
+.ures-edit-btn:not(.cond-badge) { padding: 1px 6px; background: none; border-radius: var(--radius-sm); }
+.ures-edit-btn:hover, .ures-edit-btn:focus-visible { background: var(--surface-4); }
+.ures-edit-btn.cond-badge:empty::before { content: "\2013"; }
+.ures-edit-btn.ignored { color: var(--text-dim); }
+.ures-edit-btn.edited { color: var(--awarning); box-shadow: inset 0 0 0 1px var(--awarning); }
+.opt-cond-btn { margin-left: 4px; padding: 0 4px !important; font-size: var(--text-xs) !important; font-family: var(--font-mono); color: var(--text-dim); }
+.opt-loaded .loaded-qty .opt-qty-btn { padding: 0 3px; margin-left: -3px; color: inherit; }
+.opt-move-menu.ures-edit-menu { min-width: 0; }
+.ures-edit-menu.cond .ures-edit-items button { justify-content: center; font-family: var(--font-mono); }
+.ures-edit-menu.qty .ures-edit-items { display: grid; grid-template-columns: repeat(5, 2.6em); gap: 2px; }
+.ures-edit-menu.qty .ures-edit-items button { justify-content: center; padding: 5px 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ures-edit-menu button[aria-current] { background: var(--accent-muted); color: var(--activetext); font-weight: 700; }
+.ures-edit-input { display: block; box-sizing: border-box; width: 100%; margin-top: 4px; padding: 4px 8px; border: 1px solid var(--border-moderate); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--normal); font: inherit; font-size: var(--text-sm); }
+.ures-reload-bar.nudge { animation: ures-reload-nudge 0.4s ease-in-out; }
+@keyframes ures-reload-nudge { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+/* The store sends carry the page's quantities until it is reloaded */
+.ures-dirty .opt-header-actions { opacity: 0.45; }
+.ures-dirty .opt-header-actions * { cursor: not-allowed; }
+
 .ures-table tfoot td {
     padding: 10px 10px;
     background: var(--surface-2);
@@ -1415,11 +1436,11 @@
    stay under the header however tall it wraps */
 .opt-table thead { position: sticky; top: var(--nav-height); z-index: 5; }
 /* Widths on the cols: the first row is the store header, spanning them all */
-.opt-table col:nth-child(1) { width: 31%; }
-.opt-table col:nth-child(2) { width: 14%; }
+.opt-table col:nth-child(1) { width: 27%; }
+.opt-table col:nth-child(2) { width: 13%; }
 .opt-table col:nth-child(3) { width: 11%; }
 .opt-table col:nth-child(4) { width: 11%; }
-.opt-table col:nth-child(5) { width: 12%; }
+.opt-table col:nth-child(5) { width: 17%; }
 .opt-table col:nth-child(6) { width: 14%; }
 /* Wide enough for a row's Move to button beside its box */
 .opt-table col:nth-child(7) { width: 7%; }

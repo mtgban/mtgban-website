@@ -553,8 +553,9 @@
                     </div>
                 </td>
                 <td class="ures-price" data-sort="{{if ne .OriginalPrice 0.0}}{{printf "%.2f" .OriginalPrice}}{{end}}">$ {{printf "%.2f" .OriginalPrice}}</td>
-                <td style="text-align:center" data-sort="{{cond_rank .OriginalCondition}}"><span class="cond-badge">{{.OriginalCondition}}</span></td>
-                <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{.Quantity}}</td>
+                {{/* upload-edit.js opens a menu from each button; a product's grade is not the reader's to set */}}
+                <td style="text-align:center" data-sort="{{cond_rank .OriginalCondition}}">{{if and $canRemove (not $card.Sealed)}}<button type="button" class="ures-edit-btn cond-badge{{if .IgnoredCondition}} ignored{{end}}" data-edit="cond" title="Change the condition"{{if .IgnoredCondition}} aria-description="Your settings ignore conditions"{{end}}>{{or .OriginalCondition .IgnoredCondition}}</button>{{else}}<span class="cond-badge">{{.OriginalCondition}}</span>{{end}}</td>
+                <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{if $canRemove}}<button type="button" class="ures-edit-btn ures-qty-btn" data-edit="qty" title="Change the copies">{{.Quantity}}</button>{{else}}{{.Quantity}}{{end}}</td>
                 {{range $storeKeys}}
                     {{$price := (index $scraperEntries .)}}
                     {{/* The legend's green: a buylist offer above the price the list came with. */}}
@@ -1167,15 +1168,14 @@
                             <tr data-opt-id="{{.CardID}}" data-opt-cond="{{.Condition}}"{{if .Moved}} class="opt-moved" data-opt-moved="{{$scraperKey}}"{{end}}{{with .MoveTo}} data-move="{{.}}"{{end}} data-opt-price="{{$price}}" data-share-price="{{.LoadedPrice}}" data-share-cond="{{.LoadedCondition}}" data-load-idx="{{$n}}" data-load-qty="{{.Quantity}}" data-load-name="{{$card.Name}}" data-load-ckid="{{$card.CKBuylistID}}" data-load-tcgid="{{$card.TCGId}}" data-load-set="{{$card.SetCode}}" data-load-number="{{$card.Number}}" data-opt-edition="{{$card.Edition}}" data-opt-img="{{$card.ImageURL}}" data-opt-finish-tag="{{$card.FinishTag}}" data-opt-finish-class="{{$card.FinishClass}}" data-opt-cw="{{$card.HasContentWarning}}"{{with index $.SortKeys .CardID}} data-k-name="{{.Name}}" data-k-set="{{.Set}}" data-k-release="{{.Release}}" data-k-number="{{.Number}}" data-k-finish="{{.Finish}}" data-k-color="{{.Color}}" data-k-rarity="{{.Rarity}}"{{end}} data-k-cond="{{cond_rank .Condition}}"{{if .SortLead}} data-k-lead="{{.SortLead}}"{{end}} onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});hw.toggleAttribute('data-sealed',{{$card.Sealed}});">
                                 <td class="opt-name"><div class="opt-name-cell">
                                     <span class="emoji opt-copy" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>
-                                    <div class="opt-name-text"><a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}{{buylist_badge $scraperKey $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}
-                                    {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}</div>
+                                    <div class="opt-name-text"><a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}{{buylist_badge $scraperKey $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}</div>
                                 </div></td>
                                 <td class="opt-set" data-sort="{{$card.Edition}}&#9;{{$card.Name}}">
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 20 "Class" ""}} {{$card.SetCode}} #{{$card.Number}}{{if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}
                                 </td>
                                 <td>{{$ckTip := buylist_title "CK" (grade "NM") "" $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}<div class="bl-info"{{if $ckTip}} title="{{plain_tip $ckTip}}" data-tip="{{$ckTip}}"{{end}}>{{buylist_detail $scraperKey $card.HotlistStore $price $card.GoodBuylist $card.HighestBuylist true $card.CKSignal}}<span class="bl-ck-line">{{buylist_ck $card.CKSignal}}{{velocity_rate $card}}</span></div></td>
                                 <td class="opt-offer"><span class="offer">$ <a href="/go/b/{{$scraperKey}}/{{.CardID}}" target="_blank">{{printf "%.2f" $price}}</a></span></td>
-                                <td class="opt-loaded" data-sort="{{if .Price}}{{printf "%.2f" .Price}}{{end}}"><span class="loaded-wrap"><span class="loaded">{{if .Price}}$ {{if $.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a>{{else}}{{printf "%.2f" .Price}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{end}}</span><span class="loaded-qty">{{if .Quantity}}&times;{{.Quantity}}{{end}}</span><span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}</span></span></td>
+                                <td class="opt-loaded" data-sort="{{if .Price}}{{printf "%.2f" .Price}}{{end}}"><span class="loaded-wrap"><span class="loaded">{{if .Price}}$ {{if $.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a>{{else}}{{printf "%.2f" .Price}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{end}}</span>{{if not $card.Sealed}}<button type="button" class="ures-edit-btn opt-cond-btn" data-edit="cond" title="Change the condition">{{or .Condition "NM"}}</button>{{end}}<span class="loaded-qty">{{if .Quantity}}<button type="button" class="ures-edit-btn opt-qty-btn" data-edit="qty" title="Change the copies in your list">&times;{{.Quantity}}</button>{{end}}</span><span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}</span></span></td>
                                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}" data-sort="{{if .Price}}{{printf "%.2f" .Spread}}{{end}}">
                                     {{if .Price}}
                                         {{printf "%.2f" .Spread}}%
@@ -1267,10 +1267,11 @@
     </form>
 
     <script type="text/javascript" src="/js/upload-exports.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/upload-edit.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-sort.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-share.js?hash={{.Hash}}" defer></script>
 
-    <!-- Reload button (hidden until a pick or remove is made) -->
+    <!-- Reload button (hidden until a pick, edit or remove is made) -->
     <div id="reload-bar" class="ures-reload-bar" style="display:none">
         <span class="reload-stat" id="reload-fixed-wrap" style="display:none"><span class="count-fixed" id="reload-fixed-count">0</span> updated</span>
         <span class="reload-stat" id="reload-removed-wrap" style="display:none"><span class="count-removed" id="reload-removed-count">0</span> removed</span>
