@@ -1437,6 +1437,8 @@
 /* A popover, so the cell's overflow cannot clip it; upload-optimizer.js
    places it under its button */
 .opt-move-menu { position: fixed; inset: auto; margin: 0; padding: 4px; min-width: 180px; background: var(--surface-1); color: var(--normal); border: 1px solid var(--border-moderate); border-radius: var(--radius-sm); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+/* The card under the pointer would sit on an open menu */
+body:has(.opt-move-menu:popover-open) .hoverWrap { display: none !important; }
 .opt-move-title { padding: 4px 10px 6px; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
 .opt-move-menu button { display: flex; width: 100%; border: none; background: none; cursor: pointer; text-align: left; justify-content: space-between; gap: 16px; padding: 6px 10px; border-radius: var(--radius-sm); color: var(--normal); font-size: var(--text-sm); text-decoration: none; }
 .opt-move-menu button:hover, .opt-move-menu button:focus-visible { background: var(--row-hover); }
