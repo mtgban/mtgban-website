@@ -52,6 +52,14 @@ unminified) on every desktop page, `command-palette.js` (101 KB) and
 `guide-data.js` (80 KB) among them; the 10 deploy workflows are
 near-copies of each other.
 
+The price archive's `variants.mtgban_id` is `BanUUID` in Go, the matcher's
+`CardObject.UUID` (not always a uuid), while `ban_id` is `BanID`. Renaming
+the column to `ban_uuid` would make the schema read the same; Magic chart
+reads and variant filing name the column, so older binaries fail from the
+rename until the new tag is out, and it needs a deploy window. The
+`db_migration/` scripts and `timeseries/schema_variants_mtgban_id.sql` move
+with it.
+
 ## Plan for the giant functions
 
 `Upload`, `Search` and `Admin` are split by moving each phase into a

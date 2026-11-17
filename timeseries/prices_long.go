@@ -42,9 +42,9 @@ const hgetAllLongQuery = `
 // HGetAllLong returns a printing's prices over the lookback, as date ->
 // provider -> price, by its mtgban_id. The id resolves in a subquery, one
 // round-trip; an unknown id returns an empty map.
-func (c *Client) HGetAllLong(ctx context.Context, mtgbanID string, lb Lookback) (map[string]ProviderPrices, error) {
+func (c *Client) HGetAllLong(ctx context.Context, banUUID string, lb Lookback) (map[string]ProviderPrices, error) {
 	result := make(map[string]ProviderPrices)
-	rows, err := c.query(ctx, c.stmtHGetAllLong, hgetAllLongQuery, mtgbanID, lb.Since())
+	rows, err := c.query(ctx, c.stmtHGetAllLong, hgetAllLongQuery, banUUID, lb.Since())
 	if err != nil {
 		return nil, err
 	}

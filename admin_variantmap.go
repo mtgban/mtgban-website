@@ -13,8 +13,8 @@ import (
 
 // variantMapRow joins the alias the archive files a card under to its matcher id.
 type variantMapRow struct {
-	Alias    timeseries.MagicVariant
-	MtgbanID string
+	Alias   timeseries.MagicVariant
+	BanUUID string
 }
 
 // variantMapRows lists every id the backend holds, sorted by matcher id:
@@ -26,10 +26,10 @@ func variantMapRows(b *matcher.Backend) []variantMapRow {
 		alias := magicAlias(co)
 		alias.MtgjsonUUID = timeseries.NormalizeUUID(alias.MtgjsonUUID)
 		alias.Language = *timeseries.NormalizeLanguage(&alias.Language)
-		rows = append(rows, variantMapRow{Alias: alias, MtgbanID: co.UUID})
+		rows = append(rows, variantMapRow{Alias: alias, BanUUID: co.UUID})
 	}
 	slices.SortFunc(rows, func(a, b variantMapRow) int {
-		return strings.Compare(a.MtgbanID, b.MtgbanID)
+		return strings.Compare(a.BanUUID, b.BanUUID)
 	})
 	return rows
 }
@@ -49,7 +49,7 @@ func writeVariantMap(w io.Writer, rows []variantMapRow) error {
 	}
 	for _, r := range rows {
 		a := r.Alias
-		line := a.MtgjsonUUID + "\t" + tf(a.IsFoil) + "\t" + tf(a.IsEtched) + "\t" + tf(a.IsAlt) + "\t" + a.Language + "\t" + r.MtgbanID + "\n"
+		line := a.MtgjsonUUID + "\t" + tf(a.IsFoil) + "\t" + tf(a.IsEtched) + "\t" + tf(a.IsAlt) + "\t" + a.Language + "\t" + r.BanUUID + "\n"
 		if _, err := bw.WriteString(line); err != nil {
 			return err
 		}

@@ -233,9 +233,9 @@ func fetchChartPrices(ctx context.Context, target *chartTarget, lb timeseries.Lo
 		return nil, nil
 	}
 
-	results, err := PricesArchiveDB.HGetAllLong(ctx, target.MtgbanID, lb)
+	results, err := PricesArchiveDB.HGetAllLong(ctx, target.BanUUID, lb)
 	if err != nil {
-		log.Printf("chart: mtgban_id %s (%s): %v", target.MtgbanID, target.Name, err)
+		log.Printf("chart: mtgban_id %s (%s): %v", target.BanUUID, target.Name, err)
 		return nil, err
 	}
 	return results, nil
@@ -1021,16 +1021,16 @@ func (s *longSnapshot) resolveFailed(err error) {
 		s.ResolveErrors++
 		return
 	}
-	if s.respelledIDs[respelled.MtgbanID] {
+	if s.respelledIDs[respelled.BanUUID] {
 		return
 	}
 	if s.respelledIDs == nil {
 		s.respelledIDs = map[string]bool{}
 	}
-	s.respelledIDs[respelled.MtgbanID] = true
+	s.respelledIDs[respelled.BanUUID] = true
 	s.Respelled++
 	if len(s.RespelledPairs) < maxRespelledPairs {
-		s.RespelledPairs = append(s.RespelledPairs, respelled.Stored+" -> "+respelled.MtgbanID)
+		s.RespelledPairs = append(s.RespelledPairs, respelled.Stored+" -> "+respelled.BanUUID)
 	}
 }
 

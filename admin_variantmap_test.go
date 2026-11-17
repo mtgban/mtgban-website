@@ -16,10 +16,10 @@ func TestVariantMapRowsNameTheCopyAndItsOriginal(t *testing.T) {
 	rows := variantMapRows(backend())
 	byID := map[string]variantMapRow{}
 	for _, r := range rows {
-		byID[r.MtgbanID] = r
+		byID[r.BanUUID] = r
 	}
 	o, c := byID[original.UUID], byID[original.UUID+"_alt"]
-	if o.MtgbanID == "" || c.MtgbanID == "" {
+	if o.BanUUID == "" || c.BanUUID == "" {
 		t.Fatal("original or copy missing")
 	}
 	if o.Alias.IsAlt || !c.Alias.IsAlt || o.Alias.MtgjsonUUID != c.Alias.MtgjsonUUID {
@@ -29,7 +29,7 @@ func TestVariantMapRowsNameTheCopyAndItsOriginal(t *testing.T) {
 
 func TestWriteVariantMapIsTabSeparated(t *testing.T) {
 	var buf bytes.Buffer
-	rows := []variantMapRow{{Alias: timeseries.MagicVariant{MtgjsonUUID: "u", IsFoil: true, Language: "Japanese"}, MtgbanID: "u_f"}}
+	rows := []variantMapRow{{Alias: timeseries.MagicVariant{MtgjsonUUID: "u", IsFoil: true, Language: "Japanese"}, BanUUID: "u_f"}}
 	if err := writeVariantMap(&buf, rows); err != nil {
 		t.Fatal(err)
 	}

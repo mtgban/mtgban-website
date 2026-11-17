@@ -322,24 +322,24 @@ func (c *Client) WarmVariantCache(ctx context.Context, scope VariantScope) (Vari
 	var counts VariantCounts
 	for rows.Next() {
 		var banID int64
-		var mtgbanID, uuid sql.NullString
+		var banUUID, uuid sql.NullString
 		var isFoil, isEtched, isAlt bool
 		var language string
 		var catID, prodID sql.NullInt64
 		var subType sql.NullString
-		if err := rows.Scan(&banID, &mtgbanID, &uuid, &isFoil, &isEtched, &isAlt, &language,
+		if err := rows.Scan(&banID, &banUUID, &uuid, &isFoil, &isEtched, &isAlt, &language,
 			&catID, &prodID, &subType); err != nil {
 			return VariantCounts{}, err
 		}
 		byBanID[banID] = VariantInfo{
-			BanID: banID, MtgbanID: mtgbanID.String, MtgjsonUUID: uuid.String,
+			BanID: banID, BanUUID: banUUID.String, MtgjsonUUID: uuid.String,
 			IsFoil: isFoil, IsEtched: isEtched, IsAlt: isAlt, Language: language,
 			TCGCategoryID: int(catID.Int64), TCGProductID: int(prodID.Int64),
 			TCGSubType: subType.String,
 		}
 		if uuid.Valid {
-			if mtgbanID.Valid {
-				magic[mtgbanID.String] = banID
+			if banUUID.Valid {
+				magic[banUUID.String] = banID
 			}
 			counts.Magic++
 		} else if prodID.Valid {
@@ -431,45 +431,45 @@ func (c *Client) LookupTCGSubTypeBanIDs(ctx context.Context, productID int) (map
 // ErrVariantRespelled is returned when a printing's alias row already holds
 // another mtgban_id: the matcher spells the printing differently now.
 type ErrVariantRespelled struct {
-	MtgbanID string
-	Stored   string
-	Alias    MagicVariant
+	BanUUID string
+	Stored  string
+	Alias   MagicVariant
 }
 
 func (e *ErrVariantRespelled) Error() string {
-	return fmt.Sprintf("magic variant %+v is filed as %q, asked for as %q", e.Alias, e.Stored, e.MtgbanID)
+	return fmt.Sprintf("magic variant %+v is filed as %q, asked for as %q", e.Alias, e.Stored, e.BanUUID)
 }
 
 // ErrEmptyMagicID is ResolveMagicBanID's answer to an empty id, which would
 // otherwise be filed as a key.
 var ErrEmptyMagicID = errors.New("timeseries: empty mtgban_id")
 
-// ResolveMagicBanID returns the ban_id filed under mtgbanID, minting it with
+// ResolveMagicBanID returns the ban_id filed under banUUID, minting it with
 // the alias columns if new. A row holding the alias but no id adopts this one;
 // one holding another id returns *ErrVariantRespelled.
-func (c *Client) ResolveMagicBanID(ctx context.Context, mtgbanID string, alias MagicVariant) (int64, error) {
-	if mtgbanID == "" {
+func (c *Client) ResolveMagicBanID(ctx context.Context, banUUID string, alias MagicVariant) (int64, error) {
+	if banUUID == "" {
 		return 0, ErrEmptyMagicID
 	}
-	if banID, ok := c.variants.magicBanID(mtgbanID); ok {
+	if banID, ok := c.variants.magicBanID(banUUID); ok {
 		return banID, nil
 	}
 	alias = alias.normalized()
-	banID, err := c.fileMagicVariant(ctx, mtgbanID, alias)
+	banID, err := c.fileMagicVariant(ctx, banUUID, alias)
 	if err != nil {
 		var respelled *ErrVariantRespelled
 		if errors.As(err, &respelled) {
 			return 0, err
 		}
-		return 0, fmt.Errorf("resolve magic ban_id %q %+v: %w", mtgbanID, alias, err)
+		return 0, fmt.Errorf("resolve magic ban_id %q %+v: %w", banUUID, alias, err)
 	}
-	c.variants.setMagicBanID(mtgbanID, banID)
+	c.variants.setMagicBanID(banUUID, banID)
 	return banID, nil
 }
 
 // fileMagicVariant is ResolveMagicBanID's trip to the table. Each statement
 // commits on its own, so a read sees a row another process just filed.
-func (c *Client) fileMagicVariant(ctx context.Context, mtgbanID string, a MagicVariant) (int64, error) {
+func (c *Client) fileMagicVariant(ctx context.Context, banUUID string, a MagicVariant) (int64, error) {
 	// No conflict target, so a clash on either unique index is a no-op.
 	var banID int64
 	err := c.db.QueryRowContext(ctx, `
@@ -477,12 +477,12 @@ func (c *Client) fileMagicVariant(ctx context.Context, mtgbanID string, a MagicV
 		VALUES ($1,$2,$3,$4,$5,$6)
 		ON CONFLICT DO NOTHING
 		RETURNING ban_id`,
-		mtgbanID, a.MtgjsonUUID, a.IsFoil, a.IsEtched, a.IsAlt, a.Language,
+		banUUID, a.MtgjsonUUID, a.IsFoil, a.IsEtched, a.IsAlt, a.Language,
 	).Scan(&banID)
 	if err != sql.ErrNoRows {
 		return banID, err
 	}
-	if banID, ok, err := c.magicBanIDByID(ctx, mtgbanID); ok || err != nil {
+	if banID, ok, err := c.magicBanIDByID(ctx, banUUID); ok || err != nil {
 		return banID, err
 	}
 
@@ -497,13 +497,13 @@ func (c *Client) fileMagicVariant(ctx context.Context, mtgbanID string, a MagicV
 		return 0, err
 	}
 	if stored.Valid {
-		if stored.String == mtgbanID {
+		if stored.String == banUUID {
 			return banID, nil
 		}
-		return 0, &ErrVariantRespelled{MtgbanID: mtgbanID, Stored: stored.String, Alias: a}
+		return 0, &ErrVariantRespelled{BanUUID: banUUID, Stored: stored.String, Alias: a}
 	}
 	res, err := c.db.ExecContext(ctx,
-		`UPDATE variants SET mtgban_id=$1 WHERE ban_id=$2 AND mtgban_id IS NULL`, mtgbanID, banID)
+		`UPDATE variants SET mtgban_id=$1 WHERE ban_id=$2 AND mtgban_id IS NULL`, banUUID, banID)
 	if err != nil {
 		return 0, err
 	}
@@ -520,16 +520,16 @@ func (c *Client) fileMagicVariant(ctx context.Context, mtgbanID string, a MagicV
 		// sql.ErrNoRows: the row was deleted between statements.
 		return 0, err
 	}
-	if stored.String == mtgbanID {
+	if stored.String == banUUID {
 		return banID, nil
 	}
-	return 0, &ErrVariantRespelled{MtgbanID: mtgbanID, Stored: stored.String, Alias: a}
+	return 0, &ErrVariantRespelled{BanUUID: banUUID, Stored: stored.String, Alias: a}
 }
 
-func (c *Client) magicBanIDByID(ctx context.Context, mtgbanID string) (int64, bool, error) {
+func (c *Client) magicBanIDByID(ctx context.Context, banUUID string) (int64, bool, error) {
 	var banID int64
 	err := c.db.QueryRowContext(ctx,
-		`SELECT ban_id FROM variants WHERE mtgban_id=$1`, mtgbanID).Scan(&banID)
+		`SELECT ban_id FROM variants WHERE mtgban_id=$1`, banUUID).Scan(&banID)
 	if err == sql.ErrNoRows {
 		return 0, false, nil
 	}
@@ -541,7 +541,7 @@ func (c *Client) magicBanIDByID(ctx context.Context, mtgbanID string) (int64, bo
 // the bridge from a ban_id back to a chartable/displayable identity.
 type VariantInfo struct {
 	BanID         int64
-	MtgbanID      string // "" for non-Magic, or a row not yet adopted
+	BanUUID       string // mtgban_id; "" for non-Magic, or a row not yet adopted
 	MtgjsonUUID   string // "" for non-Magic
 	IsFoil        bool
 	IsEtched      bool
@@ -564,18 +564,18 @@ func (c *Client) LookupVariant(ctx context.Context, banID int64) (VariantInfo, b
 	// mtgban_id, which an adopt may have filed since. That costs a ban: chart
 	// one primary-key read for a Magic row still without one.
 	v, ok := c.variants.variant(banID)
-	if ok && (!v.IsMagic() || v.MtgbanID != "") {
+	if ok && (!v.IsMagic() || v.BanUUID != "") {
 		return v, true, nil
 	}
 
 	v = VariantInfo{BanID: banID}
-	var mtgbanID, uuid, subType sql.NullString
+	var banUUID, uuid, subType sql.NullString
 	var catID, prodID sql.NullInt64
 	err := c.db.QueryRowContext(ctx, `
 		SELECT mtgban_id, mtgjson_uuid, is_foil, is_etched, is_alt, language,
 		       tcgp_category_id, tcgp_product_id, tcgp_sub_type
 		FROM variants WHERE ban_id=$1`, banID).Scan(
-		&mtgbanID, &uuid, &v.IsFoil, &v.IsEtched, &v.IsAlt, &v.Language,
+		&banUUID, &uuid, &v.IsFoil, &v.IsEtched, &v.IsAlt, &v.Language,
 		&catID, &prodID, &subType)
 	if err == sql.ErrNoRows {
 		return VariantInfo{}, false, nil
@@ -583,7 +583,7 @@ func (c *Client) LookupVariant(ctx context.Context, banID int64) (VariantInfo, b
 	if err != nil {
 		return VariantInfo{}, false, err
 	}
-	v.MtgbanID = mtgbanID.String
+	v.BanUUID = banUUID.String
 	v.MtgjsonUUID = uuid.String
 	v.TCGCategoryID = int(catID.Int64)
 	v.TCGProductID = int(prodID.Int64)
@@ -637,13 +637,13 @@ func (c *Client) LookupTCGBanID(ctx context.Context, productID int) (VariantInfo
 	return v, true, nil
 }
 
-// CachedMagicBanID returns the ban_id filed under mtgbanID if it is already in
+// CachedMagicBanID returns the ban_id filed under banUUID if it is already in
 // the in-memory cache, without touching the DB or minting. It is the read-side
 // lookup for stamping a ban_id onto rendered cards (no per-card round-trip);
 // warm the cache once with WarmVariantCache. A miss (new printing, or an
 // unwarmed cache) returns ok=false and the caller falls back to the uuid path.
-func (c *Client) CachedMagicBanID(mtgbanID string) (int64, bool) {
-	return c.variants.magicBanID(mtgbanID)
+func (c *Client) CachedMagicBanID(banUUID string) (int64, bool) {
+	return c.variants.magicBanID(banUUID)
 }
 
 // A non-Magic ban_id is computed from the variant rather than drawn from the
@@ -793,7 +793,7 @@ func (c *Client) EnsureTCGVariants(ctx context.Context, vs []TCGVariant) (map[TC
 }
 
 //go:embed schema_variants_mtgban_id.sql
-var variantsMtgbanIDSchemaSQL string
+var variantsBanUUIDSchemaSQL string
 
 // EnsureVariantsSchema adds variants.mtgban_id and its unique index if they
 // are missing. It asks the catalog first, since the DDL locks the table even
@@ -812,7 +812,7 @@ func (c *Client) EnsureVariantsSchema(ctx context.Context) error {
 	if haveCol && haveIdx {
 		return nil
 	}
-	if err := c.execDDL(ctx, variantsMtgbanIDSchemaSQL); err != nil {
+	if err := c.execDDL(ctx, variantsBanUUIDSchemaSQL); err != nil {
 		return fmt.Errorf("timeseries: ensure variants.mtgban_id: %w", err)
 	}
 	return nil
