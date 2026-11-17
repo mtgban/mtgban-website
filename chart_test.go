@@ -626,7 +626,7 @@ func TestCollectMagicSnapshotCountsRespellings(t *testing.T) {
 
 	snapshot := collectMagicSnapshot(backend(), currentPrices(), now, func(id string, alias timeseries.MagicVariant) (int64, error) {
 		if id == respelled {
-			return 0, &timeseries.ErrVariantRespelled{MtgbanID: id, Stored: "old-id", Alias: alias}
+			return 0, &timeseries.ErrVariantRespelled{BanUUID: id, Stored: "old-id", Alias: alias}
 		}
 		return 7, nil
 	})

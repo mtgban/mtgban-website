@@ -254,7 +254,7 @@ func TestHasMagicID(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := hasMagicID(&chartTarget{MtgbanID: magicID(&matcher.CardObject{Card: matcher.Card{UUID: test.uuid}})})
+			got := hasMagicID(&chartTarget{BanUUID: magicID(&matcher.CardObject{Card: matcher.Card{UUID: test.uuid}})})
 			if got != test.want {
 				t.Errorf("hasMagicID(%q) = %t, want %t", test.uuid, got, test.want)
 			}
@@ -395,7 +395,7 @@ func TestMagicTargetNamesThePrinting(t *testing.T) {
 		for _, want := range []*matcher.CardObject{co, original} {
 			mv := magicAlias(want)
 			vi := timeseries.VariantInfo{BanID: 7, MtgjsonUUID: mv.MtgjsonUUID, IsFoil: mv.IsFoil, IsEtched: mv.IsEtched,
-				IsAlt: mv.IsAlt, Language: *timeseries.NormalizeLanguage(&mv.Language), MtgbanID: magicID(want)}
+				IsAlt: mv.IsAlt, Language: *timeseries.NormalizeLanguage(&mv.Language), BanUUID: magicID(want)}
 			got := magicTarget(b, vi.BanID, vi)
 			if got.SearchID != want.UUID || got.Label != want.String() {
 				t.Errorf("SearchID %q, Label %q; want %q, %q", got.SearchID, got.Label, want.UUID, want.String())
@@ -415,20 +415,20 @@ func TestMagicTargetWithoutAnIDFallsBackToTheFinish(t *testing.T) {
 	}
 	vi := timeseries.VariantInfo{BanID: 7, MtgjsonUUID: timeseries.NormalizeUUID(co.UUID)}
 	got := magicTarget(backend(), 7, vi)
-	if got.SearchID == "" || got.Name != co.Name || got.Label != co.String() || got.MtgbanID != "" {
+	if got.SearchID == "" || got.Name != co.Name || got.Label != co.String() || got.BanUUID != "" {
 		t.Errorf("target = %+v", got)
 	}
 	copied, err := backend().GetUUID(co.UUID + "_alt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	vi.MtgbanID = copied.UUID
-	if got := magicTarget(backend(), 7, vi); got.SearchID != vi.MtgbanID || got.MtgbanID != vi.MtgbanID || got.Label != copied.String() {
+	vi.BanUUID = copied.UUID
+	if got := magicTarget(backend(), 7, vi); got.SearchID != vi.BanUUID || got.BanUUID != vi.BanUUID || got.Label != copied.String() {
 		t.Errorf("target = %+v, want the copy's own id", got)
 	}
 	// An id the datastore no longer knows is named by its alias.
-	vi.MtgbanID = co.UUID + "_retired"
-	if got := magicTarget(backend(), 7, vi); got.SearchID != co.UUID || got.Name != co.Name || got.Label != co.String() || got.MtgbanID != vi.MtgbanID {
+	vi.BanUUID = co.UUID + "_retired"
+	if got := magicTarget(backend(), 7, vi); got.SearchID != co.UUID || got.Name != co.Name || got.Label != co.String() || got.BanUUID != vi.BanUUID {
 		t.Errorf("target = %+v, want the alias's printing under the stored id", got)
 	}
 }

@@ -69,7 +69,7 @@ func TestLongFormLive(t *testing.T) {
 	}
 	behind, cancel := context.WithTimeout(ctx, 2*time.Second)
 	ensureErr := c.EnsureVariantsSchema(behind)
-	ddlErr := c.execDDL(behind, variantsMtgbanIDSchemaSQL)
+	ddlErr := c.execDDL(behind, variantsBanUUIDSchemaSQL)
 	cancel()
 	_ = reader.Rollback()
 	if ensureErr != nil {

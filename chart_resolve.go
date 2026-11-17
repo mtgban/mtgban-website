@@ -16,14 +16,14 @@ var errChartIDNotFound = errors.New("chart id not found")
 // chartTarget is a resolved, game-agnostic chart identity. The read mode is:
 //   - BanID != 0: chart this exact variant via HGetAllByBanID (a ban: id, or a
 //     resolved TCGplayer product). Precise about language/finish/alt/sub-type.
-//   - BanID == 0: the Magic id path via MtgbanID through HGetAllLong.
+//   - BanID == 0: the Magic id path via BanUUID through HGetAllLong.
 //
 // Datasets are derived from whichever providers have data (see getChartDatasets),
 // so the target carries no game flag or provider list — a new game just works.
 type chartTarget struct {
-	BanID    int64
-	MtgbanID string // the matcher's Magic id, for the id path
-	Name     string
+	BanID   int64
+	BanUUID string // the matcher's Magic id, for the id path
+	Name    string
 	// Label names this printing on a roster chart, where two printings of
 	// one card share a Name.
 	Label string
@@ -121,7 +121,7 @@ func maybeUUIDString(s string) bool {
 // hasMagicID reports whether a target that resolved to no ban_id can still be
 // read by its Magic id; a non-Magic card has none.
 func hasMagicID(target *chartTarget) bool {
-	return target.MtgbanID != ""
+	return target.BanUUID != ""
 }
 
 // matcherTarget resolves a game-native card id through matcher — an mtgjson
@@ -145,7 +145,7 @@ func matcherTarget(ctx context.Context, b *matcher.Backend, id string) (*chartTa
 		// the id lookup HGetAllLong does in SQL); a cold cache / unknown
 		// product leaves BanID 0 and the Magic id path takes over.
 		return &chartTarget{
-			MtgbanID: magicID(co),
+			BanUUID:  magicID(co),
 			Name:     co.Name,
 			Label:    co.String(),
 			BanID:    resolveBanIDForCard(ctx, co),
@@ -316,7 +316,7 @@ func targetFromTCGID(ctx context.Context, b *matcher.Backend, tcgID int) (*chart
 	if matched, err := b.MatchID(idStr); err == nil {
 		if co, err := b.GetUUID(matched); err == nil {
 			return &chartTarget{
-				MtgbanID: magicID(co),
+				BanUUID:  magicID(co),
 				Name:     co.Name,
 				Label:    co.String(),
 				BanID:    resolveBanIDForCard(ctx, co),
@@ -353,10 +353,10 @@ func targetFromBanID(ctx context.Context, b *matcher.Backend, banID int64) (*cha
 // magicTarget builds a Magic chart target for a ban_id's variant.
 func magicTarget(b *matcher.Backend, banID int64, vi timeseries.VariantInfo) *chartTarget {
 	t := &chartTarget{
-		BanID:    banID,
-		MtgbanID: vi.MtgbanID,
+		BanID:   banID,
+		BanUUID: vi.BanUUID,
 		// The printing the ban_id names, on its finish.
-		SearchID: vi.MtgbanID,
+		SearchID: vi.BanUUID,
 	}
 	// Display name comes from matcher, read off the finish's own id so
 	// the label names it (the chart uses BanID for data).
