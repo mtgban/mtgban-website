@@ -103,9 +103,16 @@ function loadSlots(window) {
 test('opening the Tools menu counts once; closing it does not', () => {
     const { BAN, calls } = fakeBAN();
     const { btn } = loadTools({ BAN });
-    btn.listeners.click(ev());
-    btn.listeners.click(ev());
+    btn.listeners.click({ ...ev(), isTrusted: true });
+    btn.listeners.click({ ...ev(), isTrusted: true });
     expect(calls).toEqual([['ui.nav.tools', 'open', undefined]]);
+});
+
+test('a drag opening the Tools menu through click() does not count', () => {
+    const { BAN, calls } = fakeBAN();
+    const { btn } = loadTools({ BAN });
+    btn.listeners.click(ev());
+    expect(calls).toEqual([]);
 });
 
 test('a slot click counts by where it sits; a click that ends a drag does not', () => {
