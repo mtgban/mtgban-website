@@ -483,7 +483,7 @@ func TestOptimizerShowsTheLoadedQuantity(t *testing.T) {
 		want  string
 	}{
 		{OptimizedUploadEntry{CardID: "a", Price: 5, Quantity: 3}, `<td class="opt-loaded" data-sort="5.00">`},
-		{OptimizedUploadEntry{CardID: "a", Price: 5, Quantity: 3}, `</a></span><button type="button" class="ures-edit-btn opt-cond-btn" data-edit="cond" title="Change the condition">NM</button><span class="loaded-qty"><button type="button" class="ures-edit-btn opt-qty-btn" data-edit="qty" title="Change the copies in your list">&times;3</button></span>`},
+		{OptimizedUploadEntry{CardID: "a", Price: 5, Quantity: 3}, `5.00</button></span><button type="button" class="ures-edit-btn opt-cond-btn" data-edit="cond" title="Change the condition">NM</button><span class="loaded-qty"><button type="button" class="ures-edit-btn opt-qty-btn" data-edit="qty" title="Change the copies in your list">&times;3</button></span>`},
 		{OptimizedUploadEntry{CardID: "a", Quantity: 4}, `<span class="loaded"></span><button type="button" class="ures-edit-btn opt-cond-btn" data-edit="cond" title="Change the condition">NM</button><span class="loaded-qty"><button type="button" class="ures-edit-btn opt-qty-btn" data-edit="qty" title="Change the copies in your list">&times;4</button></span>`},
 		{OptimizedUploadEntry{CardID: "a"}, `<span class="loaded"></span><button type="button" class="ures-edit-btn opt-cond-btn" data-edit="cond" title="Change the condition">NM</button><span class="loaded-qty"></span>`},
 	} {
@@ -756,6 +756,44 @@ func TestLeftoversMergeOpenedCopies(t *testing.T) {
 	}
 	if len(l.rows) != 2 || l.rows[0].Quantity != 4 || l.rows[1].Quantity != 2 {
 		t.Errorf("listed %+v, want the opened copies as 4 and the uploaded as 2", l.rows)
+	}
+}
+
+// TestMergedCopiesKeepOnlyACommonOffer keeps the offer link on opened copies
+// merged into one line, in a store's list or the leftovers, only when every
+// copy's notes name the same offer.
+func TestMergedCopiesKeepOnlyACommonOffer(t *testing.T) {
+	const a, b = "https://example.com/offer/a", "https://example.com/offer/b"
+	for _, tc := range []struct {
+		notes []string
+		want  string
+	}{
+		{[]string{a, a}, a},
+		{[]string{a, b}, ""},
+		{[]string{a, b, a}, ""},
+	} {
+		rows := uploadRows{
+			resultPrices:     map[string]map[string]float64{"card": {"CK": 2}},
+			optimizedResults: map[string][]OptimizedUploadEntry{},
+			optimizedAt:      map[optimizedKey]int{},
+			optimizedTotals:  map[string]float64{},
+			optimizedQtys:    map[string]int{},
+			tallies:          map[string]*unpackedTally{},
+		}
+		var l leftovers
+		for i, note := range tc.notes {
+			entry := &UploadEntry{CardID: "card", Notes: note, UnpackedFrom: fmt.Sprint("deck", i)}
+			row := uploadRow{UploadEntry: entry, priceKey: "card", qty: 1}
+			rows.optimizeRow(row, map[string]float64{"CK": 2}, []string{"CK"}, uploadSettings{maxQty: 10}, uploadIndexes{})
+			l.add(row, LeftoverEntry{CardID: "card", Quantity: 1, Notes: note})
+		}
+		got := rows.optimizedResults["CK"]
+		if len(got) != 1 || got[0].Notes != tc.want {
+			t.Errorf("notes %q: CK lists %+v, want one row noting %q", tc.notes, got, tc.want)
+		}
+		if len(l.rows) != 1 || l.rows[0].Notes != tc.want {
+			t.Errorf("notes %q: leftovers %+v, want one row noting %q", tc.notes, l.rows, tc.want)
+		}
 	}
 }
 
