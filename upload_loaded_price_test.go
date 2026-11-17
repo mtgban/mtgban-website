@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 // A linked price must be visibly a link. It keeps the column's own colour
@@ -115,6 +117,20 @@ func TestLeftoverOfferLinkWithPricesIgnored(t *testing.T) {
 		section := leftoverRows(out, "opt-not-bought")
 		if !strings.Contains(section, `class="ures-offer-link" href="`+offer) {
 			t.Errorf("IgnorePrices %v: the leftover has no offer link: %s", ignore, section)
+		}
+	}
+}
+
+// Every results row holds a grade, empty for a row with no condition, so a
+// condition picked for it reaches its Optimizer row, the key of its move.
+func TestResultsRowGrade(t *testing.T) {
+	for _, cond := range []mtgban.Condition{"", "SP"} {
+		entries := []UploadEntry{{CardID: "a", OriginalCondition: cond}}
+		out := renderUpload(t, PageVars{UploadVars: UploadVars{UploadEntries: entries, SinglesEntries: entries}})
+		row := regexp.MustCompile(`<tr data-hash="a"[^>]*>`).FindString(out)
+		want := ` data-grade="` + string(cond) + `"`
+		if !strings.Contains(row, want) {
+			t.Errorf("condition %q: row %q lacks%s", cond, row, want)
 		}
 	}
 }

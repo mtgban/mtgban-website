@@ -111,10 +111,23 @@ func TestReadOptMoves(t *testing.T) {
 		form := url.Values{"rows": {tc.rows}, "opt_moves": {tc.moves}}
 		req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		got := readOptMoves(req, tc.blMode)
+		got := readOptMoves(req, tc.blMode, false)
 		if !maps.Equal(got, tc.want) {
 			t.Errorf("%s: read %v, want %v", tc.name, got, tc.want)
 		}
+	}
+}
+
+// With conditions ignored no row holds one, so a move is read without the
+// condition its row showed, and a card moved to two stores has no move.
+func TestReadOptMovesWithConditionsIgnored(t *testing.T) {
+	form := url.Values{"rows": {"card\t1"}, "opt_moves": {"retail\ncard\tSP\tSCG\ncard\tMP\tSCG\nother\t\tCK\nsplit\tSP\tSCG\nsplit\tMP\tCK\nsplit\tHP\tCK"}}
+	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	got := readOptMoves(req, false, true)
+	want := map[string]string{"card": "SCG", "other": "CK", "split": ""}
+	if !maps.Equal(got, want) {
+		t.Errorf("read %v, want %v", got, want)
 	}
 }
 

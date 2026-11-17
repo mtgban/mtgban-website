@@ -91,9 +91,8 @@ function dispatch(type, target, extra = {}) {
 
 // A results row and the optimizer row of the same card, as upload.html
 // draws them; an opened product's row has no buttons.
-function resultRow(name, id, cond, qty, { editable = true, grade = true, price = '0' } = {}) {
-    const attrs = { 'data-hash': id, 'data-qtys': String(qty), 'data-cond': cond, 'data-price': price, 'data-card-name': name };
-    if (grade) attrs['data-grade'] = cond;
+function resultRow(name, id, cond, qty, { editable = true, grade = cond, price = '0' } = {}) {
+    const attrs = { 'data-hash': id, 'data-qtys': String(qty), 'data-cond': cond, 'data-grade': grade, 'data-price': price, 'data-card-name': name };
     const shown = '$ ' + Number(price).toFixed(2);
     const cells = editable
         ? [el('td', {}, [el('button', { class: 'ures-edit-btn', 'data-edit': 'price' }, [shown])]), el('td', {}, [el('button', { class: 'ures-edit-btn cond-badge', 'data-edit': 'cond' }, [cond])]), el('td', {}, [el('button', { class: 'ures-edit-btn ures-qty-btn', 'data-edit': 'qty' }, [String(qty)])])]
@@ -260,13 +259,23 @@ test('the rows of an opened product edit nothing, from either tab', () => {
 });
 
 test('with conditions ignored an optimizer row edits its card whatever the grade', () => {
-    const ring = resultRow('Ring', 'b', 'SP', 1, { grade: false });
+    const ring = resultRow('Ring', 'b', 'SP', 1, { grade: '' });
     const opt = optRow('b', '', 1);
     const { pick } = load({ results: [ring], opt: [opt] });
     pick(btn(opt, 'cond'), 'HP');
-    expect(ring.dataset.cond).toBe('HP');
-    expect('grade' in ring.dataset).toBe(false);
-    expect(opt.dataset.optCond).toBe('');
+    expect([ring.dataset.cond, ring.dataset.grade, opt.dataset.optCond]).toEqual(['HP', 'HP', 'HP']);
+});
+
+test('a line without a grade gives its optimizer row the grade picked, the key its move is sent by', () => {
+    const ring = resultRow('Ring', 'b', '', 1);
+    const opt = optRow('b', '', 1);
+    const { pick } = load({ results: [ring], opt: [opt] });
+    pick(btn(ring, 'cond'), 'MP');
+    expect([ring.dataset.cond, ring.dataset.grade, opt.dataset.optCond]).toEqual(['MP', 'MP', 'MP']);
+    expect(btn(opt, 'cond').textContent).toBe('MP');
+    // And from the optimizer row, which still finds its line
+    pick(btn(opt, 'cond'), 'HP');
+    expect([ring.dataset.cond, opt.dataset.optCond]).toEqual(['HP', 'HP']);
 });
 
 test('the store sends wait for a reload, and the bar nudges', () => {
@@ -322,7 +331,7 @@ test('a price set on an optimizer row prices each list line of its card', () => 
 test('a grade can be taken back to none, as a list line without one', () => {
     const bolt = resultRow('Bolt', 'a', 'SP', 1);
     const optBolt = optRow('a', 'SP', 1);
-    const ring = resultRow('Ring', 'b', '', 2, { grade: false });
+    const ring = resultRow('Ring', 'b', '', 2);
     const { calls, menu, pick, shown } = load({ results: [bolt, ring], opt: [optBolt], sentPack: 1 });
 
     pick(btn(bolt, 'cond'), '');

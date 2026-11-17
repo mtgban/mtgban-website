@@ -540,7 +540,7 @@
                 data-from="{{.UnpackedFrom}}" data-fromqty="{{.UnpackedQuantity}}"
                 {{with index $root.SortKeys .CardID}}data-k-name="{{.Name}}" data-k-set="{{.Set}}" data-k-release="{{.Release}}" data-k-number="{{.Number}}" data-k-finish="{{.Finish}}" data-k-color="{{.Color}}" data-k-rarity="{{.Rarity}}"{{end}}
                 data-k-cond="{{cond_rank .OriginalCondition}}"{{if .SortLead}} data-k-lead="{{.SortLead}}"{{end}}
-                data-card-name="{{$card.Name}}" data-edition="{{$card.Edition}}" data-set-code="{{$card.SetCode}}" data-number="{{$card.Number}}" data-image-url="{{$card.ImageURL}}" data-finish-tag="{{$card.FinishTag}}" data-finish-class="{{$card.FinishClass}}" data-has-warning="{{$card.HasContentWarning}}"{{with .OriginalCondition}} data-grade="{{.}}"{{end}}
+                data-card-name="{{$card.Name}}" data-edition="{{$card.Edition}}" data-set-code="{{$card.SetCode}}" data-number="{{$card.Number}}" data-image-url="{{$card.ImageURL}}" data-finish-tag="{{$card.FinishTag}}" data-finish-class="{{$card.FinishClass}}" data-has-warning="{{$card.HasContentWarning}}" data-grade="{{.OriginalCondition}}"
                 {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
                 <td data-sort="{{$card.Name}} {{$card.Edition}} {{$card.Number}}">
                     <div class="ures-card-cell">
