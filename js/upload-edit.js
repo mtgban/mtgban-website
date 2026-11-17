@@ -375,8 +375,25 @@
 
     // An Optimizer row of an opened product's card edits nothing.
     document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.opt-store .ures-edit-btn').forEach(function(btn) {
-            if (!editable(listRows(btn))) btn.remove();
+        var buttons = document.querySelectorAll('.opt-store .ures-edit-btn');
+        if (!buttons.length) return;
+        // One pass over the list: a card's rows are found by key, not by
+        // scanning the table for every button
+        var fixed = {};
+        var seen = {};
+        document.querySelectorAll('.ures-table tr[data-hash]').forEach(function(tr) {
+            var k = tr.dataset.hash + '\t' + (tr.dataset.grade || '');
+            seen[k] = true;
+            if (!tr.querySelector('.ures-edit-btn')) fixed[k] = true;
+        });
+        buttons.forEach(function(btn) {
+            var opt = btn.closest('tr[data-opt-id]');
+            if (!opt) {
+                if (!editable(listRows(btn))) btn.remove();
+                return;
+            }
+            var k = opt.dataset.optId + '\t' + (opt.dataset.optCond || '');
+            if (!seen[k] || fixed[k]) btn.remove();
         });
     });
 })();
