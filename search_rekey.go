@@ -115,7 +115,7 @@ func rekeyFilters(ds *datastore, p *prices, name, filters []string, pinned []Fil
 	}
 
 	config := parseSearchPage(ds, p, strings.Join(others, " "), sealed, false, nil, nil, nil)
-	applySearchScope(&config, pinned)
+	applySearchScope(&config, SearchConfig{CardFilters: pinned})
 	if sealed {
 		config.SearchMode = "sealed"
 	}

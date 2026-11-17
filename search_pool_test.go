@@ -20,7 +20,7 @@ func poolSearch(t *testing.T, query, scope string, sealed bool) ([]string, error
 	t.Helper()
 	ds := currentDatastore()
 	config := parseSearchOptionsNG(ds.backend, currentPrices(), query, nil, nil, nil)
-	applySearchScope(&config, scopeFilters(ds, currentPrices(), scope, false, false))
+	applySearchScope(&config, scopeConfig(ds, currentPrices(), scope, false, false))
 	if sealed {
 		config.SearchMode = "sealed"
 	}

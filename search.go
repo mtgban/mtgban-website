@@ -217,10 +217,9 @@ var AllConditions = []mtgban.Condition{"INDEX", mtgban.NM, mtgban.SP, mtgban.MP,
 // query's parse has already added them. A second set here would only
 // collide with the first.
 //
-// Only filters come back: a card name typed into the pinned bar is
-// dropped, because pinning a name is what the main bar is for. A bar
-// that yields nothing at all is a bar the search will ignore, which is
-// the one thing the reader has to be told.
+// Only card filters come back, the store, condition and price ones being
+// in scopeConfig: a card name typed into the pinned bar is dropped,
+// because pinning a name is what the main bar is for.
 func scopeFilters(ds *datastore, p *prices, scope string, sealed, bareIDs bool) []FilterElem {
 	return scopeConfig(ds, p, scope, sealed, bareIDs).CardFilters
 }
@@ -231,6 +230,20 @@ func scopeConfig(ds *datastore, p *prices, scope string, sealed, bareIDs bool) S
 		return SearchConfig{}
 	}
 	return parseSearchPage(ds, p, scope, sealed, bareIDs, nil, nil, nil)
+}
+
+// scopeApplies is whether the pinned bar's parse holds anything the search
+// applies: a card filter, or one on the offers (store:, cond:, price>).
+func scopeApplies(pinned SearchConfig) bool {
+	return len(pinned.CardFilters) > 0 || scopeNarrowsOffers(pinned)
+}
+
+// scopeNarrowsOffers is whether the pinned bar filters the offers shown
+// rather than the cards, which no finish typed in the main bar overrides.
+func scopeNarrowsOffers(pinned SearchConfig) bool {
+	return len(pinned.StoreFilters) > 0 || len(pinned.PriceFilters) > 0 ||
+		len(pinned.EntryFilters) > 0 || len(pinned.PostFilters) > 0 ||
+		pinned.SkipRetail || pinned.SkipBuylist
 }
 
 // parseSearchPage parses what a reader typed into a search's bars. A sealed
@@ -248,6 +261,7 @@ func parseSearchPage(ds *datastore, p *prices, query string, sealed, bareIDs boo
 
 // applySearchScope folds the pinned bar's filters into the search the
 // main bar asked for, and returns the pinned ones the main bar overrode.
+// Store, condition and price filters join beside the card ones.
 //
 // Filters are ANDed, so a pinned "s:sos" under a typed "s:mh3" does
 // answer nothing - but that is what the reader asked for twice, and the
@@ -259,8 +273,8 @@ func parseSearchPage(ds *datastore, p *prices, query string, sealed, bareIDs boo
 // Finish is the one axis known for certain: a finish the main bar names
 // replaces a pinned one, the way the last of "&*" is the one that
 // counts, and the bar is marked as overridden rather than read as applied.
-func applySearchScope(config *SearchConfig, pinned []FilterElem) []FilterElem {
-	if len(pinned) == 0 {
+func applySearchScope(config *SearchConfig, pinned SearchConfig) []FilterElem {
+	if !scopeApplies(pinned) {
 		return nil
 	}
 	// A query that names its own cards, or that we hand to another
@@ -269,9 +283,16 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) []FilterElem {
 		return nil
 	}
 
+	config.StoreFilters = append(config.StoreFilters, pinned.StoreFilters...)
+	config.PriceFilters = append(config.PriceFilters, pinned.PriceFilters...)
+	config.EntryFilters = append(config.EntryFilters, pinned.EntryFilters...)
+	config.PostFilters = append(config.PostFilters, pinned.PostFilters...)
+	config.SkipRetail = config.SkipRetail || pinned.SkipRetail
+	config.SkipBuylist = config.SkipBuylist || pinned.SkipBuylist
+
 	typedFinish := slices.ContainsFunc(config.CardFilters, asksFinish)
 	var overridden []FilterElem
-	for _, filter := range pinned {
+	for _, filter := range pinned.CardFilters {
 		if typedFinish && asksFinish(filter) {
 			overridden = append(overridden, filter)
 			continue
@@ -730,7 +751,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// Something is pinned, and none of it is a filter: the search will pass
 	// over it whole, and the bar has to say so rather than sit there looking
 	// like it is doing the work.
-	pageVars.ScopeIgnored = scope != "" && len(pinned) == 0
+	pageVars.ScopeIgnored = scope != "" && !scopeApplies(pinnedConfig)
 
 	isSetsPage := r.URL.Path == "/sets"
 
@@ -743,7 +764,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	//
 	// The editions tree on /sets is a page rather than a placeholder waiting
 	// for a query, so it keeps its own empty state either way.
-	scopeOnly := query == "" && len(pinned) > 0 && !isSetsPage
+	scopeOnly := query == "" && scopeApplies(pinnedConfig) && !isSetsPage
 
 	pageVars.HasAvailable = len(b.GetSealedUUIDs()) > 0
 	_, pageVars.OfflineModeAllowed = offlineModeAllowed(r)
@@ -818,9 +839,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.ShowUpsell = !miscSearchOpts.has("noUpsell")
 
 	config := parseSearchPage(ds, p, query, pageVars.IsSealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
-	overridden := applySearchScope(&config, pinned)
+	overridden := applySearchScope(&config, pinnedConfig)
 	pageVars.ScopeOverridden = len(overridden) > 0
-	pageVars.ScopeAllOverridden = pageVars.ScopeOverridden && len(overridden) == len(pinned)
+	pageVars.ScopeAllOverridden = pageVars.ScopeOverridden && len(overridden) == len(pinned) && !scopeNarrowsOffers(pinnedConfig)
 	config.Sales = salesVelocityStore.Snapshot()
 	pageVars.HasVelocity = config.Sales != nil
 	if pageVars.CanVelocity {
@@ -1033,7 +1054,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 
 	sealed := page.URL.Path == "/sealed"
 	config := parseSearchPage(ds, p, query, sealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
-	applySearchScope(&config, scopeFilters(ds, p, strings.TrimSpace(page.FormValue("scope")), sealed, false))
+	applySearchScope(&config, scopeConfig(ds, p, strings.TrimSpace(page.FormValue("scope")), sealed, false))
 	if sealed {
 		config.SearchMode = "sealed"
 	}
