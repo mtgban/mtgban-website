@@ -503,7 +503,7 @@ func Generate(backend *matcher.Backend, providerURL string, allKeys []string, ed
 
 	out := &OEmbed{
 		Version:      "1.0",
-		ProviderName: "MTGBAN Price Search",
+		ProviderName: "BAN Price Search",
 		ProviderURL:  providerURL,
 		Title:        title,
 		// The panel travels in html, which oEmbed allows for a rich type

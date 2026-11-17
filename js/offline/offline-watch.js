@@ -46,7 +46,7 @@
         toast.setAttribute('role', 'status');
 
         var msg = document.createElement('span');
-        msg.textContent = 'MTGBAN is unreachable.';
+        msg.textContent = 'BAN is unreachable.';
 
         link = document.createElement('a');
         link.href = '/offline';

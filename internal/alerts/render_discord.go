@@ -95,7 +95,7 @@ func undeliverableReason(err error) string {
 		return reason
 	}
 	if rest.Message.Code == discordgo.ErrCodeCannotSendMessagesToThisUser {
-		reason = "Discord refused the DM: join the MTGBAN server and allow DMs from members"
+		reason = "Discord refused the DM: join the BAN server and allow DMs from members"
 	}
 	if rest.Message.Message != "" {
 		reason += " (Discord: " + rest.Message.Message + ")"

@@ -354,7 +354,7 @@ const (
 	DefaultExternalURL   = "https://mtgban.com"
 	DefaultAPIGatewayURL = "https://api.mtgban.com"
 	DefaultDatastorePath = "AllPrintings.json.xz"
-	DefaultMailFrom      = "MTGBAN <no-reply@mtgban.com>"
+	DefaultMailFrom      = "BAN <no-reply@mtgban.com>"
 
 	DefaultSignatureDuration = 11 * 24 * time.Hour
 )

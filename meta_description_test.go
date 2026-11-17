@@ -15,7 +15,7 @@ func TestMetaDescriptionActiveNav(t *testing.T) {
 		},
 	}
 	out := renderPage(t, "home.html", false, pv)
-	want := `content="MTGBAN Search: Find a card by name."`
+	want := `content="BAN Search: Find a card by name."`
 	if !strings.Contains(out, want) {
 		t.Fatalf("expected %q in rendered page, got:\n%s", want, out)
 	}

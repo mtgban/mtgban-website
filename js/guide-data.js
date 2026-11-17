@@ -8,7 +8,7 @@ window.__BAN_GUIDE = {
             category: 'Overview',
             title: 'Welcome',
             icon: 'sparkles',
-            summary: 'What MTGBAN is and where to find things',
+            summary: 'What BAN is and where to find things',
             snippets: [],
             keywords: ['welcome', 'intro', 'overview', 'start', 'getting started', 'about', 'mtgban', 'ban'],
             content: {
@@ -917,7 +917,7 @@ window.__BAN_GUIDE = {
                     { value: 'name:"X"', short: 'Include only cards named X' },
                     { value: '-name:"X"', short: 'Exclude cards named X' },
                     { value: 'namee:REGEXP', short: 'Name filter using regular expression' },
-                    { value: 'id:VALUE', short: 'Filter by MTGBAN/MTGJSON/Scryfall/TCG ID' }
+                    { value: 'id:VALUE', short: 'Filter by BAN/MTGJSON/Scryfall/TCG ID' }
                 ],
                 examples: [
                     { query: 'name:"Lightning Bolt"', desc: 'Exact name match' },
@@ -1234,7 +1234,7 @@ window.__BAN_GUIDE = {
                     { value: 'stores.json', short: 'Store tags used as keys in price objects, in a stable order. filter=sealed or filter=singles narrows it; tag=names returns full store names instead.' },
                     { value: 'retail/{SET}.json', short: 'Retail prices for one edition. buylist/{SET}.json for buylist, all/{SET}.json for both.' },
                     { value: 'sealed/{SET}.json', short: 'Sealed product prices, retail and buylist in one call.' },
-                    { value: 'retail/{id}.json', short: 'One card, regular and foil prices. The id can be an MTGBAN id, MTGJSON UUID, Scryfall id, or TCGplayer product id. buylist/{id}.json for buylist.' },
+                    { value: 'retail/{id}.json', short: 'One card, regular and foil prices. The id can be a BAN id, MTGJSON UUID, Scryfall id, or TCGplayer product id. buylist/{id}.json for buylist.' },
                     { value: 'search/retail/{query}.json', short: 'Prices for every card matching a search, using the same syntax as the site (see the Syntax tab). Also search/buylist, and search/retail/sealed or search/buylist/sealed for sealed products. Search keys stores by full name (tag=tags for tags) and cards by Scryfall id (MTGJSON for sealed), and always includes quantities and conditions.' },
                     { value: 'retail.json', short: 'Full snapshot, JSON only, deprecated. Query editions instead.' }
                 ],
@@ -1243,7 +1243,7 @@ window.__BAN_GUIDE = {
                     { query: 'buylist/10E.csv', desc: 'Tenth Edition buylist as CSV', palette: true },
                     { query: 'sets.json?filter=sealed', desc: 'Sets that have sealed data', palette: true },
                     { query: 'stores.json?tag=names', desc: 'Full store names in tag order', palette: true },
-                    { query: 'retail/7da23b15-dfb8-4267-9b33-d7a4c035c434.json', desc: 'One card by MTGBAN id', palette: true },
+                    { query: 'retail/7da23b15-dfb8-4267-9b33-d7a4c035c434.json', desc: 'One card by BAN id', palette: true },
                     { query: 'search/retail/Sol Ring s:CMR.json', desc: 'Every Commander Legends Sol Ring', palette: true }
                 ]
             }

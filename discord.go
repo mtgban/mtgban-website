@@ -308,7 +308,7 @@ func unknownTitle(*url.URL) string {
 // on this site would be a search for whatever the URL happened to spell,
 // which is not what the reader clicked.
 func storeLinkDescription(co *matcher.CardObject, guildID string) string {
-	description := "Support **MTGBAN** by using this link"
+	description := "Support **BAN** by using this link"
 	if co == nil {
 		return description
 	}
@@ -666,7 +666,7 @@ func matchStoreLink(b *matcher.Backend, mGuildID, mContent string) (*discordgo.M
 				u = store.URLFunc(u)
 			}
 
-			// Add the MTGBAN affiliation
+			// Add the BAN affiliation
 			v := u.Query()
 			for _, value := range store.DefaultFields {
 				v.Set(value, Affiliates().Codes[store.Handle])

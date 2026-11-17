@@ -1006,7 +1006,7 @@
             p.appendChild(document.createTextNode(' You also need to be in the '));
             var a = document.createElement('a');
             a.href = inviteURL;
-            a.textContent = 'MTGBAN server';
+            a.textContent = 'BAN server';
             p.appendChild(a);
             p.appendChild(document.createTextNode('.'));
         }

@@ -1,6 +1,6 @@
 {
-    "name": "MTGBAN",
-    "short_name": "MTGBAN",
+    "name": "BAN",
+    "short_name": "BAN",
     "description": "Trading card price comparison and buylist arbitrage",
     "start_url": "/search",
     "scope": "/",

@@ -566,11 +566,11 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 
 	openSearchDescription := OpenSearchDescriptionType{
 		Xmlns:         "http://a9.com/-/spec/opensearch/1.1/",
-		ShortName:     "MTGBAN Price Search",
-		Description:   "Search MTGBAN for " + gameName + " prices",
+		ShortName:     "BAN Price Search",
+		Description:   "Search BAN for " + gameName + " prices",
 		Language:      "en",
 		InputEncoding: "UTF-8",
-		Tags:          "MTGBAN " + gameName + " Price Search",
+		Tags:          "BAN " + gameName + " Price Search",
 		Image:         images,
 		URL:           urls,
 	}
