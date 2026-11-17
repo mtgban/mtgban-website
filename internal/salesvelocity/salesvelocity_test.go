@@ -22,8 +22,8 @@ func TestBuild(t *testing.T) {
 		{ProductID: 2, Variant: "Foil", Copies: 12, Orders: 9, Days: 4, Price: 40},
 		// Two products filed under one card: copies and orders add up, and
 		// the price is their mean weighted by orders.
-		{ProductID: 3, Variant: "Normal", Copies: 2, Orders: 2, Days: 2, Price: 2},
-		{ProductID: 4, Variant: "Normal", Copies: 3, Orders: 1, Days: 1, Price: 5},
+		{ProductID: 3, Variant: "Normal", Copies: 2, Orders: 2, Days: 2, Price: 2, RecentOrders: 1},
+		{ProductID: 4, Variant: "Normal", Copies: 3, Orders: 1, Days: 1, Price: 5, RecentOrders: 1},
 		// Their days keep the larger count, not the sum: the rows can't say which days overlap.
 		{ProductID: 7, Variant: "Normal", Copies: 40, Orders: 40, Days: 12, Price: 1},
 		{ProductID: 8, Variant: "Normal", Copies: 40, Orders: 40, Days: 20, Price: 1},
@@ -31,10 +31,11 @@ func TestBuild(t *testing.T) {
 		{ProductID: 5, Variant: "Normal", Copies: 1, Orders: 1, Days: 1},
 	}
 	last := []lastRow{
-		{ProductID: 1, Variant: "Normal", Last: day(10, 11)},
-		{ProductID: 2, Variant: "Foil", Last: day(10, 12)},
-		{ProductID: 3, Variant: "Normal", Last: day(10, 10)},
-		{ProductID: 4, Variant: "Normal", Last: day(10, 12)},
+		{ProductID: 1, Variant: "Normal", Last: day(10, 11), First: day(1, 5)},
+		{ProductID: 2, Variant: "Foil", Last: day(10, 12), First: day(10, 1)},
+		// The first sale is the earlier of the two.
+		{ProductID: 3, Variant: "Normal", Last: day(10, 10), First: day(4, 2)},
+		{ProductID: 4, Variant: "Normal", Last: day(10, 12), First: day(3, 9)},
 		{ProductID: 7, Variant: "Normal", Last: day(10, 12)},
 		{ProductID: 8, Variant: "Normal", Last: day(10, 11)},
 		{ProductID: 5, Variant: "Normal", Last: day(10, 12)},
@@ -59,9 +60,9 @@ func TestBuild(t *testing.T) {
 		t.Errorf("unmatched: got %d, want 2", unmatched)
 	}
 	want := map[string]Sales{
-		"steady": {Copies: 69, Orders: 31, Days: 18, LastSale: day(10, 11), Price: 1.5},
-		"foil":   {Copies: 12, Orders: 9, Days: 4, LastSale: day(10, 12), Price: 40},
-		"merged": {Copies: 5, Orders: 3, Days: 2, LastSale: day(10, 12), Price: 3},
+		"steady": {Copies: 69, Orders: 31, Days: 18, FirstSale: day(1, 5), LastSale: day(10, 11), Price: 1.5},
+		"foil":   {Copies: 12, Orders: 9, Days: 4, FirstSale: day(10, 1), LastSale: day(10, 12), Price: 40},
+		"merged": {Copies: 5, Orders: 3, Days: 2, FirstSale: day(3, 9), LastSale: day(10, 12), Price: 3, RecentOrders: 2},
 		"busy":   {Copies: 80, Orders: 80, Days: 20, LastSale: day(10, 12), Price: 1},
 		"zero":   {LastSale: day(8, 2)},
 	}
@@ -169,6 +170,59 @@ func TestBandString(t *testing.T) {
 		if got != want {
 			t.Errorf("%v: got %q, want %q", band, got, want)
 		}
+	}
+}
+
+// TestRising flags a card selling at least twice as fast in the last week, in
+// orders, once it has enough of them to tell from noise and sold before the window.
+func TestRising(t *testing.T) {
+	start := time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC)
+	before, inside := start.AddDate(0, -2, 0), start.AddDate(0, 0, 3)
+	for _, tc := range []struct {
+		desc           string
+		orders, recent int32
+		first          time.Time
+		window         int
+		want           float64
+	}{
+		{"twice as fast", 37, 14, before, 30, 2},
+		{"faster still", 30, 14, before, 30, 14.0 / 7 / (16.0 / 23)},
+		{"just under twice", 37, 13, before, 30, 0},
+		{"too few orders", 29, 14, before, 30, 0},
+		{"steady", 30, 8, before, 30, 0},
+		{"no sale before the week", 40, 40, before, 30, 0},
+		{"one order before the week", 30, 29, before, 30, 29.0 / 7 * 23},
+		{"first sold in the window", 37, 14, inside, 30, 0},
+		{"first sold on the window's first day", 37, 14, start, 30, 0},
+		{"a window no longer than the week", 40, 20, before, 7, 0},
+	} {
+		got := Sales{Orders: tc.orders, RecentOrders: tc.recent, FirstSale: tc.first}.Rising(tc.window, start)
+		if got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.desc, got, tc.want)
+		}
+	}
+	// snapshotOf's window starts on start.
+	s := snapshotOf(map[string]*Sales{
+		"up":    {Copies: 40, Orders: 37, RecentOrders: 14, Days: 20, FirstSale: before},
+		"new":   {Copies: 40, Orders: 37, RecentOrders: 14, Days: 20, FirstSale: inside},
+		"flat":  {Orders: 30, RecentOrders: 7, FirstSale: before},
+		"spike": {Copies: 30, Orders: 30, RecentOrders: 29, Days: 8, FirstSale: before},
+	})
+	if !s.Rising("up") || s.Rising("new") || s.Rising("flat") || s.Rising("missing") || (*Snapshot)(nil).Rising("up") {
+		t.Error("Snapshot.Rising disagrees with Sales.Rising")
+	}
+	_, detail, _ := s.View("up")
+	if !strings.Contains(detail, "|days with a sale|20\n|last 7 days|2.0× the pace before") {
+		t.Errorf("up: no trend line before the last sale: %q", detail)
+	}
+	_, detail, _ = s.View("new")
+	if strings.Contains(detail, "last 7 days") {
+		t.Errorf("new: a trend line: %q", detail)
+	}
+	// One order before the week makes 95×, which the details cap.
+	_, detail, _ = s.View("spike")
+	if !s.Rising("spike") || !strings.Contains(detail, "|last 7 days|over 5× the pace before") {
+		t.Errorf("spike: got %q", detail)
 	}
 }
 
@@ -299,7 +353,7 @@ func TestText(t *testing.T) {
 		{"another window", Sales{Copies: 7, Orders: 7, Days: 5, LastSale: last}, 7, "1.0/day",
 			"**Sold on TCGplayer, last 7 days**\n|copies|7\n|orders|7\n|days with a sale|5\n|last sale|2026-10-11"},
 	} {
-		rate, detail := text(tc.v, tc.window, "")
+		rate, detail := text(tc.v, tc.window)
 		if rate != tc.rate || detail != tc.detail {
 			t.Errorf("%s: got %q, %q; want %q, %q", tc.desc, rate, detail, tc.rate, tc.detail)
 		}
@@ -344,7 +398,7 @@ func TestViewPace(t *testing.T) {
 func TestView(t *testing.T) {
 	v := Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
 	s := snapshotOf(map[string]*Sales{"card": &v})
-	wantRate, wantDetail := text(v, Window, "")
+	wantRate, wantDetail := text(v, Window)
 	rate, detail, _ := s.View("card")
 	if rate != wantRate || detail != wantDetail {
 		t.Errorf("card: got %q, %q; want %q, %q", rate, detail, wantRate, wantDetail)

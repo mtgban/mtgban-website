@@ -550,6 +550,7 @@ type GenericCard struct {
 	VelocityDetail    string
 	VelocityNotable   bool // the rate is worth showing on a table of cards
 	VelocityPace      salesvelocity.Pace
+	VelocityRising    bool
 	Newspaper         bool
 	HasContentWarning bool
 	CropURL           string
@@ -1177,6 +1178,7 @@ func cardPrintings(b *matcher.Backend, cardID string) string {
 func (c *GenericCard) fillSales(sales *salesvelocity.Snapshot) {
 	c.Velocity, c.VelocityDetail, c.VelocityNotable = sales.View(c.UUID)
 	c.VelocityPace = sales.Pace(c.UUID)
+	c.VelocityRising = sales.Rising(c.UUID)
 }
 
 // cardMetadata is what a page shows of each card it lists, keyed by card id.

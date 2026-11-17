@@ -28,8 +28,9 @@ Per card uuid, a printing in one finish:
   sale day, the one before the newest `sale_date` of any game in the table;
 - the price, each day's `median_price` over the window weighted by its
   orders (`total_revenue` is no price: it ignores each sale's quantity);
+- the orders in the window's last 7 days, for its trend;
 - the days in that window with a sale;
-- the last sale over the 365 days ending on the same day.
+- the first and last sale over the 365 days ending on the same day.
 
 The rate is the copies over 30, to one decimal.
 
@@ -74,13 +75,36 @@ The rate each pace starts from, by band, from `TestSalesVelocityLive`:
 
 | band | cards | fastest from | fast from | steady from |
 |---|---:|---:|---:|---:|
-| under $1 | 56356 | 2.90 | 0.60 | 0.17 |
-| at $1–3 | 42559 | 2.20 | 0.53 | 0.17 |
-| at $3–10 | 22009 | 2.77 | 0.60 | 0.13 |
-| at $10–30 | 10009 | 2.10 | 0.50 | 0.13 |
-| at $30–100 | 4809 | 1.50 | 0.37 | 0.13 |
-| at $100–300 | 1276 | 1.00 | 0.27 | 0.10 |
-| at $300+ | 648 | 0.70 | 0.17 | 0.07 |
+| under $1 | 57985 | 3.20 | 0.63 | 0.17 |
+| at $1–3 | 43673 | 2.30 | 0.57 | 0.17 |
+| at $3–10 | 22783 | 2.90 | 0.60 | 0.17 |
+| at $10–30 | 10286 | 2.17 | 0.50 | 0.13 |
+| at $30–100 | 4977 | 1.47 | 0.33 | 0.13 |
+| at $100–300 | 1319 | 1.00 | 0.27 | 0.10 |
+| at $300+ | 659 | 0.70 | 0.17 | 0.07 |
+
+## Its trend
+
+An arrow, `↑`, leads the rate of a card selling at least twice as fast in the
+window's last 7 days as in the 23 before them, with the details' line
+`last 7 days | 2.4× the pace before`. It counts orders rather than copies, so
+one buyer taking a stack does not make a trend, and it needs 30 orders in the
+window: with fewer, chance alone moves a card that far too often. A card first
+sold in the window has no pace before it, so a new set's cards, all selling
+more each day of their first weeks, are left out rather than all marked.
+Past 5× the line reads `over 5×`: by then the days before hold an order or
+two, and a figure like 95× measures them rather than the trend.
+
+Only a rise is marked. A card slowing to half its pace is mostly chance at
+these counts, and every set's cards slow as they age.
+
+The cards with enough orders and a sale before the window, those marked, and
+those chance alone would mark were each card's orders spread evenly over the
+window, from `TestSalesVelocityLive`:
+
+| cards with enough orders | rising | by chance |
+|---:|---:|---:|
+| 28877 | 984 (3.4%) | 321 (1.1%) |
 
 ## Who sees it
 
@@ -202,8 +226,8 @@ every game loads once a day.
 
 `TestSalesVelocityLive` (`internal/salesvelocity/live_test.go`) runs the queries
 against the configured newspaper database, read-only, builds the snapshot
-on the local datastore and prints the two tables below and the one under
-"Its colour". They were
+on the local datastore and prints the two tables below and the ones under
+"Its colour" and "Its trend". They were
 measured on the Magic datastore when the feature was built, the window
 ending on the last complete sale day; rerun the test to refresh them. It skips
 unless `NEWSPAPER_LIVE` is set, and without the datastore:

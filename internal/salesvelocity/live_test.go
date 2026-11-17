@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"testing"
 	"time"
@@ -169,4 +170,41 @@ func TestSalesVelocityLive(t *testing.T) {
 		fmt.Printf("| %s | %d | %.2f | %.2f | %.2f |\n", cmp.Or(band.String(), "all"), counts[i],
 			from[i][PaceFastest], from[i][PaceFast], from[i][PaceSteady])
 	}
+
+	// The cards rising, against those chance alone would flag were each card's
+	// orders spread evenly over the window. Cards first sold in the window
+	// have no pace before it, so are left out.
+	windowStart := day.AddDate(0, 0, 1-Window)
+	eligible, rising, chance := 0, 0, 0.0
+	for _, v := range cards {
+		if v.Orders < trendMinOrders || !v.FirstSale.Before(windowStart) {
+			continue
+		}
+		eligible++
+		if v.Rising(Window, windowStart) > 0 {
+			rising++
+		}
+		chance += risingByChance(v.Orders, windowStart)
+	}
+	fmt.Print("\n| cards with enough orders | rising | by chance |\n|---:|---:|---:|\n")
+	fmt.Printf("| %d | %d (%.1f%%) | %.0f (%.1f%%) |\n", eligible, rising, 100*float64(rising)/float64(eligible),
+		chance, 100*chance/float64(eligible))
+}
+
+// risingByChance is the odds a card with orders spread evenly over the window
+// has enough of them in its last TrendDays to read as rising.
+func risingByChance(orders int32, start time.Time) float64 {
+	n := float64(orders)
+	p := float64(TrendDays) / float64(Window)
+	odds := 0.0
+	for k := range orders + 1 {
+		if (Sales{Orders: orders, RecentOrders: k, FirstSale: start.AddDate(0, 0, -1)}).Rising(Window, start) == 0 {
+			continue
+		}
+		lnN, _ := math.Lgamma(n + 1)
+		lnK, _ := math.Lgamma(float64(k) + 1)
+		lnNK, _ := math.Lgamma(n - float64(k) + 1)
+		odds += math.Exp(lnN - lnK - lnNK + float64(k)*math.Log(p) + (n-float64(k))*math.Log(1-p))
+	}
+	return odds
 }
