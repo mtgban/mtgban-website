@@ -1070,9 +1070,9 @@ window.__BAN_GUIDE = {
             requiresNav: 'Upload',
             title: 'Upload & Optimize',
             icon: 'upload',
-            summary: 'Upload a collection in any common format and compare prices across vendors.',
+            summary: 'Upload a collection in any common format, compare prices across vendors, edit the results and split a buylist with the Optimizer.',
             snippets: [],
-            keywords: ['upload', 'collection', 'CSV', 'excel', 'xls', 'xlsx', 'google sheets', 'tcgplayer', 'tcg collection', 'deckbox', 'binderpos', 'cardsphere', 'buylist', 'optimize', 'export', 'CK', 'SCG', 'TCG', 'MKM', 'card kingdom', 'cardmarket', 'cardconduit', 'retail', 'mtgban', 'sheet'],
+            keywords: ['upload', 'collection', 'CSV', 'excel', 'xls', 'xlsx', 'google sheets', 'tcgplayer', 'tcg collection', 'deckbox', 'binderpos', 'cardsphere', 'buylist', 'optimize', 'export', 'CK', 'SCG', 'TCG', 'MKM', 'card kingdom', 'cardmarket', 'cardconduit', 'retail', 'mtgban', 'sheet', 'edit', 'condition', 'copies', 'quantity', 'your price', 'also as', 'reload', 'column', 'drag', 'reorder', 'optimizer', 'move to', 'add store', 'filtered out', 'not bought', 'custom buylist', 'rules', 'buy rate'],
             content: {
                 table: [
                     { value: 'CSV / TSV',                              short: 'Comma or tab separated with sensible headers' },
@@ -1156,9 +1156,9 @@ window.__BAN_GUIDE = {
             category: 'Tips & Tricks',
             title: 'Reading Prices',
             icon: 'eye',
-            summary: 'How to interpret refresh timing, conditions, buylist ratios, and trade credit values.',
+            summary: 'How to interpret refresh timing, conditions, buylist ratios, trade credit values, and the sales velocity colors.',
             snippets: [],
-            keywords: ['tips', 'tricks', 'reading', 'prices', 'refresh', 'timing', 'condition', 'buylist', 'ratio', 'trade credit', 'tooltip', 'index', 'NM', 'sealed', 'interpret'],
+            keywords: ['tips', 'tricks', 'reading', 'prices', 'refresh', 'timing', 'condition', 'buylist', 'ratio', 'trade credit', 'tooltip', 'index', 'NM', 'sealed', 'interpret', 'velocity', 'sales', 'tcgplayer sales', 'copies sold', 'green', 'orange', 'red', 'arrow', '↑'],
             content: {
                 table: [],
                 examples: [
@@ -1195,9 +1195,9 @@ window.__BAN_GUIDE = {
             category: 'Tips & Tricks',
             title: 'Power Features',
             icon: 'zap',
-            summary: 'Historical charts, reprint finder, flavor name search, and where to report issues.',
+            summary: 'Historical charts, reprint finder, the backpack shortcut, choosing stores, flavor name search, and where to report issues.',
             snippets: [],
-            keywords: ['tips', 'tricks', 'power user', 'history', 'chart', 'historical', 'reprint', 'finder', 'flavor name', 'feedback', 'discord', '📊', '📖', 'icon'],
+            keywords: ['tips', 'tricks', 'power user', 'history', 'chart', 'historical', 'reprint', 'finder', 'flavor name', 'feedback', 'discord', '📊', '📖', 'icon', 'backpack', 'ctrl b', 'cmd b', 'shortcut', 'stores', 'settings', 'tick', 'hide store'],
             content: {
                 table: [],
                 examples: [
