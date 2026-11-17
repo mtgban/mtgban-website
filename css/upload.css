@@ -1278,6 +1278,13 @@
 .opt-cond-btn { margin-left: 4px; padding: 0 4px !important; font-size: var(--text-xs) !important; font-family: var(--font-mono); color: var(--text-dim); }
 .opt-loaded .loaded-qty .opt-qty-btn { padding: 0 3px; margin-left: -3px; color: inherit; }
 .opt-move-menu.ures-edit-menu { min-width: 0; }
+/* A Results store column: dragged by its header, dropped by its × */
+.ures-table th[draggable="true"] { cursor: grab; }
+.ures-table th.ures-dragging { opacity: 0.5; }
+.ures-table th.ures-drop-before { box-shadow: inset 2px 0 0 var(--ainfo); }
+.ures-table th.ures-drop-after { box-shadow: inset -2px 0 0 var(--ainfo); }
+.ures-store-drop { margin-left: 4px; padding: 0 3px; border: none; background: none; color: var(--text-dim); font: inherit; line-height: 1; cursor: pointer; border-radius: var(--radius-sm); }
+.ures-store-drop:hover, .ures-store-drop:focus-visible { color: var(--adanger); background: var(--surface-3); }
 .ures-edit-menu.cond .ures-edit-items button { justify-content: center; font-family: var(--font-mono); }
 .ures-edit-menu.qty .ures-edit-items { display: grid; grid-template-columns: repeat(5, 2.6em); gap: 2px; }
 .ures-edit-menu.qty .ures-edit-items button { justify-content: center; padding: 5px 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }

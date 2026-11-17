@@ -251,7 +251,7 @@ func TestUploadSpellsTheCustomBuylistRule(t *testing.T) {
 			t.Errorf("no rule on %s in the %d byte page", tag, len(page))
 		}
 	}
-	if !strings.Contains(page, `<th class="r" data-sort-method="number" data-sort-descending>Session ZZV<`) {
+	if !strings.Contains(page, `<th class="r" data-sort-method="number" data-sort-descending data-store="ZZV" data-store-kind="singles" draggable="true">Session ZZV<`) {
 		t.Error("another store's column has lost its plain header")
 	}
 }

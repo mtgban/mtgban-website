@@ -223,3 +223,38 @@ func TestFillUploadKeysAddStores(t *testing.T) {
 		})
 	}
 }
+
+// A list posted with its stores out of the picker's order, as a dragged
+// Results column posts it, has its reload form carry that order on; one in
+// the picker's order carries nothing, so a reload reads the saved stores.
+func TestFillUploadKeysStoreOrder(t *testing.T) {
+	both := uploadIDs{cardIDs: []string{"card"}, sealedProductIDs: []string{"product"}}
+	for _, tc := range []struct {
+		name            string
+		canChange       bool
+		stores, sealeds []string
+		order, sealed   []string
+	}{
+		{"picker's order", true, []string{"CK", "TCGPlayer"}, []string{"CKSealed", "TCGSealed"}, nil, nil},
+		{"singles moved", true, []string{"TCGPlayer", "CK"}, []string{"CKSealed", "TCGSealed"}, []string{"TCGPlayer", "CK"}, nil},
+		{"sealed moved", true, []string{"CK"}, []string{"TCGSealed", "CKSealed"}, nil, []string{"TCGSealed", "CKSealed"}},
+		{"cannot change stores", false, []string{"TCGPlayer", "CK"}, nil, nil, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			selected := uploadStores{
+				enabledStores:       tc.stores,
+				enabledSealedStores: tc.sealeds,
+				singlesSellers:      []string{"CK", "SCG", "TCGPlayer"},
+				sealedSellers:       []string{"CKSealed", "TCGSealed"},
+			}
+			vars := UploadVars{CanChangeStores: tc.canChange}
+			fillUploadKeys(&vars, false, selected, both, uploadPrices{}, uploadIndexes{})
+			if !slices.Equal(vars.StoreOrder, tc.order) {
+				t.Errorf("StoreOrder = %v, want %v", vars.StoreOrder, tc.order)
+			}
+			if !slices.Equal(vars.SealedStoreOrder, tc.sealed) {
+				t.Errorf("SealedStoreOrder = %v, want %v", vars.SealedStoreOrder, tc.sealed)
+			}
+		})
+	}
+}
