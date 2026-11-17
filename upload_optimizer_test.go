@@ -758,3 +758,43 @@ func TestLeftoversMergeOpenedCopies(t *testing.T) {
 		t.Errorf("listed %+v, want the opened copies as 4 and the uploaded as 2", l.rows)
 	}
 }
+
+// TestResultsStoreColumnsMove marks the columns of the stores the list was
+// priced against as draggable, with an × while another would be left, and
+// leaves the custom buylist's column and a reader who may not change stores
+// without either. The reload form carries a dragged order on.
+func TestResultsStoreColumnsMove(t *testing.T) {
+	vars := func(canChange bool, picked ...string) PageVars {
+		return PageVars{UploadVars: UploadVars{
+			CanChangeStores: canChange,
+			EnabledSellers:  picked,
+			ScraperKeys:     []string{"CK", "SCG", "custom"},
+			UploadEntries:   []UploadEntry{{CardID: "a"}},
+			SinglesEntries:  []UploadEntry{{CardID: "a"}},
+			StoreOrder:      []string{"SCG", "CK"},
+		}}
+	}
+	drop := `<button type="button" class="ures-store-drop"`
+	out := renderUpload(t, vars(true, "CK", "SCG"))
+	for _, w := range []string{
+		`data-store="CK" data-store-kind="singles" draggable="true">`,
+		`data-store="SCG" data-store-kind="singles" draggable="true">`,
+		`<input type="hidden" name="stores" value="SCG"><input type="hidden" name="stores" value="CK">`,
+	} {
+		if !strings.Contains(out, w) {
+			t.Errorf("no %s", w)
+		}
+	}
+	if strings.Contains(out, `data-store="custom"`) {
+		t.Error("the custom buylist's column moves")
+	}
+	if n := strings.Count(out, drop); n != 2 {
+		t.Errorf("%d columns drop, want 2", n)
+	}
+	if out := renderUpload(t, vars(true, "CK")); strings.Count(out, drop) != 0 {
+		t.Error("the one store left drops")
+	}
+	if out := renderUpload(t, vars(false, "CK", "SCG")); strings.Contains(out, `data-store-kind=`) || strings.Count(out, drop) != 0 {
+		t.Error("columns move for a reader who may not change stores")
+	}
+}

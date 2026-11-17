@@ -502,6 +502,12 @@
      one side of it quietly stopped being the product's contents, so the rows
      of an unpacked list are not the reader's to remove. */}}
 {{$canRemove := not .Unpacked}}
+{{/* The stores a column can be dropped or moved among: those the list was
+     priced against, which the custom buylist is not one of */}}
+{{$kind := "singles"}}{{$picked := .Root.EnabledSellers}}
+{{if eq .Noun "product"}}{{$kind = "sealed"}}{{$picked = .Root.EnabledSealedSellers}}{{end}}
+{{if and .Root.IsBuylist (eq $kind "singles")}}{{$picked = .Root.EnabledVendors}}{{end}}
+{{if and .Root.IsBuylist (eq $kind "sealed")}}{{$picked = .Root.EnabledSealedVendors}}{{end}}
 <table class="ures-table">
     <thead>
         <tr>
@@ -510,7 +516,8 @@
             <th class="c" data-sort-method="number">Cond</th>
             <th class="c" data-sort-method="number" data-sort-descending>Qty</th>
             {{range $storeKeys}}
-                <th class="r" data-sort-method="number" data-sort-descending{{with index $.Root.CustomTips .}} title="{{.}}"{{end}}>{{index $.Root.StoreNames .}}</th>
+                {{$movable := and $.Root.CanChangeStores (slice_has $picked .)}}
+                <th class="r" data-sort-method="number" data-sort-descending{{with index $.Root.CustomTips .}} title="{{.}}"{{end}}{{if $movable}} data-store="{{.}}" data-store-kind="{{$kind}}" draggable="true"{{end}}>{{index $.Root.StoreNames .}}{{if and $movable (gt (len $picked) 1)}}<button type="button" class="ures-store-drop" title="Price this list again without {{index $.Root.StoreNames .}}" aria-label="Drop {{index $.Root.StoreNames .}}">&times;</button>{{end}}</th>
             {{end}}
             {{if $indexKeys}}<th data-sort-method="number" data-sort-descending title="Reference prices for the printing as a whole. Unlike the store columns, these are not adjusted for the condition in the Cond column.">Index<span class="ures-index-note">per printing</span></th>{{end}}
         </tr>
@@ -1264,10 +1271,13 @@
         <input type="hidden" id="res_tcgplayer_csv" name="tcgplayer_csv" value="">
         <input type="hidden" id="res_csvscope" name="csvscope" value="">
         <input type="hidden" id="res_unpack" name="unpack" value="">
+        {{range .StoreOrder}}<input type="hidden" name="stores" value="{{.}}">{{end}}
+        {{range .SealedStoreOrder}}<input type="hidden" name="sealed_stores" value="{{.}}">{{end}}
     </form>
 
     <script type="text/javascript" src="/js/upload-exports.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-edit.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/upload-columns.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-sort.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-share.js?hash={{.Hash}}" defer></script>
 

@@ -466,6 +466,12 @@ type UploadVars struct {
 	OptAddStores       []string
 	OptAddSealedStores []string
 
+	// The singles and sealed stores in the order the reader dragged the
+	// Results columns into, which the page's re-posts carry on; empty in
+	// the stores' own order
+	StoreOrder       []string
+	SealedStoreOrder []string
+
 	// UnpackSealed counts the rows holding a decklist, which is what decides
 	// whether the results offer to open them. The contents themselves are
 	// resolved when the offer is taken, not before.
@@ -914,6 +920,12 @@ func fillUploadKeys(pageVars *UploadVars, blMode bool, selected uploadStores, id
 	}
 	if len(ids.cardIDs) > 0 {
 		pageVars.OptAddStores = leaveOut(offered, selected.enabledStores)
+	}
+	if !slices.Equal(selected.enabledStores, keepInOrder(offered, selected.enabledStores)) {
+		pageVars.StoreOrder = selected.enabledStores
+	}
+	if !slices.Equal(selected.enabledSealedStores, keepInOrder(offeredSealed, selected.enabledSealedStores)) {
+		pageVars.SealedStoreOrder = selected.enabledSealedStores
 	}
 	if len(ids.sealedProductIDs) > 0 {
 		pageVars.OptAddSealedStores = leaveOut(offeredSealed, selected.enabledSealedStores)
