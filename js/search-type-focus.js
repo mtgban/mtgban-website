@@ -15,6 +15,8 @@
         }
         return false;
     }
+    // search-sidebar.js asks the same before Ctrl/Cmd+B
+    window.banDialogOpen = dialogOpen;
 
     document.addEventListener('keydown', function(e) {
         if (e.defaultPrevented || e.isComposing || e.metaKey) return;

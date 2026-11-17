@@ -504,6 +504,10 @@ document.addEventListener('keydown', function(e) {
     var t = e.target;
     var searchBox = t.id === 'nav-searchbox' || t.id === 'searchbox';
     if (t.isContentEditable || (!searchBox && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    // An open dialog or backpack panel covers the card, wherever the focus
+    // is; a browser too old for the check goes by the focus
+    if ((window.banDialogOpen && window.banDialogOpen()) || document.querySelector('#backpack-panel.open')) return;
+    if (t.closest && t.closest('[role="dialog"], #backpack-panel')) return;
     var img = document.getElementById('cardImage');
     if (!shownHeader || !shownHeader.isConnected || !img) return;
     // checkVisibility is missing before Safari 17.4 and Firefox 125
