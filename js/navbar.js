@@ -30,7 +30,8 @@
             shut();
         } else {
             open();
-            if (window.BAN && window.BAN.track) window.BAN.track('ui.nav.tools', 'open');
+            // A drag opens the menu through click() too: only a reader's click counts
+            if (e.isTrusted && window.BAN && window.BAN.track) window.BAN.track('ui.nav.tools', 'open');
         }
     });
     document.addEventListener('click', function(e) {
