@@ -1012,6 +1012,12 @@ span.emoji {
 .bl-ck + .bl-velocity::before {
     content: "\00b7\00a0";
 }
+/* How fast a card sells against cards of its price (salesvelocity.Pace),
+   wherever the rate shows */
+.velocity-fastest { color: var(--asuccess); font-weight: 700; }
+.velocity-fast { color: var(--asuccess); }
+.velocity-steady { color: var(--awarning); }
+.velocity-slow { color: var(--adanger); }
 /* The details column's one tooltip, CK's verdict, stock, P90 and odds */
 .bl-info[title] { cursor: help; }
 

@@ -581,6 +581,9 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     justify-self: end;
     font-weight: 400;
 }
+.sales-velocity .m-vendor-price.velocity-fastest {
+    font-weight: 700;
+}
 .m-vendor-row.sales-velocity-upsell {
     display: block;
     padding: 0.3rem 0.75rem;

@@ -549,6 +549,7 @@ type GenericCard struct {
 	Velocity          string // TCGplayer copies sold a day, see salesvelocity.go
 	VelocityDetail    string
 	VelocityNotable   bool // the rate is worth showing on a table of cards
+	VelocityPace      salesvelocity.Pace
 	Newspaper         bool
 	HasContentWarning bool
 	CropURL           string
@@ -1175,6 +1176,7 @@ func cardPrintings(b *matcher.Backend, cardID string) string {
 // fillSales reads the card's rate and details from sales, none when it is nil.
 func (c *GenericCard) fillSales(sales *salesvelocity.Snapshot) {
 	c.Velocity, c.VelocityDetail, c.VelocityNotable = sales.View(c.UUID)
+	c.VelocityPace = sales.Pace(c.UUID)
 }
 
 // cardMetadata is what a page shows of each card it lists, keyed by card id.

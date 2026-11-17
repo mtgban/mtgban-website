@@ -26,6 +26,8 @@ Per card uuid, a printing in one finish:
 
 - copies and orders summed over the 30 days ending on the last complete
   sale day, the one before the newest `sale_date` of any game in the table;
+- the price, each day's `median_price` over the window weighted by its
+  orders (`total_revenue` is no price: it ignores each sale's quantity);
 - the days in that window with a sale;
 - the last sale over the 365 days ending on the same day.
 
@@ -46,6 +48,39 @@ The row is a `<details>` on both layouts, showing the rate and opening on a
 click or tap to the details, so a phone reads what a desktop reads. A phone
 card with sales and no buylist gets a Buyers panel to hold it, saying there
 are no offers.
+
+## Its colour
+
+The rate is coloured by how fast the card sells against cards of a like
+price, since copies a day hold level to about $30 and fall above it: a $500
+card selling every other day is a fast one, a $1 card doing the same is not.
+`grade` (`internal/salesvelocity`) splits the cards with a sale in the window
+into bands at $1, 3, 10, 30, 100 and 300, a band of under 200 cards joining
+the one below it, and ranks each card by the share of its band it outsells:
+
+| Pace | Share outsold | Shown |
+|---|---|---|
+| fastest | 90% or more | green, bold |
+| fast | 60% or more | green |
+| steady | 25% or more | orange |
+| slow | less, or no sale in the window | red |
+
+Shares rather than set rates keep the colours right for every game, each
+grading its own cards. The details add a line naming the band and the share,
+`vs. cards at $10–30 | faster than 92%`. The search row, on both layouts, and
+the INFO column take the colour as a `velocity-<pace>` class.
+
+The rate each pace starts from, by band, from `TestSalesVelocityLive`:
+
+| band | cards | fastest from | fast from | steady from |
+|---|---:|---:|---:|---:|
+| under $1 | 56356 | 2.90 | 0.60 | 0.17 |
+| at $1–3 | 42559 | 2.20 | 0.53 | 0.17 |
+| at $3–10 | 22009 | 2.77 | 0.60 | 0.13 |
+| at $10–30 | 10009 | 2.10 | 0.50 | 0.13 |
+| at $30–100 | 4809 | 1.50 | 0.37 | 0.13 |
+| at $100–300 | 1276 | 1.00 | 0.27 | 0.10 |
+| at $300+ | 648 | 0.70 | 0.17 | 0.07 |
 
 ## Who sees it
 
@@ -167,7 +202,8 @@ every game loads once a day.
 
 `TestSalesVelocityLive` (`internal/salesvelocity/live_test.go`) runs the queries
 against the configured newspaper database, read-only, builds the snapshot
-on the local datastore and prints the two tables below. They were
+on the local datastore and prints the two tables below and the one under
+"Its colour". They were
 measured on the Magic datastore when the feature was built, the window
 ending on the last complete sale day; rerun the test to refresh them. It skips
 unless `NEWSPAPER_LIVE` is set, and without the datastore:
