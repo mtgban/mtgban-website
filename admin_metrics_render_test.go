@@ -171,7 +171,9 @@ func TestOverviewRenders(t *testing.T) {
 		Remove: []MetricsCandidateRow{{Candidate: metricsreport.Candidate{Name: "search.sort", Value: "alpha", Class: metricsreport.ClassUnused,
 			Area: "search", Help: "Sort order picked on search", RateText: "0.00% of requests", Denom: 300}, URL: "?page=metrics&view=feature&name=search.sort"}},
 		Invest: []MetricsSignalRow{{Signal: metricsreport.Signal{Section: metricsreport.SectionFailures, Label: "Empty searches", Count: 30, Denom: 200,
-			Help: "Searches that found nothing"}, RateText: "15.0%"}},
+			Help: "Searches that found nothing"}, RateText: "15.0%"},
+			// a wall has a count and nothing to rate it against
+			{Signal: metricsreport.Signal{Section: metricsreport.SectionWalls, Label: "Upload row cap", Count: 12}}},
 		Areas:    []MetricsAreaRow{{Area: "search", Events: 1200, URL: "?page=metrics&view=feature&area=search"}},
 		StockDay: metricsRenderDay,
 		Stock: []MetricsStockGroup{{Name: "stock.pref", Help: "Saved preferences", Total: 40,
@@ -185,6 +187,7 @@ func TestOverviewRenders(t *testing.T) {
 		"Consider removing", "Consider investing", "search.sort", "alpha", "and 4 more in upload",
 		`title="Sort order picked on search"`, "unused", "0.00% of requests",
 		"Empty searches", "15.0%", `title="Searches that found nothing"`,
+		"Upload row cap", `12 <span class="admin-metrics-dim">counted</span>`,
 		hrefOf("?page=metrics&view=feature&area=search")+`>search</a>`,
 		"Stored state, all sites", "counts from Mar 4, 2026", "<details>", "stock.pref", "Saved preferences",
 		"magic dark", "25.0%", "75.0%",
