@@ -175,3 +175,32 @@ func TestReverseSortKeepsEveryGamesFinishOrder(t *testing.T) {
 		})
 	}
 }
+
+// TestReverseSortFromSyntax: -sort: takes the same orders as sort: and runs
+// them backwards, while the order it names is the one used.
+func TestReverseSortFromSyntax(t *testing.T) {
+	b := &matcher.Backend{}
+	for _, c := range []struct {
+		query, target string
+		sort          string
+		reversed      bool
+	}{
+		{"sort:retail", "/search", "retail", false},
+		{"-sort:retail", "/search", "retail", true},
+		{"-sort:Retail", "/search", "retail", true},
+		{"sort:retail", "/search?reverse=true", "retail", true},
+		{"-sort:retail", "/search?reverse=false", "retail", true},
+		{"-sort:nope", "/search", "", false},
+		// Velocity unlocked by no handler leaves the parameter's order, forwards
+		{"-sort:velocity", "/search?sort=alpha", "alpha", false},
+	} {
+		config := parseSearchOptionsNG(b, currentPrices(), c.query, nil, nil, nil)
+		r := httptest.NewRequest("GET", c.target, nil)
+		if got := readSearchSort(r, config); got != c.sort {
+			t.Errorf("%s at %s: sort %q, want %q", c.query, c.target, got, c.sort)
+		}
+		if got := readSearchReverse(r, config); got != c.reversed {
+			t.Errorf("%s at %s: reversed %v, want %v", c.query, c.target, got, c.reversed)
+		}
+	}
+}

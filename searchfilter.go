@@ -30,6 +30,8 @@ type SearchConfig struct {
 
 	// Sort strategy
 	SortMode string
+	// SortReverse is SortMode run backwards, as -sort: asks
+	SortReverse bool
 
 	// Only for SearchMode == "hashing"
 	UUIDs []string
@@ -1406,6 +1408,7 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 			switch code {
 			case "chrono", "hybrid", "alpha", "number", "retail", "buylist", "velocity":
 				config.SortMode = code
+				config.SortReverse = negate
 			}
 
 		// This option loads a specific set of uuids from a deck list, which is similar
