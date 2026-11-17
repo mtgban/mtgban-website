@@ -326,6 +326,9 @@ type OptimizedUploadEntry struct {
 	// The row's tie group under the sorting setting, from 1, or 0 when the
 	// setting leaves the list in its order (numberSortTies)
 	SortLead int
+
+	// The row's notes, for the link back to the offer it was read from
+	Notes string
 }
 
 // Checkbox options enabled by default in the settings UI when the
@@ -1191,7 +1194,7 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 
 		listed := rows.optimizeRow(row, offers, bestStores, st, indexes)
 		if blMode && !listed {
-			e := LeftoverEntry{CardID: row.CardID, Condition: row.conds, Quantity: row.qty, Loaded: rowComparePrice(row, st, indexes), CompareSource: st.altPriceSource}
+			e := LeftoverEntry{CardID: row.CardID, Condition: row.conds, Quantity: row.qty, Loaded: rowComparePrice(row, st, indexes), CompareSource: st.altPriceSource, Notes: row.Notes}
 			if len(bestStores) == 0 {
 				rows.notBought.add(row, e)
 			} else {
@@ -1260,6 +1263,8 @@ type LeftoverEntry struct {
 	Spread        float64
 	// MoveTo is the stores that offer for the row, as OptimizedUploadEntry's
 	MoveTo string
+	// Notes is the row's, for the link back to its offer
+	Notes string
 }
 
 // leftovers lists upload rows in no store's list, copies of a card opened
@@ -1274,6 +1279,9 @@ func (l *leftovers) add(row uploadRow, e LeftoverEntry) {
 	at, seen := l.at[row.priceKey]
 	if opened && seen {
 		l.rows[at].Quantity += row.qty
+		if l.rows[at].Notes != row.Notes {
+			l.rows[at].Notes = ""
+		}
 		return
 	}
 	if opened {
@@ -1335,6 +1343,9 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 			added = price * float64(qty)
 			entry.Quantity += qty
 			entry.Profitability = mtgban.Profitability(entry.BestPrice, entry.Price, entry.Quantity, 0)
+			if entry.Notes != row.Notes {
+				entry.Notes = ""
+			}
 		} else {
 			// Break down by store
 			if opened {
@@ -1353,6 +1364,7 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 				Quantity:        row.qty,
 				VisualPrice:     comparePrice * st.visualPerc / 100.0,
 				Profitability:   mtgban.Profitability(price, comparePrice, row.qty, 0),
+				Notes:           row.Notes,
 			})
 		}
 

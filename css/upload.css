@@ -1446,11 +1446,11 @@
    stay under the header however tall it wraps */
 .opt-table thead { position: sticky; top: var(--nav-height); z-index: 5; }
 /* Widths on the cols: the first row is the store header, spanning them all */
-.opt-table col:nth-child(1) { width: 27%; }
+.opt-table col:nth-child(1) { width: 25%; }
 .opt-table col:nth-child(2) { width: 13%; }
 .opt-table col:nth-child(3) { width: 11%; }
 .opt-table col:nth-child(4) { width: 11%; }
-.opt-table col:nth-child(5) { width: 17%; }
+.opt-table col:nth-child(5) { width: 19%; }
 .opt-table col:nth-child(6) { width: 14%; }
 /* Wide enough for a row's Move to button beside its box */
 .opt-table col:nth-child(7) { width: 7%; }
@@ -1540,11 +1540,23 @@ body:not(:has(#panel-optimizer.active)) :is(.res-sort-btn, .res-sort-sep) { disp
 .opt-loaded .loaded { display: inline-block; min-width: 5em; text-align: right; color: var(--activetext); }
 /* When prices aren't ignored the loaded value is the uploaded price (not a
    linkable page); this small symbol still opens the alternate source. */
-.opt-loaded .opt-altlink { margin-left: 4px; font-size: var(--text-xs); text-decoration: none; opacity: 0.6; }
+.opt-loaded .opt-altlink { font-size: var(--text-xs); text-decoration: none; opacity: 0.6; }
 .opt-loaded .opt-altlink:hover { opacity: 1; }
+/* The offer a row was read from: an icon after the price, since a click on
+   the loaded price edits it. On Results its negative right margin cancels
+   its width, so it hangs past the number and the prices stay in line. */
+.ures-price a.ures-offer-link { display: inline-flex; vertical-align: -1px; margin: 0 -16px 0 4px; color: var(--text-dim); text-decoration: none; }
+.opt-loaded .opt-icons a.ures-offer-link { display: inline-flex; color: var(--text-dim); text-decoration: none; }
+.ures-price a.ures-offer-link:hover,
+.opt-loaded .opt-icons a.ures-offer-link:hover { color: var(--ainfo); }
+.ures-offer-link svg { width: 12px; height: 12px; }
 .opt-loaded .loaded-qty { display: inline-block; min-width: 2.5em; text-align: left; padding-left: 6px; color: var(--text-dim); font-size: var(--text-sm); }
-.opt-offer .opt-icons,
-.opt-loaded .opt-icons { display: inline-block; width: 2em; text-align: left; padding-left: 6px; }
+.opt-offer .opt-icons { display: inline-block; width: 2em; text-align: left; padding-left: 6px; }
+/* ⚠️, 🔗 and the offer link each keep a slot, so they line up row to row */
+.opt-loaded .opt-icons { display: inline-grid; grid-template-columns: 1.4em 1.1em 1.1em; align-items: center; vertical-align: middle; text-align: left; padding-left: 6px; }
+.opt-loaded .opt-icons .opt-warn { grid-column: 1; }
+.opt-loaded .opt-icons .opt-altlink { grid-column: 2; }
+.opt-loaded .opt-icons .ures-offer-link { grid-column: 3; }
 .opt-spread { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-base); font-weight: 600; text-align: right; white-space: nowrap; }
 .opt-spread.hot { color: var(--awarning); }
 .opt-spread.ok { color: var(--activetext); }

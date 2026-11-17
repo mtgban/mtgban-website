@@ -21,7 +21,12 @@
     {{- else if eq . "package-open"}}<path d="M12 22v-9"/><path d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z"/><path d="M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13"/><path d="M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z"/>
     {{- else if eq . "arrow-down-wide-narrow"}}<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/>
     {{- else if eq . "backpack"}}<path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 10h8"/><path d="M8 18h8"/><path d="M8 22v-6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+    {{- else if eq . "external-link"}}<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3"/>
     {{- end}}</svg>{{end}}
+
+{{/* The offer a row was read from: after the loaded price on Results,
+     whose click edits it, and in the Optimizer's icons beside the 🔗. */}}
+{{define "offer-link"}}{{with sourceLink .Notes}}<a class="ures-offer-link" href="{{.}}" target="_blank" rel="nofollow noopener" title="Open this offer where it was read from" aria-label="Open this offer where it was read from" {{if $.Opt}}data-track="ui.optimizer"{{else}}data-track="ui.upload.result"{{end}} data-track-value="offer_link">{{template "upload-icon" "external-link"}}</a>{{end}}{{end}}
 
 {{/* The optimizer's leftover rows after the stores' sections, in the
      stores' table: each card, what it is compared against and, when a store
@@ -63,7 +68,7 @@
                 </td>
                 <td>{{with .Store}}{{index $root.StoreNames .}}{{end}}</td>
                 <td class="opt-offer" data-sort="{{if .Store}}{{printf "%.2f" .Price}}{{end}}">{{if .Store}}<span class="offer">$ <a href="/go/b/{{.Store}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a></span>{{end}}</td>
-                <td class="opt-loaded" data-sort="{{if .Loaded}}{{printf "%.2f" .Loaded}}{{end}}"><span class="loaded-wrap"><span class="loaded">{{if .Loaded}}$ {{if $root.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Loaded}}</a>{{else}}{{printf "%.2f" .Loaded}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{end}}</span><span class="loaded-qty">&times;{{.Quantity}}</span></span></td>
+                <td class="opt-loaded" data-sort="{{if .Loaded}}{{printf "%.2f" .Loaded}}{{end}}"><span class="loaded-wrap"><span class="loaded">{{if .Loaded}}$ {{if $root.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Loaded}}</a>{{else}}{{printf "%.2f" .Loaded}}{{end}}{{end}}</span><span class="loaded-qty">&times;{{.Quantity}}</span><span class="opt-icons">{{if and .Loaded (not $root.IgnorePrices)}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{template "offer-link" dict "Notes" .Notes "Opt" true}}</span></span></td>
                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}" data-sort="{{if .Spread}}{{printf "%.2f" .Spread}}{{end}}">{{if .Spread}}{{printf "%.2f" .Spread}}%{{end}}</td>
                 <td class="c">{{if .MoveTo}}<button type="button" class="opt-move-btn" popovertarget="{{$id}}-move-{{$n}}" title="Move to a store" aria-label="Move to a store" data-track="ui.optimizer" data-track-value="move_menu"><svg aria-hidden="true"><use href="#opt-move-icon"/></svg></button><div class="opt-move-menu" id="{{$id}}-move-{{$n}}" popover></div>{{end}}</td>
             </tr>
@@ -559,7 +564,7 @@
                         {{if $canRemove}}<button type="button" class="ures-remove-btn" onclick="window.toggleRemoveRow && toggleRemoveRow(this)" title="Remove from results" aria-label="Remove from results">×</button>{{end}}
                     </div>
                 </td>
-                <td class="ures-price" data-sort="{{if ne .OriginalPrice 0.0}}{{printf "%.2f" .OriginalPrice}}{{end}}">{{if $canRemove}}<button type="button" class="ures-edit-btn" data-edit="price" title="Change your price">$ {{printf "%.2f" .OriginalPrice}}</button>{{else}}$ {{printf "%.2f" .OriginalPrice}}{{end}}</td>
+                <td class="ures-price" data-sort="{{if ne .OriginalPrice 0.0}}{{printf "%.2f" .OriginalPrice}}{{end}}">{{if $canRemove}}<button type="button" class="ures-edit-btn" data-edit="price" title="Change your price">$ {{printf "%.2f" .OriginalPrice}}</button>{{else}}$ {{printf "%.2f" .OriginalPrice}}{{end}}{{template "offer-link" dict "Notes" .Notes}}</td>
                 {{/* upload-edit.js opens a menu from each button; a product's grade is not the reader's to set */}}
                 <td style="text-align:center" data-sort="{{cond_rank .OriginalCondition}}">{{if and $canRemove (not $card.Sealed)}}<button type="button" class="ures-edit-btn cond-badge{{if .IgnoredCondition}} ignored{{end}}" data-edit="cond" title="Change the condition"{{if .IgnoredCondition}} aria-description="Your settings ignore conditions"{{end}}>{{or .OriginalCondition .IgnoredCondition}}</button>{{else}}<span class="cond-badge">{{.OriginalCondition}}</span>{{end}}</td>
                 <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{if $canRemove}}<button type="button" class="ures-edit-btn ures-qty-btn" data-edit="qty" title="Change the copies">{{.Quantity}}</button>{{else}}{{.Quantity}}{{end}}</td>
@@ -735,7 +740,7 @@
                     </div>
                 </div>
             </td>
-            <td class="ures-price" data-sort="{{if ne .OriginalPrice 0.0}}{{printf "%.2f" .OriginalPrice}}{{end}}">$ {{printf "%.2f" .OriginalPrice}}</td>
+            <td class="ures-price" data-sort="{{if ne .OriginalPrice 0.0}}{{printf "%.2f" .OriginalPrice}}{{end}}">$ {{printf "%.2f" .OriginalPrice}}{{template "offer-link" dict "Notes" .Notes}}</td>
             <td style="text-align:center" data-sort="{{cond_rank .OriginalCondition}}"><span class="cond-badge">{{.OriginalCondition}}</span></td>
             <td style="text-align:center">{{.Quantity}}</td>
         </tr>
@@ -1182,7 +1187,7 @@
                                 </td>
                                 <td>{{$ckTip := buylist_title "CK" (grade "NM") "" $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}<div class="bl-info"{{if $ckTip}} title="{{plain_tip $ckTip}}" data-tip="{{$ckTip}}"{{end}}>{{buylist_detail $scraperKey $card.HotlistStore $price $card.GoodBuylist $card.HighestBuylist true $card.CKSignal}}<span class="bl-ck-line">{{buylist_ck $card.CKSignal}}{{velocity_rate $card}}</span></div></td>
                                 <td class="opt-offer"><span class="offer">$ <a href="/go/b/{{$scraperKey}}/{{.CardID}}" target="_blank">{{printf "%.2f" $price}}</a></span></td>
-                                <td class="opt-loaded" data-sort="{{if .Price}}{{printf "%.2f" .Price}}{{end}}"><span class="loaded-wrap"><span class="loaded">{{if .Price}}$ {{if $.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a>{{else}}<button type="button" class="ures-edit-btn opt-price-btn" data-edit="price" title="Change your price">{{printf "%.2f" .Price}}</button><a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{end}}</span>{{if not $card.Sealed}}<button type="button" class="ures-edit-btn opt-cond-btn" data-edit="cond" title="Change the condition">{{or .Condition "NM"}}</button>{{end}}<span class="loaded-qty">{{if .Quantity}}<button type="button" class="ures-edit-btn opt-qty-btn" data-edit="qty" title="Change the copies in your list">&times;{{.Quantity}}</button>{{end}}</span><span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}</span></span></td>
+                                <td class="opt-loaded" data-sort="{{if .Price}}{{printf "%.2f" .Price}}{{end}}"><span class="loaded-wrap"><span class="loaded">{{if .Price}}$ {{if $.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a>{{else}}<button type="button" class="ures-edit-btn opt-price-btn" data-edit="price" title="Change your price">{{printf "%.2f" .Price}}</button>{{end}}{{end}}</span>{{if not $card.Sealed}}<button type="button" class="ures-edit-btn opt-cond-btn" data-edit="cond" title="Change the condition">{{or .Condition "NM"}}</button>{{end}}<span class="loaded-qty">{{if .Quantity}}<button type="button" class="ures-edit-btn opt-qty-btn" data-edit="qty" title="Change the copies in your list">&times;{{.Quantity}}</button>{{end}}</span><span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}<span class="opt-warn">&#9888;&#65039;</span>{{end}}{{if not $.IgnorePrices}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{end}}{{template "offer-link" dict "Notes" .Notes "Opt" true}}</span></span></td>
                                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}" data-sort="{{if .Price}}{{printf "%.2f" .Spread}}{{end}}">
                                     {{if .Price}}
                                         {{printf "%.2f" .Spread}}%

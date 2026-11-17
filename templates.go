@@ -19,6 +19,29 @@ import (
 	"github.com/mtgban/mtgban-website/observability"
 )
 
+// sourceLink is the offer a results row was read from, when its notes are
+// an absolute http or https URL, else "". The extension handing a list over
+// writes the offer's page there; any other note stays text. The URL is
+// rebuilt rather than echoed so userinfo never reaches an href.
+func sourceLink(note string) string {
+	parsed, err := url.Parse(strings.TrimSpace(note))
+	if err != nil || parsed.Host == "" {
+		return ""
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return ""
+	}
+	clean := url.URL{
+		Scheme:   parsed.Scheme,
+		Host:     parsed.Host,
+		Path:     parsed.Path,
+		RawPath:  parsed.RawPath,
+		RawQuery: parsed.RawQuery,
+		Fragment: parsed.Fragment,
+	}
+	return clean.String()
+}
+
 // csvWithout returns csv with `drop` and any empty entries removed. Used by
 // the templates to build "remove this card" URLs that strip one entry from the
 // chart roster while keeping the rest in order.
@@ -239,6 +262,7 @@ var funcMap = template.FuncMap{
 		}
 		return string(encoded)
 	},
+	"sourceLink": sourceLink,
 	"inc": func(i, j int) int {
 		return i + j
 	},
