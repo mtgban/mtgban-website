@@ -2,13 +2,18 @@ var fixedRows = {};
 var removedRows = {};
 var activePicker = null;
 
+// updateReloadBar counts the rows given another printing or edited in a
+// menu (upload-edit.js) as updated, once each, and the rows removed.
 function updateReloadBar() {
-    var fixedCount = Object.keys(fixedRows).length;
+    var updatedCount = Object.keys(fixedRows).length;
+    document.querySelectorAll('.ures-table tr[data-hash]').forEach(function(row) {
+        if (row.querySelector('.ures-edit-btn.edited') && !fixedRows[row.dataset.origHash || row.dataset.hash]) updatedCount++;
+    });
     var removedCount = Object.keys(removedRows).length;
-    var total = fixedCount + removedCount;
-    document.getElementById('reload-fixed-count').textContent = fixedCount;
+    var total = updatedCount + removedCount;
+    document.getElementById('reload-fixed-count').textContent = updatedCount;
     document.getElementById('reload-removed-count').textContent = removedCount;
-    document.getElementById('reload-fixed-wrap').style.display = fixedCount > 0 ? '' : 'none';
+    document.getElementById('reload-fixed-wrap').style.display = updatedCount > 0 ? '' : 'none';
     document.getElementById('reload-removed-wrap').style.display = removedCount > 0 ? '' : 'none';
     document.getElementById('reload-bar').style.display = total > 0 ? 'flex' : 'none';
 }

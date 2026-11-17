@@ -145,6 +145,7 @@ function printings(window) {
     const node = () => ({ style: {}, textContent: '', classList: { add() {}, remove() {} } });
     const document = {
         getElementById: (id) => (byId[id] = byId[id] || node()),
+        querySelectorAll: () => [],
         createElement: () => {
             const on = {};
             return { appendChild() {}, addEventListener: (t, f) => { on[t] = f; }, _click: () => on.click() };

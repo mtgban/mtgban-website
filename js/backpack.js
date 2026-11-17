@@ -1600,7 +1600,7 @@
         if (panel && panel.classList.contains("open")) close(); else open();
     }
 
-    window.Backpack = { read: read, add: add, setQty: setQty, remove: remove, setCond: setCond, addCond: addCond, moveTo: moveTo, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, tabs: tabs, addTab: addTab, renameTab: renameTab, deleteTab: deleteTab, open: open, close: close };
+    window.Backpack = { sentPack: function () { return sentPack; }, read: read, add: add, setQty: setQty, remove: remove, setCond: setCond, addCond: addCond, moveTo: moveTo, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, tabs: tabs, addTab: addTab, renameTab: renameTab, deleteTab: deleteTab, open: open, close: close };
 
     function init() {
         var nav = document.getElementById("nav-backpack");

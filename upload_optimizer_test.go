@@ -475,17 +475,17 @@ func TestOptimizerSortsSetsByEdition(t *testing.T) {
 	}
 }
 
-// TestOptimizerShowsTheLoadedQuantity puts the quantity beside the loaded
-// price, with no price too, and sorts the cell on the price alone.
+// TestOptimizerShowsTheLoadedQuantity puts the grade and quantity beside
+// the loaded price, with no price too, and sorts the cell on the price alone.
 func TestOptimizerShowsTheLoadedQuantity(t *testing.T) {
 	for _, tc := range []struct {
 		entry OptimizedUploadEntry
 		want  string
 	}{
 		{OptimizedUploadEntry{CardID: "a", Price: 5, Quantity: 3}, `<td class="opt-loaded" data-sort="5.00">`},
-		{OptimizedUploadEntry{CardID: "a", Price: 5, Quantity: 3}, `</a></span><span class="loaded-qty">&times;3</span>`},
-		{OptimizedUploadEntry{CardID: "a", Quantity: 4}, `<span class="loaded"></span><span class="loaded-qty">&times;4</span>`},
-		{OptimizedUploadEntry{CardID: "a"}, `<span class="loaded"></span><span class="loaded-qty"></span>`},
+		{OptimizedUploadEntry{CardID: "a", Price: 5, Quantity: 3}, `</a></span><button type="button" class="ures-edit-btn opt-cond-btn" data-edit="cond" title="Change the condition">NM</button><span class="loaded-qty"><button type="button" class="ures-edit-btn opt-qty-btn" data-edit="qty" title="Change the copies in your list">&times;3</button></span>`},
+		{OptimizedUploadEntry{CardID: "a", Quantity: 4}, `<span class="loaded"></span><button type="button" class="ures-edit-btn opt-cond-btn" data-edit="cond" title="Change the condition">NM</button><span class="loaded-qty"><button type="button" class="ures-edit-btn opt-qty-btn" data-edit="qty" title="Change the copies in your list">&times;4</button></span>`},
+		{OptimizedUploadEntry{CardID: "a"}, `<span class="loaded"></span><button type="button" class="ures-edit-btn opt-cond-btn" data-edit="cond" title="Change the condition">NM</button><span class="loaded-qty"></span>`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			Optimized:     map[string][]OptimizedUploadEntry{"CK": {tc.entry}},
