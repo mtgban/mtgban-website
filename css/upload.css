@@ -1283,6 +1283,9 @@
 .ures-edit-menu.qty .ures-edit-items button { justify-content: center; padding: 5px 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .ures-edit-menu button[aria-current] { background: var(--accent-muted); color: var(--activetext); font-weight: 700; }
 .ures-edit-input { display: block; box-sizing: border-box; width: 100%; margin-top: 4px; padding: 4px 8px; border: 1px solid var(--border-moderate); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--normal); font: inherit; font-size: var(--text-sm); }
+.ures-edit-menu.price .ures-edit-input { width: 8em; font-family: var(--font-mono); }
+.ures-edit-menu .ures-edit-set { justify-content: center; margin-top: 4px; }
+.opt-loaded .loaded .opt-price-btn { padding: 0 2px; color: inherit; }
 .ures-reload-bar.nudge { animation: ures-reload-nudge 0.4s ease-in-out; }
 @keyframes ures-reload-nudge { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 /* The store sends carry the page's quantities until it is reloaded */

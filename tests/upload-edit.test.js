@@ -82,18 +82,19 @@ function dispatch(type, target, extra = {}) {
 
 // A results row and the optimizer row of the same card, as upload.html
 // draws them; an opened product's row has no buttons.
-function resultRow(name, id, cond, qty, { editable = true, grade = true } = {}) {
-    const attrs = { 'data-hash': id, 'data-qtys': String(qty), 'data-cond': cond, 'data-card-name': name };
+function resultRow(name, id, cond, qty, { editable = true, grade = true, price = '0' } = {}) {
+    const attrs = { 'data-hash': id, 'data-qtys': String(qty), 'data-cond': cond, 'data-price': price, 'data-card-name': name };
     if (grade) attrs['data-grade'] = cond;
+    const shown = '$ ' + Number(price).toFixed(2);
     const cells = editable
-        ? [el('td', {}, [el('button', { class: 'ures-edit-btn cond-badge', 'data-edit': 'cond' }, [cond])]), el('td', {}, [el('button', { class: 'ures-edit-btn ures-qty-btn', 'data-edit': 'qty' }, [String(qty)])])]
-        : [el('td', {}, [cond]), el('td', {}, [String(qty)])];
+        ? [el('td', {}, [el('button', { class: 'ures-edit-btn', 'data-edit': 'price' }, [shown])]), el('td', {}, [el('button', { class: 'ures-edit-btn cond-badge', 'data-edit': 'cond' }, [cond])]), el('td', {}, [el('button', { class: 'ures-edit-btn ures-qty-btn', 'data-edit': 'qty' }, [String(qty)])])]
+        : [el('td', {}, [shown]), el('td', {}, [cond]), el('td', {}, [String(qty)])];
     return el('tr', attrs, cells);
 }
-function optRow(id, cond, qty) {
+function optRow(id, cond, qty, price = '1.00') {
     return el('tr', { 'data-opt-id': id, 'data-opt-cond': cond, 'data-load-qty': String(qty) }, [
         el('td', {}, [el('button', { class: 'ures-edit-btn opt-cond-btn', 'data-edit': 'cond' }, [cond])]),
-        el('td', {}, [el('button', { class: 'ures-edit-btn opt-qty-btn', 'data-edit': 'qty' }, ['×' + qty])]),
+        el('td', {}, [el('button', { class: 'ures-edit-btn opt-price-btn', 'data-edit': 'price' }, [price]), el('button', { class: 'ures-edit-btn opt-qty-btn', 'data-edit': 'qty' }, ['×' + qty])]),
     ]);
 }
 
@@ -269,6 +270,42 @@ test('the store sends wait for a reload, and the bar nudges', () => {
     expect(blocked.stopped).toBe(true);
     expect(bar.classList.contains('nudge')).toBe(true);
     expect(calls.track).toEqual(['ui.upload.result:edit_qty']);
+});
+
+test('a price set on an optimizer row prices each list line of its card', () => {
+    const ring = resultRow('Ring', 'b', 'SP', 1, { price: '1.5' });
+    const ring2 = resultRow('Ring', 'b', 'SP', 2, { price: '2' });
+    const opt = optRow('b', 'SP', 3, '1.50');
+    const { calls, menu, shown } = load({ results: [ring, ring2], opt: [opt] });
+
+    btn(opt, 'price').click();
+    const box = menu().querySelector('.ures-edit-input');
+    expect(box.value).toBe('1.50');
+    expect(doc.activeElement).toBe(box);
+    box.value = '3.256';
+    menu().querySelector('.ures-edit-set').click();
+
+    expect([ring.dataset.price, ring2.dataset.price]).toEqual(['3.26', '3.26']);
+    expect(btn(ring, 'price').textContent).toBe('$ 3.26');
+    expect(btn(ring2, 'price').classList.contains('edited')).toBe(true);
+    expect(btn(opt, 'price').textContent).toBe('3.26');
+    expect(shown()).toBe('2 updated');
+    expect(calls.track).toEqual(['ui.optimizer:edit_price']);
+    // The backpack keeps no price
+    expect(calls.pack).toEqual([]);
+
+    // Back to what one line came with clears only that line
+    btn(ring, 'price').click();
+    menu().querySelector('.ures-edit-input').value = '1.5';
+    dispatch('keydown', menu().querySelector('.ures-edit-input'), { key: 'Enter' });
+    expect(btn(ring, 'price').classList.contains('edited')).toBe(false);
+    expect(shown()).toBe('1 updated');
+
+    // A price that is no number changes nothing
+    btn(ring, 'price').click();
+    menu().querySelector('.ures-edit-input').value = '';
+    menu().querySelector('.ures-edit-set').click();
+    expect(ring.dataset.price).toBe('1.5');
 });
 
 test('a grade can be taken back to none, as a list line without one', () => {
