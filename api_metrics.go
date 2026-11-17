@@ -16,7 +16,7 @@ const (
 	metricsMaxCount   = 50
 	metricsMaxString  = 40
 
-	metricsMaxErrorEntries = 20 // error entries a post may add
+	metricsMaxErrorEntries = 5 // error entries a post may add, js/metrics.js sends no more
 )
 
 // beaconEntry is one count on the wire.
