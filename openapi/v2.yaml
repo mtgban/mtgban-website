@@ -62,7 +62,7 @@ paths:
       summary: Prices for one edition or one card
       description: >-
         setOrId is a set code for an edition snapshot, or a card id
-        (MTGBAN, MTGJSON, Scryfall, or TCGplayer) for a single card.
+        (BAN, MTGJSON, Scryfall, or TCGplayer) for a single card.
         Replace .json with .csv for the version 1 CSV.
       parameters:
         - name: mode
@@ -207,7 +207,7 @@ paths:
       summary: Daily price history for cards or a page of a set
       description: >-
         idsOrSet is a set code for the set's singles, served in pages; a
-        card id (MTGBAN, MTGJSON, Scryfall, or TCGplayer) for one printing
+        card id (BAN, MTGJSON, Scryfall, or TCGplayer) for one printing
         in every finish; or a comma-separated list of card ids, with no
         spaces, for a batch. A single segment is tried as a set code
         first; a list with a comma is always a batch. Each id resolves to
@@ -662,7 +662,7 @@ components:
         6.5 for 6.5%) and a string for text
       properties:
         ranking: { type: integer }
-        id: { type: string, description: "The card's MTGBAN id, as id=ban keys the price endpoints" }
+        id: { type: string, description: "The card's BAN id, as id=ban keys the price endpoints" }
         name: { type: string }
         set: { type: string }
         number: { type: string }

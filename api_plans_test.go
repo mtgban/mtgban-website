@@ -155,7 +155,7 @@ func TestAPIPlansTrialButtonNeedsPledgeAndSecret(t *testing.T) {
 	if strings.Contains(noPledge, `href="/api-trial`) {
 		t.Error("trial offered to a login with no pledge")
 	}
-	if !strings.Contains(noPledge, `<p class="api-note">The trial key is for supporters with an active <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">MTGBAN Patreon</a> pledge.</p>`) {
+	if !strings.Contains(noPledge, `<p class="api-note">The trial key is for supporters with an active <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">BAN Patreon</a> pledge.</p>`) {
 		t.Error("no-pledge note missing for a signed-in reader")
 	}
 	// html/template percent-encodes the query value, including the scheme's slashes.

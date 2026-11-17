@@ -48,7 +48,7 @@ paths:
       summary: Prices for one edition or one card
       description: >-
         setOrId is a set code for an edition snapshot, or a card id
-        (MTGBAN, MTGJSON, Scryfall, or TCGplayer) for a single card.
+        (BAN, MTGJSON, Scryfall, or TCGplayer) for a single card.
         Replace .json with .csv for CSV.
       parameters:
         - name: mode

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// The wordmark reads MTGBAN on every deployment, so a non-Magic site names
+// The wordmark reads BAN on every deployment, so a non-Magic site names
 // the game it serves under it - on the landing page and on the navbar that
 // carries the search bar. Magic keeps the bare wordmark.
 func TestBrandNamesTheGame(t *testing.T) {

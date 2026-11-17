@@ -424,7 +424,7 @@ func TestBanSearchLinkAddressesThePrinting(t *testing.T) {
 func TestStoreLinkDescriptionOffersOnlyWhatItResolved(t *testing.T) {
 	skipWithoutDatastore(t)
 
-	const affiliateLine = "Support **MTGBAN** by using this link"
+	const affiliateLine = "Support **BAN** by using this link"
 
 	if got := storeLinkDescription(nil, "1234"); got != affiliateLine {
 		t.Errorf("a link that named nothing reads %q, want %q", got, affiliateLine)

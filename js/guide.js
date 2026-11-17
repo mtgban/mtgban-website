@@ -78,7 +78,7 @@
     // Plain-text export of one category, for pasting into an AI agent.
     function categoryText(catName) {
         var NL = String.fromCharCode(10);
-        var out = ['# MTGBAN ' + catName + ' guide', 'Source: ' + window.location.origin + '/guide#' + (TAB_BY_CATEGORY[catName] || DEFAULT_TAB), ''];
+        var out = ['# BAN ' + catName + ' guide', 'Source: ' + window.location.origin + '/guide#' + (TAB_BY_CATEGORY[catName] || DEFAULT_TAB), ''];
         var secs = document.querySelectorAll('.guide-section[data-category="' + catName + '"]');
         for (var i = 0; i < secs.length; i++) {
             var s = secs[i];

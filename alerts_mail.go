@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	alertConfirmSubject = "Confirm your MTGBAN alert email"
+	alertConfirmSubject = "Confirm your BAN alert email"
 	alertConfirmTTL     = 24 * time.Hour
 	// alertMailCeiling is the most alert mails one user gets in 24 hours.
 	alertMailCeiling = 20
@@ -152,10 +152,10 @@ func decodeMailEventsSecret(raw string) []byte {
 // alertConfirmMail is the confirmation mail's text and HTML bodies.
 func alertConfirmMail(link string) (text, html string) {
 	hours := int(alertConfirmTTL.Hours())
-	text = fmt.Sprintf("Open this link within %d hours to confirm this address for your MTGBAN price alerts:\n\n%s\n\n"+
+	text = fmt.Sprintf("Open this link within %d hours to confirm this address for your BAN price alerts:\n\n%s\n\n"+
 		"If you did not ask for this, ignore this mail.\n", hours, link)
 	escaped := template.HTMLEscapeString(link)
-	html = fmt.Sprintf(`<p>Open this link within %d hours to confirm this address for your MTGBAN price alerts:</p>`+
+	html = fmt.Sprintf(`<p>Open this link within %d hours to confirm this address for your BAN price alerts:</p>`+
 		`<p><a href="%s">%s</a></p><p>If you did not ask for this, ignore this mail.</p>`, hours, escaped, escaped)
 	return text, html
 }

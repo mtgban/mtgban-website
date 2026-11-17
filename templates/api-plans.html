@@ -1,4 +1,4 @@
-{{define "title"}}API plans - MTGBAN{{end}}
+{{define "title"}}API plans - BAN{{end}}
 
 {{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/api-plans.css?hash={{.Hash}}">
@@ -142,7 +142,7 @@
     </form>
 
     {{if and (not .CanTrial) .Email}}
-    <p class="api-note">The trial key is for supporters with an active <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">MTGBAN Patreon</a> pledge.</p>
+    <p class="api-note">The trial key is for supporters with an active <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">BAN Patreon</a> pledge.</p>
     {{else if not .Email}}
     <p class="api-note">Sign in with Patreon to request the trial key.</p>
     {{end}}

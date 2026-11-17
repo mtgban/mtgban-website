@@ -642,7 +642,7 @@
         });
     };
 
-    // ── Import: restore favorites from an MTGBAN favorites CSV ──────
+    // ── Import: restore favorites from a BAN favorites CSV ──────
     // Only accepts the exact format produced by downloadFavoritesCSV
     // (header checked below). Merges by UUID into the current favorites.
     var FAV_CSV_HEADER = ['UUID', 'Name', 'Edition', 'Set', 'Number', 'Finish', 'Best Sell', 'Sell Store', 'Best Buy', 'Buy Store'];
@@ -678,7 +678,7 @@
         var header = rows[0].map(function(h) { return (h || '').trim().toLowerCase(); });
         var expected = FAV_CSV_HEADER.map(function(h) { return h.toLowerCase(); });
         if (header.join('|') !== expected.join('|')) {
-            showToast('Not an MTGBAN favorites CSV');
+            showToast('Not a BAN favorites CSV');
             return;
         }
 
