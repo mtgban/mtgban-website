@@ -641,7 +641,8 @@ override; phone UA detection via `mileusna/useragent`).
   preference, which merges tab by tab (a deleted one kept as a
   tombstone) in the order reordered last; a row dragged onto another
   tab, or its dropdown's "Move to", moves every copy there. The
-  optimizer's take button acts on the backpack the send came from and
+  optimizer's take button acts on the active backpack, its confirmation
+  naming the backpack a send came from when that is another one, and
   matches rows by `data-opt-cond`, each row's condition; a blank one,
   from an upload that ignored conditions, takes the card's copies in any
   condition, best first.
