@@ -6,7 +6,7 @@
 {{define "extra-meta"}}
     <meta name='impact-site-verification' value='77b54a05-53ed-42d4-b087-cb40fa950018' />
     {{with .SharePreview}}
-        <meta property="og:site_name" content="MTGBAN Upload" />
+        <meta property="og:site_name" content="BAN Upload" />
         <meta property="og:title" content="{{.Title}}" />
         <meta property="og:description" content="{{.Description}}" />
         {{if .ImageURL}}<meta property="og:image" content="{{.ImageURL}}" />{{end}}
@@ -65,7 +65,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
         </div>
         {{if not .ModalMode}}
         {{if .PatreonLogin}}
-        <p class="landing-blurb">MTGBAN compares prices and availability for {{game_title}} singles and sealed products across major retailers. We partner with several data providers to offer the most accurate pricing information on the market, with a wide offer of trading tools.<br><br>Many of the stores we link to support the site through affiliate programs - purchases made through those links help keep MTGBAN running, at no extra cost to you. Take a look at our vast search catalog for <a href="/sets"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="sets"{{end}}>singles</a> and <a href="/sealed"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="sealed"{{end}}>sealed</a> to find the best deals (or pick a <a href="/random"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="random"{{end}}>random card</a>).</p>
+        <p class="landing-blurb">BAN compares prices and availability for {{game_title}} singles and sealed products across major retailers. We partner with several data providers to offer the most accurate pricing information on the market, with a wide offer of trading tools.<br><br>Many of the stores we link to support the site through affiliate programs - purchases made through those links help keep BAN running, at no extra cost to you. Take a look at our vast search catalog for <a href="/sets"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="sets"{{end}}>singles</a> and <a href="/sealed"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="sealed"{{end}}>sealed</a> to find the best deals (or pick a <a href="/random"{{if and $.MetricsPage (not (or $.ModalMode $.ErrorMessage))}} data-track="ui.home" data-track-value="random"{{end}}>random card</a>).</p>
         {{else}}
         <div class="landing-tagline"><br></div>
         {{end}}
