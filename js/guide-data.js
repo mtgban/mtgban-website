@@ -326,6 +326,7 @@ window.__BAN_GUIDE = {
                     { query: 'cn:1-50', desc: 'Cards numbered 1–50' },
                     { query: 'cn>300', desc: 'Cards above #300' },
                     { query: 'cn:MKM:42', desc: '#42 from MKM only' },
+                    { query: '123 sld', desc: '#123 from SLD, the same as sld 123' },
                     { query: 'cns:107★', desc: 'Only the starred #107' }
                 ]
             }
