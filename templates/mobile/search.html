@@ -74,7 +74,7 @@
     {{if .CanScope}}
     <div class="m-scope-row" id="nav-scope">
         <div class="m-scope-autocomplete autocomplete">
-            <input class="m-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
+            <input class="m-scope-box{{if or .ScopeIgnored .ScopeOverridden}} is-ignored{{end}}" id="nav-scopebox" type="text"
                    value="{{.SearchScope}}" placeholder="Extra filters for this session"
                    maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
         </div>
@@ -167,7 +167,7 @@
         {{if .CanScope}}
         <div class="m-scope-row" id="nav-scope">
             <div class="m-scope-autocomplete autocomplete">
-                <input class="m-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
+                <input class="m-scope-box{{if or .ScopeIgnored .ScopeOverridden}} is-ignored{{end}}" id="nav-scopebox" type="text"
                        value="{{.SearchScope}}" placeholder="Extra filters for this session"
                        maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
             </div>
@@ -646,7 +646,7 @@
             {{else}}
                 <p class="m-no-results-msg">{{range $i, $n := .Notices}}{{if $i}}<br>{{end}}{{$n}}{{end}}</p>
             {{end}}
-            {{if and .SearchScope (not .ScopeIgnored)}}
+            {{if and .SearchScope (not .ScopeIgnored) (not .ScopeAllOverridden)}}
                 <p class="m-no-results-hint">Pinned filters are narrowing this search:</p>
                 <ul class="m-no-results-suggestions">
                     <li><a href="?q={{.SearchQuery}}" data-track="ui.search.suggestion" data-track-value="unpin_scope">Search again without <code>{{.SearchScope}}</code></a></li>

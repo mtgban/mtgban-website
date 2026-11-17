@@ -38,10 +38,9 @@ func TestSearchScopeAddsFilters(t *testing.T) {
 	}
 }
 
-// TestSearchScopeKeepsBothSides is the contract in place of a merge that
-// picks a winner: both bars apply, always. Two editions do answer nothing,
-// and that is the point - the empty page names the pinned bar and offers to
-// drop it, where a bar quietly overruled reads as applied while it is not.
+// TestSearchScopeKeepsBothSides is the contract outside finish: both bars
+// apply. Two editions do answer nothing, and that is the point - the empty
+// page names the pinned bar and offers to drop it.
 func TestSearchScopeKeepsBothSides(t *testing.T) {
 	skipWithoutDatastore(t)
 
@@ -67,6 +66,69 @@ func TestSearchScopeKeepsBothSides(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSearchScopeTypedFinishWins: a finish typed in the main bar replaces
+// a pinned one, and only a finish asked for on both sides counts.
+func TestSearchScopeTypedFinishWins(t *testing.T) {
+	skipWithoutDatastore(t)
+
+	tests := []struct {
+		typed      string
+		pinned     string
+		overridden int
+		finishes   []string
+	}{
+		{"sliver overlord*", "&", 1, []string{"finish:foil"}},
+		{"sliver overlord&", "f:foil", 1, []string{"finish:nonfoil"}},
+		{"f:etched", "r:mythic &", 1, []string{"finish:etched"}},
+		{"sliver overlord is:foil", "&", 1, []string{"is:foil"}},
+		{"sliver overlord*", "is:nonfoil", 1, []string{"finish:foil"}},
+		{"sliver overlord&", "is:foil r:mythic", 1, []string{"finish:nonfoil"}},
+		{"sliver overlord", "&", 0, []string{"finish:nonfoil"}},
+		{"sliver overlord*", "is:altfoil", 0, []string{"finish:foil"}},
+		{"-f:foil", "&", 0, []string{"-finish:foil", "finish:nonfoil"}},
+		{"not:foil", "&", 0, []string{"-is:foil", "finish:nonfoil"}},
+		{"is:foil,promo", "&", 0, []string{"is:foil", "finish:nonfoil"}},
+		{"is:promo", "is:nonfoil", 0, []string{"is:nonfoil"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.typed+" + "+tt.pinned, func(t *testing.T) {
+			config := parseForTest(t, tt.typed)
+			pinned := scopeFilters(currentDatastore(), currentPrices(), tt.pinned, false, false)
+			overridden := applySearchScope(&config, pinned)
+
+			if len(overridden) != tt.overridden {
+				t.Errorf("overrode %d pinned filters, want %d", len(overridden), tt.overridden)
+			}
+			if len(config.CardFilters)+len(overridden) != len(parseForTest(t, tt.typed).CardFilters)+len(pinned) {
+				t.Errorf("a pinned filter went missing: merged %v", filterNames(config.CardFilters))
+			}
+			if got := finishFilters(config.CardFilters); !slices.Equal(got, tt.finishes) {
+				t.Errorf("finishes %v, want %v", got, tt.finishes)
+			}
+		})
+	}
+}
+
+// finishFilters writes each finish a search filters on as name:value,
+// "-" first where it is left out; is: only where the value is a finish.
+func finishFilters(filters []FilterElem) []string {
+	var out []string
+	for _, filter := range filters {
+		for _, value := range filter.Values {
+			if filter.Name != "finish" && (filter.Name != "is" || (value != "foil" && value != "nonfoil")) {
+				continue
+			}
+			prefix := ""
+			if filter.Negate {
+				prefix = "-"
+			}
+			out = append(out, prefix+filter.Name+":"+value)
+		}
+	}
+	return out
 }
 
 // TestSearchScopeIgnoresNames is the other half of the contract: the
@@ -147,16 +209,18 @@ func TestSearchScopeRendersInSuggestions(t *testing.T) {
 	// The claim the page makes about the bar has to match what the bar is
 	// doing: a bar the search ignores did not empty the page, and offering
 	// to undo it sends the reader after the one thing that is blameless.
-	for _, key := range []string{"search.html", "mobile/search.html"} {
+	for _, key := range []string{"search.html", "mobile/search.html", "search.html overridden", "mobile/search.html overridden"} {
 		t.Run(key+" ignored", func(t *testing.T) {
-			tmpl, found := cache[key]
+			name, overridden := strings.CutSuffix(key, " overridden")
+			tmpl, found := cache[name]
 			if !found {
-				t.Fatalf("%s is not in the template cache", key)
+				t.Fatalf("%s is not in the template cache", name)
 			}
 
 			vars := pageVars
-			vars.IsMobile = strings.HasPrefix(key, "mobile/")
-			vars.ScopeIgnored = true
+			vars.IsMobile = strings.HasPrefix(name, "mobile/")
+			vars.ScopeIgnored = !overridden
+			vars.ScopeOverridden, vars.ScopeAllOverridden = overridden, overridden
 
 			var buf bytes.Buffer
 			if err := tmpl.ExecuteTemplate(&buf, tmpl.Name(), vars); err != nil {

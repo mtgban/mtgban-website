@@ -692,6 +692,30 @@ func TestSearchCountsWhatItRanWith(t *testing.T) {
 		}
 	})
 
+	t.Run("a pinned finish the main bar overrode is not counted", func(t *testing.T) {
+		shown := func(rows []observability.Row) bool {
+			return slices.ContainsFunc(find(rows, "search.suggestion_shown"), func(r observability.Row) bool {
+				return r.Value == "unpin_scope"
+			})
+		}
+
+		rows := get(t, "/search?q=zzzqx*&scope="+url.QueryEscape("f:nonfoil s:FIXTUREA"), "document")
+		if got := value(t, rows, "search.filter"); got != "s" {
+			t.Errorf("search.filter = %q, want the pinned s alone", got)
+		}
+		if !shown(rows) {
+			t.Error("the pinned set still narrows, but unpin_scope was not shown")
+		}
+
+		rows = get(t, "/search?q=zzzqx*&scope="+url.QueryEscape("f:nonfoil"), "document")
+		if found := find(rows, "search.filter"); len(found) != 0 {
+			t.Errorf("search.filter rows = %+v, want none", found)
+		}
+		if shown(rows) {
+			t.Error("unpin_scope shown for a bar the main bar overrode whole")
+		}
+	})
+
 	t.Run("the page's own fetch counts nothing", func(t *testing.T) {
 		countsNoSearch(t, get(t, "/search?q="+url.QueryEscape("Fixture Card Alpha"), "empty"))
 		countsNoSearch(t, get(t, "/sets?sort=size", "empty"))
