@@ -39,13 +39,13 @@ function fakeDocument(rows, mode) {
     };
 }
 
-function loadOptimizer(rows) {
+function loadOptimizer(rows, mode = 'true') {
     const calls = { track: [], stored: {}, reprocessed: 0 };
     const window = { BAN: { track: (name, value) => calls.track.push(name + ':' + value) }, BAN_OPT_STORE_NAMES: { SCG: 'Star City Games' } };
     const sessionStorage = { setItem: (k, v) => { calls.stored[k] = v; } };
     const fns = new Function('window', 'document', 'wireLoadLists', 'sessionStorage', 'reprocessUploadResults',
         optimizer + '\nreturn {moveOptRow, fillMoveMenu};')(
-        window, fakeDocument(rows, 'true'), () => {}, sessionStorage, () => { calls.reprocessed++; });
+        window, fakeDocument(rows, mode), () => {}, sessionStorage, () => { calls.reprocessed++; });
     window.reprocessUploadResults = true;
     return { ...fns, calls };
 }
@@ -82,7 +82,7 @@ test('a move marks the row alone for its card and prices the list again on the c
 });
 
 test('the menu lists the row\'s stores by name with their offer, and a way back once moved', () => {
-    const { fillMoveMenu } = loadOptimizer([]);
+    const { fillMoveMenu } = loadOptimizer([], 'false');
     const menu = element('div');
     const items = (r) => {
         fillMoveMenu(menu, r);
@@ -94,4 +94,35 @@ test('the menu lists the row\'s stores by name with their offer, and a way back 
     ]);
     expect(menu.children[0].text).toBe('Move to');
     expect(items(row('a', 'NM', '', 'CK'))).toEqual([['Let the optimizer place it', '', '']]);
+});
+
+test('on a buylist the menu leads to Not bought, and out of it once there', () => {
+    const { fillMoveMenu } = loadOptimizer([]);
+    const menu = element('div');
+    const items = (r) => {
+        fillMoveMenu(menu, r);
+        return menu.children.slice(1).map((b) => [b.children[0].text, b.dataset.store]);
+    };
+    expect(items(row('a', 'NM', 'SCG:4.00'))).toEqual([
+        ['Star City Games', 'SCG'],
+        ['Not bought', '-'],
+    ]);
+    expect(items(row('a', 'NM', 'SCG:4.00', 'CK'))).toEqual([
+        ['Star City Games', 'SCG'],
+        ['Not bought', '-'],
+        ['Let the optimizer place it', ''],
+    ]);
+    expect(items(row('a', 'NM', 'SCG:4.00', '-'))).toEqual([
+        ['Star City Games', 'SCG'],
+        ['Let the optimizer place it', ''],
+    ]);
+});
+
+test('a move to Not bought goes with the others', () => {
+    const picked = row('a', 'NM', 'SCG:4.00');
+    const { moveOptRow, calls } = loadOptimizer([picked]);
+    moveOptRow(picked, '-');
+    expect(picked.dataset.optMoved).toBe('-');
+    expect(calls.track).toEqual(['ui.optimizer:row_move']);
+    expect(packOptMoves([picked], 'true')).toBe('buylist\na\tNM\t-');
 });

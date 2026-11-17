@@ -57,7 +57,7 @@
         <tbody>
         {{range $n, $row := .Rows}}
             {{$card := index $root.Metadata .CardID}}
-            <tr data-opt-id="{{.CardID}}" data-opt-cond="{{.Condition}}"{{with .MoveTo}} data-move="{{.}}"{{end}}{{with index $root.SortKeys .CardID}} data-k-name="{{.Name}}" data-k-set="{{.Set}}" data-k-release="{{.Release}}" data-k-number="{{.Number}}" data-k-finish="{{.Finish}}" data-k-color="{{.Color}}" data-k-rarity="{{.Rarity}}"{{end}} data-k-cond="{{cond_rank .Condition}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});hw.toggleAttribute('data-sealed',{{$card.Sealed}});">
+            <tr data-opt-id="{{.CardID}}" data-opt-cond="{{.Condition}}"{{if .Moved}} class="opt-moved" data-opt-moved="-"{{end}}{{with .MoveTo}} data-move="{{.}}"{{end}}{{with index $root.SortKeys .CardID}} data-k-name="{{.Name}}" data-k-set="{{.Set}}" data-k-release="{{.Release}}" data-k-number="{{.Number}}" data-k-finish="{{.Finish}}" data-k-color="{{.Color}}" data-k-rarity="{{.Rarity}}"{{end}} data-k-cond="{{cond_rank .Condition}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});hw.toggleAttribute('data-sealed',{{$card.Sealed}});">
                 <td class="opt-name"><div class="opt-name-cell">
                     <span class="emoji opt-copy" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>
                     <div class="opt-name-text"><a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}
@@ -70,7 +70,7 @@
                 <td class="opt-offer" data-sort="{{if .Store}}{{printf "%.2f" .Price}}{{end}}">{{if .Store}}<span class="offer">$ <a href="/go/b/{{.Store}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a></span>{{end}}</td>
                 <td class="opt-loaded" data-sort="{{if .Loaded}}{{printf "%.2f" .Loaded}}{{end}}"><span class="loaded-wrap"><span class="loaded">{{if .Loaded}}$ {{if $root.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Loaded}}</a>{{else}}{{printf "%.2f" .Loaded}}{{end}}{{end}}</span><span class="loaded-qty">&times;{{.Quantity}}</span><span class="opt-icons">{{if and .Loaded (not $root.IgnorePrices)}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{template "offer-link" dict "Notes" .Notes "Opt" true}}</span></span></td>
                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}" data-sort="{{if .Spread}}{{printf "%.2f" .Spread}}{{end}}">{{if .Spread}}{{printf "%.2f" .Spread}}%{{end}}</td>
-                <td class="c">{{if .MoveTo}}<button type="button" class="opt-move-btn" popovertarget="{{$id}}-move-{{$n}}" title="Move to a store" aria-label="Move to a store" data-track="ui.optimizer" data-track-value="move_menu"><svg aria-hidden="true"><use href="#opt-move-icon"/></svg></button><div class="opt-move-menu" id="{{$id}}-move-{{$n}}" popover></div>{{end}}</td>
+                <td class="c">{{if or .MoveTo .Moved}}<button type="button" class="opt-move-btn" popovertarget="{{$id}}-move-{{$n}}" title="{{if .Moved}}Moved here by you{{else}}Move to a store{{end}}" aria-label="Move to a store" data-track="ui.optimizer" data-track-value="move_menu"><svg aria-hidden="true"><use href="#opt-move-icon"/></svg></button><div class="opt-move-menu" id="{{$id}}-move-{{$n}}" popover></div>{{end}}</td>
             </tr>
         {{end}}
         </tbody>
@@ -1198,7 +1198,7 @@
                                         {{if and $.CanFilterByPrice (gt .Profitability 15.0)}}&#10071;{{end}}
                                     {{end}}
                                 </td>
-                                <td class="c">{{if or $row.MoveTo $row.Moved}}<button type="button" class="opt-move-btn" popovertarget="opt-move-{{$scraperKey}}-{{$n}}" title="{{if $row.Moved}}Moved here by you{{else}}Move to another store{{end}}" aria-label="Move to another store" data-track="ui.optimizer" data-track-value="move_menu"><svg aria-hidden="true"><use href="#opt-move-icon"/></svg></button><div class="opt-move-menu" id="opt-move-{{$scraperKey}}-{{$n}}" popover></div>{{end}}<input type="checkbox" checked autocomplete="off" class="opt-row-check" onchange="window.toggleOptRow && toggleOptRow(this)"></td>
+                                <td class="c">{{if or $row.MoveTo $row.Moved $.IsBuylist}}<button type="button" class="opt-move-btn" popovertarget="opt-move-{{$scraperKey}}-{{$n}}" title="{{if $row.Moved}}Moved here by you{{else}}Move to another store{{end}}" aria-label="Move to another store" data-track="ui.optimizer" data-track-value="move_menu"><svg aria-hidden="true"><use href="#opt-move-icon"/></svg></button><div class="opt-move-menu" id="opt-move-{{$scraperKey}}-{{$n}}" popover></div>{{end}}<input type="checkbox" checked autocomplete="off" class="opt-row-check" onchange="window.toggleOptRow && toggleOptRow(this)"></td>
                             </tr>
                         {{end}}
                         </tbody>
@@ -1207,7 +1207,7 @@
             {{end}}
         {{end}}
         {{with .FilteredOut}}{{template "upload-leftovers" dict "ID" "opt-filtered-out" "Title" "Filtered out" "Tip" "A store buys these, but the value or spread filters drop every offer" "Rows" . "Root" $}}{{end}}
-        {{with .NotBought}}{{template "upload-leftovers" dict "ID" "opt-not-bought" "Title" "Not bought" "Tip" "No store priced here buys these right now" "Rows" . "Root" $}}{{end}}
+        {{with .NotBought}}{{template "upload-leftovers" dict "ID" "opt-not-bought" "Title" "Not bought" "Tip" "No store priced here buys these right now, or you moved them here" "Rows" . "Root" $}}{{end}}
     </div>
     {{end}}
 
