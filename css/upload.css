@@ -1410,7 +1410,7 @@
 .opt-share-btn, .pack-add-btn, .pack-take-btn { padding-left: 8px; padding-right: 8px; }
 .opt-share-btn svg, .pack-add-btn svg, .pack-take-btn svg { width: 15px; height: 15px; vertical-align: -3px; }
 
-.opt-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.opt-table { width: 100%; border-collapse: collapse; table-layout: fixed; --opt-box: 14px; }
 /* The store header and the column labels stick as one block, so the labels
    stay under the header however tall it wraps */
 .opt-table thead { position: sticky; top: var(--nav-height); z-index: 5; }
@@ -1425,8 +1425,12 @@
 .opt-table col:nth-child(7) { width: 7%; }
 .opt-table td { padding: 7px 12px; border-bottom: 1px solid var(--border-subtle); font-size: var(--text-base); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
 .opt-table td:nth-child(3) { text-align: left; }
-.opt-table td:nth-child(7) { text-align: center; }
+/* The box and the Move to button keep fixed slots from the right, so rows
+   missing either, the filtered out's among them, still line up */
+.opt-table td:nth-child(7), .opt-table thead th:nth-child(7) { text-align: right; }
 .opt-table td:nth-child(7) { white-space: nowrap; }
+.opt-table td:nth-child(7) input, .opt-table thead th:nth-child(7) input { width: var(--opt-box); height: var(--opt-box); margin: 0; vertical-align: middle; }
+.opt-leftovers td:nth-child(7) { padding-right: calc(12px + var(--opt-box)); }
 .opt-move-btn { padding: 2px; margin-right: 6px; border: none; background: none; color: var(--text-dim); cursor: pointer; vertical-align: middle; line-height: 0; border-radius: var(--radius-sm); }
 .opt-move-btn:hover, .opt-move-btn:focus-visible { color: var(--activetext); background: var(--surface-3); }
 .opt-move-btn svg { width: 15px; height: 15px; }
