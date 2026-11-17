@@ -495,7 +495,7 @@
                         <summary>
                             <span class="m-vendor-name">TCGplayer sales</span>
                             <span class="m-vendor-right">
-                                <span class="m-vendor-price{{with $card.VelocityPace}} velocity-{{.}}{{end}}">{{$card.Velocity}}</span>
+                                <span class="m-vendor-price{{with $card.VelocityPace}} velocity-{{.}}{{end}}">{{if $card.VelocityRising}}<span class="velocity-rising" title="Selling at least twice as fast this week">&#8593;</span>{{end}}{{$card.Velocity}}</span>
                                 <span class="m-vendor-qty"></span>
                                 <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
                             </span>

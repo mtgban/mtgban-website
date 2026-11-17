@@ -31,7 +31,10 @@ const (
 // Sales is one card's sales over the window and its last sale.
 type Sales struct {
 	Copies, Orders, Days int32
-	LastSale             time.Time
+	// The orders in the window's last TrendDays.
+	RecentOrders int32
+	// The first and last sale over the lookback.
+	FirstSale, LastSale time.Time
 	// The median sale price over the window, weighted by orders.
 	Price float64
 
@@ -77,6 +80,34 @@ func (p Pace) String() string {
 // PerDay is the copies sold a day over window days.
 func (v Sales) PerDay(window int) float64 {
 	return float64(v.Copies) / float64(window)
+}
+
+const (
+	// TrendDays is the end of the window a trend compares with the days before it.
+	TrendDays = 7
+	// The fewest orders in the window a trend is read from, and how many times
+	// the days before it the last TrendDays sell at to count as rising.
+	trendMinOrders = 30
+	trendFactor    = 2
+	// The most times faster the details print: past it the days before hold
+	// an order or two, and the ratio says more about them than the trend.
+	trendCap = 5
+)
+
+// Rising is how many times faster the last TrendDays sold than the days before
+// them in the window starting on start, in orders, or 0 when that is under
+// trendFactor or there are too few orders to tell from noise. A card first
+// sold in the window is new rather than rising, having no pace before it.
+func (v Sales) Rising(window int, start time.Time) float64 {
+	before := v.Orders - v.RecentOrders
+	if v.Orders < trendMinOrders || before <= 0 || window <= TrendDays || !v.FirstSale.Before(start) {
+		return 0
+	}
+	ratio := float64(v.RecentOrders) / TrendDays / (float64(before) / float64(window-TrendDays))
+	if ratio < trendFactor {
+		return 0
+	}
+	return ratio
 }
 
 // Snapshot is one load of the sales, keyed by card uuid.
@@ -139,19 +170,20 @@ const GlobalDayQuery = `
 	 LIMIT 1`
 
 // WindowQuery is the copies, orders, sale days and median sale price per
-// product and printing of one game.
+// product and printing of one game, and the orders in its last $4 days.
 const WindowQuery = `
 	SELECT product_id, variant,
 	       coalesce(sum(sales_count), 0), coalesce(sum(num_orders), 0), count(*),
-	       coalesce(sum(median_price * num_orders) / nullif(sum(num_orders), 0), 0)::float8
+	       coalesce(sum(median_price * num_orders) / nullif(sum(num_orders), 0), 0)::float8,
+	       coalesce(sum(num_orders) FILTER (WHERE sale_date > $2::date - $4::int), 0)
 	  FROM tcgplayersalesdata
 	 WHERE sale_date BETWEEN $1::date AND $2::date
 	   AND product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $3)
 	 GROUP BY 1, 2`
 
-// LastQuery is the last sale per product and printing of one game over the lookback.
+// LastQuery is the last and first sale per product and printing of one game over the lookback.
 const LastQuery = `
-	SELECT product_id, variant, max(sale_date)
+	SELECT product_id, variant, max(sale_date), min(sale_date)
 	  FROM tcgplayersalesdata
 	 WHERE sale_date BETWEEN $1::date AND $2::date
 	   AND product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $3)
@@ -163,6 +195,7 @@ type salesRow struct {
 	Variant              string
 	Copies, Orders, Days int32
 	Price                float64
+	RecentOrders         int32
 }
 
 // lastRow is one row of LastQuery.
@@ -170,6 +203,7 @@ type lastRow struct {
 	ProductID int64
 	Variant   string
 	Last      time.Time
+	First     time.Time
 }
 
 // salesPair is a product in one printing, as the sales table keys it.
@@ -254,7 +288,7 @@ type salesQuerier interface {
 // readSalesRows reads game's window ending on day, per product and printing.
 func readSalesRows(ctx context.Context, q salesQuerier, game string, day time.Time) ([]salesRow, error) {
 	from := day.AddDate(0, 0, 1-Window)
-	rows, err := q.QueryContext(ctx, WindowQuery, from.Format(time.DateOnly), day.Format(time.DateOnly), game)
+	rows, err := q.QueryContext(ctx, WindowQuery, from.Format(time.DateOnly), day.Format(time.DateOnly), game, TrendDays)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +297,7 @@ func readSalesRows(ctx context.Context, q salesQuerier, game string, day time.Ti
 	var all []salesRow
 	for rows.Next() {
 		var row salesRow
-		err := rows.Scan(&row.ProductID, &row.Variant, &row.Copies, &row.Orders, &row.Days, &row.Price)
+		err := rows.Scan(&row.ProductID, &row.Variant, &row.Copies, &row.Orders, &row.Days, &row.Price, &row.RecentOrders)
 		if err != nil {
 			return nil, err
 		}
@@ -284,7 +318,7 @@ func readLastRows(ctx context.Context, q salesQuerier, game string, day time.Tim
 	var all []lastRow
 	for rows.Next() {
 		var row lastRow
-		err := rows.Scan(&row.ProductID, &row.Variant, &row.Last)
+		err := rows.Scan(&row.ProductID, &row.Variant, &row.Last, &row.First)
 		if err != nil {
 			return nil, err
 		}
@@ -368,8 +402,14 @@ func build(rows []salesRow, last []lastRow, match func(productID int64, variant 
 	}
 	for _, row := range last {
 		v := entry(row.ProductID, row.Variant)
-		if v != nil && row.Last.After(v.LastSale) {
+		if v == nil {
+			continue
+		}
+		if row.Last.After(v.LastSale) {
 			v.LastSale = row.Last
+		}
+		if v.FirstSale.IsZero() || row.First.Before(v.FirstSale) {
+			v.FirstSale = row.First
 		}
 	}
 	for _, row := range rows {
@@ -382,6 +422,7 @@ func build(rows []salesRow, last []lastRow, match func(productID int64, variant 
 		}
 		v.Copies += row.Copies
 		v.Orders += row.Orders
+		v.RecentOrders += row.RecentOrders
 		// The larger count, not the sum: the rows can't say which days overlap.
 		v.Days = max(v.Days, row.Days)
 	}
@@ -517,9 +558,21 @@ func paceLine(v Sales, bands []Band) string {
 	return "|vs. " + peers + "|" + faster
 }
 
+// trendLine is the details' line on a card rising the times given, empty for
+// one not rising.
+func trendLine(rising float64) string {
+	if rising == 0 {
+		return ""
+	}
+	if rising > trendCap {
+		return fmt.Sprintf("|last %d days|over %d× the pace before", TrendDays, trendCap)
+	}
+	return fmt.Sprintf("|last %d days|%.1f× the pace before", TrendDays, rising)
+}
+
 // text is a card's rate and its details (tip_html format) over window days,
-// with pace, its paceLine, before the last sale.
-func text(v Sales, window int, pace string) (rate, detail string) {
+// with notes, its paceLine and trendLine, before the last sale.
+func text(v Sales, window int, notes ...string) (rate, detail string) {
 	head := fmt.Sprintf("**Sold on TCGplayer, last %d days**", window)
 	if v.Copies == 0 {
 		zero := "no sale in the window"
@@ -541,8 +594,10 @@ func text(v Sales, window int, pace string) (rate, detail string) {
 		"|orders|" + strconv.Itoa(int(v.Orders)),
 		"|days with a sale|" + strconv.Itoa(int(v.Days)),
 	}
-	if pace != "" {
-		lines = append(lines, pace)
+	for _, note := range notes {
+		if note != "" {
+			lines = append(lines, note)
+		}
 	}
 	if !v.LastSale.IsZero() {
 		lines = append(lines, "|last sale|"+v.LastSale.Format(time.DateOnly))
@@ -561,8 +616,19 @@ func (s *Snapshot) View(cardID string) (rate, detail string, notable bool) {
 	if !found {
 		return "", "", false
 	}
-	rate, detail = text(v, Window, paceLine(v, s.Bands))
+	rate, detail = text(v, Window, paceLine(v, s.Bands), trendLine(s.rising(v)))
 	return rate, detail, v.PerDay(Window) >= notableFloor
+}
+
+// rising is v.Rising over the snapshot's window.
+func (s *Snapshot) rising(v Sales) float64 {
+	return v.Rising(Window, s.Day.AddDate(0, 0, 1-Window))
+}
+
+// Rising reports whether a card sells markedly faster in the last TrendDays.
+func (s *Snapshot) Rising(cardID string) bool {
+	v, found := s.For(cardID)
+	return found && s.rising(v) > 0
 }
 
 // Pace is how fast a card sells for its price, PaceNone without data.

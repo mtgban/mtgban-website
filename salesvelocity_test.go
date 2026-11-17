@@ -182,16 +182,16 @@ func TestLoadSalesVelocityReadsInOneSnapshot(t *testing.T) {
 		case salesvelocity.DayQuery, salesvelocity.GlobalDayQuery:
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{newest}}}, nil
 		case salesvelocity.WindowQuery:
-			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price"}}, nil
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price", "recent"}}, nil
 		}
-		return &fakeRows{cols: []string{"p", "v", "l"}}, nil
+		return &fakeRows{cols: []string{"p", "v", "l", "f"}}, nil
 	}}
 	s := withFakeNewspaper(t, f)
 	s.loadSalesVelocity()
 
 	queries := f.seen()
 	want := []salesQuery{
-		{sql: salesvelocity.WindowQuery, args: []driver.Value{"2026-09-13", "2026-10-12", "Magic: The Gathering"}, inTx: true},
+		{sql: salesvelocity.WindowQuery, args: []driver.Value{"2026-09-13", "2026-10-12", "Magic: The Gathering", int64(salesvelocity.TrendDays)}, inTx: true},
 		{sql: salesvelocity.LastQuery, args: []driver.Value{"2025-10-13", "2026-10-12", "Magic: The Gathering"}, inTx: true},
 	}
 	if len(queries) != len(want)+2 {
@@ -239,7 +239,7 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 		if query == salesvelocity.DayQuery || query == salesvelocity.GlobalDayQuery {
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{day}}}, nil
 		}
-		return &fakeRows{cols: []string{"p", "v", "l"}}, nil
+		return &fakeRows{cols: []string{"p", "v", "l", "f"}}, nil
 	}}
 	s := withFakeNewspaper(t, f)
 	setTestJobs(t)
@@ -257,7 +257,7 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 		t.Errorf("second query: got %q %v, want the day query across every game", queries[1].sql, queries[1].args)
 	}
 	for _, q := range queries[2:] {
-		if len(q.args) != 3 || q.args[1] != "2026-10-11" || q.args[2] != gameMap[matcher.GameLorcana] {
+		if len(q.args) < 3 || q.args[1] != "2026-10-11" || q.args[2] != gameMap[matcher.GameLorcana] {
 			t.Errorf("got args %v, want the day and %q", q.args, gameMap[matcher.GameLorcana])
 		}
 	}
@@ -291,11 +291,11 @@ func TestLoadSalesVelocityEndsOnEveryGamesCompleteDay(t *testing.T) {
 		case salesvelocity.GlobalDayQuery:
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{globalNewest}}}, nil
 		case salesvelocity.WindowQuery:
-			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price"}, vals: [][]driver.Value{
-				{productID, "Normal", int64(3), int64(2), int64(1), 1.5},
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price", "recent"}, vals: [][]driver.Value{
+				{productID, "Normal", int64(3), int64(2), int64(1), 1.5, int64(1)},
 			}}, nil
 		}
-		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{productID, "Normal", gameNewest}}}, nil
+		return &fakeRows{cols: []string{"p", "v", "l", "f"}, vals: [][]driver.Value{{productID, "Normal", gameNewest, gameNewest}}}, nil
 	}}
 	s := withFakeNewspaper(t, f)
 	s.ds.Store(testSite.datastore())
@@ -310,7 +310,7 @@ func TestLoadSalesVelocityEndsOnEveryGamesCompleteDay(t *testing.T) {
 		t.Errorf("%s: no sales filed", cardID)
 	}
 	want := map[string][]driver.Value{
-		salesvelocity.WindowQuery: {"2026-10-05", "2026-11-03", "Magic: The Gathering"},
+		salesvelocity.WindowQuery: {"2026-10-05", "2026-11-03", "Magic: The Gathering", int64(salesvelocity.TrendDays)},
 		salesvelocity.LastQuery:   {"2025-11-04", "2026-11-03", "Magic: The Gathering"},
 	}
 	for _, q := range f.seen() {
@@ -336,11 +336,11 @@ func TestLoadSalesVelocityAfterADatastoreReload(t *testing.T) {
 		case salesvelocity.DayQuery, salesvelocity.GlobalDayQuery:
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{newest}}}, nil
 		case salesvelocity.WindowQuery:
-			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price"}, vals: [][]driver.Value{
-				{productID, "Normal", int64(3), int64(2), int64(1), 1.5},
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price", "recent"}, vals: [][]driver.Value{
+				{productID, "Normal", int64(3), int64(2), int64(1), 1.5, int64(1)},
 			}}, nil
 		}
-		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{productID, "Normal", newest}}}, nil
+		return &fakeRows{cols: []string{"p", "v", "l", "f"}, vals: [][]driver.Value{{productID, "Normal", newest, newest}}}, nil
 	}}
 	s := withFakeNewspaper(t, f)
 	s.ds.Store(testSite.datastore())
@@ -519,11 +519,11 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 		case salesvelocity.DayQuery, salesvelocity.GlobalDayQuery:
 			return &fakeRows{cols: []string{"sale_date"}, vals: [][]driver.Value{{day}}}, nil
 		case salesvelocity.WindowQuery:
-			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price"}, vals: [][]driver.Value{
-				{productID, "Normal", int64(69), int64(31), int64(18), 1.5},
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "price", "recent"}, vals: [][]driver.Value{
+				{productID, "Normal", int64(69), int64(31), int64(18), 1.5, int64(6)},
 			}}, nil
 		}
-		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{productID, "Normal", lastSale}}}, nil
+		return &fakeRows{cols: []string{"p", "v", "l", "f"}, vals: [][]driver.Value{{productID, "Normal", lastSale, lastSale}}}, nil
 	}}
 	s := withFakeNewspaper(t, f)
 	s.ds.Store(testSite.datastore())
@@ -534,7 +534,7 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 	}
 	got, found := salesVelocityStore.Snapshot().For(cardID)
 	// The only card outsells none of its band.
-	want := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, LastSale: lastSale, Price: 1.5, Pace: salesvelocity.PaceSlow}
+	want := salesvelocity.Sales{Copies: 69, Orders: 31, Days: 18, RecentOrders: 6, FirstSale: lastSale, LastSale: lastSale, Price: 1.5, Pace: salesvelocity.PaceSlow}
 	if !found || got != want {
 		t.Errorf("%s: got %+v, %v; want %+v", cardID, got, found, want)
 	}
@@ -595,7 +595,7 @@ func velocityPageVars(canVelocity, showUpsell bool) PageVars {
 			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
 			CanVelocity:  canVelocity,
 		},
-		Metadata: map[string]GenericCard{cardID: {Name: "Some Card", Edition: "Some Set", Velocity: rate, VelocityDetail: detail, VelocityPace: sales.Pace(cardID)}},
+		Metadata: map[string]GenericCard{cardID: {Name: "Some Card", Edition: "Some Set", Velocity: rate, VelocityDetail: detail, VelocityPace: sales.Pace(cardID), VelocityRising: sales.Rising(cardID)}},
 	}
 }
 
@@ -672,6 +672,16 @@ func TestSearchColorsSalesVelocity(t *testing.T) {
 	for name, page := range velocityPages(t, velocityPageVars(true, true)) {
 		if strings.Contains(page, "velocity-slow") || strings.Contains(page, "velocity-\"") {
 			t.Errorf("%s: a card with no pace is marked", name)
+		}
+		if strings.Contains(page, "velocity-rising") {
+			t.Errorf("%s: a card not rising has the arrow", name)
+		}
+	}
+	sold := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{"velocity-card": {Copies: 69, Orders: 37, RecentOrders: 14, FirstSale: sold}})
+	for name, page := range velocityPages(t, velocityPageVars(true, true)) {
+		if !strings.Contains(page, `&#8593;</span>2.3/day</span>`) && !strings.Contains(page, `↑</span>2.3/day</span>`) {
+			t.Errorf("%s: no arrow before a rising rate, rendered:\n%s", name, page)
 		}
 	}
 }
@@ -1564,10 +1574,14 @@ func TestVelocityRateCarriesPace(t *testing.T) {
 	vars := reversePageVars()
 	for id, card := range vars.Metadata {
 		card.Velocity, card.VelocityDetail, card.VelocityNotable = "2.3/day", "**Sold**\n|copies|69", true
-		card.VelocityPace = salesvelocity.PaceFast
+		card.VelocityPace, card.VelocityRising = salesvelocity.PaceFast, true
 		vars.Metadata[id] = card
 	}
-	if !strings.Contains(renderArbit(t, vars), `<span class="bl-velocity velocity-fast" title="`) {
+	got := renderArbit(t, vars)
+	if !strings.Contains(got, `<span class="bl-velocity velocity-fast" title="`) {
 		t.Error("the rate in INFO has no pace")
+	}
+	if !strings.Contains(got, `<span class="velocity-rising">&#8593;</span>2.3/day</span>`) {
+		t.Error("the rate in INFO has no arrow")
 	}
 }

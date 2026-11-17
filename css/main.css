@@ -1018,6 +1018,8 @@ span.emoji {
 .velocity-fast { color: var(--asuccess); }
 .velocity-steady { color: var(--awarning); }
 .velocity-slow { color: var(--adanger); }
+/* Selling at least twice as fast this week (salesvelocity.Sales.Rising) */
+.velocity-rising { font-weight: 700; margin-right: 0.15em; }
 /* The details column's one tooltip, CK's verdict, stock, P90 and odds */
 .bl-info[title] { cursor: help; }
 
