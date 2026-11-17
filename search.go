@@ -2218,9 +2218,9 @@ func passthroughIndex(entries []SearchEntry, consumed []string) []SearchEntry {
 
 // sellerEntryFound reports whether a seller's entry for a card passes a
 // search's condition and price filters. An index's entries carry no
-// condition, so only its price is filtered.
+// condition, so only its price is filtered, unless the API grades it.
 func sellerEntryFound(p *prices, info mtgban.ScraperInfo, cardID string, entry mtgban.InventoryEntry, config *SearchConfig) bool {
-	if !info.MetadataOnly && shouldSkipEntryNG(entry, config.EntryFilters) {
+	if gradedStore(info) && shouldSkipEntryNG(entry, config.EntryFilters) {
 		return false
 	}
 	return !shouldSkipPrice(p, cardID, entry, config.PriceFilters, info.Shorthand)
