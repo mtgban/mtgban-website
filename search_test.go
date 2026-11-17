@@ -283,6 +283,36 @@ func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
 	}
 }
 
+// A query no name starts with falls back to a fragment from inside one.
+func TestSearchFallsBackToSubstring(t *testing.T) {
+	skipWithoutDatastore(t)
+	if _, err := backend().SearchEquals("Frostboil Snarl"); err != nil {
+		t.Skip("no Frostboil Snarl in this datastore")
+	}
+
+	for query, name := range map[string]string{
+		"oilsn":      "Frostboil Snarl",
+		"boil snarl": "Frostboil Snarl",
+		// Bolt Bend starts with the query but is not in M10.
+		"bolt s:m10": "Lightning Bolt",
+	} {
+		config := parseSearchOptionsNG(backend(), currentPrices(), query, nil, nil, nil)
+		results, err := searchAndFilter(currentDatastore(), currentPrices(), config)
+		if err != nil {
+			t.Fatalf("%q: %v", query, err)
+		}
+		if len(results) == 0 {
+			t.Errorf("%q found nothing", query)
+		}
+		for _, uuid := range results {
+			co, _ := backend().GetUUID(uuid)
+			if co.Name != name {
+				t.Errorf("%q found %s", query, co.Name)
+			}
+		}
+	}
+}
+
 // brokenStore is a seller whose inventory panics when read, as a scan would
 // on a bug in a store's data. Its Info still answers, so only a scan panics.
 type brokenStore struct{ mtgban.Seller }

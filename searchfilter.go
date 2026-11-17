@@ -2172,7 +2172,8 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 	// Little Tailor", "Monkey D. Luffy" - so the exact match the default mode
 	// tries almost never lands on what someone typed, and the prefix widening
 	// behind it only helps a query that started at the front of the name.
-	// Magic names are searched whole, so it keeps the exact-then-prefix path.
+	// Magic names are searched whole, so it keeps the exact-then-prefix path,
+	// reaching a substring only when nothing starts with the query.
 	//
 	// Last, so the modes parsed out of the query above win, and so the checks
 	// above that read an unset mode - the Scryfall "|" syntax, the bare

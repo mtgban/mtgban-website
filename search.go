@@ -3187,6 +3187,23 @@ func searchAndFilter(ds *datastore, p *prices, config SearchConfig) ([]string, e
 					uuids, err = ds.backend.SearchRegexp(query)
 				}
 			}
+			// Last, a fragment from inside a name: "oilsn" is Frostboil Snarl.
+			// Filters that reject every name the query starts widen to it the
+			// same way, so "bolt s:m10" reaches Lightning Bolt past Bolt Bend.
+			// An empty query already had the whole pool.
+			if err == nil && query != "" && len(filters) != 0 {
+				selected := filterUUIDs(ds.backend, p, uuids, filters)
+				if len(selected) != 0 {
+					return selected, nil
+				}
+				moreUUIDs, moreErr := ds.backend.SearchContains(query)
+				if moreErr == nil {
+					uuids = moreUUIDs
+				}
+			}
+			if err != nil {
+				uuids, err = ds.backend.SearchContains(query)
+			}
 		}
 		// attemptMatch reads the query as a card name, which is no answer on
 		// the sealed tab: what is asked there is which product carries the
