@@ -44,7 +44,8 @@ b2 sync b2://mtgban-dumps/magic/cardkingdom/ ~/mtgban-dumps/magic/cardkingdom/
 # -acl / -grants (override those table paths), -dumps <dir> (read the dumps
 # from a local directory), -noload (skip price load), -stores a,b (load
 # only those stores' dumps at startup), -nonews, -sig (force signature
-# checks in dev), -log <dir>.
+# checks in dev), -alerts-send (deliver alert DMs and mail in dev),
+# -log <dir>.
 # Also: -tcgcsv-daily / -tcgcsv-products / -tcgcsv-backfill (with
 # -tcgcsv-from/-to/-force/-categories) run one ingest job and exit rather
 # than serving; tcgcsvd/README.md covers the jobs and cmd/tcgcsvd, which
@@ -386,7 +387,7 @@ stale the moment an item lands.
   this way and which side deploys first.
 - `embed.go` is Discord **embed** formatting, not Go `//go:embed` asset
   embedding — don't be misled by the name.
-- **Template FuncMap risks:** `templates.go` adds about 60 template helpers
+- **Template FuncMap risks:** `templates.go` adds about 70 template helpers
   via `template.FuncMap`. `templates_test.go` checks that every template
   parses and every reference resolves, not what each helper returns; only
   `csvWithout` has a table test of its own (`chart_test.go`). The rest
