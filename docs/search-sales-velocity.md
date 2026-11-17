@@ -16,9 +16,8 @@ column: TCGplayer's product ids are global.
 
 The newspaper pulls TCGplayer's `latestsales` for each product with a
 signed-in cookie. Signed out, TCGplayer returns only the newest five sales, and
-rows before 2026-10-13 were pulled that way, so they hold at most five orders
-a day. A window ending before 2026-11-11 reaches back past that date and reads
-low on the busiest cards.
+the table's oldest rows were pulled that way, so they hold at most five
+orders a day; the window is past them.
 
 ## The metric
 

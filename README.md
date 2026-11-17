@@ -19,7 +19,7 @@ go test ./...          # needs allprintings5.json in the repo root
 ## Alert mail
 
 Price alerts can deliver by email as well as Discord DM. The sender address
-is `mail.from` in the config (`ConfigType.Mail`), defaulting to `MTGBAN
+is `mail.from` in the config (`ConfigType.Mail`), defaulting to `BAN
 <no-reply@mtgban.com>`; a value `net/mail` cannot parse is logged and fatal
 at startup outside `-dev`.
 
