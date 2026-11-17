@@ -2,8 +2,9 @@
 // list: every re-post and export packs them (packRows), so an edit only
 // rewrites their data-cond/data-qtys/data-price, and the offers catch up
 // when the reader reloads. An Optimizer row edits the Results rows of its
-// card and grade. A list sent from the backpack takes each condition and
-// copies edit back to it; the backpack keeps no price.
+// card and grade, and a card can take one more line in a grade it lacks.
+// A list sent from the backpack takes each condition and copies edit back
+// to it; the backpack keeps no price.
 (function() {
     var CONDS = ['NM', 'SP', 'MP', 'HP', 'PO'];
     var QTYS = 20;
@@ -34,6 +35,15 @@
     }
 
     function price(tr) { return parseFloat(tr.dataset.price) || 0; }
+
+    // freeConds is the grades the card has no list line in yet, a line
+    // without one being priced as NM.
+    function freeConds(id) {
+        var held = Array.prototype.filter.call(document.querySelectorAll('.ures-table tr[data-hash]'), function(tr) {
+            return tr.dataset.hash === id && !tr.classList.contains('ures-removed-row');
+        }).map(function(tr) { return tr.dataset.cond || 'NM'; });
+        return CONDS.filter(function(c) { return held.indexOf(c) < 0; });
+    }
 
     function input(kind, placeholder, value) {
         var box = document.createElement('input');
@@ -79,6 +89,16 @@
             CONDS.forEach(function(c) { items.appendChild(item(c, c, c === cur)); });
             // A list line may give no grade, priced as NM
             items.appendChild(item('None', '', cur === ''));
+            var free = freeConds(rows[0].dataset.hash);
+            if (!free.length) return;
+            var also = document.createElement('div');
+            also.className = 'opt-move-title';
+            also.textContent = 'Also as';
+            menu.appendChild(also);
+            var adds = document.createElement('div');
+            adds.className = 'ures-edit-items';
+            free.forEach(function(c) { adds.appendChild(item(c, '+' + c, false)); });
+            menu.appendChild(adds);
             return;
         }
         var qty = copies(rows);
@@ -147,7 +167,7 @@
         var condBtn = tr.querySelector('.ures-edit-btn[data-edit="cond"]');
         var qtyBtn = tr.querySelector('.ures-edit-btn[data-edit="qty"]');
         var priceBtn = tr.querySelector('.ures-edit-btn[data-edit="price"]');
-        if (condBtn) condBtn.classList.toggle('edited', tr.dataset.cond !== tr.dataset.origCond);
+        if (condBtn) condBtn.classList.toggle('edited', 'added' in tr.dataset || tr.dataset.cond !== tr.dataset.origCond);
         if (qtyBtn) qtyBtn.classList.toggle('edited', tr.dataset.qtys !== tr.dataset.origQtys);
         if (priceBtn) priceBtn.classList.toggle('edited', price(tr) !== (parseFloat(tr.dataset.origPrice) || 0));
     }
@@ -186,6 +206,35 @@
             mark(tr);
             syncPack(tr.dataset.hash, was, cond, 0);
         });
+    }
+
+    // addLine puts one copy of the row's card in grade cond on a line of
+    // its own under it, priced as the row until a reload.
+    function addLine(src, cond) {
+        var tr = src.cloneNode(true);
+        ['origCond', 'origQtys', 'origPrice', 'origHash'].forEach(function(k) { delete tr.dataset[k]; });
+        tr.classList.remove('ures-removed-row');
+        tr.dataset.added = '';
+        tr.dataset.cond = cond;
+        tr.dataset.qtys = '1';
+        if (src.dataset.grade !== undefined) tr.dataset.grade = cond;
+        var rank = String(CONDS.indexOf(cond));
+        tr.dataset.kCond = rank;
+        var b = tr.querySelector('.ures-edit-btn[data-edit="cond"]');
+        b.textContent = cond;
+        b.classList.remove('ignored');
+        b.parentNode.dataset.sort = rank;
+        var q = tr.querySelector('.ures-edit-btn[data-edit="qty"]');
+        if (q) q.textContent = '1';
+        tr.querySelectorAll('.ures-edit-btn.edited').forEach(function(x) { x.classList.remove('edited'); });
+        remember(tr);
+        mark(tr);
+        src.after(tr);
+        var pack = window.Backpack && window.Backpack.sentPack ? window.Backpack.sentPack() : 0;
+        if (!pack || !window.ListStorage) return;
+        // A grade struck from the page is still in the backpack: it takes the new line's copy
+        if (!window.Backpack.addCond(window.ListStorage.backpackKey({id: src.dataset.hash, cond: src.dataset.cond || '', pack: pack}), cond)) return syncPack(src.dataset.hash, cond, cond, 1);
+        if (window.renderBackpack) window.renderBackpack();
     }
 
     // setQty gives the rows qty copies between them, one each at least:
@@ -252,7 +301,11 @@
         menu.hidePopover();
         var rows = listRows(btn);
         if (!editable(rows)) return;
-        if (btn.dataset.edit === 'cond') {
+        if (btn.dataset.edit === 'cond' && value.charAt(0) === '+') {
+            if (freeConds(rows[0].dataset.hash).indexOf(value.slice(1)) < 0) return;
+            addLine(rows[0], value.slice(1));
+            track(btn, 'add_cond');
+        } else if (btn.dataset.edit === 'cond') {
             if (value !== '' && CONDS.indexOf(value) < 0) return;
             setCond(rows, value);
             track(btn, 'edit_cond');
