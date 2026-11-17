@@ -70,7 +70,6 @@ type SearchEntry struct {
 	Ratio        float64
 	Quantity     int
 	URL          string
-	NoQuantity   bool
 	BundleIcon   string
 
 	// Listings is TCGplayer's sellers/copies for the grade, on the TCGplayer
@@ -92,11 +91,6 @@ type SearchEntry struct {
 
 	Secondary float64
 
-	// IsEV marks a row produced by the sealed expected-value collapse. The
-	// EV/Median/StdDev columns only mean anything for those, so the header
-	// naming them follows this rather than the mere presence of index rows.
-	IsEV bool
-
 	ExtraValues map[string]float64
 
 	Locked bool
@@ -104,6 +98,11 @@ type SearchEntry struct {
 	// Restricted marks a store the config's default search blocklist hides,
 	// so only a tier that lifts it sees the row.
 	Restricted bool
+	// IsEV marks a row produced by the sealed expected-value collapse. The
+	// EV/Median/StdDev columns only mean anything for those, so the header
+	// naming them follows this rather than the mere presence of index rows.
+	IsEV       bool
+	NoQuantity bool
 	// OrigPrice and OrigCredit hold the quoted number when a user's store
 	// adjustment rewrote Price or Credit (store_factors.go); zero otherwise.
 	OrigPrice  float64
