@@ -136,6 +136,10 @@ function switchUploadMode() {
     var mode = document.getElementById("res_mode");
     mode.value = mode.value === "true" ? "false" : "true";
     var form = document.getElementById("upload_form");
+    // The page's store order names this mode's stores, not the other's
+    form.querySelectorAll('input[name="stores"], input[name="sealed_stores"]').forEach(function(el) {
+        el.remove();
+    });
     form.target = '';
     if (window.showUploadProcessing) showUploadProcessing();
     form.submit();
