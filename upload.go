@@ -996,7 +996,7 @@ func uploadSortKeys(b *matcher.Backend, uploadedData []UploadEntry) map[string]u
 
 // fillCarts gives each split its cart button and each row the stores it can
 // be moved to, among stores, the page's stores in their order, filtered out
-// rows included.
+// and not bought rows included.
 func (v *UploadVars) fillCarts(p *prices, stores []string) {
 	v.CartLoads = map[string]cartLoad{}
 	for key, entries := range v.Optimized {
@@ -1006,9 +1006,11 @@ func (v *UploadVars) fillCarts(p *prices, stores []string) {
 			entries[i].MoveTo = moveOptions(stores, key, v.ResultPrices[offerKey], v.IsBuylist)
 		}
 	}
-	for i := range v.FilteredOut {
-		offerKey := v.FilteredOut[i].CardID + string(v.FilteredOut[i].Condition)
-		v.FilteredOut[i].MoveTo = moveOptions(stores, "", v.ResultPrices[offerKey], v.IsBuylist)
+	for _, leftovers := range [][]LeftoverEntry{v.FilteredOut, v.NotBought} {
+		for i := range leftovers {
+			offerKey := leftovers[i].CardID + string(leftovers[i].Condition)
+			leftovers[i].MoveTo = moveOptions(stores, "", v.ResultPrices[offerKey], v.IsBuylist)
+		}
 	}
 }
 
@@ -1164,7 +1166,8 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 
 		offers := rows.tallyOffers(row, blMode, st, prices, indexes)
 		priced = append(priced, pricedRow{row, offers})
-		if row.counts {
+		// A row moved to Not bought goes to no store, so it tips no tie
+		if row.counts && !(blMode && st.moves[row.priceKey] == notBoughtMove) {
 			shares.Add(offers, blMode)
 		}
 	}
@@ -1186,15 +1189,19 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 		}
 
 		// A row the reader moved goes to their store alone, while that
-		// store still offers for it
+		// store still offers for it, or to Not bought, which a buylist has
 		moved := st.moves[row.priceKey]
 		if offers[moved] > 0 {
 			bestStores = []string{moved}
 		}
+		movedOut := blMode && moved == notBoughtMove
+		if movedOut {
+			bestStores = nil
+		}
 
 		listed := rows.optimizeRow(row, offers, bestStores, st, indexes)
 		if blMode && !listed {
-			e := LeftoverEntry{CardID: row.CardID, Condition: row.conds, Quantity: row.qty, Loaded: rowComparePrice(row, st, indexes), CompareSource: st.altPriceSource, Notes: row.Notes}
+			e := LeftoverEntry{CardID: row.CardID, Condition: row.conds, Quantity: row.qty, Loaded: rowComparePrice(row, st, indexes), CompareSource: st.altPriceSource, Moved: movedOut, Notes: row.Notes}
 			if len(bestStores) == 0 {
 				rows.notBought.add(row, e)
 			} else {
@@ -1263,6 +1270,8 @@ type LeftoverEntry struct {
 	Spread        float64
 	// MoveTo is the stores that offer for the row, as OptimizedUploadEntry's
 	MoveTo string
+	// Moved is whether the reader moved the row to Not bought
+	Moved bool
 	// Notes is the row's, for the link back to its offer
 	Notes string
 }
@@ -1904,13 +1913,18 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 	}
 }
 
+// notBoughtMove is the store a row moved to Not bought names, which no
+// store's shorthand is.
+const notBoughtMove = "-"
+
 // maxTieOrder is how many stores the Custom tiebreak names.
 const maxTieOrder = 3
 
 // readOptMoves reads the optimizer rows the reader moved to a store of their
 // choosing, the store by price key (card id and condition). Only a results
 // page pricing its own rows again sends them, as a first line naming the
-// mode and one "id<TAB>condition<TAB>store" line a row; a store's shorthand
+// mode and one "id<TAB>condition<TAB>store" line a row, the store
+// notBoughtMove for a row moved to Not bought; a store's shorthand
 // names its buylist and its retail alike, so a move made in the other mode
 // is dropped.
 func readOptMoves(r *http.Request, blMode, skipConds bool) map[string]string {

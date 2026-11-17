@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/mtgban/mtgban-website/internal/uploadtie"
 )
 
 // moveRows prices the uploaded rows at CK for 5 and SCG for 4 a copy, best
@@ -149,8 +151,9 @@ func TestMoveOptions(t *testing.T) {
 }
 
 // Every optimizer row another store offers for gets a Move to button and an
-// empty menu the script fills from the row, at retail as on a buylist; a
-// moved row is marked with the store it was moved to.
+// empty menu the script fills from the row, at retail as on a buylist, and
+// on a buylist every row does; a moved row is marked with the store it was
+// moved to.
 func TestOptimizerMoveMenu(t *testing.T) {
 	for _, buylist := range []bool{true, false} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
@@ -165,8 +168,13 @@ func TestOptimizerMoveMenu(t *testing.T) {
 			OptimizedKeys:   []string{"CK"},
 			OptimizedTotals: map[string]float64{"CK": 10},
 		}})
-		if strings.Count(out, `class="opt-move-btn"`) != 2 {
-			t.Errorf("buylist %v: want buttons on a and c alone", buylist)
+		// On a buylist b can still go to Not bought
+		buttons := 2
+		if buylist {
+			buttons = 3
+		}
+		if strings.Count(out, `class="opt-move-btn"`) != buttons {
+			t.Errorf("buylist %v: want %d buttons", buylist, buttons)
 		}
 		for _, want := range []string{
 			`data-opt-id="a" data-opt-cond="NM" data-move="SCG:4.00"`,
@@ -181,6 +189,102 @@ func TestOptimizerMoveMenu(t *testing.T) {
 			if !strings.Contains(out, want) {
 				t.Errorf("buylist %v: no %s", buylist, want)
 			}
+		}
+	}
+}
+
+// On a buylist a card moved to Not bought leaves every store's list and the
+// highest total, past its offers, and lists there with the stores it can
+// go back to; at retail, which has no such section, the move is ignored.
+func TestOptimizerMovesToNotBought(t *testing.T) {
+	st := uploadSettings{moves: map[string]string{"card": notBoughtMove}}
+	entries := []UploadEntry{{CardID: "card", OriginalPrice: 10}, {CardID: "other", OriginalPrice: 10}}
+	rows := moveRows(t, entries, st)
+	if got := sectionOf(rows, "card"); got != nil {
+		t.Errorf("card at %q, want no store", got)
+	}
+	if got := sectionOf(rows, "other"); strings.Join(got, ",") != "CK" {
+		t.Errorf("other at %q, want CK", got)
+	}
+	if rows.highestTotal != 5 {
+		t.Errorf("highest total %v, want 5", rows.highestTotal)
+	}
+	notBought := rows.notBought.rows
+	if len(notBought) != 1 || notBought[0].CardID != "card" || !notBought[0].Moved || notBought[0].Store != "" {
+		t.Errorf("not bought %+v, want card alone, moved, with no store", notBought)
+	}
+	if len(rows.filteredOut.rows) != 0 {
+		t.Errorf("filtered out %+v, want none", rows.filteredOut.rows)
+	}
+
+	v := UploadVars{IsBuylist: true, NotBought: notBought, ResultPrices: rows.resultPrices}
+	v.fillCarts(nil, []string{"CK", "SCG", "ABU"})
+	if v.NotBought[0].MoveTo != "CK:5.00,SCG:4.00" {
+		t.Errorf("move to %q, want CK and SCG", v.NotBought[0].MoveTo)
+	}
+
+	prices := uploadPrices{
+		results:       map[string]map[string]*BanPrice{"card": {"CK": {Regular: 5}}},
+		enabledStores: []string{"CK"},
+	}
+	retail := priceUploadRows(backend(), false, uploadSettings{moves: st.moves, percMargin: 1, multiplier: 1}, prices, uploadIndexes{}, entries[:1])
+	if got := sectionOf(retail, "card"); strings.Join(got, ",") != "CK" {
+		t.Errorf("retail: card at %q, want CK", got)
+	}
+}
+
+// A card moved to Not bought is marked as moved there, with a Move to
+// button that leads back out; a card no store buys has none.
+func TestNotBoughtMoveMenu(t *testing.T) {
+	out := renderUpload(t, PageVars{UploadVars: UploadVars{
+		IsBuylist:     true,
+		ScraperKeys:   []string{"CK", "SCG"},
+		UploadEntries: []UploadEntry{{CardID: "a"}, {CardID: "b"}},
+		ResultPrices:  map[string]map[string]float64{"a": {"CK": 5}},
+		NotBought: []LeftoverEntry{
+			{CardID: "a", Quantity: 1, Moved: true},
+			{CardID: "b", Quantity: 1},
+		},
+	}})
+	section := leftoverRows(out, "opt-not-bought")
+	if strings.Count(section, `class="opt-move-btn"`) != 1 {
+		t.Errorf("want a button on a alone: %s", section)
+	}
+	for _, want := range []string{
+		`data-opt-id="a" data-opt-cond="" class="opt-moved" data-opt-moved="-" data-move="CK:5.00"`,
+		`data-opt-id="b" data-opt-cond="" data-k-name`,
+		`popovertarget="opt-not-bought-move-0" title="Moved here by you"`,
+	} {
+		if !strings.Contains(section, want) {
+			t.Errorf("no %s", want)
+		}
+	}
+}
+
+// A card moved to Not bought goes to no store, so it adds to no store's
+// share of the list: CK's sole offer on it would win the tie on "tied" for
+// CK, where SCG's sole offer on "scg" wins it without.
+func TestNotBoughtMoveTipsNoTie(t *testing.T) {
+	prices := uploadPrices{
+		results: map[string]map[string]*BanPrice{
+			"moved": {"CK": {Regular: 5}},
+			"tied":  {"CK": {Regular: 3}, "SCG": {Regular: 3}},
+			"scg":   {"SCG": {Regular: 2}},
+		},
+		enabledStores: []string{"CK", "SCG"},
+	}
+	entries := []UploadEntry{{CardID: "moved"}, {CardID: "tied"}, {CardID: "scg"}}
+	for _, tc := range []struct {
+		moves map[string]string
+		want  string
+	}{
+		{nil, "CK"},
+		{map[string]string{"moved": notBoughtMove}, "SCG"},
+	} {
+		st := uploadSettings{moves: tc.moves, percMargin: 1, multiplier: 1, tiebreak: uploadtie.Consolidate}
+		rows := priceUploadRows(backend(), true, st, prices, uploadIndexes{}, entries)
+		if got := sectionOf(rows, "tied"); strings.Join(got, ",") != tc.want {
+			t.Errorf("moves %v: tied at %q, want %s", tc.moves, got, tc.want)
 		}
 	}
 }

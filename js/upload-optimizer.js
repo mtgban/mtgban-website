@@ -129,7 +129,8 @@ function restoreOptUnticked() {
 }
 
 // A row's Move to menu is built when it opens, from the row's data-move:
-// the page's other stores that offer for the card, best first. It opens
+// the page's other stores that offer for the card, best first, then Not
+// bought on a buylist, which has that section. It opens
 // under its button, or over it in the lower part of the window, and closes
 // on a pick or on a scroll, which would leave it behind its row.
 document.addEventListener('beforetoggle', function(e) {
@@ -162,6 +163,10 @@ function fillMoveMenu(menu, row) {
         var store = pair.slice(0, at);
         menu.appendChild(moveMenuItem(names[store] || store, '$ ' + pair.slice(at + 1), store));
     });
+    var mode = document.getElementById('res_mode');
+    if (mode && mode.value === 'true' && row.dataset.optMoved !== '-') {
+        menu.appendChild(moveMenuItem('Not bought', '', '-'));
+    }
     if (row.hasAttribute('data-opt-moved')) {
         menu.appendChild(moveMenuItem('Let the optimizer place it', '', ''));
     }
@@ -181,9 +186,10 @@ function moveMenuItem(label, price, store) {
 }
 
 // moveOptRow puts the row's card in store whatever the optimizer's rules
-// say, or back in the optimizer's hands when store is empty, and prices the
-// list again, landing back on the card. The move is the page's alone: the
-// next re-post carries it (ensureHashesLoaded) and nothing stores it.
+// say, in Not bought when store is '-', or back in the optimizer's hands
+// when store is empty, and prices the list again, landing back on the
+// card. The move is the page's alone: the next re-post carries it
+// (ensureHashesLoaded) and nothing stores it.
 function moveOptRow(row, store) {
     var id = row.dataset.optId;
     var cond = row.dataset.optCond || '';
