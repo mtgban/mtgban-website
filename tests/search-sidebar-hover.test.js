@@ -384,6 +384,22 @@ test('the backpack keys leave fields, other chords and a hidden sidebar alone', 
     expect(tracked).toEqual([]);
 });
 
+test('an open dialog keeps the backpack keys, wherever the focus is', () => {
+    const dom = packDom();
+    const { w, acted, press } = packKeys(dom);
+
+    // Open, with the focus left on the page
+    w.banDialogOpen = () => true;
+    expect(press({ ctrlKey: true })).toBe(false);
+    // No visibility check to ask: the focus inside one says so
+    delete w.banDialogOpen;
+    expect(press({ ctrlKey: true }, { tagName: 'BUTTON', closest: sel => (sel.includes('[role="dialog"]') ? {} : null) })).toBe(false);
+    expect(acted).toEqual([]);
+
+    expect(press({ ctrlKey: true })).toBe(true);
+    expect(acted).toEqual([['add', dom.h1.add]]);
+});
+
 test('the autofocused search box passes the backpack keys on', () => {
     const dom = packDom();
     const { acted, press } = packKeys(dom);
