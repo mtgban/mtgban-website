@@ -317,9 +317,17 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minP
 }
 
 // moverCardID resolves a mover row to this game's uuid: Magic rows carry the
-// mtgjson uuid already, non-Magic rows carry their TCGplayer product, resolved
-// through the external id map with the sub-type naming the finish.
+// matcher id they were filed under, or the mtgjson uuid where the matcher
+// spells that id differently now, and non-Magic rows carry their TCGplayer
+// product, resolved through the external id map with the sub-type naming the
+// finish.
 func moverCardID(b *matcher.Backend, row timeseries.MoverRow) (string, bool, bool) {
+	if row.MtgbanID != "" {
+		_, err := b.GetUUID(row.MtgbanID)
+		if err == nil {
+			return row.MtgbanID, row.IsFoil, true
+		}
+	}
 	if row.MtgjsonUUID != "" {
 		return row.MtgjsonUUID, row.IsFoil, true
 	}

@@ -346,7 +346,7 @@ func buildMoverRowsQuery(provider int16, tcgCategory int, latest, prior time.Tim
 			SELECT ban_id, price FROM prices
 			 WHERE provider=$1 AND date=$3 AND price >= $5
 		)
-		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched,
+		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched, v.mtgban_id,
 		       v.tcgp_product_id, v.tcgp_sub_type,
 		       cur.price, old.price
 		  FROM cur JOIN old USING (ban_id)
@@ -387,16 +387,17 @@ func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays i
 	var result []MoverRow
 	for rows.Next() {
 		var m MoverRow
-		var uuid, subType sql.NullString
+		var uuid, mtgbanID, subType sql.NullString
 		var isFoil, isEtched sql.NullBool
 		var productID sql.NullInt64
-		err = rows.Scan(&uuid, &isFoil, &isEtched, &productID, &subType, &m.Current, &m.Prior)
+		err = rows.Scan(&uuid, &isFoil, &isEtched, &mtgbanID, &productID, &subType, &m.Current, &m.Prior)
 		if err != nil {
 			return nil, err
 		}
 		m.MtgjsonUUID = uuid.String
 		m.IsFoil = isFoil.Bool
 		m.IsEtched = isEtched.Bool
+		m.MtgbanID = mtgbanID.String
 		m.TCGProductID = int(productID.Int64)
 		m.TCGSubType = subType.String
 		result = append(result, m)

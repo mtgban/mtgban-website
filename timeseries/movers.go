@@ -6,6 +6,10 @@ type MoverRow struct {
 	IsFoil      bool
 	IsEtched    bool
 
+	// MtgbanID is the matcher id the row was filed under. A token sheet's
+	// mtgjson uuid is an alias no card has, so only this id names it.
+	MtgbanID string
+
 	// Non-Magic rows have no mtgjson uuid; they are keyed by their
 	// TCGplayer product instead (see GetMoversLong)
 	TCGProductID int
