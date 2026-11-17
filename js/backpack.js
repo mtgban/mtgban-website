@@ -495,6 +495,8 @@
         if (!canUpload() || !ordered().length) return;
         var form = sendForm(mode);
         setPending(emptySwitch && emptySwitch.checked ? ordered().map(key) : null);
+        // A send from a send's own page: the ids below are the next page's, not keepSent's
+        sentPack = 0;
         try { sessionStorage.setItem(SENT_KEY, JSON.stringify({ pack: active(), ids: ordered().map(function (e) { return e.id; }) })); } catch (e) {}
         document.body.appendChild(form);
         if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack.upload", mode === "buylist" ? "buylist" : "retail");
@@ -515,6 +517,19 @@
         if (!Array.isArray(pending) || !Array.isArray(ban.priced)) return;
         var ids = pending.map(idOf);
         if (ids.join(",") === ban.priced.join(",")) clear(pending);
+    }
+
+    // keepSent leaves the send the rows its page would post, as it goes: a
+    // card added in another condition, less the rows struck, so the
+    // re-price that follows is still the send's.
+    function keepSent() {
+        if (!sentPack || typeof window.exportRows !== "function") return;
+        var ids = [];
+        Array.prototype.forEach.call(window.exportRows("all"), function (tr) {
+            var id = tr.getAttribute("data-hash");
+            if (id && !tr.classList.contains("ures-removed-row")) ids.push(id);
+        });
+        try { sessionStorage.setItem(SENT_KEY, JSON.stringify({ pack: sentPack, ids: ids })); } catch (e) {}
     }
 
     // ---- result rows and the navbar ----
@@ -1621,6 +1636,7 @@
         });
         window.addEventListener("storage", function (ev) { if (!ev || !ev.key || ev.key === KEY || ev.key === ACTIVE_KEY || ev.key === TABS_KEY) render(); });
         window.addEventListener("pageshow", function (ev) { if (ev && ev.persisted) render(); });
+        window.addEventListener("pagehide", keepSent);
         clearIfPriced();
         render();
     }
