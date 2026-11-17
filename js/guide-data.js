@@ -850,9 +850,9 @@ window.__BAN_GUIDE = {
             category: 'Search Syntax',
             title: 'Sorting',
             icon: 'arrow-up-down',
-            summary: 'Sort results by date (default), price, name, or collector number.',
-            snippets: ['sort:chrono', 'sort:retail', 'sort:buylist', 'sort:alpha', 'sort:number', 'sort:hybrid', 'sort:velocity'],
-            keywords: ['sort', 'order', 'chrono', 'hybrid', 'alpha', 'alphabetical', 'number', 'retail', 'buylist', 'price', 'date', 'print', 'collector'],
+            summary: 'Sort results by date (default), price, name, or collector number; -sort: runs the order backwards.',
+            snippets: ['sort:chrono', 'sort:retail', 'sort:buylist', 'sort:alpha', 'sort:number', 'sort:hybrid', 'sort:velocity', '-sort:retail'],
+            keywords: ['sort', 'order', 'reverse', 'chrono', 'hybrid', 'alpha', 'alphabetical', 'number', 'retail', 'buylist', 'price', 'date', 'print', 'collector'],
             content: {
                 table: [
                     { value: 'chrono', short: 'By print date (default)' },
@@ -865,6 +865,7 @@ window.__BAN_GUIDE = {
                 ],
                 examples: [
                     { query: 'sort:retail', desc: 'Highest TCG price first' },
+                    { query: '-sort:retail', desc: 'Cheapest first' },
                     { query: 's:mh3 sort:velocity', desc: 'Fastest-selling cards of a set first' },
                     { query: 'r:mythic sort:retail', desc: 'Most expensive mythics first' },
                     { query: 'is:fetchland sort:buylist', desc: 'Fetchlands by buylist value' }

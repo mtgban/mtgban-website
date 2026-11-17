@@ -1081,8 +1081,13 @@ func readSearchSort(r *http.Request, config SearchConfig) string {
 	return sort
 }
 
-// readSearchReverse says whether a search runs its order backwards.
+// readSearchReverse says whether a search runs its order backwards: -sort:
+// in its own syntax, where that is the order used, or the reverse parameter.
 func readSearchReverse(r *http.Request, config SearchConfig) bool {
+	_, from := searchSortFrom(r, config)
+	if from == "operator" && config.SortReverse {
+		return true
+	}
 	reversed, _ := strconv.ParseBool(r.FormValue("reverse"))
 	return reversed
 }
