@@ -47,9 +47,9 @@ func TestReverseSortKeepsNonfoilFirst(t *testing.T) {
 	for _, sortMode := range []string{"chrono", "alpha", "hybrid", "number", "odds"} {
 		t.Run(sortMode, func(t *testing.T) {
 			forward := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, currentPrices(), forward, odds, nil, sortMode)
+			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, currentPrices(), forward, odds, nil, sortMode, false)
 			reversed := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest("GET", "/search?reverse=true", nil), ds, currentPrices(), reversed, odds, nil, sortMode)
+			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, currentPrices(), reversed, odds, nil, sortMode, true)
 
 			if forward[0] == reversed[0] {
 				t.Errorf("%s leads both directions: the list was not reversed", forward[0])
@@ -98,17 +98,17 @@ func TestReverseOddsSortKeepsUncoveredLast(t *testing.T) {
 	ds := &datastore{backend: &matcher.Backend{}}
 	odds := map[string]float64{"low": 0.5, "zero": 0, "high": 2}
 
-	for query, want := range map[string][]string{
-		"":              {"zero", "low", "high"},
-		"?reverse=true": {"high", "low", "zero"},
+	for reversed, want := range map[bool][]string{
+		false: {"zero", "low", "high"},
+		true:  {"high", "low", "zero"},
 	} {
 		keys := []string{"none", "high", "missing", "zero", "low"}
-		sortSearchKeys(httptest.NewRequest("GET", "/search"+query, nil), ds, currentPrices(), keys, odds, nil, "odds")
+		sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, currentPrices(), keys, odds, nil, "odds", reversed)
 		if !slices.Equal(keys[:3], want) {
-			t.Errorf("%q: covered cards sorted %v, want %v", query, keys[:3], want)
+			t.Errorf("reversed %v: covered cards sorted %v, want %v", reversed, keys[:3], want)
 		}
 		if !slices.Contains(keys[3:], "none") || !slices.Contains(keys[3:], "missing") {
-			t.Errorf("%q: uncovered cards are not last: %v", query, keys)
+			t.Errorf("reversed %v: uncovered cards are not last: %v", reversed, keys)
 		}
 	}
 }
@@ -141,9 +141,9 @@ func TestReverseSortKeepsEveryGamesFinishOrder(t *testing.T) {
 	for _, sortMode := range []string{"chrono", "alpha", "hybrid", "number"} {
 		t.Run(sortMode, func(t *testing.T) {
 			forward := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, currentPrices(), forward, nil, nil, sortMode)
+			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, currentPrices(), forward, nil, nil, sortMode, false)
 			reversed := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest("GET", "/search?reverse=true", nil), ds, currentPrices(), reversed, nil, nil, sortMode)
+			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, currentPrices(), reversed, nil, nil, sortMode, true)
 
 			// Each card's finishes in the order shown, and the cards in theirs
 			finishesOf := func(sorted []string) (map[string][]string, []string) {

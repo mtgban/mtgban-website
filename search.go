@@ -846,7 +846,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sort sets as requested, default to chronological
-	shown := orderSearchKeys(r, ds, p, result, config.Sales, pageVars.SearchSort)
+	shown := orderSearchKeys(r, ds, p, result, config.Sales, pageVars.SearchSort, readSearchReverse(r, config))
 	pageVars.ReverseMode = shown.reversed
 	pageVars.Pagination = shown.pagination
 
@@ -1001,7 +1001,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 		oembedError(w, http.StatusNotFound)
 		return
 	}
-	keys := orderSearchKeys(page, ds, p, result, config.Sales, readSearchSort(page, config)).keys
+	keys := orderSearchKeys(page, ds, p, result, config.Sales, readSearchSort(page, config), readSearchReverse(page, config)).keys
 	result.sellers, result.vendors = collectOffers(b, p, page, config, keys)
 	sortOfferRows(page, keys, result)
 
@@ -1079,6 +1079,12 @@ func fillSearchPrefs(pageVars *SearchVars, r *http.Request) {
 func readSearchSort(r *http.Request, config SearchConfig) string {
 	sort, _ := searchSortFrom(r, config)
 	return sort
+}
+
+// readSearchReverse says whether a search runs its order backwards.
+func readSearchReverse(r *http.Request, config SearchConfig) bool {
+	reversed, _ := strconv.ParseBool(r.FormValue("reverse"))
+	return reversed
 }
 
 // searchSortFrom is readSearchSort's order and where it came from: operator,
@@ -1404,9 +1410,10 @@ func searchPageSize(r *http.Request) int {
 // orderSearchKeys sorts the results as the reader asked and returns the page
 // of them to show. The sort works in place: CardHashes is the same slice, and
 // the Uploader transfer posts it in this order.
-func orderSearchKeys(r *http.Request, ds *datastore, p *prices, result searchResults, sales *salesvelocity.Snapshot, sortMode string) searchPage {
+func orderSearchKeys(r *http.Request, ds *datastore, p *prices, result searchResults, sales *salesvelocity.Snapshot, sortMode string, reversed bool) searchPage {
 	var shown searchPage
-	shown.reversed = sortSearchKeys(r, ds, p, result.keys, result.odds, sales, sortMode)
+	shown.reversed = reversed
+	sortSearchKeys(r, ds, p, result.keys, result.odds, sales, sortMode, reversed)
 
 	// If results can't fit in one page, chunk response and enable pagination
 	shown.keys = result.keys
@@ -1422,17 +1429,16 @@ func orderSearchKeys(r *http.Request, ds *datastore, p *prices, result searchRes
 	return shown
 }
 
-// sortSearchKeys orders keys in place as the reader asked, odds being what a
-// variable search's cards are expected at and sales what they sell at, and
-// says whether it reversed them.
-func sortSearchKeys(r *http.Request, ds *datastore, p *prices, allKeys []string, odds map[string]float64, sales *salesvelocity.Snapshot, sortMode string) bool {
+// sortSearchKeys orders keys in place by sortMode, backwards when reversed,
+// odds being what a variable search's cards are expected at and sales what
+// they sell at.
+func sortSearchKeys(r *http.Request, ds *datastore, p *prices, allKeys []string, odds map[string]float64, sales *salesvelocity.Snapshot, sortMode string, reversed bool) {
 	b := ds.backend
 	sortData := resolveSortingData(b, allKeys)
 
 	// A reversed sort swaps what it compares, and so turns every field
 	// around but the finish, negated here so one card's finishes keep
 	// their order
-	reversed, _ := strconv.ParseBool(r.FormValue("reverse"))
 	if reversed {
 		negateFinishes(sortData)
 	}
@@ -1537,8 +1543,6 @@ func sortSearchKeys(r *http.Request, ds *datastore, p *prices, allKeys []string,
 	} else {
 		sort.Slice(allKeys, less)
 	}
-
-	return reversed
 }
 
 // negateFinishes negates every finish rank cmpNumberAndFinish reads: the

@@ -384,7 +384,7 @@ func readSearchRun(r *http.Request, b *matcher.Backend, config SearchConfig, pin
 		run.Scope = "ignored"
 	}
 	run.Sort, run.SortFrom = searchSortFrom(r, config)
-	run.Reverse, _ = strconv.ParseBool(r.FormValue("reverse"))
+	run.Reverse = readSearchReverse(r, config)
 	run.PageIndex, _ = strconv.Atoi(r.FormValue("p"))
 	for _, cookie := range searchViewCookies {
 		// The server ignores the listing cookie while the listing is locked.
