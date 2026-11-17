@@ -1385,7 +1385,7 @@
     border-bottom: 1px solid var(--border-subtle);
     position: relative;
 }
-.opt-store-header h3 { font-size: var(--text-lg); font-weight: 700; white-space: nowrap; align-self: end; }
+.opt-store-header h3 { font-size: var(--text-lg); font-weight: 700; white-space: nowrap; }
 /* Out of the flex flow so the stacked arrows can never stretch the header */
 .opt-section-nav {
     position: absolute;
