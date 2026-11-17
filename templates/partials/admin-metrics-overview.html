@@ -63,7 +63,7 @@
         <thead><tr><th>Signal</th><th>Rate</th>{{if .InvestEvidence}}<th>Evidence</th>{{end}}</tr></thead>
         <tbody>
         {{range .Invest}}
-            <tr title="{{.Help}}"><td class="admin-metrics-name">{{if .URL}}<a href="{{.URL}}">{{.Label}}</a>{{else}}{{.Label}}{{end}}</td><td class="admin-metrics-wrap admin-metrics-words">{{template "admin-metrics-signal-rate" .}}</td>{{if $.Metrics.Overview.InvestEvidence}}<td class="admin-metrics-wrap">{{.Evidence}}</td>{{end}}</tr>
+            <tr title="{{.Help}}"><td class="admin-metrics-name">{{if .URL}}<a href="{{.URL}}">{{.Label}}</a>{{else}}{{.Label}}{{end}}</td><td class="admin-metrics-wrap admin-metrics-words">{{if or .NotMeasured .RateText .Denom}}{{template "admin-metrics-signal-rate" .}}{{else}}{{.Count}} <span class="admin-metrics-dim">counted</span>{{end}}</td>{{if $.Metrics.Overview.InvestEvidence}}<td class="admin-metrics-wrap">{{.Evidence}}</td>{{end}}</tr>
         {{else}}
             <tr><td colspan="{{if $.Metrics.Overview.InvestEvidence}}3{{else}}2{{end}}" class="admin-usage-empty">{{if $.Metrics.Overview.Counted}}Nothing to report in this window{{else}}{{template "admin-metrics-uncounted" $.Metrics.Overview.Read}}{{end}}</td></tr>
         {{end}}
