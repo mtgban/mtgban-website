@@ -368,8 +368,10 @@
             Array.from(dock.querySelectorAll('[data-util]')).forEach(placeUtil);
             return;
         }
+        // The menu may still hold them: its own handler, below, runs second.
         savedDock().forEach(function(name) {
-            var el = document.querySelector('.nav2-utility [data-util="' + name + '"]');
+            var el = document.querySelector('.nav2-utility [data-util="' + name + '"]') ||
+                document.querySelector('#mobile-util [data-util="' + name + '"]');
             if (el) dock.appendChild(el);
         });
     }
@@ -379,6 +381,8 @@
 
         Array.from(document.querySelectorAll('[data-util]')).forEach(function(el) {
             el.addEventListener('dragstart', function(e) {
+                // In the menu there is neither the bar nor the strip to drop on.
+                if (el.parentNode !== utility && el.parentNode !== dock) { e.preventDefault(); return; }
                 draggedUtil = el;
                 didDrag = true;
                 el.classList.add('dragging');
@@ -456,6 +460,31 @@
         e.stopPropagation();
         try { localStorage.setItem('mtgban_nav_hint_dismissed', '1'); } catch (err) {}
         hint.remove();
+    });
+})();
+
+// ── Narrow bar: its icons move to the top of the hamburger menu ──
+// The inline script in navbar.html does it before paint; this follows
+// resizes. Its query is made after the dock's, so on a change the dock
+// moves first (media query lists report in the order they were made).
+(function() {
+    var util = document.querySelector('.nav2-utility');
+    var menuUtil = document.getElementById('mobile-util');
+    var narrow = window.matchMedia ? window.matchMedia('(max-width: 900px)') : null;
+    if (!util || !menuUtil || !narrow || !narrow.addEventListener) return;
+    var hamburger = util.querySelector('.ban-nav-hamburger');
+    narrow.addEventListener('change', function(e) {
+        if (e.matches) {
+            Array.from(util.children).forEach(function(el) { if (el !== hamburger) menuUtil.appendChild(el); });
+        } else {
+            Array.from(menuUtil.children).forEach(function(el) { util.insertBefore(el, hamburger); });
+        }
+    });
+    // Each icon opens something of its own, or leaves the page: shut the menu.
+    menuUtil.addEventListener('click', function(e) {
+        if (!e.target.closest('.nav2-icon-btn')) return;
+        document.getElementById('mobile-menu').classList.remove('open');
+        document.getElementById('mobile-overlay').classList.remove('open');
     });
 })();
 

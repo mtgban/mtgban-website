@@ -224,3 +224,88 @@ test('the undock order matches the template', () => {
     const order = JSON.parse(navbar.match(/var UTIL_ORDER = (\[[^\]]*\]);/)[1].replace(/'/g, '"'));
     expect(order).toEqual(rendered);
 });
+
+// While the bar is narrow its icons sit atop the hamburger menu, beside its
+// close button, rather than taking width from the search.
+const menuCode = navbar.slice(navbar.indexOf('// ── Narrow bar'), navbar.indexOf('// ── Context-aware nav search'));
+
+// withMenu adds the menu's row and panel to a page.
+function withMenu(p) {
+    p.menuUtil = element({ id: 'mobile-util' });
+    p.menu = element({ id: 'mobile-menu' }, ['open']);
+    p.overlay = element({ id: 'mobile-overlay' }, ['open']);
+    const byId = p.document.getElementById;
+    const extra = { 'mobile-util': p.menuUtil, 'mobile-menu': p.menu, 'mobile-overlay': p.overlay };
+    p.document.getElementById = (id) => extra[id] || byId(id);
+    const query = p.document.querySelector;
+    p.document.querySelector = (sel) => {
+        const m = sel.match(/^#mobile-util \[data-util="(\w+)"\]$/);
+        return m ? p.menuUtil.children.find((c) => c.attrs['data-util'] === m[1]) || null : query(sel);
+    };
+    return p;
+}
+
+// media hands out one list per matchMedia call and reports a change to
+// each in the order they were made, as browsers do.
+function media(matches) {
+    const lists = [];
+    return {
+        matchMedia() {
+            const l = { matches, fns: [], addEventListener(type, fn) { l.fns.push(fn); } };
+            lists.push(l);
+            return l;
+        },
+        fire(m) { lists.forEach((l) => { l.matches = m; l.fns.forEach((fn) => fn({ matches: m })); }); },
+    };
+}
+
+function loadBoth(p, mq) {
+    const window = { __BAN_NAV: [], matchMedia: mq.matchMedia };
+    new Function('document', 'localStorage', 'window', 'location', 'setTimeout', drag)(
+        p.document, p.localStorage, window, { pathname: '/search' }, () => {});
+    new Function('document', 'window', menuCode)(p.document, window);
+}
+
+test('narrowing moves every icon into the menu, docked ones too; widening puts each back', () => {
+    const p = withMenu(page());
+    p.stored.mtgban_nav_layout_v1 = JSON.stringify({ dock: ['account'], sections: [], grid: [] });
+    p.dock.appendChild(p.utils.account);
+    const mq = media(false);
+    loadBoth(p, mq);
+
+    mq.fire(true);
+    expect(names(p.menuUtil)).toEqual(['backpack', 'account', 'guide', 'settings']);
+    expect(names(p.utility)).toEqual(['hamburger']);
+    expect(names(p.dock)).toEqual([]);
+
+    mq.fire(false);
+    expect(names(p.menuUtil)).toEqual([]);
+    expect(names(p.utility)).toEqual(['backpack', 'guide', 'settings', 'hamburger']);
+    expect(names(p.dock)).toEqual(['account']);
+    expect(layout(p).dock).toEqual(['account']);
+});
+
+test('an icon in the menu does not drag, and clicking one shuts the menu', () => {
+    const p = withMenu(page());
+    const mq = media(false);
+    loadBoth(p, mq);
+    mq.fire(true);
+
+    let prevented = false;
+    p.utils.guide.listeners.dragstart({ ...ev(), preventDefault() { prevented = true; } });
+    expect(prevented).toBe(true);
+    expect(p.toolsBtn.getAttribute('aria-expanded')).toBe('false');
+
+    p.menuUtil.listeners.click({ target: { closest: (sel) => (sel === '.nav2-icon-btn' ? p.utils.guide : null) } });
+    expect(p.menu.classList.contains('open')).toBe(false);
+    expect(p.overlay.classList.contains('open')).toBe(false);
+});
+
+test('a narrow first paint puts the icons in the menu and docks nothing', () => {
+    const p = withMenu(page());
+    p.stored.mtgban_nav_layout_v1 = JSON.stringify({ dock: ['account'], sections: [], grid: [] });
+    loadRestore(p, true);
+    expect(names(p.menuUtil)).toEqual(['backpack', 'account', 'guide', 'settings']);
+    expect(names(p.utility)).toEqual(['hamburger']);
+    expect(names(p.dock)).toEqual([]);
+});

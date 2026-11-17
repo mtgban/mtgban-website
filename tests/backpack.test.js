@@ -48,7 +48,7 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], results, navMenu = false, sort, fetch, signedIn = false, timers, uploadMode } = {}) {
+function page({ store = [], mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], results, navMenu = false, sort, fetch, signedIn = false, timers, uploadMode, narrowBar = false } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store) };
     if (uploadMode) m.uploadMode = uploadMode;
@@ -61,7 +61,12 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
     const body = el('body'); if (mobile) body.classes.add('mobile');
     const nav = el('button'); nav.setAttribute('id', 'nav-backpack');
     const navCount = el('span'); navCount.setAttribute('id', 'nav-backpack-count'); navCount.hidden = true; nav.appendChild(navCount);
-    body.appendChild(nav);
+    // A narrow bar puts the button in the hamburger menu's top row.
+    let hamburger = null;
+    if (narrowBar) {
+        const row = el('div'); row.setAttribute('id', 'mobile-util'); row.appendChild(nav); body.appendChild(row);
+        hamburger = el('button'); hamburger.classes.add('ban-nav-hamburger'); body.appendChild(hamburger);
+    } else body.appendChild(nav);
     if (navMenu) { const menu = el('div'); menu.setAttribute('id', 'nav-backpack-menu'); menu.hidden = true; body.appendChild(menu); }
     // Two result rows, each with an add and a minus button carrying the card id.
     const minus = [];
@@ -134,6 +139,7 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
         getElementById: (id) => ids[id] || null,
         createElement: (tag) => el(tag),
         querySelectorAll: (sel) => body.querySelectorAll(sel),
+        querySelector: (sel) => body.querySelector(sel),
         activeElement: null,
     };
     currentDoc = document;
@@ -155,7 +161,7 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
     const stored = () => JSON.parse(m.mtgban_backpack);
     const pendingIds = () => (sm.mtgban_backpack_pending_clear === undefined ? undefined : JSON.parse(sm.mtgban_backpack_pending_clear));
     return {
-        window, document, m, sm, rows, minus, nav, navCount, stored, key, pendingIds, optSections, res, tracked,
+        window, document, m, sm, rows, minus, nav, navCount, hamburger, stored, key, pendingIds, optSections, res, tracked,
         fireClick: (target) => (docListeners.click || []).forEach((fn) => fn({ target })),
         fireChange: (target) => (docListeners.change || []).forEach((fn) => fn({ target })),
         fireStorage: (key = 'mtgban_backpack') => storageListeners.forEach((fn) => fn({ key })),
@@ -2248,5 +2254,23 @@ describe('the backpack keys and drags are counted', () => {
         fire(tabsOf()[2], 'dragstart', dragEvent(tab));
         fire(tabsOf()[0], 'drop', dragEvent(tab));
         expect(drags(p)).toEqual([['ui.backpack.drag', 'card_to_tab'], ['ui.backpack.drag', 'tab_reorder']]);
+    });
+});
+
+describe('closing the panel', () => {
+    test('hands focus back to the navbar button', () => {
+        const p = page();
+        p.nav.click();
+        p.window.Backpack.close();
+        expect(p.document.activeElement).toBe(p.nav);
+        expect(p.nav.attrs['aria-expanded']).toBe('false');
+    });
+
+    test('hands focus to the hamburger while the button is in its shut menu', () => {
+        const p = page({ narrowBar: true });
+        p.nav.click();
+        p.window.Backpack.close();
+        expect(p.document.activeElement).toBe(p.hamburger);
+        expect(p.nav.attrs['aria-expanded']).toBe('false');
     });
 });
