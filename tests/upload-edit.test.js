@@ -29,6 +29,7 @@ function el(tag, attrs = {}, children = []) {
                 get: (_, k) => a['data-' + kebab(k)],
                 set: (_, k, v) => { a['data-' + kebab(k)] = String(v); return true; },
                 has: (_, k) => ('data-' + kebab(k)) in a,
+                deleteProperty: (_, k) => delete a['data-' + kebab(k)],
                 ownKeys: () => Object.keys(a).filter((k) => k.startsWith('data-')).map((k) => camel(k.slice(5))),
                 getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true }),
             });
@@ -39,6 +40,14 @@ function el(tag, attrs = {}, children = []) {
         removeAttribute(n) { delete this.attrs[n]; },
         appendChild(c) { c.parentNode = this; this.children.push(c); return c; },
         remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((c) => c !== this); this.parentNode = null; },
+        after(n) { const kids = this.parentNode.children; n.parentNode = this.parentNode; kids.splice(kids.indexOf(this) + 1, 0, n); },
+        cloneNode() {
+            const c = el(this.tag, { ...this.attrs });
+            c.className = this.className;
+            c.text = this.text;
+            this.children.forEach((k) => c.appendChild(k.cloneNode()));
+            return c;
+        },
         closest(sel) { for (let n = this; n; n = n.parentNode) if (n.matches && n.matches(sel)) return n; return null; },
         matches(sel) { return sel.split(',').some((s) => matchChain(this, s.trim().split(/\s+/))); },
         querySelectorAll(sel) { const out = []; const walk = (n) => n.children.forEach((c) => { if (c.matches(sel)) out.push(c); walk(c); }); walk(this); return out; },
@@ -98,7 +107,7 @@ function optRow(id, cond, qty, price = '1.00') {
     ]);
 }
 
-function load({ results, opt = [], sentPack = 0 }) {
+function load({ results, opt = [], sentPack = 0, packHas = [] }) {
     listeners = {};
     const calls = { track: [], pack: [], reprocessed: 0, rendered: 0 };
     // The reload bar as upload.html draws it
@@ -126,6 +135,8 @@ function load({ results, opt = [], sentPack = 0 }) {
             sentPack: () => sentPack,
             setCond: (k, c) => calls.pack.push(['cond', k, c]),
             setQty: (k, q) => calls.pack.push(['qty', k, q]),
+            // The backpack refuses a grade it already holds
+            addCond: (k, c) => { calls.pack.push(['add', k, c]); return !packHas.includes(c); },
         },
         renderBackpack: () => { calls.rendered++; },
         BAN_UPLOAD_PRINTINGS: { cards: {} },
@@ -151,7 +162,7 @@ test('a grade picked on a result row rewrites the row the exports pack, and its 
 
     btn(bolt, 'cond').click();
     expect(menu().open).toBe(true);
-    expect(menu().querySelectorAll('.ures-edit-items button').map((b) => b.textContent)).toEqual(['NM', 'SP', 'MP', 'HP', 'PO', 'None']);
+    expect(menu().querySelector('.ures-edit-items').querySelectorAll('button').map((b) => b.textContent)).toEqual(['NM', 'SP', 'MP', 'HP', 'PO', 'None']);
     expect(menu().querySelector('[aria-current]').textContent).toBe('NM');
     menu().querySelector('[data-value="SP"]').click();
 
@@ -334,4 +345,60 @@ test('a grade can be taken back to none, as a list line without one', () => {
 
     // The backpack keeps no grade as NM
     expect(calls.pack).toEqual([['cond', 'a|SP', 'NM'], ['cond', 'b', 'MP'], ['cond', 'b|MP', 'NM']]);
+});
+
+test('a card takes one more line in a grade it has none in, under the row', () => {
+    const bolt = resultRow('Bolt', 'a', 'NM', 3, { price: '2' });
+    const boltSP = resultRow('Bolt', 'a', 'SP', 1);
+    const ring = resultRow('Ring', 'b', 'NM', 1);
+    const table = { results: [bolt, boltSP, ring], opt: [optRow('a', 'NM', 3)], sentPack: 1 };
+    const { calls, menu, pick, shown } = load(table);
+    const lines = () => doc.querySelectorAll('.ures-table tr[data-hash]');
+
+    pick(btn(bolt, 'qty'), '5');
+    btn(bolt, 'cond').click();
+    const adds = menu().querySelectorAll('.ures-edit-items')[1];
+    // The grades the card already has a line in are not offered
+    expect(adds.querySelectorAll('button').map((b) => b.dataset.value)).toEqual(['+MP', '+HP', '+PO']);
+    adds.querySelector('[data-value="+HP"]').click();
+
+    expect(lines().map((tr) => tr.dataset.cardName + ' ' + tr.dataset.cond)).toEqual(['Bolt NM', 'Bolt HP', 'Bolt SP', 'Ring NM']);
+    const hp = lines()[1];
+    expect([hp.dataset.qtys, hp.dataset.grade, hp.dataset.kCond, hp.dataset.price]).toEqual(['1', 'HP', '3', '2']);
+    expect(btn(hp, 'cond').textContent).toBe('HP');
+    expect(btn(hp, 'qty').textContent).toBe('1');
+    // The new line is the one to reload; the row it came from keeps its own edit
+    expect(btn(hp, 'cond').classList.contains('edited')).toBe(true);
+    expect(btn(hp, 'qty').classList.contains('edited')).toBe(false);
+    expect(bolt.dataset.qtys).toBe('5');
+    expect(shown()).toBe('2 updated');
+    expect(calls.track).toEqual(['ui.upload.result:edit_qty', 'ui.upload.result:add_cond']);
+    expect(calls.pack).toEqual([['qty', 'a', 5], ['add', 'a', 'HP']]);
+
+    // From the optimizer row too, and the line added holds its grade
+    btn(doc.querySelector('.opt-store tr[data-opt-id]'), 'cond').click();
+    expect(menu().querySelectorAll('.ures-edit-items')[1].querySelectorAll('button').map((b) => b.dataset.value)).toEqual(['+MP', '+PO']);
+});
+
+test('a card held in every grade is offered no more lines', () => {
+    const rows = ['NM', 'SP', 'MP', 'HP', ''].map((c) => resultRow('Bolt', 'a', c, 1));
+    const { menu } = load({ results: rows });
+    btn(rows[0], 'cond').click();
+    // A line without a grade holds NM, so PO is the one left
+    expect(menu().querySelectorAll('.ures-edit-items').length).toBe(2);
+    rows[4].attrs['data-cond'] = 'PO';
+    btn(rows[0], 'cond').click();
+    expect(menu().querySelectorAll('.ures-edit-items').length).toBe(1);
+});
+
+test('a grade struck from the page and taken again sets the copies of the backpack entry it left there', () => {
+    const bolt = resultRow('Bolt', 'a', 'NM', 3);
+    const boltSP = resultRow('Bolt', 'a', 'SP', 4);
+    boltSP.classList.add('ures-removed-row');
+    const { calls, menu } = load({ results: [bolt, boltSP], sentPack: 1, packHas: ['SP'] });
+
+    btn(bolt, 'cond').click();
+    menu().querySelectorAll('.ures-edit-items')[1].querySelector('[data-value="+SP"]').click();
+    expect(calls.pack).toEqual([['add', 'a', 'SP'], ['qty', 'a|SP', 1]]);
+    expect(calls.rendered).toBe(1);
 });
