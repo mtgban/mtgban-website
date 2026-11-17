@@ -64,6 +64,10 @@ const (
 	// maxPackedRows caps the rows a page posts back packed into one field,
 	// above what unpacking a full Pro upload legitimately expands to.
 	maxPackedRows = 4 * MaxUploadTotalEntries
+	// maxPostedPrice is the price a posted row is taken to hold none from:
+	// above any card's, and far enough under a float's limit that totals
+	// stay finite.
+	maxPostedPrice = 1e9
 )
 
 // Bounds on what one uploaded workbook may unpack to. excelize's own default
@@ -3121,7 +3125,8 @@ func loadHashes(hashes, qtys, cond, prices, notes, from, fromQtys []string) ([]U
 		if len(qtys) > i {
 			qty, err := strconv.Atoi(qtys[i])
 			entry.HasQuantity = (err == nil)
-			entry.Quantity = qty
+			// A row holds a copy at least
+			entry.Quantity = max(qty, 1)
 		}
 
 		if len(cond) > i {
@@ -3129,7 +3134,11 @@ func loadHashes(hashes, qtys, cond, prices, notes, from, fromQtys []string) ([]U
 		}
 
 		if len(prices) > i {
-			entry.OriginalPrice, _ = strconv.ParseFloat(prices[i], 64)
+			price, _ := strconv.ParseFloat(prices[i], 64)
+			// ParseFloat reads "NaN", "Inf" and 1e308 too; none is a price
+			if price > 0 && price < maxPostedPrice {
+				entry.OriginalPrice = price
+			}
 		}
 
 		// Carried so a row keeps what it knows about itself across a

@@ -400,6 +400,29 @@ func TestLoadHashesCarriesTheNotes(t *testing.T) {
 	}
 }
 
+// A posted row is whatever the browser sent: a quantity below one counts
+// as one copy, and a price that is negative, not a number or beyond any
+// card's as none.
+func TestLoadHashesBoundsQuantityAndPrice(t *testing.T) {
+	qtys := []string{"3", "0", "-5", "x", "2", "2", "2", "2", "2", "2"}
+	prices := []string{"1.5", "2", "2", "2", "-1", "NaN", "Inf", "-Inf", "1e308", "999999"}
+	ids := make([]string, len(qtys))
+	for i := range ids {
+		ids[i] = "card"
+	}
+	entries, err := loadHashes(ids, qtys, nil, prices, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("loadHashes: %v", err)
+	}
+	wantQty := []int{3, 1, 1, 1, 2, 2, 2, 2, 2, 2}
+	wantPrice := []float64{1.5, 2, 2, 2, 0, 0, 0, 0, 0, 999999}
+	for i, e := range entries {
+		if e.Quantity != wantQty[i] || e.OriginalPrice != wantPrice[i] {
+			t.Errorf("row %d (%q, %q): got %d at %v, want %d at %v", i, qtys[i], prices[i], e.Quantity, e.OriginalPrice, wantQty[i], wantPrice[i])
+		}
+	}
+}
+
 // A row with no note is unaffected, and a short notes list does not read past
 // its end.
 func TestLoadHashesToleratesMissingNotes(t *testing.T) {
