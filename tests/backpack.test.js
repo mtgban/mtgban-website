@@ -791,7 +791,7 @@ describe('the backpack tabs', () => {
     });
 });
 
-describe('taking from the backpack a send came from', () => {
+describe('taking from the open backpack on a send', () => {
     const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.pack, e.id, e.qty]).sort();
     const store = [{ id: 'uuid-1', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', pack: 2, qty: 3, t: 2, m: 2 }];
     const tabList = [{ pack: 1 }, { pack: 2, name: 'Trades' }];
@@ -804,14 +804,16 @@ describe('taking from the backpack a send came from', () => {
         return p.sm;
     }
 
-    test('the Upload page showing the send takes from its backpack, whatever tab is open', () => {
+    test('the Upload page showing the send takes from the open backpack, warning it is not the one sent', () => {
         const session = sent();
         const p = page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, sections: [[['uuid-1', 1, false, 'NM']]] });
         expect(p.optSections[0].take.hidden).toBe(false);
         p.window.takeRowsFromBackpack(p.optSections[0].take);
-        expect(confirms).toEqual(["Remove this store's ticked cards from Trades?"]);
-        expect(live(p)).toEqual([[1, 'uuid-1', 2], [2, 'uuid-1', 2]]);
-        expect(ids['backpack-toast'].textContent).toBe('Removed 1 copy from Trades');
+        expect(confirms).toEqual(["Remove this store's ticked cards from Backpack 1? These cards were sent from Trades."]);
+        expect(live(p)).toEqual([[1, 'uuid-1', 1], [2, 'uuid-1', 3]]);
+        expect(ids['backpack-toast'].textContent).toBe('Removed 1 copy from Backpack 1');
+        // The condition and copies menu (upload-edit.js) still edits the backpack sent
+        expect(p.window.Backpack.sentPack()).toBe(2);
     });
 
     test('the Upload page showing the send names its backpack beside Results', () => {
@@ -840,15 +842,28 @@ describe('taking from the backpack a send came from', () => {
         expect(ids['upload-pack-from'].textContent).toBe('');
     });
 
-    test('a page posting itself back still takes from the backpack sent', () => {
+    test('the Upload page showing the send takes from its backpack with no warning while it is open', () => {
         const session = sent();
-        page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] } });
-        const p = page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, sections: [[['uuid-1', 1, false, 'NM']]] });
+        const p = page({ store, tabs: 2, active: 2, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, sections: [[['uuid-1', 1, false, 'NM']]] });
         p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(confirms).toEqual(["Remove this store's ticked cards from Trades?"]);
         expect(live(p)).toEqual([[1, 'uuid-1', 2], [2, 'uuid-1', 2]]);
     });
 
-    test('a re-price posting the rows in another order still takes from the backpack sent', () => {
+    test('the take button follows the open backpack, not the one sent', () => {
+        const session = sent();
+        const p = page({ store: [store[1]], tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, sections: [[['uuid-1', 1, false, 'NM']]] });
+        expect(p.optSections[0].take.hidden).toBe(true);
+    });
+
+    test('a page posting itself back still knows the backpack sent', () => {
+        const session = sent();
+        page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] } });
+        const p = page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, sections: [[['uuid-1', 1, false, 'NM']]] });
+        expect(p.window.Backpack.sentPack()).toBe(2);
+    });
+
+    test('a re-price posting the rows in another order still knows the backpack sent', () => {
         const more = [...store, { id: 'uuid-2', pack: 2, qty: 1, t: 3, m: 3 }];
         const s = page({ store: more, tabs: 2, active: 2, tabList });
         s.nav.click();
@@ -856,8 +871,7 @@ describe('taking from the backpack a send came from', () => {
         const priced = JSON.parse(s.sm.mtgban_backpack_sent).ids.slice().reverse();
         expect(priced).toEqual(['uuid-1', 'uuid-2']);
         const p = page({ store: more, tabs: 2, active: 1, tabList, session: s.sm, ban: { canUpload: true, priced }, sections: [[['uuid-1', 1, false, 'NM']]] });
-        p.window.takeRowsFromBackpack(p.optSections[0].take);
-        expect(live(p)).toEqual([[1, 'uuid-1', 2], [2, 'uuid-1', 2], [2, 'uuid-2', 1]]);
+        expect(p.window.Backpack.sentPack()).toBe(2);
     });
 
     // reprice leaves the send's page with these result rows and returns the page pricing priced.
@@ -872,12 +886,12 @@ describe('taking from the backpack a send came from', () => {
         return page({ store: more, tabs: 2, active: 1, tabList, session: s.sm, ban: { canUpload: true, priced } });
     }
 
-    test('a re-price after a card was added in a second condition still takes from the backpack sent', () => {
+    test('a re-price after a card was added in a second condition still knows the backpack sent', () => {
         const p = reprice([['uuid-2', 1, 'NM'], ['uuid-1', 3, 'NM'], ['uuid-1', 1, 'SP']], ['uuid-2', 'uuid-1', 'uuid-1']);
         expect(p.window.Backpack.sentPack()).toBe(2);
     });
 
-    test('a re-price after a row was struck from results still takes from the backpack sent', () => {
+    test('a re-price after a row was struck from results still knows the backpack sent', () => {
         const p = reprice([['uuid-2', 1, 'NM', true], ['uuid-1', 3, 'NM']], ['uuid-1']);
         expect(p.window.Backpack.sentPack()).toBe(2);
     });

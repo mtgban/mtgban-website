@@ -117,9 +117,8 @@
     function setActive(p) { try { localStorage.setItem(ACTIVE_KEY, String(p)); } catch (e) {} }
 
     // sentPack is, on the Upload page showing a send's cards, the backpack
-    // that send came from, which the page takes from whatever tab is open.
+    // that send came from.
     var sentPack = 0;
-    function source() { return sentPack || active(); }
     function packName(p) {
         var list = tabs();
         if (list.length < 2) return "the backpack";
@@ -717,10 +716,10 @@
         var by = {};
         live().forEach(function (e) { by[key(e)] = true; });
         // An empty backpack has nothing to take, which spares reading every row
-        var empty = !inPack(source()).length;
+        var empty = !inPack(active()).length;
         document.querySelectorAll(".pack-take-btn").forEach(function (b) {
             var rows = empty ? null : rowsFor(b);
-            b.hidden = !rows || !Object.keys(picked(rows, source())).some(function (k) { return by[k]; });
+            b.hidden = !rows || !Object.keys(picked(rows, active())).some(function (k) { return by[k]; });
         });
         document.querySelectorAll(".pack-add-btn").forEach(function (b) {
             var rows = rowsFor(b);
@@ -839,16 +838,17 @@
     };
 
     // takeRowsFromBackpack takes the copies the button's rows list out of
-    // the backpack they came from, once the reader confirms it. Taking the
-    // last hides the button, so a focused one hands focus to the section's
-    // fold button, or to the results' add button.
+    // the open backpack, once the reader confirms it; the question warns
+    // when the list was sent from another one. Taking the last hides the
+    // button, so a focused one hands focus to the section's fold button, or
+    // to the results' add button.
     window.takeRowsFromBackpack = function (btn) {
         var rows = rowsFor(btn);
         if (!rows) return;
         var section = btn.closest(".opt-store");
+        var p = active();
         var doTake = function () {
             var focused = document.activeElement === btn;
-            var p = source();
             var copies = take(picked(rows, p));
             if (!copies) return;
             if (window.BAN && window.BAN.track) {
@@ -860,7 +860,9 @@
             var next = section ? section.querySelector(".section-fold") : btn.parentNode.querySelector(".pack-add-btn");
             if (focused && btn.hidden && next) next.focus();
         };
-        var ask = (section ? "Remove this store's ticked cards from " : "Remove these results from ") + packName(source()) + "?";
+        var ask = (section ? "Remove this store's ticked cards from " : "Remove these results from ") + packName(p) + "?";
+        var other = sentPack !== p && tabs().some(function (t) { return t.pack === sentPack; });
+        if (other) ask += " These cards were sent from " + packName(sentPack) + ".";
         // The dialog hands focus back to the button before it calls doTake
         if (typeof window.confirmDialog === "function") window.confirmDialog(ask, doTake, { confirmLabel: "Remove" });
         else if (window.confirm(ask)) doTake();
