@@ -518,20 +518,35 @@
     function mergeList(local, server, idOf, cap, tombCap) {
         var byId = {};
         var order = [];
-        function add(item) {
+        // An item only the server has follows the server item before it,
+        // so items that tie on time keep the server's order.
+        var after = {}, first = [], prev = null;
+        function add(item, fromServer) {
             var id = idOf(item);
             if (id == null) return;
             var cur = byId[id];
             if (!cur) {
                 byId[id] = item;
-                order.push(id);
+                if (!fromServer) order.push(id);
+                else if (prev === null) first.push(id);
+                else (after[prev] = after[prev] || []).push(id);
             } else if (mtime(item) > mtime(cur)) {
                 byId[id] = item;
             }
+            if (fromServer) prev = id;
         }
-        (local || []).forEach(add);
-        (server || []).forEach(add);
-        var merged = order.map(function(id) { return byId[id]; });
+        (local || []).forEach(function(item) { add(item, false); });
+        (server || []).forEach(function(item) { add(item, true); });
+        var ids = [];
+        first.concat(order).forEach(function(id) {
+            var stack = [id];
+            while (stack.length) {
+                var x = stack.pop();
+                ids.push(x);
+                for (var i = (after[x] || []).length - 1; i >= 0; i--) stack.push(after[x][i]);
+            }
+        });
+        var merged = ids.map(function(id) { return byId[id]; });
         var live = merged.filter(function(x) { return !x.del; });
         live.sort(function(a, b) { return (b.t || 0) - (a.t || 0); });
         if (cap && live.length > cap) {
