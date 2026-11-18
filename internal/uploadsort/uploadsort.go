@@ -32,7 +32,7 @@ type Keys struct {
 	Finish string
 
 	// One color in the game's order, then several (fewer first, then the
-	// game's order), then none
+	// game's order), then none: other colorless cards, artifacts, lands
 	Color string
 
 	// The rarity's rank, rarest first; empty for one the game does not rank
@@ -50,7 +50,7 @@ func For(b *matcher.Backend, cardID string) Keys {
 	keys := Keys{
 		Name:   strings.ToLower(co.Name),
 		Number: co.Number,
-		Color:  colorKey(b.Colors, co.Colors),
+		Color:  colorKey(b.Colors, co.Colors, co.Types),
 	}
 	// An undated set gets no key, so it files last either way
 	set, err := b.GetSet(co.SetCode)
@@ -79,9 +79,10 @@ func For(b *matcher.Backend, cardID string) Keys {
 }
 
 // colorKey files colors by order, the game's: "1" and the color's place for
-// one, "2", how many and each place for several, "3" for none. A color the
-// game does not list, "colorless" among them, counts as none.
-func colorKey(order, colors []string) string {
+// one, "2", how many and each place for several, then for none "3", or "4"
+// for an artifact and "5" for a land. A color the game does not list,
+// "colorless" among them, counts as none.
+func colorKey(order, colors, types []string) string {
 	var places []int
 	for _, color := range colors {
 		place := slices.Index(order, color)
@@ -90,6 +91,12 @@ func colorKey(order, colors []string) string {
 		}
 	}
 	if len(places) == 0 {
+		switch {
+		case slices.Contains(types, "Land"):
+			return "5"
+		case slices.Contains(types, "Artifact"):
+			return "4"
+		}
 		return "3"
 	}
 	slices.Sort(places)

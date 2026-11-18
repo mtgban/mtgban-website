@@ -24,18 +24,26 @@ func TestUploadSortKeysOrderMagicPrintings(t *testing.T) {
 	t.Parallel()
 	b := backend()
 
-	// One color in Magic's order, then two, then none
+	// One color in Magic's order, then two, then none: colorless cards,
+	// artifacts, lands
 	colors := []string{
 		matchKeys(t, b, "Swords to Plowshares", "Ice Age", false).Color,
 		matchKeys(t, b, "Counterspell", "Ice Age", false).Color,
 		matchKeys(t, b, "Lightning Bolt", "Magic 2010", false).Color,
 		matchKeys(t, b, "Lightning Helix", "Ravnica: City of Guilds", false).Color,
+		matchKeys(t, b, "Kozilek, Butcher of Truth", "Rise of the Eldrazi", false).Color,
 		matchKeys(t, b, "Sol Ring", "Commander 2021", false).Color,
+		matchKeys(t, b, "Seat of the Synod", "Mirrodin", false).Color,
 	}
 	for i := 1; i < len(colors); i++ {
 		if colors[i-1] >= colors[i] {
 			t.Errorf("colors out of order: %q", colors)
 		}
+	}
+	// An artifact land files with the other lands
+	tower := matchKeys(t, b, "Command Tower", "Commander 2021", false).Color
+	if tower != colors[len(colors)-1] {
+		t.Errorf("Command Tower filed as %q, Seat of the Synod as %q", tower, colors[len(colors)-1])
 	}
 
 	alpha := matchKeys(t, b, "Lightning Bolt", "Limited Edition Alpha", false)
