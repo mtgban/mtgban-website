@@ -130,7 +130,33 @@
     // newest first and a card's grades best first, which Clear, a send and
     // the Upload list follow; the panel shows it under the reader's sort.
     function ordered(p) {
-        return inPack(p || active()).sort(function (a, b) { return (b.t || 0) - (a.t || 0) || CONDS.indexOf(a.cond) - CONDS.indexOf(b.cond); });
+        var list = inPack(p || active()), at = cardAt(list);
+        return list.sort(function (a, b) { return (b.t || 0) - (a.t || 0) || at[a.id] - at[b.id] || CONDS.indexOf(a.cond) - CONDS.indexOf(b.cond); });
+    }
+    // cardIn is where list holds a live entry of e's card in e's backpack.
+    function cardIn(list, e) {
+        for (var i = 0; i < list.length; i++) {
+            if (!list[i].del && list[i].id === e.id && list[i].pack === e.pack) return i;
+        }
+        return -1;
+    }
+    // nth is where list holds backpack p's n-th live entry, past its last
+    // one when it holds fewer, and the front for an n not given.
+    function nth(list, p, n) {
+        var seen = 0, end = 0;
+        for (var i = 0; i < list.length && typeof n === "number"; i++) {
+            if (list[i].del || list[i].pack !== p) continue;
+            if (seen++ === n) return i;
+            end = i + 1;
+        }
+        return end;
+    }
+    // cardAt is where each card first shows in list: cards added at once
+    // share their time, and keep the order they were stored in.
+    function cardAt(list) {
+        var at = {};
+        list.forEach(function (e, i) { if (!(e.id in at)) at[e.id] = i; });
+        return at;
     }
     // A Clear tombstones every card, so keep as many tombstones as cards.
     function save(list) {
@@ -185,13 +211,22 @@
     function remember(list, keys, tabsBefore) {
         var step = keys.map(function (k) {
             var i = find(list, k);
-            if (i >= 0 && !list[i].del) return JSON.parse(JSON.stringify(list[i]));
+            if (i >= 0 && !list[i].del) return placed(list, i);
             return { k: k, gone: true };
         });
         if (tabsBefore) step.push({ tabs: tabsBefore });
         var steps = undoSteps();
         steps.push(step);
         saveUndoSteps(steps);
+    }
+
+    // placed is a copy of list[i] holding its place among its backpack's
+    // cards, which undo puts it back at.
+    function placed(list, i) {
+        var was = JSON.parse(JSON.stringify(list[i]));
+        was.pos = 0;
+        for (var j = 0; j < i; j++) if (!list[j].del && list[j].pack === was.pack) was.pos++;
+        return was;
     }
 
     // undo puts back the cards the last change touched, stamped now so the
@@ -216,7 +251,11 @@
             }
             if (idx >= 0) list.splice(idx, 1);
             was.m = t;
-            list.unshift(was);
+            var pos = was.pos;
+            delete was.pos;
+            // Back beside the card's other grades, or at its place
+            var at = cardIn(list, was);
+            list.splice(at >= 0 ? at : nth(list, was.pack, pos), 0, was);
         });
         save(list);
         if (pack) setActive(pack);
@@ -358,7 +397,7 @@
             moved.pack = p;
             moved.m = t;
             if (j >= 0) list.splice(j, 1);
-            list.unshift(moved);
+            list.splice(find(list, k), 0, moved);
         }
         e.del = t; e.m = t;
         save(list);
@@ -381,7 +420,7 @@
         dup.qty = 1;
         dup.m = now();
         if (j >= 0) list.splice(j, 1);
-        list.unshift(dup);
+        list.splice(find(list, k) + 1, 0, dup);
         save(list);
         return true;
     }
@@ -944,6 +983,7 @@
     function viewOrder(entries, s) {
         var dir = s.dir === "asc" ? 1 : -1;
         var p = isPriceSort(s.by) ? prices() : null;
+        var at = cardAt(entries);
         return entries.slice().sort(function (a, b) {
             switch (s.by) {
             case "name":
@@ -956,7 +996,7 @@
                 if (!pa !== !pb) return pa ? -1 : 1;
                 return (pa && pb && dir * (pa.v - pb.v)) || byCard(a, b);
             default:
-                return dir * ((a.t || 0) - (b.t || 0)) || byGrade(a, b);
+                return dir * ((a.t || 0) - (b.t || 0) || at[b.id] - at[a.id]) || byGrade(a, b);
             }
         });
     }
