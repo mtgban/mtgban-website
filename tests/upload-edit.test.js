@@ -106,7 +106,7 @@ function optRow(id, cond, qty, price = '1.00') {
     ]);
 }
 
-function load({ results, opt = [], sentPack = 0, packHas = [] }) {
+function load({ results, opt = [], optB = [], sentPack = 0, packHas = [] }) {
     listeners = {};
     const calls = { track: [], pack: [], reprocessed: 0, rendered: 0 };
     // The reload bar as upload.html draws it
@@ -117,6 +117,7 @@ function load({ results, opt = [], sentPack = 0, packHas = [] }) {
     const body = el('body', {}, [
         el('table', { class: 'ures-table' }, results),
         el('div', { class: 'opt-store' }, [actions, el('table', {}, opt)]),
+        el('div', { class: 'opt-store' }, [el('table', {}, optB)]),
         bar,
     ]);
     doc = {
@@ -200,6 +201,7 @@ test('copies picked on an optimizer row set the whole list line', () => {
     expect(btn(ring, 'qty').textContent).toBe('5');
     expect(btn(optRing2, 'qty').classList.contains('edited')).toBe(true);
     expect(btn(optRing2, 'qty').title).toBe('5 in your list; reload to update');
+    expect([optRing.hasAttribute('data-qty-edited'), optRing2.hasAttribute('data-qty-edited')]).toEqual([true, true]);
     expect(calls.track).toEqual(['ui.optimizer:edit_qty']);
     expect(shown()).toBe('1 updated');
 
@@ -232,7 +234,10 @@ test('copies picked on an optimizer row over several list lines leave each line 
     pick(btn(opt, 'qty'), '5');
     expect([ring.dataset.qtys, ring2.dataset.qtys]).toEqual(['4', '1']);
     expect(btn(opt, 'qty').title).toBe('5 in your list; reload to update');
-    expect(calls.pack).toEqual([['qty', 'b|SP', 2], ['qty', 'b|SP', 5]]);
+    // A list line edited on its own counts every line of the card and grade
+    pick(btn(ring2, 'qty'), '3');
+    expect([opt.hasAttribute('data-qty-edited'), btn(opt, 'qty').title]).toEqual([true, '7 in your list; reload to update']);
+    expect(calls.pack).toEqual([['qty', 'b|SP', 2], ['qty', 'b|SP', 5], ['qty', 'b|SP', 7]]);
 });
 
 test('a list sent from the backpack takes each edit back to the entry it came from', () => {
@@ -278,6 +283,19 @@ test('a line without a grade gives its optimizer row the grade picked, the key i
     expect([ring.dataset.cond, opt.dataset.optCond]).toEqual(['HP', 'HP']);
 });
 
+test('copies cut on a card two stores share mark both, a struck line left out', () => {
+    const bolt = resultRow('Bolt', 'a', 'NM', 5);
+    const struck = resultRow('Bolt', 'a', 'NM', 4);
+    struck.classList.add('ures-removed-row');
+    const optA = optRow('a', 'NM', 3);
+    const optB = optRow('a', 'NM', 2);
+    const { pick } = load({ results: [bolt, struck], opt: [optA], optB: [optB] });
+
+    pick(btn(bolt, 'qty'), '2');
+    expect([optA.hasAttribute('data-qty-edited'), optB.hasAttribute('data-qty-edited')]).toEqual([true, true]);
+    expect(btn(optB, 'qty').title).toBe('2 in your list; reload to update');
+});
+
 test('the store sends wait for a reload, and the bar nudges', () => {
     const bolt = resultRow('Bolt', 'a', 'NM', 3);
     const { calls, bar, actions, pick } = load({ results: [bolt] });
@@ -290,6 +308,10 @@ test('the store sends wait for a reload, and the bar nudges', () => {
     expect(blocked.stopped).toBe(true);
     expect(bar.classList.contains('nudge')).toBe(true);
     expect(calls.track).toEqual(['ui.upload.result:edit_qty']);
+
+    // The backpack pair reads the edits, so it is not held back
+    const pack = actions.appendChild(el('button', { class: 'opt-btn pack-add-btn' }, [el('svg')]));
+    expect(dispatch('click', pack.children[0]).defaultPrevented).toBe(false);
 });
 
 test('a price set on an optimizer row prices each list line of its card', () => {

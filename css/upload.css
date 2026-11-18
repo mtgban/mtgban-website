@@ -1295,9 +1295,9 @@
 .opt-loaded .loaded .opt-price-btn { padding: 0 2px; color: inherit; }
 .ures-reload-bar.nudge { animation: ures-reload-nudge 0.4s ease-in-out; }
 @keyframes ures-reload-nudge { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
-/* The store sends carry the page's quantities until it is reloaded */
-.ures-dirty .opt-header-actions { opacity: 0.45; }
-.ures-dirty .opt-header-actions * { cursor: not-allowed; }
+/* The store sends carry the page's quantities until it is reloaded; the backpack pair reads the edits */
+.ures-dirty .opt-header-actions > :not(.pack-add-btn, .pack-take-btn) { opacity: 0.45; }
+.ures-dirty .opt-header-actions > :not(.pack-add-btn, .pack-take-btn), .ures-dirty .opt-header-actions > :not(.pack-add-btn, .pack-take-btn) * { cursor: not-allowed; }
 
 .ures-table tfoot td {
     padding: 10px 10px;
