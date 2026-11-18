@@ -141,6 +141,7 @@ func trackPage() PageVars {
 		PatreonIDs:  map[string]string{"ban": "client"},
 		HasVelocity: true,
 		ShowUpsell:  true,
+		CanAlerts:   true,
 		Metadata: cardMetadata{id: {
 			UUID: id, ChartID: id, Name: "A Card", SetCode: "TST", Edition: "Test Set", Date: "2020-01-02",
 			Treatments: []string{"galaxyfoil"}, PromoTypes: []string{"showcase"},
@@ -154,7 +155,7 @@ func trackPage() PageVars {
 			CondKeys:     []mtgban.Condition{"INDEX", "NM", "SP"},
 			FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{},
 			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
-			CanFixSearch: true, HasAvailable: true, CanAlerts: true,
+			CanFixSearch: true, HasAvailable: true,
 		},
 	}
 }

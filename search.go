@@ -703,17 +703,11 @@ type SearchVars struct {
 	TotalCards  int
 	TotalUnique int
 
-	// CanAlerts says the reader's ACL grants the Alerts page and an
-	// allowance, so result rows may offer the alert link.
-	CanAlerts bool
 	// CanVelocity shows the sales velocity row to the newspaper tiers.
 	CanVelocity bool
 	// VelocityNotice says a velocity filter needs a higher tier, for the phone's
 	// empty page, which quotes the query instead of listing the notices.
 	VelocityNotice string
-	// AlertChannelList is the delivery channels the alert modal offers,
-	// read off #alert-modal's data-alert-channels by js/alerts.js.
-	AlertChannelList string
 
 	// Printings is each result's printings row for the sidebar, from
 	// cardPrintings.
