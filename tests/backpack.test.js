@@ -1129,6 +1129,38 @@ describe('the condition dropdown', () => {
         expect(p.minus[0].hidden).toBe(true);
     });
 
+    test('cards added together keep their places through a grade change, an add, a removal, a Clear and their undo', () => {
+        const store = ['A', 'B', 'C', 'D'].map((name, i) => ({ id: 'uuid-' + i, name, qty: 1, t: 7, m: 7 }));
+        const p = page({ store });
+        const panel = open(p);
+        const list = ids['backpack-list'];
+        const names = () => panel.querySelectorAll('.backpack-row-name').map((n) => n.textContent);
+        list.scrollTop = 300;
+        selects(panel)[1].focus();
+        pick(selects(panel)[1], 'SP');
+        expect(names()).toEqual(['A', 'B', 'C', 'D']);
+        expect(selects(panel)[1].value).toBe('SP');
+        expect(list.scrollTop).toBe(300);
+        pick(selects(panel)[2], '+HP');
+        expect(names()).toEqual(['A', 'B', 'C', 'C', 'D']);
+        expect(selects(panel).map((s) => s.value)).toEqual(['NM', 'SP', 'NM', 'HP', 'NM']);
+        pick(selects(panel)[0], 'PO');
+        expect(names()).toEqual(['A', 'B', 'C', 'C', 'D']);
+        for (let i = 0; i < 3; i++) ids['backpack-undo'].click();
+        expect(names()).toEqual(['A', 'B', 'C', 'D']);
+        panel.querySelectorAll('.backpack-minus')[2].click();
+        panel.querySelectorAll('.backpack-minus')[2].click();
+        expect(names()).toEqual(['A', 'B']);
+        ids['backpack-undo'].click();
+        expect(names()).toEqual(['A', 'B', 'D']);
+        ids['backpack-undo'].click();
+        expect(names()).toEqual(['A', 'B', 'C', 'D']);
+        p.window.Backpack.clear();
+        ids['backpack-undo'].click();
+        expect(names()).toEqual(['A', 'B', 'C', 'D']);
+        expect(selects(panel).map((s) => s.value)).toEqual(['NM', 'NM', 'NM', 'NM']);
+    });
+
     test('picking an add puts one copy in that grade beside the entry', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 3, t: 5, m: 5 }, { id: 'uuid-2', name: 'B', qty: 1, t: 9, m: 9 }] });
         const panel = open(p);
