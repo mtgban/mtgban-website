@@ -126,7 +126,7 @@
                 // Keyboard paging still needs currentIdx tracked, but the
                 // row under the pointer wins the sidebar when there is one.
                 if (!pointerHandled && typeof window.showHoverFor === 'function') {
-                    window.showHoverFor(headers[stuckIdx], false);
+                    window.showHoverFor(headers[stuckIdx], true);
                 }
             }
         });

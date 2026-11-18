@@ -278,8 +278,9 @@ function collapsePrintings() {
 // first card, snapping the panel to the wrong result. Chrome
 // fires it with no preceding mousemove; Firefox re-emits a
 // same-position mousemove first. Guard against both: require a
-// recent *real* (position-changing) move or scroll, and ignore
-// any hover glued to a keystroke (the phantom's actual cause).
+// recent *real* (position-changing) move, and ignore any hover
+// glued to a keystroke (the phantom's actual cause). A scroll is
+// not a move: the scroll handler hit-tests the pointer itself.
 var __lastMove = 0, __mx = null, __my = null, __lastKey = 0;
 // Set while the scroll handler calls a row's handler after
 // hit-testing the pointer itself: that update is trusted by
@@ -290,9 +291,6 @@ document.addEventListener('mousemove', function(e) {
         __mx = e.clientX; __my = e.clientY; __lastMove = performance.now();
     }
 }, true);
-['wheel', 'scroll'].forEach(function(ev) {
-    document.addEventListener(ev, function() { __lastMove = performance.now(); }, true);
-});
 ['keydown', 'keyup'].forEach(function(ev) {
     document.addEventListener(ev, function() { __lastKey = performance.now(); }, true);
 });

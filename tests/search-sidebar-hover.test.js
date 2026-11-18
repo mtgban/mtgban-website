@@ -300,6 +300,28 @@ test('showHoverFor(el, false) is rejected by the phantom-hover guard under the s
     expect(cardArtCalls.length).toBe(before);
 });
 
+// Scrolling under a still pointer keeps no hover window open: the
+// mouseover a modifier press fires after a scroll is a phantom too.
+test('a scroll does not let an untrusted hover past the phantom guard', () => {
+    const dom = fakeDom();
+    let t = 1000;
+    const { cardArtCalls, docListeners } = load(dom, { stubHoverSidebar: false, now: () => t });
+    const fire = (ev, e) => (docListeners[ev] || []).forEach(fn => fn(e || {}));
+    const before = cardArtCalls.length; // after the DOM-ready seed (h1)
+
+    fire('mousemove', { clientX: 10, clientY: 10 });
+    t = 1050;
+    dom.listeners.mouseover({ target: dom.h2 });
+    expect(cardArtCalls.length).toBe(before + 1);
+
+    t = 2000;
+    fire('wheel');
+    fire('scroll');
+    t = 2020;
+    dom.listeners.mouseover({ target: dom.h1 });
+    expect(cardArtCalls.length).toBe(before + 1);
+});
+
 // The backpack keys act on the header whose card the sidebar shows, through
 // that header's own add and minus buttons.
 function packDom() {
