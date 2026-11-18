@@ -83,7 +83,7 @@ func TestAlertModalCarriesTheChannelsOffTheAlertsPage(t *testing.T) {
 		vars PageVars
 		want bool
 	}{
-		"search": {PageVars{SearchVars: SearchVars{AlertChannelList: "discord,email"}}, true},
+		"search": {PageVars{AlertChannelList: "discord,email"}, true},
 		"alerts": {PageVars{AlertsPage: &AlertsPageVars{AllowedChannels: "discord,email"}}, false},
 	} {
 		var out strings.Builder
