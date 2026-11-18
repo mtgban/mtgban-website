@@ -155,3 +155,26 @@ func TestQuantityNote(t *testing.T) {
 		}
 	}
 }
+
+func TestAlertTarget(t *testing.T) {
+	above := Threshold{Kind: KindPct, Value: 20}
+	below := Threshold{Kind: KindAbs, Value: 7}
+	for _, c := range []struct {
+		side         Side
+		above, below Threshold
+		want         float64
+	}{
+		{SideBuylist, above, below, 12},
+		{SideRetail, above, below, 7},
+		{SideBuylist, Threshold{}, below, 7},
+		{SideRetail, above, Threshold{}, 12},
+		{SideRetail, Threshold{}, Threshold{Kind: KindPct, Value: 15}, 8.5},
+		{SideRetail, Threshold{}, Threshold{}, 0},
+	} {
+		a := Alert{Side: c.side, ReferencePrice: 10, Above: c.above, Below: c.below}
+		got := a.Target()
+		if got != c.want {
+			t.Errorf("%s above %v below %v: target %v, want %v", c.side, c.above, c.below, got, c.want)
+		}
+	}
+}

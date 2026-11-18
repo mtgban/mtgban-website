@@ -34,6 +34,19 @@
             </select>
         </label>
         {{end}}
+        {{if and $.CanUpload .Optimize}}
+        {{/* Each alert's target goes in as the row's loaded price. */}}
+        <form class="alerts-optimize" action="/upload?from=alerts" method="post">
+            <input type="hidden" name="mode" value="{{.OptimizeBuylist}}"/>
+            {{range .Optimize}}
+            <input type="hidden" name="hashes" value="{{.CardID}}"/>
+            <input type="hidden" name="hashesQtys" value="{{.Quantity}}"/>
+            <input type="hidden" name="hashesCond" value="{{.Condition}}"/>
+            <input type="hidden" name="hashesPrice" value="{{.Price}}"/>
+            {{end}}
+            <button type="submit" class="settings-btn alerts-optimize-btn" data-track="ui.alerts.optimize" title="Price your alerts in Upload, each at its target">Optimize</button>
+        </form>
+        {{end}}
         {{if .Alerts}}<button type="button" class="settings-btn alert-btn-danger alerts-delete-all" data-action="delete-all">Delete all</button>{{end}}
     </div>
     {{if not .Alerts}}

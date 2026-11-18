@@ -52,14 +52,27 @@
     padding: 0.3em 0.5em;
     font-size: var(--text-sm);
 }
-/* The sort takes the free space when it is there, the button otherwise. */
-.alerts-sort:not([hidden]) + .alerts-delete-all { margin-left: 0; }
+/* The sort takes the free space when it is there, the buttons otherwise. */
+.alerts-sort:not([hidden]) + .alerts-optimize,
+.alerts-sort:not([hidden]) + .alerts-delete-all,
+.alerts-optimize + .alerts-delete-all { margin-left: 0; }
 .alerts-delete-all {
     margin-left: auto;
     align-self: center;
     padding: 0.3em 0.7em;
     font-size: var(--text-sm);
 }
+.alerts-optimize { margin-left: auto; align-self: center; }
+.alerts-optimize-btn {
+    padding: 0.3em 0.7em;
+    font-size: var(--text-sm);
+    background: var(--dodgerblue-fill);
+    border-color: var(--dodgerblue-fill);
+    color: #fff;
+}
+/* A phone has no room for the sort beside both buttons: it takes a line. */
+body.mobile .alerts-sort:not([hidden]) { flex: 1 0 100%; }
+body.mobile .alerts-sort .alert-input { flex: 1; }
 .alerts-notice,
 .alerts-empty {
     padding: 0.75em 1em;

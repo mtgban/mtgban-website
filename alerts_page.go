@@ -32,6 +32,62 @@ type AlertsPageVars struct {
 	UnsubscribeURL string
 	// Cards is each alert's card by its id, for the rows' hover image.
 	Cards cardMetadata
+	// Optimize is what the Optimize button posts, a row a card and grade.
+	Optimize []alertOptimizeRow
+	// OptimizeBuylist is the side Upload opens on, most alerts' side.
+	OptimizeBuylist bool
+}
+
+// alertOptimizeRow is one alert as a row of Upload: its card, the
+// copies it notes or 1, its grade, and the price it waits for as the
+// row's loaded price.
+type alertOptimizeRow struct {
+	CardID    string
+	Quantity  int
+	Condition string
+	Price     string
+}
+
+// alertOptimizeRows are the alerts whose card the datastore still has, as
+// the Optimize button's rows, and whether Upload opens on buylist: the side
+// of most of them, buylist on a tie. Upload merges rows of one card and
+// grade, so each gets one row, from an alert on the opening side if any.
+func alertOptimizeRows(views []alerts.View, cards cardMetadata) ([]alertOptimizeRow, bool) {
+	var live []alerts.View
+	buylist := 0
+	for _, view := range views {
+		if cards[view.CardID].UUID == "" {
+			continue
+		}
+		live = append(live, view)
+		if view.Side == alerts.SideBuylist {
+			buylist++
+		}
+	}
+	side := alerts.SideRetail
+	if buylist*2 >= len(live) {
+		side = alerts.SideBuylist
+	}
+
+	var rows []alertOptimizeRow
+	at := map[[2]string]int{}
+	for _, view := range live {
+		row := alertOptimizeRow{
+			CardID:    view.CardID,
+			Quantity:  max(view.Quantity, 1),
+			Condition: view.Condition,
+			Price:     strconv.FormatFloat(view.Target(), 'f', 2, 64),
+		}
+		key := [2]string{view.CardID, view.Condition}
+		i, seen := at[key]
+		if !seen {
+			at[key] = len(rows)
+			rows = append(rows, row)
+		} else if view.Side == side {
+			rows[i] = row
+		}
+	}
+	return rows, side == alerts.SideBuylist
 }
 
 // alertChannelList is alertChannels comma-joined, as the pages hand it to
@@ -131,4 +187,5 @@ func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
 	for _, view := range views {
 		vars.Cards[view.CardID] = uuid2card(b, p, view.CardID, false, nil)
 	}
+	vars.Optimize, vars.OptimizeBuylist = alertOptimizeRows(views, vars.Cards)
 }

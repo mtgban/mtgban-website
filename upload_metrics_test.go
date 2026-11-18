@@ -20,7 +20,7 @@ import (
 
 // listPostFiles are the templates and scripts that post a list to /upload.
 var listPostFiles = []string{
-	"templates/search.html", "templates/news.html", "templates/screener.html", "templates/upload.html",
+	"templates/search.html", "templates/news.html", "templates/screener.html", "templates/upload.html", "templates/partials/alerts-body.html",
 	"js/favorites.js", "js/backpack.js", "js/command-palette.js",
 }
 
@@ -28,9 +28,10 @@ var listPostFiles = []string{
 // action's query, never in a form field.
 func TestEveryListPostNamesItsOrigin(t *testing.T) {
 	for file, want := range map[string][]string{
-		"templates/search.html":   {`<form action="/upload?from=search_sidebar" method="post"`},
-		"templates/news.html":     {`<form action="/upload?from=news" method="post">`},
-		"templates/screener.html": {`<form action="/upload?from=screener" method="post">`},
+		"templates/search.html":               {`<form action="/upload?from=search_sidebar" method="post"`},
+		"templates/news.html":                 {`<form action="/upload?from=news" method="post">`},
+		"templates/screener.html":             {`<form action="/upload?from=screener" method="post">`},
+		"templates/partials/alerts-body.html": {`<form class="alerts-optimize" action="/upload?from=alerts" method="post">`},
 		"templates/upload.html": {
 			`action="/upload{{if .CardHashes}}?from=upload_form{{end}}" method="post" id="upload_form"`,
 			`<form id="upload_form" action="/upload?from=results_reload" method="post" style="display:none">`,
@@ -86,8 +87,8 @@ func TestListPostOriginsAreRegistered(t *testing.T) {
 			t.Errorf("upload.from lists %s, which no control sends", v)
 		}
 	}
-	if len(sent) != 8 {
-		t.Errorf("found %d origins, want the 8 controls: %v", len(sent), sent)
+	if len(sent) != 9 {
+		t.Errorf("found %d origins, want the 9 controls: %v", len(sent), sent)
 	}
 }
 

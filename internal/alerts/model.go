@@ -88,6 +88,19 @@ func (t Threshold) Resolve(reference float64, above bool) float64 {
 	return 0
 }
 
+// Target is the price the alert waits for: its above line on the buylist
+// side and its below line on retail, else the one line it sets.
+func (a Alert) Target() float64 {
+	want, other, above := a.Below, a.Above, false
+	if a.Side == SideBuylist {
+		want, other, above = a.Above, a.Below, true
+	}
+	if !want.Set() {
+		want, above = other, !above
+	}
+	return want.Resolve(a.ReferencePrice, above)
+}
+
 // Contact is what the evaluator knows about a user beyond their alerts.
 type Contact struct {
 	UserHash string
