@@ -522,9 +522,10 @@ func TestPageClickNames(t *testing.T) {
 			}
 		}
 	}
-	// The alert modal renders on the alerts page and wherever search.html does.
-	if n, _ := Lookup("ui.alerts.modal"); n.Page != "alerts,search,sealed,sets" {
-		t.Errorf("ui.alerts.modal is rated on %q, want the alerts and search.html labels", n.Page)
+	// The alert modal renders on the alerts page, wherever search.html does
+	// and on Upload's Not bought rows.
+	if n, _ := Lookup("ui.alerts.modal"); n.Page != "alerts,search,sealed,sets,upload" {
+		t.Errorf("ui.alerts.modal is rated on %q, want the alerts, search.html and upload labels", n.Page)
 	}
 	send, _ := Lookup("ui.optimizer.send")
 	if scope, _, ok := send.Check("Bob's Cards", "csv", v); !ok || scope != "other" {

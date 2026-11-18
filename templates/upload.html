@@ -1,5 +1,7 @@
 {{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/upload.css?hash={{.Hash}}">
+    {{if .CanAlerts}}<link rel="stylesheet" type="text/css" href="/css/settings-modal.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/alerts.css?hash={{.Hash}}">{{end}}
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
 {{end}}
 
@@ -21,6 +23,7 @@
     {{- else if eq . "package-open"}}<path d="M12 22v-9"/><path d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z"/><path d="M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13"/><path d="M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z"/>
     {{- else if eq . "arrow-down-wide-narrow"}}<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/>
     {{- else if eq . "backpack"}}<path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 10h8"/><path d="M8 18h8"/><path d="M8 22v-6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+    {{- else if eq . "bell"}}<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>
     {{- else if eq . "external-link"}}<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3"/>
     {{- end}}</svg>{{end}}
 
@@ -30,10 +33,11 @@
 
 {{/* The optimizer's leftover rows after the stores' sections, in the
      stores' table: each card, what it is compared against and, when a store
-     buys it, its best offer and the stores it can be moved to. Without
-     data-load-idx, no total, cart or send counts these rows. */}}
+     buys it, its best offer and the stores it can be moved to, and with
+     Alert, the price alert bell, which notes the row's copies on the alert. Without data-load-idx, no total, cart or
+     send counts these rows. */}}
 {{define "upload-leftovers"}}
-{{$root := .Root}}{{$id := .ID}}
+{{$root := .Root}}{{$id := .ID}}{{$alert := .Alert}}
 <div class="opt-store opt-leftovers" id="{{$id}}" data-fold>
     <table class="opt-table" onmouseout="window.optTableOut && optTableOut(this, event)">
     <colgroup><col><col><col><col><col><col><col></colgroup>
@@ -70,7 +74,7 @@
                 <td class="opt-offer" data-sort="{{if .Store}}{{printf "%.2f" .Price}}{{end}}">{{if .Store}}<span class="offer">$ <a href="/go/b/{{.Store}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a></span>{{end}}</td>
                 <td class="opt-loaded" data-sort="{{if .Loaded}}{{printf "%.2f" .Loaded}}{{end}}"><span class="loaded-wrap"><span class="loaded">{{if .Loaded}}$ {{if $root.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Loaded}}</a>{{else}}{{printf "%.2f" .Loaded}}{{end}}{{end}}</span><span class="loaded-qty">&times;{{.Quantity}}</span><span class="opt-icons">{{if and .Loaded (not $root.IgnorePrices)}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{template "offer-link" dict "Notes" .Notes "Opt" true}}</span></span></td>
                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}" data-sort="{{if .Spread}}{{printf "%.2f" .Spread}}{{end}}">{{if .Spread}}{{printf "%.2f" .Spread}}%{{end}}</td>
-                <td class="c">{{if or .MoveTo .Moved}}<button type="button" class="opt-move-btn" popovertarget="{{$id}}-move-{{$n}}" title="{{if .Moved}}Moved here by you{{else}}Move to a store{{end}}" aria-label="Move to a store" data-track="ui.optimizer" data-track-value="move_menu"><svg aria-hidden="true"><use href="#opt-move-icon"/></svg></button><div class="opt-move-menu" id="{{$id}}-move-{{$n}}" popover></div>{{end}}</td>
+                <td class="c">{{if $alert}}<button type="button" class="opt-move-btn opt-alert-btn alert-link" data-card-id="{{.CardID}}" data-cond="{{.Condition}}" data-qty="{{.Quantity}}" onclick="window.openAlertModal && openAlertModal({cardId: this.getAttribute('data-card-id'), side: 'buylist', condition: this.getAttribute('data-cond'), quantity: this.getAttribute('data-qty'), from: 'upload'})" title="Set a price alert" aria-label="Set a price alert" data-track="ui.optimizer" data-track-value="alert">{{template "upload-icon" "bell"}}</button>{{end}}{{if or .MoveTo .Moved}}<button type="button" class="opt-move-btn" popovertarget="{{$id}}-move-{{$n}}" title="{{if .Moved}}Moved here by you{{else}}Move to a store{{end}}" aria-label="Move to a store" data-track="ui.optimizer" data-track-value="move_menu"><svg aria-hidden="true"><use href="#opt-move-icon"/></svg></button><div class="opt-move-menu" id="{{$id}}-move-{{$n}}" popover></div>{{end}}</td>
             </tr>
         {{end}}
         </tbody>
@@ -1207,7 +1211,7 @@
             {{end}}
         {{end}}
         {{with .FilteredOut}}{{template "upload-leftovers" dict "ID" "opt-filtered-out" "Title" "Filtered out" "Tip" "A store buys these, but the value or spread filters drop every offer" "Rows" . "Root" $}}{{end}}
-        {{with .NotBought}}{{template "upload-leftovers" dict "ID" "opt-not-bought" "Title" "Not bought" "Tip" "No store priced here buys these right now, or you moved them here" "Rows" . "Root" $}}{{end}}
+        {{with .NotBought}}{{template "upload-leftovers" dict "ID" "opt-not-bought" "Title" "Not bought" "Tip" "No store priced here buys these right now, or you moved them here" "Rows" . "Root" $ "Alert" $.CanAlerts}}{{end}}
     </div>
     {{end}}
 
@@ -1219,6 +1223,8 @@
     <script type="text/javascript" src="/js/upload-optimizer.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/section-fold.js?hash={{.Hash}}" defer></script>
     {{end}}
+    {{if .CanAlerts}}{{template "alert-modal" .}}
+    <script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}" defer></script>{{end}}
 
     <!-- Printing picker overlay -->
     <div id="printing-overlay" class="printing-overlay" onclick="if(event.target===this)window.closePrintingPicker && closePrintingPicker()">
