@@ -415,6 +415,12 @@
         return false;
     }
 
+    // The copies are noted as held to sell on a buylist, wanted on retail.
+    function renderQuantity() {
+        document.getElementById('alert-quantity-label').textContent = state.side === 'buylist' ? 'You have' : 'You want';
+        form.elements.quantity.value = state.quantity ? state.quantity : '';
+    }
+
     function renderDelivery() {
         var field = document.getElementById('alert-delivery-field');
         var result = deliveryOptions(deliveryAllowed(), state.delivery, !!state.alertId);
@@ -459,6 +465,7 @@
         sideGroup.classList.toggle('alert-locked', !!state.alertId);
         renderConditions();
         renderStores();
+        renderQuantity();
         var ref = form.elements.reference_price;
         ref.value = state.reference !== null && state.reference !== undefined ? Number(state.reference).toFixed(2) : '';
         renderThreshold('above', state.aboveKind, state.aboveValue);
@@ -508,6 +515,7 @@
             s.side = a.side;
             s.condition = a.condition;
             s.stores = a.stores || [];
+            s.quantity = a.quantity || null;
             // An alert set on stores offering nothing has no reference.
             s.reference = a.reference_price || null;
             s.referenceStore = a.reference_price ? 'custom' : '';
@@ -546,6 +554,7 @@
             optionsSide: '',
             condition: 'NM',
             stores: [],
+            quantity: null,
             reference: null,
             referenceStore: '',
             existing: null,
@@ -591,6 +600,8 @@
 
     function readForm() {
         state.stores = checkedStores();
+        var qty = form.elements.quantity.value.trim();
+        state.quantity = qty === '' ? null : Number(qty);
         var ref = form.elements.reference_price.value.trim();
         state.reference = ref === '' ? null : parseFloat(ref);
         state.aboveValue = state.aboveKind ? parseFloat(form.elements.above_value.value) : null;
@@ -616,6 +627,10 @@
             setError('Each threshold you turn on needs a number above zero.');
             return;
         }
+        if (state.quantity !== null && !(Number.isInteger(state.quantity) && state.quantity >= 0 && state.quantity <= 9999)) {
+            setError('Copies must be a whole number from 0 to 9999.');
+            return;
+        }
         if (referenceUsed(state.aboveKind, state.belowKind) && !(state.reference > 0)) {
             setError('A percentage needs a reference price: no store you picked has an offer, so type one.');
             return;
@@ -625,6 +640,7 @@
             side: state.side,
             condition: state.condition,
             stores: state.stores,
+            quantity: state.quantity || 0,
             above: threshold(state.aboveKind, state.aboveValue),
             below: threshold(state.belowKind, state.belowValue),
             delivery: state.delivery
@@ -660,6 +676,7 @@
                 readForm();
                 state.side = value;
                 setPills('side', value);
+                renderQuantity();
                 // Save waits for this side's options; see renderNotice.
                 saveBtn.disabled = true;
                 var s = state;

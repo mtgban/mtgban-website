@@ -42,6 +42,24 @@ func TestAlertEmbedNamesEveryStoreWithALink(t *testing.T) {
 	}
 }
 
+func TestAlertEmbedNotesTheQuantity(t *testing.T) {
+	a := Alert{
+		CardID: "card-1", Side: SideBuylist, Condition: "NM", Quantity: 4,
+		Above: Threshold{Kind: KindAbs, Value: 12},
+		Card:  Card{Name: "Lightning Bolt", Set: "LEA", Number: "161", Finish: "nonfoil"},
+	}
+	d := Decision{FireAbove: true, AboveHits: []Quote{{Store: "CK", Price: 12.5}}}
+	e := renderDiscord(Firing{Alert: a, Decision: d}, shorthandLabel)
+	if !strings.HasPrefix(e.Description, "Lightning Bolt LEA #161, nonfoil, NM buylist · you have 4\n") {
+		t.Fatalf("description lacks the quantity on the card line:\n%s", e.Description)
+	}
+	a.Quantity = 0
+	e = renderDiscord(Firing{Alert: a, Decision: d}, shorthandLabel)
+	if strings.Contains(e.Description, "you have") {
+		t.Fatalf("description notes an unset quantity:\n%s", e.Description)
+	}
+}
+
 func TestAlertEmbedWithoutReference(t *testing.T) {
 	a := Alert{
 		CardID: "card-1", Side: SideBuylist, Condition: "NM",

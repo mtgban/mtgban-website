@@ -267,6 +267,39 @@ func TestCreateAndUpdateWriteArmedStateAndOrigin(t *testing.T) {
 	}
 }
 
+func TestQuantityRoundTrips(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+
+	a := sample(h)
+	a.Quantity = 4
+	created, err := s.Create(ctx, a)
+	if err != nil || created.Quantity != 4 {
+		t.Fatalf("Create quantity=%d err=%v", created.Quantity, err)
+	}
+	active, err := s.ListActive(ctx, "magic", []Side{SideBuylist})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, x := range active {
+		if x.ID == created.ID && x.Quantity != 4 {
+			t.Fatalf("ListActive quantity=%d", x.Quantity)
+		}
+	}
+	edit := created
+	edit.Quantity = 0
+	ok, err := s.Update(ctx, edit)
+	if err != nil || !ok {
+		t.Fatalf("Update: ok=%v err=%v", ok, err)
+	}
+	got, _, _ := s.Get(ctx, created.ID, h)
+	if got.Quantity != 0 {
+		t.Fatalf("Update quantity=%d", got.Quantity)
+	}
+}
+
 func TestCreateListGetDelete(t *testing.T) {
 	s := testStore(t)
 	h := freshUser(t, s)

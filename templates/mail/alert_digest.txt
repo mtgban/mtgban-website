@@ -1,6 +1,6 @@
 {{.Headline}}
 
-{{range .Rows}}{{.Card}} ({{.Set}} #{{.Number}}, {{.Finish}}, {{.Condition}}, {{.Side}})
+{{range .Rows}}{{.Card}} ({{.Set}} #{{.Number}}, {{.Finish}}, {{.Condition}}, {{.Side}}){{with .Quantity}} · {{.}}{{end}}
   {{.CardURL}}
   {{.Store}}: {{.Change}}, threshold {{.Threshold}}
   {{.Link}}

@@ -113,6 +113,7 @@
                 <td class="alert-card">
                     <a href="/search?q={{.CardID}}">{{.Card.Name}}</a>
                     <span class="alert-meta">{{.Card.Set}} #{{.Card.Number}} {{.Card.Finish}}</span>
+                    {{with .QuantityNote}}<span class="alert-meta">{{.}}</span>{{end}}
                     {{if .LastError}}<span class="alert-note alert-note-error">{{.LastError}}</span>
                     {{else if eq .Status "over_allowance"}}<span class="alert-note">Parked over your allowance. It comes back at the next price update once there is room.</span>
                     {{else if .LastEvent}}<span class="alert-note">Fired {{.LastEvent.FiredAt.Format "Jan 2, 15:04"}} at {{.LastEvent.Store}}{{if not .LastEvent.Delivered}}, not delivered{{end}}</span>{{end}}

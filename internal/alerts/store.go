@@ -868,7 +868,7 @@ func (s *Store) ChannelsDisabledSince(ctx context.Context, since, until time.Tim
 const alertColumns = `id, user_hash, game, card_id, side, condition, stores, reference_price,
 	above_kind, above_value, below_kind, below_value, delivery, status, above_armed, below_armed,
 	last_fired_at, last_error, card_name, card_set, card_number, card_finish, created_price,
-	created_at, updated_at, origin`
+	created_at, updated_at, origin, quantity`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -880,7 +880,7 @@ func scanAlert(row rowScanner) (Alert, error) {
 	err := row.Scan(&a.ID, &a.UserHash, &a.Game, &a.CardID, &a.Side, &a.Condition, pq.Array(&a.Stores), &a.ReferencePrice,
 		&aboveKind, &aboveValue, &belowKind, &belowValue, &a.Delivery, &a.Status, &a.AboveArmed, &a.BelowArmed,
 		&lastFired, &a.LastError, &a.Card.Name, &a.Card.Set, &a.Card.Number, &a.Card.Finish, &createdPrice,
-		&a.CreatedAt, &a.UpdatedAt, &a.Origin)
+		&a.CreatedAt, &a.UpdatedAt, &a.Origin, &a.Quantity)
 	if err != nil {
 		return Alert{}, err
 	}
@@ -971,12 +971,12 @@ func createAlert(ctx context.Context, db querier, a Alert) (Alert, error) {
 	row := db.QueryRowContext(ctx, `
 		INSERT INTO alerts (user_hash, game, card_id, side, condition, stores, reference_price,
 			above_kind, above_value, below_kind, below_value, delivery,
-			card_name, card_set, card_number, card_finish, created_price, above_armed, below_armed, origin)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+			card_name, card_set, card_number, card_finish, created_price, above_armed, below_armed, origin, quantity)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 		RETURNING `+alertColumns,
 		a.UserHash, a.Game, a.CardID, a.Side, a.Condition, pq.Array(a.Stores), a.ReferencePrice,
 		ak, av, bk, bv, a.Delivery, a.Card.Name, a.Card.Set, a.Card.Number, a.Card.Finish, createdPrice,
-		a.AboveArmed, a.BelowArmed, a.Origin)
+		a.AboveArmed, a.BelowArmed, a.Origin, a.Quantity)
 	return scanAlert(row)
 }
 
@@ -1091,14 +1091,14 @@ func (s *Store) Update(ctx context.Context, a Alert) (bool, error) {
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE alerts SET condition = $3, stores = $4, reference_price = $5,
 			above_kind = $6, above_value = $7, below_kind = $8, below_value = $9, delivery = $10,
-			above_armed = $11, below_armed = $12, origin = $13,
+			above_armed = $11, below_armed = $12, origin = $13, quantity = $14,
 			status = CASE WHEN status = 'undeliverable' AND delivery <> $10 THEN 'active' ELSE status END,
 			last_error = CASE WHEN status = 'active' OR (status = 'undeliverable' AND delivery <> $10) THEN ''
 				ELSE last_error END,
 			updated_at = now()
 		WHERE id = $1 AND user_hash = $2`,
 		a.ID, a.UserHash, a.Condition, pq.Array(a.Stores), a.ReferencePrice, ak, av, bk, bv, a.Delivery,
-		a.AboveArmed, a.BelowArmed, a.Origin)
+		a.AboveArmed, a.BelowArmed, a.Origin, a.Quantity)
 	if err != nil {
 		return false, err
 	}
@@ -1286,7 +1286,7 @@ func (s *Store) ListActive(ctx context.Context, game string, sides []Side) ([]Ac
 		SELECT a.id, a.user_hash, a.game, a.card_id, a.side, a.condition, a.stores, a.reference_price,
 		       a.above_kind, a.above_value, a.below_kind, a.below_value, a.delivery, a.status, a.above_armed, a.below_armed,
 		       a.last_fired_at, a.last_error, a.card_name, a.card_set, a.card_number, a.card_finish, a.created_price,
-		       a.created_at, a.updated_at, a.origin,
+		       a.created_at, a.updated_at, a.origin, a.quantity,
 		       COALESCE(c.discord_user_id, ''), c.tier, c.updated_at
 		  FROM alerts a JOIN alert_contacts c USING (user_hash)
 		 WHERE a.game = $1 AND a.status = 'active' AND a.side = ANY($2)
@@ -1304,7 +1304,7 @@ func (s *Store) ListActive(ctx context.Context, game string, sides []Side) ([]Ac
 		err := rows.Scan(&x.ID, &x.UserHash, &x.Game, &x.CardID, &x.Side, &x.Condition, pq.Array(&x.Stores), &x.ReferencePrice,
 			&aboveKind, &aboveValue, &belowKind, &belowValue, &x.Delivery, &x.Status, &x.AboveArmed, &x.BelowArmed,
 			&lastFired, &x.LastError, &x.Card.Name, &x.Card.Set, &x.Card.Number, &x.Card.Finish, &createdPrice,
-			&x.CreatedAt, &x.UpdatedAt, &x.Origin,
+			&x.CreatedAt, &x.UpdatedAt, &x.Origin, &x.Quantity,
 			&x.Contact.DiscordUserID, &x.Contact.Tier, &x.Contact.UpdatedAt)
 		if err != nil {
 			return nil, err

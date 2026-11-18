@@ -43,11 +43,13 @@ CREATE TABLE IF NOT EXISTS alerts (
     card_finish      TEXT NOT NULL,
     created_price    NUMERIC(10,2),
     origin           TEXT NOT NULL DEFAULT '',
+    quantity         INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK (above_kind IS NOT NULL OR below_kind IS NOT NULL)
 );
 ALTER TABLE alerts ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT '';
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0);
 CREATE INDEX IF NOT EXISTS alerts_game_active ON alerts (game) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS alerts_by_user ON alerts (user_hash, game, created_at DESC);
 

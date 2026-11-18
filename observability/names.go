@@ -203,6 +203,7 @@ var names = []Name{
 	{Name: "alerts.create_condition", Area: "alerts", Denom: "alerts.create", Values: ValueEnum, Enum: []string{"NM", "SP", "MP", "HP", "PO"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "The grade a new alert watches."},
 	{Name: "alerts.create_threshold", Area: "alerts", Denom: "alerts.create", Values: ValueEnum, Enum: []string{"above_abs", "above_pct", "below_abs", "below_pct"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A threshold a new alert set."},
 	{Name: "alerts.create_stores", Area: "alerts", Denom: "alerts.create", Values: ValueBucket, Enum: []string{"0", "1-2", "3-9", "10+"}, Report: ReportContext, Help: "Stores a new alert is scoped to, 0 being every store."},
+	{Name: "alerts.create_quantity", Area: "alerts", Denom: "alerts.create", Values: ValueEnum, Enum: []string{"retail", "buylist"}, Report: ReportCandidate, Unit: UnitValue, Kind: "option", Help: "A new alert noted the copies the user has or wants, by side."},
 	{Name: "alerts.edit", Area: "alerts", Page: "alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert was edited."},
 	{Name: "alerts.pause", Area: "alerts", Page: "alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert was paused."},
 	{Name: "alerts.resume", Area: "alerts", Page: "alerts", Report: ReportCandidate, Unit: UnitValue, Kind: "control", Help: "An alert was resumed."},

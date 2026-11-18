@@ -56,7 +56,7 @@ func compareGolden(t *testing.T, path, got string) {
 func feldonAlert(id int64) Alert {
 	return Alert{
 		ID: id, UserHash: "u1", Game: "magic", CardID: "8fbb2d90-4917-56c1-aeb1-69b104d52ee9",
-		Side: SideBuylist, Condition: "NM",
+		Side: SideBuylist, Condition: "NM", Quantity: 4,
 		Card:           Card{Name: "Feldon of the Third Path", Set: "C19", Number: "141", Finish: "nonfoil"},
 		ReferencePrice: 0.80,
 		Above:          Threshold{Kind: KindAbs, Value: 1.05},

@@ -57,6 +57,8 @@ func TestValidateRefusals(t *testing.T) {
 		{"bad kind", func(a *Alert) { a.Above.Kind = "ratio" }, "kind"},
 		{"empty card", func(a *Alert) { a.CardID = "" }, "card"},
 		{"blank store", func(a *Alert) { a.Stores = []string{"CK", ""} }, "store"},
+		{"negative quantity", func(a *Alert) { a.Quantity = -1 }, "quantity"},
+		{"quantity too large", func(a *Alert) { a.Quantity = maxQuantity + 1 }, "quantity"},
 		{"rounds to zero", func(a *Alert) { a.Above.Value = 0.004 }, "above zero"},
 		{"infinite value", func(a *Alert) { a.Above.Value = math.Inf(1) }, "finite"},
 		{"too large", func(a *Alert) { a.Above.Value = 1e8 }, "too large"},
@@ -130,5 +132,26 @@ func TestThresholdResolve(t *testing.T) {
 	}
 	if (Threshold{}).Set() {
 		t.Fatal("empty threshold reports set")
+	}
+}
+
+func TestQuantityNote(t *testing.T) {
+	cases := []struct {
+		side Side
+		qty  int
+		want string
+	}{
+		{SideBuylist, 4, "you have 4"},
+		{SideRetail, 2, "you want 2"},
+		{SideBuylist, 0, ""},
+		{SideRetail, 0, ""},
+	}
+	for _, tc := range cases {
+		a := validAlert()
+		a.Side, a.Quantity = tc.side, tc.qty
+		got := a.QuantityNote()
+		if got != tc.want {
+			t.Errorf("%s %d = %q, want %q", tc.side, tc.qty, got, tc.want)
+		}
 	}
 }

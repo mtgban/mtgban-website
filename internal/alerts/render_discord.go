@@ -137,7 +137,12 @@ func renderDiscord(f Firing, label func(shorthand string) string) *discordgo.Mes
 		kind, verb = "b", "Sell"
 	}
 	var b strings.Builder
-	b.WriteString(alertLine(a.Card, a.Condition, a.Side))
+	line := alertLine(a.Card, a.Condition, a.Side)
+	note := a.QuantityNote()
+	if note != "" {
+		line = strings.TrimSuffix(line, "\n") + " · " + note + "\n"
+	}
+	b.WriteString(line)
 	lines := func(heading string, hits []Quote) {
 		fmt.Fprintf(&b, "\n**%s**\n", heading)
 		shown := hits

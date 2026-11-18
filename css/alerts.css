@@ -372,6 +372,7 @@
 }
 .alert-input:disabled { opacity: 0.45; }
 .alert-input-short { width: 9em; }
+.alert-input-qty { width: 5em; }
 
 .alert-label-note {
     margin-left: 0.5em;
