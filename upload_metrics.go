@@ -45,7 +45,7 @@ var uploadURLHosts = map[string]string{
 }
 
 // uploadFroms are the from values the list-posting controls send.
-var uploadFroms = []string{"search_sidebar", "favorites", "backpack", "news", "screener", "palette", "results_reload", "upload_form"}
+var uploadFroms = []string{"search_sidebar", "favorites", "backpack", "news", "screener", "palette", "alerts", "results_reload", "upload_form"}
 
 // uploadSorts are the result sorts upload.sorting counts.
 var uploadSorts = []string{"highprice", "alphabetical", "setalpha", "setchrono", "highspread", "profitability"}

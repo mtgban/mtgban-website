@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -226,4 +227,85 @@ func TestAlertsPageCountsADeepLink(t *testing.T) {
 		testSite.Alerts(httptest.NewRecorder(), alertsRequest(http.MethodGet, "/alerts?card=abc", ""))
 		wantNoRow(t, rows.rows(), "alerts.deep_link")
 	})
+}
+
+// The Optimize button sends each alert whose card resolves, at the
+// copies it notes or 1, its target as the row's price, on the side most
+// of them are, buylist on a tie.
+func TestAlertOptimizeRows(t *testing.T) {
+	sell := alerts.Alert{CardID: "a", Side: alerts.SideBuylist, Condition: "NM", ReferencePrice: 10,
+		Above: alerts.Threshold{Kind: alerts.KindPct, Value: 20}, Below: alerts.Threshold{Kind: alerts.KindAbs, Value: 5}}
+	buy := alerts.Alert{CardID: "b", Side: alerts.SideRetail, Condition: "SP", Quantity: 3, ReferencePrice: 10,
+		Below: alerts.Threshold{Kind: alerts.KindAbs, Value: 7.5}}
+	gone := alerts.Alert{CardID: "gone", Side: alerts.SideBuylist, Condition: "NM",
+		Above: alerts.Threshold{Kind: alerts.KindAbs, Value: 3}}
+	// The same card and grade as sell, watched on retail.
+	rebuy := alerts.Alert{CardID: "a", Side: alerts.SideRetail, Condition: "NM", Quantity: 2,
+		Below: alerts.Threshold{Kind: alerts.KindAbs, Value: 8}}
+	cards := cardMetadata{"a": {UUID: "a"}, "b": {UUID: "b"}}
+
+	for name, tc := range map[string]struct {
+		alerts      []alerts.Alert
+		want        []alertOptimizeRow
+		wantBuylist bool
+	}{
+		"a tie opens buylist":   {[]alerts.Alert{sell, buy, gone}, []alertOptimizeRow{{"a", 1, "NM", "12.00"}, {"b", 3, "SP", "7.50"}}, true},
+		"most are retail":       {[]alerts.Alert{sell, buy, buy}, []alertOptimizeRow{{"a", 1, "NM", "12.00"}, {"b", 3, "SP", "7.50"}}, false},
+		"one card, both sides":  {[]alerts.Alert{rebuy, sell}, []alertOptimizeRow{{"a", 1, "NM", "12.00"}}, true},
+		"one card, retail wins": {[]alerts.Alert{sell, rebuy, buy}, []alertOptimizeRow{{"a", 2, "NM", "8.00"}, {"b", 3, "SP", "7.50"}}, false},
+	} {
+		views := make([]alerts.View, len(tc.alerts))
+		for i, a := range tc.alerts {
+			views[i] = alerts.View{Alert: a}
+		}
+		rows, buylist := alertOptimizeRows(views, cards)
+		if !slices.Equal(rows, tc.want) {
+			t.Errorf("%s: rows = %v, want %v", name, rows, tc.want)
+		}
+		if buylist != tc.wantBuylist {
+			t.Errorf("%s: opens on buylist %v, want %v", name, buylist, tc.wantBuylist)
+		}
+	}
+}
+
+// The Optimize button posts each row with its grade and price, and shows
+// only to a reader who can reach Upload and has a row to send.
+func TestAlertsPageOffersOptimize(t *testing.T) {
+	tmpl, err := template.New("").Funcs(funcMap).ParseFiles("templates/partials/alerts-body.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	one := []alerts.View{{Alert: alerts.Alert{ID: 1, CardID: "card-1", Status: alerts.StatusActive}}}
+	rows := []alertOptimizeRow{{"card-1", 4, "SP", "12.00"}}
+	for name, tc := range map[string]struct {
+		canUpload bool
+		rows      []alertOptimizeRow
+		want      bool
+	}{
+		"can upload":      {true, rows, true},
+		"cannot upload":   {false, rows, false},
+		"no card to send": {true, nil, false},
+	} {
+		vars := AlertsPageVars{SignedIn: true, Allowed: true, Allowance: 5, Alerts: one, Optimize: tc.rows, OptimizeBuylist: true}
+		var out strings.Builder
+		err := tmpl.ExecuteTemplate(&out, "alerts-body", PageVars{CanUpload: tc.canUpload, AlertsPage: &vars})
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		page := out.String()
+		if got := strings.Contains(page, `action="/upload?from=alerts"`); got != tc.want {
+			t.Errorf("%s: Optimize offered %v, want %v", name, got, tc.want)
+		}
+		if !tc.want {
+			continue
+		}
+		for _, field := range []string{
+			`name="mode" value="true"`, `name="hashes" value="card-1"`, `name="hashesQtys" value="4"`,
+			`name="hashesCond" value="SP"`, `name="hashesPrice" value="12.00"`,
+		} {
+			if !strings.Contains(page, field) {
+				t.Errorf("%s: the form lacks %s:\n%s", name, field, page)
+			}
+		}
+	}
 }
