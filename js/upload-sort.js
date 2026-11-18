@@ -66,7 +66,9 @@ function uresSortBy(th, repeated) {
 }
 
 // Puts the table's rows in the column's order, col null for none: the
-// sorting setting's tie groups then lead.
+// sorting setting's tie groups then lead. The Card column (data-sort-chain)
+// sorts by the order picked from its menu, or by its text when no row has a
+// value for it.
 function uresMoveRows(table, col, numeric, descending) {
     var tbody = table.tBodies[0];
     if (!tbody) return;
@@ -75,7 +77,18 @@ function uresMoveRows(table, col, numeric, descending) {
         if (!uresServerPlace.has(row)) uresServerPlace.set(row, i);
         (row.getAttribute('data-sort-method') === 'none' ? rest : entries).push(row);
     });
-    uresSortedRows(entries, col, numeric, descending, uresTies(table, col === null)).concat(rest).forEach(function(row) {
+    var ties = uresTies(table, col === null);
+    var heads = col !== null && ties.length && table.tHead.rows[table.tHead.rows.length - 1].cells;
+    var picked = heads && heads[col].hasAttribute('data-sort-chain') && entries.some(function(row) {
+        return ties.some(function(t) { return uresSortKey(row, t.numeric, t.attr) !== null; });
+    });
+    if (picked) {
+        ties = ties.map(function(t) {
+            return {attr: t.attr, numeric: t.numeric, descending: t.descending !== descending};
+        }).concat({attr: 'data-k-lead', numeric: true});
+        col = null;
+    }
+    uresSortedRows(entries, col, numeric, descending, ties).concat(rest).forEach(function(row) {
         tbody.appendChild(row);
     });
 

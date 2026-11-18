@@ -482,3 +482,48 @@ test("an order synced after the page loaded is kept by the next edit, sorts the 
     uresMenuAct('results', 'name', 'toggle');
     expect(JSON.parse(store.map.mtgban_upload_sort)).toEqual({ results: 'name:a', opt: 'set:a' });
 });
+
+test("the Card column sorts by the menu's order, turned round on a second click; another column leads over it", () => {
+    const card = element({ 'data-sort-chain': '' });
+    const spread = element({ 'data-sort-method': 'number', 'data-sort-descending': 'true' });
+    const r = (idx, name, set, sp) => Object.assign(element({ 'data-load-idx': String(idx), 'data-k-name': name, 'data-k-set': set, 'data-k-lead': '1' }),
+        { cells: [cell(name), cell(sp + '%', sp)] });
+    const t = table([card, spread], [
+        r(0, 'abc', '2009 m10', '10'),
+        r(1, 'zap', '1993 alpha', '50'),
+        r(2, 'mox', '1993 alpha', '10'),
+    ], [], 'opt-table');
+    const { uresSortBy, uresMenuAct } = load(page([t]));
+    // With nothing picked, the Card column sorts by its text
+    uresSortBy(card);
+    expect(idxs(t)).toEqual(['0', '2', '1']);
+    uresMenuAct('opt', 'set', 'toggle');
+    expect(idxs(t)).toEqual(['1', '2', '0']);
+    uresSortBy(card);
+    expect(idxs(t)).toEqual(['0', '1', '2']);
+    // Spread leads, the menu's order breaking its ties
+    uresSortBy(spread);
+    expect(idxs(t)).toEqual(['1', '2', '0']);
+    uresMenuAct('opt', 'set', 'dir');
+    expect(idxs(t)).toEqual(['1', '0', '2']);
+    expect(card.getAttribute('aria-sort')).toBe(null);
+    expect(spread.getAttribute('aria-sort')).toBe('descending');
+});
+
+test('every Card header with a menu sorts by its order', () => {
+    const heads = html.match(/<th[^>]*>Card <button type="button" class="sort-ties-btn"/g);
+    expect(heads.length).toBe(3);
+    heads.forEach((th) => expect(th).toContain('data-sort-chain'));
+});
+
+test('the Card column sorts by its text when no row has a value for the picked order', () => {
+    const card = element({ 'data-sort-chain': '' });
+    const t = table([card], ['zap', 'abc', 'mox'].map((name, i) =>
+        optRow([cell(name)], i)), [], 'opt-table');
+    const { uresSortBy, uresMenuAct } = load(page([t]));
+    uresMenuAct('opt', 'rarity', 'toggle');
+    uresSortBy(card);
+    expect(idxs(t)).toEqual(['1', '2', '0']);
+    uresSortBy(card);
+    expect(idxs(t)).toEqual(['0', '2', '1']);
+});
