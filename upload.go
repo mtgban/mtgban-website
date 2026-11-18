@@ -876,6 +876,10 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fillUploadResults(&pageVars.UploadVars, b, p, ds.editions.ReprintParents, st, ids, prices, rows, uploadedData)
+	if len(pageVars.NotBought) > 0 {
+		pageVars.CanAlerts = readerCanAlert(s, r)
+		pageVars.AlertChannelList = alertChannelList(parseSig(sig))
+	}
 
 	// Logs
 	user := GetParamFromSig(sig, "UserEmail")

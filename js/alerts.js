@@ -542,7 +542,7 @@
 
     function open(opts) {
         if (!els()) return;
-        var from = document.getElementById('alerts-page') ? 'alerts_page' : 'search';
+        var from = opts.from || (document.getElementById('alerts-page') ? 'alerts_page' : 'search');
         if (window.BAN && window.BAN.track) window.BAN.track('ui.alerts.modal', 'open', from);
         state = {
             from: from,
@@ -552,9 +552,10 @@
             options: null,
             optionsSeq: 0,
             optionsSide: '',
-            condition: 'NM',
+            condition: opts.condition || 'NM',
             stores: [],
-            quantity: null,
+            // A prefill past the field's 9999 would fail a save the reader never typed into.
+            quantity: Math.min(Number(opts.quantity) || 0, 9999) || null,
             reference: null,
             referenceStore: '',
             existing: null,
@@ -664,7 +665,7 @@
 
     function onModalClick(e) {
         var editLink = e.target.closest('[data-edit-id]');
-        if (editLink) { open({ alertId: editLink.getAttribute('data-edit-id') }); return; }
+        if (editLink) { open({ alertId: editLink.getAttribute('data-edit-id'), from: state && state.from }); return; }
         var removeLink = e.target.closest('[data-remove-id]');
         if (removeLink) { removeExisting(removeLink.getAttribute('data-remove-id')); return; }
         var pill = e.target.closest('.settings-pill[data-value]');

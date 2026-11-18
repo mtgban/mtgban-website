@@ -12,7 +12,7 @@ function element() {
     const listeners = {};
     const el = {
         listeners,
-        textContent: '', innerHTML: '', value: '', hidden: false, disabled: false,
+        textContent: '', innerHTML: '', hidden: false, disabled: false,
         classList: {
             add: c => classes.add(c), remove: c => classes.delete(c),
             toggle: (c, on) => { on ? classes.add(c) : classes.delete(c); },
@@ -27,6 +27,9 @@ function element() {
         appendChild: () => {}, focus: () => {}, contains: () => true,
         addEventListener: (type, fn) => { listeners[type] = fn; },
     };
+    // An input's value is always a string, whatever was assigned.
+    let value = '';
+    Object.defineProperty(el, 'value', { get: () => value, set: v => { value = String(v); } });
     el.elements = new Proxy({}, { get: (t, name) => t[name] || (t[name] = element()) });
     return el;
 }
@@ -52,7 +55,7 @@ function load({ ids = [], select = {}, selectAll = {}, ban = true, confirmDialog
     if (confirmDialog) window.confirmDialog = confirmDialog;
     const calls = [];
     const fetch = (path, opts) => new Promise(resolve => {
-        calls.push({ path, method: opts && opts.method, answer: data => resolve({
+        calls.push({ path, method: opts && opts.method, body: opts && opts.body, answer: data => resolve({
             status: 200, ok: true,
             headers: { get: () => 'application/json' },
             json: () => Promise.resolve(data),
@@ -89,6 +92,45 @@ test('the modal counts open with where it is', () => {
     const page = load({ ids: ['alerts-page'] });
     page.window.openAlertModal({ alertId: '7' });
     expect(mine(page.track, 'ui.alerts.modal')).toEqual([['ui.alerts.modal', 'open', 'alerts_page']]);
+});
+
+test("Upload's Not bought bell counts as upload and saves the row's condition and copies", async () => {
+    const a = load();
+    a.ready();
+    a.window.openAlertModal({ cardId: 'card-a', side: 'buylist', condition: 'SP', quantity: '4', from: 'upload' });
+    a.calls[0].answer({ ...options, conditions: ['NM', 'SP'] });
+    await settle();
+    a.calls[1].answer([]);
+    await settle();
+    a.calls[2].answer([]);
+    await settle();
+    modalClick(a, sel => (sel === '.settings-pill[data-value]' ? { getAttribute: () => 'abs', parentNode: { getAttribute: () => 'above_kind' } } : null));
+    a.el('alert-form').elements.above_value.value = '5';
+    modalClick(a, role('save'));
+    expect(JSON.parse(a.calls[3].body)).toMatchObject({ condition: 'SP', quantity: 4 });
+    a.calls[3].answer({});
+    await settle();
+    expect(mine(a.track, 'ui.alerts.modal')).toEqual([['ui.alerts.modal', 'open', 'upload'], ['ui.alerts.modal', 'save', 'upload']]);
+    // The dialog's Edit link on an existing alert keeps counting as upload.
+    modalClick(a, sel => (sel === '[data-edit-id]' ? { getAttribute: () => '7' } : null));
+    expect(mine(a.track, 'ui.alerts.modal').at(-1)).toEqual(['ui.alerts.modal', 'open', 'upload']);
+});
+
+test('a row with more copies than the field takes opens at 9999 and saves', async () => {
+    const a = load();
+    a.ready();
+    a.window.openAlertModal({ cardId: 'card-a', side: 'buylist', quantity: '12000', from: 'upload' });
+    a.calls[0].answer(options);
+    await settle();
+    a.calls[1].answer([]);
+    await settle();
+    a.calls[2].answer([]);
+    await settle();
+    expect(a.el('alert-form').elements.quantity.value).toBe('9999');
+    modalClick(a, sel => (sel === '.settings-pill[data-value]' ? { getAttribute: () => 'abs', parentNode: { getAttribute: () => 'above_kind' } } : null));
+    a.el('alert-form').elements.above_value.value = '5';
+    modalClick(a, role('save'));
+    expect(JSON.parse(a.calls[3].body).quantity).toBe(9999);
 });
 
 test('a save counts save and not cancel', async () => {
@@ -266,7 +308,7 @@ test('with no BAN the modal opens, cancels and saves', async () => {
 
 test('every value and scope the script sends is registered', () => {
     expect(registry['ui.alerts.modal'].enum).toEqual(['open', 'save', 'cancel']);
-    expect(registry['ui.alerts.modal'].scopes).toEqual(['alerts_page', 'search']);
+    expect(registry['ui.alerts.modal'].scopes).toEqual(['alerts_page', 'search', 'upload']);
     expect(registry['ui.alerts.row'].enum).toEqual(['edit', 'pause', 'resume', 'delete', 'delete_all']);
     expect(registry['ui.alerts.sort'].enum).toEqual(['created', 'name', 'now', 'fired', 'status', 'side']);
 });

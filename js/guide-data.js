@@ -1072,7 +1072,7 @@ window.__BAN_GUIDE = {
             icon: 'upload',
             summary: 'Upload a collection in any common format, compare prices across vendors, edit the results and split a buylist with the Optimizer.',
             snippets: [],
-            keywords: ['upload', 'collection', 'CSV', 'excel', 'xls', 'xlsx', 'google sheets', 'tcgplayer', 'tcg collection', 'deckbox', 'binderpos', 'cardsphere', 'buylist', 'optimize', 'export', 'CK', 'SCG', 'TCG', 'MKM', 'card kingdom', 'cardmarket', 'cardconduit', 'retail', 'mtgban', 'sheet', 'edit', 'condition', 'copies', 'quantity', 'your price', 'also as', 'reload', 'column', 'drag', 'reorder', 'optimizer', 'move to', 'add store', 'filtered out', 'not bought', 'custom buylist', 'rules', 'buy rate'],
+            keywords: ['upload', 'collection', 'CSV', 'excel', 'xls', 'xlsx', 'google sheets', 'tcgplayer', 'tcg collection', 'deckbox', 'binderpos', 'cardsphere', 'buylist', 'optimize', 'export', 'CK', 'SCG', 'TCG', 'MKM', 'card kingdom', 'cardmarket', 'cardconduit', 'retail', 'mtgban', 'sheet', 'edit', 'condition', 'copies', 'quantity', 'your price', 'also as', 'reload', 'column', 'drag', 'reorder', 'optimizer', 'move to', 'add store', 'filtered out', 'not bought', 'price alert', 'custom buylist', 'rules', 'buy rate'],
             content: {
                 table: [
                     { value: 'CSV / TSV',                              short: 'Comma or tab separated with sensible headers' },

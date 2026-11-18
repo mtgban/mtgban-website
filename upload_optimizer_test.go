@@ -739,6 +739,27 @@ func TestOptimizerListsLeftovers(t *testing.T) {
 	}
 }
 
+// TestNotBoughtAlertBell draws a price alert bell on each Not bought row,
+// at the row's condition and copies, with the dialog it opens, for a reader whose tier
+// has alerts; Filtered out rows never get one.
+func TestNotBoughtAlertBell(t *testing.T) {
+	for _, can := range []bool{false, true} {
+		out := renderUpload(t, PageVars{CanAlerts: can, UploadVars: UploadVars{
+			UploadEntries: []UploadEntry{{CardID: "a"}, {CardID: "b"}},
+			NotBought:     []LeftoverEntry{{CardID: "a", Condition: "SP", Quantity: 3}},
+			FilteredOut:   []LeftoverEntry{{CardID: "b", Quantity: 1, Store: "ZZW", Price: 1}},
+		}})
+		bell := strings.Contains(leftoverRows(out, "opt-not-bought"), `class="opt-move-btn opt-alert-btn alert-link" data-card-id="a" data-cond="SP" data-qty="3"`)
+		modal := strings.Contains(out, `id="alert-modal"`)
+		if bell != can || modal != can {
+			t.Errorf("CanAlerts %v: bell %v, dialog %v", can, bell, modal)
+		}
+		if strings.Contains(leftoverRows(out, "opt-filtered-out"), "opt-alert-btn") {
+			t.Errorf("CanAlerts %v: a Filtered out row has a bell", can)
+		}
+	}
+}
+
 // leftoverRows is the body of the page's leftover section id, or nothing.
 func leftoverRows(page, id string) string {
 	_, section, _ := strings.Cut(page, `id="`+id+`"`)

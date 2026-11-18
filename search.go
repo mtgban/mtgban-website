@@ -1091,15 +1091,17 @@ func searchPreview(r *http.Request, b *matcher.Backend, allKeys []string, result
 func searchReader(s *site, r *http.Request) (canAlerts, canFix bool) {
 	sig := verifiedSignature(r)
 
-	sigParams := parseSig(sig)
-	if navOffers(s, sigParams, "Alerts") {
-		canAlerts = alertAllowance(sigParams) > 0
-	}
-
 	// Admins get a per-result "Fix" toggle that surfaces a Fix link on every
 	// store, deep-linking into the overrides builder.
 	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
-	return canAlerts, canAdmin || (DevMode && !SigCheck)
+	return readerCanAlert(s, r), canAdmin || (DevMode && !SigCheck)
+}
+
+// readerCanAlert says the navbar offers alerts and the reader's tier has an
+// allowance, so a page may offer the alert link.
+func readerCanAlert(s *site, r *http.Request) bool {
+	sigParams := parseSig(verifiedSignature(r))
+	return navOffers(s, sigParams, "Alerts") && alertAllowance(sigParams) > 0
 }
 
 // fillSearchPrefs puts the reader's search preferences on the page: from

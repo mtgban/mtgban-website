@@ -1465,6 +1465,9 @@
 .opt-move-btn { padding: 2px; margin-right: 6px; border: none; background: none; color: var(--text-dim); cursor: pointer; vertical-align: middle; line-height: 0; border-radius: var(--radius-sm); }
 .opt-move-btn:hover, .opt-move-btn:focus-visible { color: var(--activetext); background: var(--surface-3); }
 .opt-move-btn svg { width: 15px; height: 15px; }
+/* A bell with an alert behind it fills in, as on Search */
+.opt-alert-btn.active { color: var(--darkeryellow, gold); }
+.opt-alert-btn.active svg { fill: var(--darkeryellow, gold); }
 /* A popover, so the cell's overflow cannot clip it; upload-optimizer.js
    places it under its button */
 .opt-move-menu { position: fixed; inset: auto; margin: 0; padding: 4px; min-width: 180px; background: var(--surface-1); color: var(--normal); border: 1px solid var(--border-moderate); border-radius: var(--radius-sm); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
