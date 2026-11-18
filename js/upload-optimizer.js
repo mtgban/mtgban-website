@@ -66,6 +66,7 @@ document.addEventListener('change', function(e) {
     var section = e.target.closest && e.target.closest('.opt-store');
     if (section) {
         updateOptTotals(section);
+        saveOptUnticked();
         var t = e.target;
         if (t.classList && t.classList.contains('opt-row-check')) {
             if (window.BAN && window.BAN.track) window.BAN.track('ui.optimizer', 'row_check');
@@ -76,6 +77,56 @@ document.addEventListener('change', function(e) {
 });
 
 wireLoadLists({section: '.opt-store', removed: 'opt-removed'});
+
+// The unticked rows, by card, condition and store, are kept in the tab's
+// session so a reload of the page (a move, a store dropped or added, the
+// Reload button or the browser's) unticks them again; a new list starts ticked.
+function optRowKey(tr) {
+    var section = tr.closest('.opt-store');
+    return tr.dataset.optId + '\t' + (tr.dataset.optCond || '') + '\t' + section.id.replace(/^opt-/, '');
+}
+
+function saveOptUnticked() {
+    var keys = [];
+    document.querySelectorAll('.opt-store tr.opt-removed[data-opt-id]').forEach(function(tr) {
+        keys.push(optRowKey(tr));
+    });
+    try {
+        if (keys.length) sessionStorage.setItem('uploadOptUnticked', JSON.stringify(keys));
+        else sessionStorage.removeItem('uploadOptUnticked');
+    } catch (e) {}
+}
+
+// Unticks the rows kept from before the reload, then has each section they
+// sit in recount its totals and rebuild its lists, as a change does.
+function restoreOptUnticked() {
+    var keys = null;
+    try {
+        if (window.BAN_UPLOAD_RELOAD) keys = JSON.parse(sessionStorage.getItem('uploadOptUnticked') || 'null');
+        else sessionStorage.removeItem('uploadOptUnticked');
+    } catch (e) {}
+    if (!Array.isArray(keys) || !keys.length) return;
+    var unticked = {};
+    keys.forEach(function(k) { unticked[k] = true; });
+    document.querySelectorAll('.opt-store').forEach(function(section) {
+        var any = false;
+        var ticked = false;
+        section.querySelectorAll('tr[data-opt-id]').forEach(function(tr) {
+            var cb = tr.querySelector('.opt-row-check');
+            if (cb && unticked[optRowKey(tr)]) {
+                cb.checked = false;
+                toggleOptRow(cb);
+                any = true;
+            } else if (cb) {
+                ticked = true;
+            }
+        });
+        if (!any) return;
+        var all = section.querySelector('thead input[type="checkbox"]');
+        if (all) all.checked = ticked;
+        section.dispatchEvent(new Event('change', {bubbles: true}));
+    });
+}
 
 // A row's Move to menu is built when it opens, from the row's data-move:
 // the page's other stores that offer for the card, best first. It opens
@@ -176,6 +227,7 @@ document.addEventListener('scroll', function() {
 // After a move the page lands back on the card, in the store it went to.
 // Run after upload-tabs.js has opened the optimizer.
 document.addEventListener('DOMContentLoaded', function() {
+    restoreOptUnticked();
     var key = null;
     try {
         key = sessionStorage.getItem('uploadOptFocus');

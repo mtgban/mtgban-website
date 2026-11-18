@@ -822,6 +822,7 @@
         var nav = performance.getEntriesByType('navigation')[0];
         var isReload = (nav && nav.type !== 'navigate') || sessionStorage.getItem('uploadReload') === '1';
         sessionStorage.removeItem('uploadReload');
+        window.BAN_UPLOAD_RELOAD = isReload;
         var opts = (getCookie('UploadOptimizerOpts') || '').split(',');
         var view = isReload ? sessionStorage.getItem('uploadResView') : {{if .UnpackedSections}}'results'{{else}}opts.indexOf('noresults') >= 0 ? 'optimizer' : 'results'{{end}};
         var optBtn = document.querySelector('.res-tab:nth-child(2)');
