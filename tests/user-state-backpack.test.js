@@ -229,3 +229,12 @@ test('a removed entry is pushed and kept with only what names and orders it', as
     expect(pushed.find((e) => e.id === 'a')).toEqual(want);
     expect(stored.find((e) => e.id === 'a')).toEqual(want);
 });
+
+test('a grade changed on another device keeps the card\'s place among cards added with it', async () => {
+    const now = Date.now();
+    const at = (id, extra) => entry(id, 1, now - 10, extra);
+    const { stored } = await reconcileBackpack(
+        [at('a'), at('b'), at('c'), at('d')],
+        [at('a'), at('b', { cond: 'SP', m: now - 1 }), at('c'), at('d'), at('b', { m: now - 1, del: now - 1 })]);
+    expect(stored.filter((e) => !e.del).map((e) => e.id + (e.cond || ''))).toEqual(['a', 'bSP', 'c', 'd']);
+});
