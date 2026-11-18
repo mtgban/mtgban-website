@@ -90,23 +90,23 @@ test('a keyboard page calls showHoverFor with trusted=true', () => {
     expect(showHoverCalls).toEqual([[h1, true]]);
 });
 
-test('a scroll with the pointer over nothing calls showHoverFor(stuckHeader, false) when the stuck header changes', () => {
+test('a scroll with the pointer over nothing calls showHoverFor(stuckHeader, true) when the stuck header changes', () => {
     const h0 = makeHeader(0);
     const h1 = makeHeader(500);
     const { listeners, showHoverCalls } = load([h0, h1], { pointerTarget: null, mx: 10, my: 10 });
 
     listeners.window.scroll();
-    expect(showHoverCalls).toEqual([[h0, false]]);
+    expect(showHoverCalls).toEqual([[h0, true]]);
 
     // Same stuck header again: no repeat call.
     listeners.window.scroll();
-    expect(showHoverCalls).toEqual([[h0, false]]);
+    expect(showHoverCalls).toEqual([[h0, true]]);
 
     // The page moved on: the other header is stuck now.
     h0._top = 500;
     h1._top = 0;
     listeners.window.scroll();
-    expect(showHoverCalls).toEqual([[h0, false], [h1, false]]);
+    expect(showHoverCalls).toEqual([[h0, true], [h1, true]]);
 });
 
 test('paging the results and Tab to the search box are counted by name, never by key', () => {
