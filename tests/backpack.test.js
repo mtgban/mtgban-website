@@ -1832,6 +1832,38 @@ describe('adding an Upload store section', () => {
         expect(p.navCount.textContent).toBe('5');
     });
 
+    test('shares copies edited on the page out over the ticked stores, so two add no more than the list', () => {
+        // Bolt x5 shared 3 and 2, cut to 2: the first store takes both
+        const p = page({ results: [['a', 2]], sections: [[['a', 3], ['c', 1]], [['a', 2]]] });
+        p.optSections[0].rows[0].setAttribute('data-qty-edited', '');
+        p.optSections[1].rows[0].setAttribute('data-qty-edited', '');
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(live(p).sort()).toEqual([[1, 'a', 'NM', 2], [1, 'c', 'NM', 1]]);
+        // Nothing is left for the second, so its pair stays hidden
+        expect([p.optSections[1].add.hidden, p.optSections[1].take.hidden]).toEqual([true, true]);
+        p.window.addRowsToBackpack(p.optSections[1].add);
+        expect(live(p).sort()).toEqual([[1, 'a', 'NM', 2], [1, 'c', 'NM', 1]]);
+    });
+
+    test('gives an unticked store\'s share of edited copies to the next', () => {
+        const p = page({ results: [['a', 1]], sections: [[['a', 3, true]], [['a', 2]]] });
+        p.optSections[0].rows[0].setAttribute('data-qty-edited', '');
+        p.optSections[1].rows[0].setAttribute('data-qty-edited', '');
+        p.window.addRowsToBackpack(p.optSections[1].add);
+        expect(live(p)).toEqual([[1, 'a', 'NM', 1]]);
+    });
+
+    test('counts edited copies as the list stands when pressed, a line struck by the backpack kept', () => {
+        const p = page({ results: [['a', 2], ['a', 4], ['a', 1]], sections: [[['a', 9]]] });
+        p.optSections[0].rows[0].setAttribute('data-qty-edited', '');
+        // Struck on the page after the edit, and struck as the card left the backpack
+        p.res.rows[1].classList.add('ures-removed-row');
+        p.res.rows[2].classList.add('ures-removed-row');
+        p.res.rows[2].setAttribute('data-pack-struck', '');
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(live(p)).toEqual([[1, 'a', 'NM', 3]]);
+    });
+
     test('joins the copies a card already has in that grade', () => {
         const p = page({ store: [{ id: 'a', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'b', name: 'B', qty: 1, t: 1, m: 1, del: 1 }], sections: [[['a', 3], ['b', 2]]] });
         p.window.addRowsToBackpack(p.optSections[0].add);

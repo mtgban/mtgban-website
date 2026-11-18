@@ -256,11 +256,17 @@
             mark(tr);
             if (conds.indexOf(tr.dataset.cond || '') < 0) conds.push(tr.dataset.cond || '');
         });
-        optRows(rows[0].dataset.hash, rows[0].dataset.grade || '').forEach(function(opt) {
+        var grade = rows[0].dataset.grade || '';
+        var listed = copies(Array.prototype.filter.call(document.querySelectorAll('.ures-table tr[data-hash]'), function(x) {
+            return x.dataset.hash === rows[0].dataset.hash && (x.dataset.grade || '') === grade && !x.classList.contains('ures-removed-row');
+        }));
+        optRows(rows[0].dataset.hash, grade).forEach(function(opt) {
+            // Until a reload the backpack pair counts the list's copies itself
+            opt.dataset.qtyEdited = '';
             var ob = opt.querySelector('.ures-edit-btn[data-edit="qty"]');
             if (ob) {
                 ob.classList.add('edited');
-                ob.title = qty + ' in your list; reload to update';
+                ob.title = listed + ' in your list; reload to update';
             }
         });
         // The backpack holds one entry for the card in a grade
@@ -324,6 +330,7 @@
 
     // update counts the edited rows on the reload bar, and holds back the
     // store sends, which carry the page's old quantities, until a reload.
+    // The backpack pair reads the edits, so it stays free.
     function update() {
         var dirty = !!document.querySelector('.ures-table tr[data-hash] .ures-edit-btn.edited');
         document.body.classList.toggle('ures-dirty', dirty);
@@ -348,7 +355,7 @@
             pick(choice.dataset.value);
             return;
         }
-        if (document.body.classList.contains('ures-dirty') && e.target.closest('.opt-header-actions')) {
+        if (document.body.classList.contains('ures-dirty') && e.target.closest('.opt-header-actions') && !e.target.closest('.pack-add-btn, .pack-take-btn')) {
             e.preventDefault();
             e.stopPropagation();
             var bar = document.getElementById('reload-bar');
