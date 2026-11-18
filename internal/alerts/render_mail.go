@@ -42,6 +42,7 @@ func LoadMailTemplates(dir string) (MailTemplates, error) {
 // mailRow is one firing's threshold crossing, as a template sees it.
 type mailRow struct {
 	Card, Set, Number, Finish, Condition, Side string
+	Quantity                                   string // the alert's QuantityNote
 	Store, Change, Threshold                   string
 	CardURL, Link, Image                       string
 }
@@ -132,7 +133,7 @@ func firingRows(f Firing, label func(string) string) []mailRow {
 		return mailRow{
 			Card: a.Card.Name, CardURL: cardURL(f.Origin, a.CardID),
 			Set: a.Card.Set, Number: a.Card.Number, Finish: a.Card.Finish,
-			Condition: a.Condition, Side: string(a.Side),
+			Condition: a.Condition, Side: string(a.Side), Quantity: a.QuantityNote(),
 			Store:     label(hit.Store),
 			Change:    changeText(a.ReferencePrice, hit.Price),
 			Threshold: thresholdLabel(t, a.ReferencePrice, above),

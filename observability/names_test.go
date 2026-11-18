@@ -328,7 +328,7 @@ func TestServerNamesAccept(t *testing.T) {
 		{"screener.sort", "asc", "abs"}, {"screener.page", "", "6+"},
 		{"alerts.create", "search", "retail"}, {"alerts.create_delivery", "", "email"},
 		{"alerts.create_condition", "", "PO"}, {"alerts.create_threshold", "", "below_pct"},
-		{"alerts.create_stores", "", "10+"}, {"alerts.edit", "", ""}, {"alerts.pause", "", ""},
+		{"alerts.create_stores", "", "10+"}, {"alerts.create_quantity", "", "buylist"}, {"alerts.edit", "", ""}, {"alerts.pause", "", ""},
 		{"alerts.resume", "", ""}, {"alerts.delete", "", ""}, {"alerts.delete_all", "", ""},
 		{"alerts.channel", "", "unsubscribe"}, {"alerts.fired", "", "buylist"},
 		{"alerts.delivered", "email", "deferred"}, {"alerts.delivered", "discord", "refused"},

@@ -37,6 +37,40 @@ func TestAlertsPageOffersResumeAsTheAPIAllows(t *testing.T) {
 	}
 }
 
+// A noted quantity reads as held on a buylist alert and wanted on a retail
+// one, under the card; an unset one adds nothing.
+func TestAlertsPageNotesTheQuantity(t *testing.T) {
+	tmpl, err := template.New("").Funcs(funcMap).ParseFiles("templates/partials/alerts-body.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct {
+		alert alerts.Alert
+		want  string
+	}{
+		"buylist": {alerts.Alert{Side: alerts.SideBuylist, Quantity: 4}, `<span class="alert-meta">you have 4</span>`},
+		"retail":  {alerts.Alert{Side: alerts.SideRetail, Quantity: 2}, `<span class="alert-meta">you want 2</span>`},
+		"unset":   {alerts.Alert{Side: alerts.SideBuylist}, ""},
+	} {
+		tc.alert.ID, tc.alert.CardID, tc.alert.Status = 1, "card-1", alerts.StatusActive
+		vars := PageVars{AlertsPage: &AlertsPageVars{
+			SignedIn: true, Allowed: true, Allowance: 5, Alerts: []alerts.View{{Alert: tc.alert}},
+		}}
+		var out strings.Builder
+		err := tmpl.ExecuteTemplate(&out, "alerts-body", vars)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		html := out.String()
+		if tc.want != "" && !strings.Contains(html, tc.want) {
+			t.Errorf("%s: lacks %q", name, tc.want)
+		}
+		if n := strings.Count(html, `class="alert-meta"`); tc.want == "" && n != 1 {
+			t.Errorf("%s: %d alert-meta spans, want the set line alone", name, n)
+		}
+	}
+}
+
 // The search page's modal carries the delivery channels itself; on the
 // alerts page #alerts-page carries them, so the modal stays bare.
 func TestAlertModalCarriesTheChannelsOffTheAlertsPage(t *testing.T) {

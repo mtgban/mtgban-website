@@ -830,6 +830,44 @@ func TestAlertsAPIPatchStatusMustBeAlone(t *testing.T) {
 	}
 }
 
+// The quantity is a note: set on create, changed or cleared by an edit,
+// and never sent beside a status.
+func TestAlertsAPIQuantity(t *testing.T) {
+	store := newFakeAlertStore()
+	api := testAlertsAPI(store)
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+	store.contacts[hash] = Contact{UserHash: hash, DiscordUserID: "1", Tier: "Legacy"}
+
+	body := `{"card_id":"card-1","side":"buylist","condition":"NM","quantity":4,"above":{"kind":"abs","value":15},"delivery":"discord"}`
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/", body, sig))
+	if w.Code != http.StatusCreated || store.rows[1].Quantity != 4 {
+		t.Fatalf("create = %d %s", w.Code, w.Body)
+	}
+
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"above":{"kind":"abs","value":20}}`, sig))
+	if w.Code != http.StatusOK || store.rows[1].Quantity != 4 {
+		t.Fatalf("edit without quantity = %d quantity=%d", w.Code, store.rows[1].Quantity)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"quantity":0}`, sig))
+	if w.Code != http.StatusOK || store.rows[1].Quantity != 0 {
+		t.Fatalf("clear = %d quantity=%d", w.Code, store.rows[1].Quantity)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"quantity":-2}`, sig))
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("negative = %d, want 422: %s", w.Code, w.Body)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"status":"paused","quantity":3}`, sig))
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status with quantity = %d, want 422: %s", w.Code, w.Body)
+	}
+}
+
 // writeFailsStore wraps a fakeAlertStore whose Update and SetStatus always
 // report not found, simulating a row that vanished between Get and write.
 type writeFailsStore struct{ *fakeAlertStore }

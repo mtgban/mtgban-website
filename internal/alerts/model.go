@@ -15,6 +15,9 @@ import (
 // NUMERIC(10,2) columns overflow at 10^8.
 const maxAmount = 1e8
 
+// maxQuantity is the most copies an alert notes.
+const maxQuantity = 9999
+
 // roundCents rounds a float to the cent NUMERIC(10,2) columns store.
 func roundCents(v float64) float64 { return math.Round(v*100) / 100 }
 
@@ -114,6 +117,7 @@ type Alert struct {
 	Side           Side            `json:"side"`
 	Condition      string          `json:"condition"`
 	Stores         []string        `json:"stores"`
+	Quantity       int             `json:"quantity,omitempty"`
 	ReferencePrice float64         `json:"reference_price"`
 	Above          Threshold       `json:"above"`
 	Below          Threshold       `json:"below"`
@@ -130,6 +134,18 @@ type Alert struct {
 	// Origin is the site the alert was last saved on, which its DM links
 	// to; empty leaves the links out.
 	Origin string `json:"-"`
+}
+
+// QuantityNote is the copies the user noted on the alert, as they read on
+// its side: held to sell on a buylist, wanted on retail. Empty when unset.
+func (a Alert) QuantityNote() string {
+	if a.Quantity <= 0 {
+		return ""
+	}
+	if a.Side == SideBuylist {
+		return fmt.Sprintf("you have %d", a.Quantity)
+	}
+	return fmt.Sprintf("you want %d", a.Quantity)
 }
 
 // Firing is one alert crossing its line in a run, ready to deliver.
@@ -273,6 +289,9 @@ func (a *Alert) Validate() error {
 	}
 	if a.Delivery != DeliveryDiscord && a.Delivery != DeliveryEmail {
 		return fmt.Errorf("unknown delivery %q", a.Delivery)
+	}
+	if a.Quantity < 0 || a.Quantity > maxQuantity {
+		return fmt.Errorf("quantity must be between 0 and %d", maxQuantity)
 	}
 	err := validateAmount("reference price", a.ReferencePrice)
 	if err != nil {

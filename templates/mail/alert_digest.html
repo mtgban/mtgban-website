@@ -30,7 +30,7 @@
 </td>
 <td valign="top">
 <div style="font-size:15px;"><a href="{{.CardURL}}" style="color:#1f2937; text-decoration:none;">{{.Card}}</a></div>
-<div style="font-size:13px; color:#6b7280;">{{.Set}} #{{.Number}}, {{.Finish}}, {{.Condition}}, {{.Side}}</div>
+<div style="font-size:13px; color:#6b7280;">{{.Set}} #{{.Number}}, {{.Finish}}, {{.Condition}}, {{.Side}}{{with .Quantity}} · {{.}}{{end}}</div>
 <div style="font-size:14px; color:#1f2937; margin-top:6px;">{{.Store}}: {{.Change}}</div>
 <div style="font-size:13px; color:#6b7280;">threshold {{.Threshold}}</div>
 <div style="font-size:13px; margin-top:6px;"><a href="{{.Link}}" style="color:#2563eb;">View this card</a></div>

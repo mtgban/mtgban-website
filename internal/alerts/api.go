@@ -160,6 +160,7 @@ type request struct {
 	Side           Side            `json:"side"`
 	Condition      string          `json:"condition"`
 	Stores         []string        `json:"stores"`
+	Quantity       *int            `json:"quantity"`
 	ReferencePrice *float64        `json:"reference_price"`
 	Above          *Threshold      `json:"above"`
 	Below          *Threshold      `json:"below"`
@@ -469,6 +470,9 @@ func (a *API) create(w http.ResponseWriter, r *http.Request, c Caller) {
 		UserHash: userHash, Game: a.game(), CardID: req.CardID, Side: req.Side, Condition: condition,
 		Stores: stores, Above: above, Below: below, Delivery: req.Delivery, Card: card, Origin: c.Origin,
 	}
+	if req.Quantity != nil {
+		alert.Quantity = *req.Quantity
+	}
 	if req.ReferencePrice != nil {
 		alert.ReferencePrice = *req.ReferencePrice
 	} else if hasPrice {
@@ -522,6 +526,9 @@ func (a *API) create(w http.ResponseWriter, r *http.Request, c Caller) {
 		a.deps.Observe(r, "", "alerts.create_threshold", v)
 	}
 	a.deps.Observe(r, "", "alerts.create_stores", storesBucket(len(created.Stores)))
+	if created.Quantity > 0 {
+		a.deps.Observe(r, "", "alerts.create_quantity", sideValue(created.Side))
+	}
 	writeJSON(w, http.StatusCreated, v)
 }
 
@@ -561,7 +568,7 @@ func (a *API) patch(w http.ResponseWriter, r *http.Request, c Caller, id int64) 
 	// A status-only patch is pause or resume; anything else is an edit,
 	// and the two must not be mixed in one request.
 	if req.Status != "" {
-		if req.CardID != "" || req.Side != "" || req.Condition != "" || req.Stores != nil ||
+		if req.CardID != "" || req.Side != "" || req.Condition != "" || req.Stores != nil || req.Quantity != nil ||
 			req.ReferencePrice != nil || req.Above != nil || req.Below != nil || req.Delivery != "" {
 			jsonError(w, http.StatusUnprocessableEntity, "status must be sent alone")
 			return
@@ -620,6 +627,9 @@ func (a *API) patch(w http.ResponseWriter, r *http.Request, c Caller, id int64) 
 			return
 		}
 		next.Stores = stores
+	}
+	if req.Quantity != nil {
+		next.Quantity = *req.Quantity
 	}
 	if req.ReferencePrice != nil {
 		next.ReferencePrice = *req.ReferencePrice

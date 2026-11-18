@@ -130,6 +130,22 @@ func TestCreateIsObserved(t *testing.T) {
 	}
 }
 
+// A noted quantity adds one fact, by side; TestCreateIsObserved shows an
+// unset one adds none.
+func TestCreateQuantityIsObserved(t *testing.T) {
+	rec := &recorder{}
+	api, _ := observedAPI(rec)
+	body := `{"card_id":"card-1","side":"buylist","condition":"NM","quantity":4,"above":{"kind":"abs","value":20}}`
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/", body, testCaller("a@b.com", "Legacy")))
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create = %d %s", w.Code, w.Body)
+	}
+	if n := rec.count(seen{"", "alerts.create_quantity", "buylist"}); n != 1 {
+		t.Fatalf("alerts.create_quantity seen %d times, want 1: %v", n, rec.got)
+	}
+}
+
 func TestCreateIsObservedOnItsPage(t *testing.T) {
 	rec := &recorder{}
 	api, _ := observedAPI(rec)
