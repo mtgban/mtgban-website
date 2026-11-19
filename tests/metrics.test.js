@@ -734,8 +734,8 @@ test('the network coming back with a privacy signal on removes the queue unsent'
     expect(KEY in p.m).toBe(false);
 });
 
-test('a response with an error status other than 429 is dropped, neither parked nor retried', async () => {
-    for (const net of [400, 413, 500, 503]) {
+test('a response with an error status the server itself gave is dropped, neither parked nor retried', async () => {
+    for (const net of [400, 413, 500, 501, 505]) {
         const p = load({ net });
         p.track('ui.x');
         p.fire();
@@ -746,6 +746,22 @@ test('a response with an error status other than 429 is dropped, neither parked 
         p.hide();
         expect(p.beacons).toEqual([]);
         expect(p.fetches.length).toBe(1);
+    }
+});
+
+test('a post a proxy answered with no server behind it is parked and sent again', async () => {
+    for (const net of [502, 503, 504]) {
+        const p = load({ net });
+        p.track('ui.x');
+        p.fire();
+        await settle();
+        expect(queued(p).e).toEqual([['ui.load', 'search', '', 1], ['ui.x', '', '', 1]]);
+        expect(p.live().map((t) => t.ms)).toEqual([30000]);
+        p.net = 'ok';
+        p.fire();
+        await settle();
+        expect(p.fetches.length).toBe(2);
+        expect(queued(p)).toBe(null);
     }
 });
 
@@ -799,7 +815,7 @@ test('a 429 with a privacy signal turned on parks nothing', async () => {
     expect(queued(p)).toBe(null);
 });
 
-test('only a rejected fetch, a refused beacon or a 429 parks', async () => {
+test('a rejected fetch and a refused beacon park', async () => {
     const rejected = load({ net: 'down' });
     rejected.fire();
     await settle();
