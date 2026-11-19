@@ -15,7 +15,7 @@
         }
         return false;
     }
-    // search-sidebar.js asks the same before Ctrl/Cmd+B
+    // search-sidebar.js asks the same before its backpack keys
     window.banDialogOpen = dialogOpen;
 
     document.addEventListener('keydown', function(e) {

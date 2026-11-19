@@ -349,7 +349,7 @@ function packKeys(dom) {
     return { ...loaded, acted, tracked, press };
 }
 
-test('Ctrl/Cmd+B adds the card on show and Shift takes one out', () => {
+test('Ctrl/Cmd+B adds the card on show and Alt/Option+B takes one out', () => {
     const dom = packDom();
     const { w, acted, tracked, press } = packKeys(dom);
 
@@ -360,7 +360,8 @@ test('Ctrl/Cmd+B adds the card on show and Shift takes one out', () => {
     w.showHoverFor(dom.span1, true); // still h1: nothing moves
     w.showHoverFor(dom.h2, true);
     expect(press({ metaKey: true })).toBe(true);
-    expect(press({ metaKey: true, shiftKey: true, key: 'B' })).toBe(true);
+    // Option+B types a character on a Mac, so the key code names it
+    expect(press({ altKey: true, key: '∫', keyCode: 66 })).toBe(true);
     expect(acted.slice(1)).toEqual([['add', dom.h2.add], ['take', dom.h2.minus]]);
     expect(tracked).toEqual([['ui.search.key', 'pack_add'], ['ui.search.key', 'pack_add'], ['ui.search.key', 'pack_take']]);
 });
@@ -380,6 +381,10 @@ test('the backpack keys leave fields, other chords and a hidden sidebar alone', 
 
     expect(press({})).toBe(false);
     expect(press({ ctrlKey: true, altKey: true })).toBe(false);
+    expect(press({ metaKey: true, altKey: true })).toBe(false);
+    // Shift+Ctrl/Cmd+B is the browser's bookmarks bar
+    expect(press({ ctrlKey: true, shiftKey: true })).toBe(false);
+    expect(press({ altKey: true, shiftKey: true })).toBe(false);
     expect(press({ ctrlKey: true, key: 'k' })).toBe(false);
     expect(press({ ctrlKey: true }, { tagName: 'INPUT', id: 'alert-price' })).toBe(false);
     expect(press({ ctrlKey: true }, { tagName: 'TEXTAREA', id: 'searchbox-notes' })).toBe(false);
@@ -396,9 +401,11 @@ test('the backpack keys leave fields, other chords and a hidden sidebar alone', 
     cardImageStub.getClientRects = () => [{}];
     expect(press({ ctrlKey: true })).toBe(true);
     acted.length = 0; tracked.length = 0;
-    // No NM copy to take: the minus is hidden, and Ctrl+Shift+B stays the browser's
+    // No NM copy to take: the minus is hidden, and Alt+B stays the browser's
     dom.h1.minus.hidden = true;
-    expect(press({ ctrlKey: true, shiftKey: true })).toBe(false);
+    expect(press({ altKey: true })).toBe(false);
+    // ...but the "∫" Option+B types on a Mac never reaches the query
+    expect(press({ altKey: true, key: '∫', keyCode: 66 })).toBe(true);
     dom.h1.isConnected = false;
     expect(press({ ctrlKey: true })).toBe(false);
 
@@ -426,7 +433,7 @@ test('the autofocused search box passes the backpack keys on', () => {
     const dom = packDom();
     const { acted, press } = packKeys(dom);
     expect(press({ metaKey: true }, { tagName: 'INPUT', id: 'nav-searchbox' })).toBe(true);
-    expect(press({ ctrlKey: true, shiftKey: true }, { tagName: 'INPUT', id: 'searchbox' })).toBe(true);
+    expect(press({ altKey: true }, { tagName: 'INPUT', id: 'searchbox' })).toBe(true);
     expect(acted).toEqual([['add', dom.h1.add], ['take', dom.h1.minus]]);
 });
 

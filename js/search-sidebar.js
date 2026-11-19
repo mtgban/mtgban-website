@@ -493,15 +493,20 @@ function showHoverFor(el, trusted) {
 window.showHoverFor = showHoverFor;
 
 // Ctrl/Cmd+B adds a copy of the card on show to the active backpack and
-// Shift+Ctrl/Cmd+B takes one out, as the buttons on its header do. A held
+// Alt/Option+B takes one out, as the buttons on its header do. A held
 // key adds once, and a hidden sidebar shows no card to act on. The search
 // box is autofocused, so it passes the keys on; other fields keep them.
 document.addEventListener('keydown', function(e) {
-    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    var add = (e.ctrlKey || e.metaKey) && !e.altKey;
+    var take = e.altKey && !e.ctrlKey && !e.metaKey;
+    if (e.shiftKey || !(add || take)) return;
+    // Option+B types "∫" on a Mac, so its keyCode names the key
     if (e.key !== 'b' && e.key !== 'B' && e.keyCode !== 66) return;
     var t = e.target;
     var searchBox = t.id === 'nav-searchbox' || t.id === 'searchbox';
     if (t.isContentEditable || (!searchBox && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    // The "∫" Option+B types would replace the query even with nothing to take
+    if (take && e.key !== 'b' && e.key !== 'B') e.preventDefault();
     // An open dialog or backpack panel covers the card, wherever the focus
     // is; a browser too old for the check goes by the focus
     if ((window.banDialogOpen && window.banDialogOpen()) || document.querySelector('#backpack-panel.open')) return;
@@ -510,13 +515,13 @@ document.addEventListener('keydown', function(e) {
     if (!shownHeader || !shownHeader.isConnected || !img) return;
     // checkVisibility is missing before Safari 17.4 and Firefox 125
     if (typeof img.checkVisibility === 'function' ? !img.checkVisibility() : !img.getClientRects().length) return;
-    var btn = shownHeader.querySelector(e.shiftKey ? '.pack-minus-btn' : '.pack-btn');
-    var act = e.shiftKey ? window.takeFromBackpack : window.addToBackpack;
+    var btn = shownHeader.querySelector(take ? '.pack-minus-btn' : '.pack-btn');
+    var act = take ? window.takeFromBackpack : window.addToBackpack;
     // A hidden minus means no NM copy to take
     if (!btn || btn.hidden || typeof act !== 'function') return;
     e.preventDefault();
     if (e.repeat) return;
-    if (window.BAN && window.BAN.track) window.BAN.track('ui.search.key', e.shiftKey ? 'pack_take' : 'pack_add');
+    if (window.BAN && window.BAN.track) window.BAN.track('ui.search.key', take ? 'pack_take' : 'pack_add');
     act(btn);
 });
 
