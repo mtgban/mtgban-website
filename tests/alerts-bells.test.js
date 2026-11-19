@@ -56,3 +56,26 @@ test('a bell with a side fills only for an alert on that side', async () => {
     expect([any.active, buylist.active, both.active, none.active]).toEqual([true, false, true, false]);
     expect([any.title, buylist.title]).toEqual(['Price alert set', 'Set a price alert']);
 });
+
+test("Upload reads the alerts when Not bought comes into view, once", async () => {
+    const section = {};
+    const observers = [];
+    const a = load([bell('card-a', 'buylist')], { section, observers });
+    a.ready();
+    expect(a.calls.length).toBe(0);
+    expect(observers[0].observed).toEqual([section]);
+    observers[0].fn([{ isIntersecting: false }]);
+    expect(a.calls.length).toBe(0);
+    observers[0].fn([{ isIntersecting: true }]);
+    expect(a.calls.map(c => c.path)).toEqual(['/api/alerts/']);
+    expect(observers[0].connected).toBe(false);
+});
+
+test('a page without Not bought, or a browser without the observer, reads them at load', () => {
+    const search = load([bell('card-a')], { observers: [] });
+    search.ready();
+    expect(search.calls.length).toBe(1);
+    const old = load([bell('card-a', 'buylist')], { section: {} });
+    old.ready();
+    expect(old.calls.length).toBe(1);
+});
