@@ -322,10 +322,10 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minP
 // product, resolved through the external id map with the sub-type naming the
 // finish.
 func moverCardID(b *matcher.Backend, row timeseries.MoverRow) (string, bool, bool) {
-	if row.MtgbanID != "" {
-		_, err := b.GetUUID(row.MtgbanID)
+	if row.BanUUID != "" {
+		_, err := b.GetUUID(row.BanUUID)
 		if err == nil {
-			return row.MtgbanID, row.IsFoil, true
+			return row.BanUUID, row.IsFoil, true
 		}
 	}
 	if row.MtgjsonUUID != "" {
