@@ -1241,8 +1241,10 @@
     // Bells on result rows fill in, like the star, for cards that already have an alert.
     function markBells(cardIds) {
         var bells = document.querySelectorAll('.alert-link[data-card-id], .m-actions-alert[data-card-id]');
+        var set = {};
+        cardIds.forEach(function (id) { set[id] = true; });
         Array.prototype.forEach.call(bells, function (b) {
-            var on = cardIds.indexOf(b.getAttribute('data-card-id')) !== -1;
+            var on = set[b.getAttribute('data-card-id')] === true;
             b.classList.toggle('active', on);
             b.title = on ? 'Price alert set' : 'Set a price alert';
         });
