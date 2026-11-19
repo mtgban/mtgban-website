@@ -387,17 +387,17 @@ func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays i
 	var result []MoverRow
 	for rows.Next() {
 		var m MoverRow
-		var uuid, mtgbanID, subType sql.NullString
+		var uuid, banUUID, subType sql.NullString
 		var isFoil, isEtched sql.NullBool
 		var productID sql.NullInt64
-		err = rows.Scan(&uuid, &isFoil, &isEtched, &mtgbanID, &productID, &subType, &m.Current, &m.Prior)
+		err = rows.Scan(&uuid, &isFoil, &isEtched, &banUUID, &productID, &subType, &m.Current, &m.Prior)
 		if err != nil {
 			return nil, err
 		}
 		m.MtgjsonUUID = uuid.String
 		m.IsFoil = isFoil.Bool
 		m.IsEtched = isEtched.Bool
-		m.MtgbanID = mtgbanID.String
+		m.BanUUID = banUUID.String
 		m.TCGProductID = int(productID.Int64)
 		m.TCGSubType = subType.String
 		result = append(result, m)

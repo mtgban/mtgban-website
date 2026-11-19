@@ -448,7 +448,7 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 	}
 
 	// An id the matcher no longer knows falls back to the row's uuid
-	uuid, _, ok = moverCardID(backend(), timeseries.MoverRow{MtgjsonUUID: "abc", MtgbanID: "abc_respelled"})
+	uuid, _, ok = moverCardID(backend(), timeseries.MoverRow{MtgjsonUUID: "abc", BanUUID: "abc_respelled"})
 	if !ok || uuid != "abc" {
 		t.Errorf("respelled row = %q/%v, want abc/true", uuid, ok)
 	}
@@ -463,7 +463,7 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 
 	// A token sheet's row resolves by its matcher id, not its alias uuid
 	sheet := "915356b7-202a-5619-b003-e613d245d5bb_tp_a1b995bd-aec0-5b7f-8db9-65b77d465558"
-	uuid, isFoil, ok = moverCardID(backend(), timeseries.MoverRow{MtgjsonUUID: "7ed91f61-e5a7-54fb-8b3f-d3fc604a2fc4", MtgbanID: sheet, IsFoil: true})
+	uuid, isFoil, ok = moverCardID(backend(), timeseries.MoverRow{MtgjsonUUID: "7ed91f61-e5a7-54fb-8b3f-d3fc604a2fc4", BanUUID: sheet, IsFoil: true})
 	if !ok || uuid != sheet || !isFoil {
 		t.Errorf("sheet row = %q/%v/%v, want %s/true/true", uuid, isFoil, ok, sheet)
 	}
