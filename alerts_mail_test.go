@@ -180,6 +180,20 @@ func fourFieldToken(payload string) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
+// tamperedToken flips one bit of token's MAC. Editing the base64 text
+// instead can decode to the same MAC: the last character's low bits are
+// padding.
+func tamperedToken(t *testing.T, token string) string {
+	t.Helper()
+	body, sig, _ := strings.Cut(token, ".")
+	mac, err := base64.RawURLEncoding.DecodeString(sig)
+	if err != nil || len(mac) == 0 {
+		t.Fatalf("token %q has no MAC: %v", token, err)
+	}
+	mac[0] ^= 1
+	return body + "." + base64.RawURLEncoding.EncodeToString(mac)
+}
+
 func pendingEmail(userHash, address string) alerts.Channel {
 	at := time.Now()
 	return alerts.Channel{UserHash: userHash, Kind: alerts.ChannelEmail, Address: address, Source: alerts.SourceUser, DisabledAt: &at, DisabledReason: "bounced"}
@@ -264,7 +278,7 @@ func TestAlertsConfirmRefusesBadLinks(t *testing.T) {
 	good := confirmToken("u1", "bob@example.com", future)
 	unsub := alerts.MintToken(alertTokenSecret(), alerts.Token{Kind: alerts.TokenUnsubscribe, UserHash: "u1", Address: "bob@example.com"})
 	for _, tc := range []struct{ name, token, rowAddress string }{
-		{"tampered", good[:len(good)-2] + "xx", "bob@example.com"},
+		{"tampered", tamperedToken(t, good), "bob@example.com"},
 		{"expired", confirmToken("u1", "bob@example.com", time.Now().Add(-time.Hour)), "bob@example.com"},
 		{"wrong kind", unsub, "bob@example.com"},
 		{"no claim", alerts.MintToken(alertTokenSecret(), alerts.Token{Kind: alerts.TokenConfirm, UserHash: "u1", Address: "bob@example.com", Expires: future}), "bob@example.com"},
@@ -658,7 +672,7 @@ func TestConfirmAndUnsubscribeAreCounted(t *testing.T) {
 			rows := withFeatureCounter(t)
 			store := &fakeLinkStore{channels: []alerts.Channel{pendingEmail("u1", "bob@example.com")}}
 			rec := httptest.NewRecorder()
-			c.serve(rec, post(c.token[:len(c.token)-2]+"xx"), store)
+			c.serve(rec, post(tamperedToken(t, c.token)), store)
 			if rec.Code != http.StatusBadRequest {
 				t.Fatalf("bad token = %d", rec.Code)
 			}
