@@ -1797,6 +1797,10 @@ body:not(:has(#panel-optimizer.active)) :is(.res-sort-btn, .res-sort-sep) { disp
        Its headers then cannot stick to the page, and would cover rows. */
     .opt-store { overflow-x: auto; }
     .opt-table thead { position: static; }
+    /* The store's header holds to the section's left edge, its width, while
+       the columns scroll under it */
+    .opt-store { container-type: inline-size; }
+    .opt-store-header { position: sticky; left: 0; max-width: 100cqw; box-sizing: border-box; }
 
     /* Reload bar: full width at bottom */
     .ures-reload-bar { left: 16px; right: 16px; }
