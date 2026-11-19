@@ -798,9 +798,10 @@ func TestMetricsAPICapsErrorEntriesPerPost(t *testing.T) {
 	withOpenBeaconLimiter(t)
 	rows := withFeatureCounter(t)
 	errs := withFeatureErrors(t)
+	classes := observability.ErrorClasses() // one class an entry, so no place reaches its lines cap
 	var entries []string
 	for i := range metricsMaxErrorEntries + 5 {
-		entries = append(entries, errorEntry("TypeError", 1, i+1, testBuild))
+		entries = append(entries, errorEntry(classes[i], 1, i+1, testBuild))
 	}
 	entries = append(entries, `{"n":"ui.load","s":"search","c":1}`)
 	postBeacon(t, beacon("["+strings.Join(entries, ",")+"]"))
@@ -808,11 +809,36 @@ func TestMetricsAPICapsErrorEntriesPerPost(t *testing.T) {
 		t.Errorf("%d error rows, want %d", len(got), metricsMaxErrorEntries)
 	}
 	counts := rows.rows()
-	wantRow(t, counts, "navbar.js", "ui.js.error", "TypeError", metricsMaxErrorEntries)
+	var stored int64
+	for _, row := range find(counts, "ui.js.error") {
+		stored += row.N
+	}
+	if stored != metricsMaxErrorEntries {
+		t.Errorf("ui.js.error counted %d, want %d", stored, metricsMaxErrorEntries)
+	}
 	wantRow(t, counts, "search", "ui.load", "", 1)
 	wantRow(t, counts, "", "metrics.client", "count", 5)
 	wantRow(t, counts, "", "metrics.client", "accepted", metricsMaxErrorEntries+1)
 	wantRow(t, counts, "", "metrics.rejected", "", 5)
+}
+
+// Made-up lines of one script and class add at most ErrorLinesPerDay rows; the rest keep their count only.
+func TestMetricsAPICapsTheLinesOfOnePlace(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	errs := withFeatureErrors(t)
+	var entries []string
+	for i := range metricsMaxErrorEntries {
+		entries = append(entries, errorEntry("TypeError", 1, 100+i, testBuild))
+	}
+	postBeacon(t, beacon("["+strings.Join(entries, ",")+"]"))
+	if got := errs.rows(); len(got) != observability.ErrorLinesPerDay {
+		t.Errorf("%d error rows, want %d", len(got), observability.ErrorLinesPerDay)
+	}
+	counts := rows.rows()
+	wantRow(t, counts, "navbar.js", "ui.js.error", "TypeError", metricsMaxErrorEntries)
+	wantRow(t, counts, "", "metrics.client", "accepted", metricsMaxErrorEntries)
+	wantRow(t, counts, "", "metrics.rejected", "", metricsMaxErrorEntries-observability.ErrorLinesPerDay)
 }
 
 // A row the store refuses is counted as rejected; its count stays accepted.

@@ -13,6 +13,13 @@ const errorRowsPerDay = 200
 // ErrorRowsPerDay is the most distinct error rows one instance keeps for a day.
 const ErrorRowsPerDay = errorRowsPerDay
 
+// errorLinesPerDay is the most distinct lines one device, build, script and class keeps for a day,
+// so a client making up lines cannot spend the instance's whole day of rows on one place.
+const errorLinesPerDay = 3
+
+// ErrorLinesPerDay is the most distinct lines one device, build, script and class keeps for a day.
+const ErrorLinesPerDay = errorLinesPerDay
+
 // errorCapLockSQL serialises one instance's writers so two cannot both see room for the last row.
 const errorCapLockSQL = `SELECT pg_advisory_xact_lock(hashtext('feature_errors:' || $1::text))`
 
@@ -32,7 +39,8 @@ type ErrorTop struct {
 	FirstDay, LastDay  time.Time
 }
 
-// UpsertErrors adds rows for one instance; refused counts new keys past the day's cap.
+// UpsertErrors adds rows for one instance; refused counts new keys past the day's cap
+// or past the lines a device, build, script and class may keep that day.
 func (c *Client) UpsertErrors(ctx context.Context, instance string, rows []ErrorRow) (refused int, err error) {
 	if len(rows) == 0 {
 		return 0, nil
@@ -53,11 +61,13 @@ func (c *Client) UpsertErrors(ctx context.Context, instance string, rows []Error
 SELECT $1::date, $2::text, $3::text, $4::text, $5::text, $6::integer, $7::text, $8::bigint
 WHERE EXISTS (SELECT 1 FROM feature_errors WHERE day = $1::date AND instance = $2 AND device = $3
               AND build = $4 AND script = $5 AND line = $6 AND class = $7)
-   OR (SELECT count(*) FROM feature_errors WHERE day = $1::date AND instance = $2) < $9
+   OR ((SELECT count(*) FROM feature_errors WHERE day = $1::date AND instance = $2) < $9
+       AND (SELECT count(*) FROM feature_errors WHERE day = $1::date AND instance = $2 AND device = $3
+            AND build = $4 AND script = $5 AND class = $7) < $10)
 ON CONFLICT (day, instance, device, build, script, line, class)
 DO UPDATE SET n = feature_errors.n + EXCLUDED.n`
 	for _, r := range rows {
-		res, err := tx.ExecContext(ctx, q, wholeDay(r.Day), instance, r.Device, r.Build, r.Script, r.Line, r.Class, r.N, errorRowsPerDay)
+		res, err := tx.ExecContext(ctx, q, wholeDay(r.Day), instance, r.Device, r.Build, r.Script, r.Line, r.Class, r.N, errorRowsPerDay, errorLinesPerDay)
 		if err != nil {
 			return 0, fmt.Errorf("observability: upsert errors: %w", err)
 		}

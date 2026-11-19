@@ -116,9 +116,11 @@ func TestErrorBufferAggregatesByKey(t *testing.T) {
 func TestErrorBufferRowsAreSorted(t *testing.T) {
 	b, store, _, _ := newTestBuffer(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC))
 	r := rand.New(rand.NewPCG(1, 2))
-	devices, scripts, classes := []string{"desktop", "mobile"}, []string{"navbar.js", "utils.js", "inline"}, []string{"Error", "TypeError"}
+	devices, scripts, classes := []string{"desktop", "mobile"}, Scripts(), []string{"Error", "TypeError"}
 	for _, i := range r.Perm(50) {
-		b.Add(devices[i%2], testBuild, scripts[i%3], classes[i/25], i, 1)
+		if !b.Add(devices[i%2], testBuild, scripts[i%len(scripts)], classes[i/25], i, 1) {
+			t.Fatalf("row %d refused", i)
+		}
 	}
 	if err := b.Flush(context.Background()); err != nil {
 		t.Fatal(err)
@@ -149,16 +151,70 @@ func TestErrorBufferSplitsAtMidnightUTC(t *testing.T) {
 func TestErrorBufferRefusesPastItsCap(t *testing.T) {
 	b, _, _, _ := newTestBuffer(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC))
 	b.maxPending = 3
+	scripts := Scripts()
 	for i := range 3 {
-		if !b.Add("desktop", testBuild, "navbar.js", "Error", i, 1) {
+		if !b.Add("desktop", testBuild, scripts[i], "Error", i, 1) {
 			t.Fatalf("key %d refused under the cap", i)
 		}
 	}
-	if b.Add("desktop", testBuild, "navbar.js", "Error", 3, 1) {
+	if b.Add("desktop", testBuild, scripts[3], "Error", 3, 1) {
 		t.Error("a 4th new key was taken")
 	}
-	if !b.Add("desktop", testBuild, "navbar.js", "Error", 0, 1) {
+	if !b.Add("desktop", testBuild, scripts[0], "Error", 0, 1) {
 		t.Error("a repeat of a held key was refused")
+	}
+}
+
+// One device, build, script and class holds at most errorLinesPerDay lines, so made-up lines cannot fill the buffer.
+func TestErrorBufferCapsTheLinesOfOnePlace(t *testing.T) {
+	b, store, _, _ := newTestBuffer(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC))
+	for i := range errorLinesPerDay {
+		if !b.Add("desktop", testBuild, "navbar.js", "TypeError", i+1, 1) {
+			t.Fatalf("line %d refused under the cap", i+1)
+		}
+	}
+	if b.Add("desktop", testBuild, "navbar.js", "TypeError", 99, 1) {
+		t.Errorf("line %d of one place was taken", errorLinesPerDay+1)
+	}
+	if !b.Add("desktop", testBuild, "navbar.js", "TypeError", 1, 4) {
+		t.Error("a held line was refused")
+	}
+	for _, other := range []struct{ device, script, class string }{
+		{"mobile", "navbar.js", "TypeError"},
+		{"desktop", "utils.js", "TypeError"},
+		{"desktop", "navbar.js", "RangeError"},
+	} {
+		if !b.Add(other.device, testBuild, other.script, other.class, 99, 1) {
+			t.Errorf("%+v was refused for another place's lines", other)
+		}
+	}
+	if err := b.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if rows := store.last(t).rows; len(rows) != errorLinesPerDay+3 {
+		t.Errorf("%d rows, want %d", len(rows), errorLinesPerDay+3)
+	}
+	// the store keeps the day's cap; the buffer only holds one flush's lines
+	if !b.Add("desktop", testBuild, "navbar.js", "TypeError", 99, 1) {
+		t.Error("a new line after a flush was refused by the buffer")
+	}
+}
+
+// Rows put back after a failed flush keep the lines cap.
+func TestErrorBufferPutBackKeepsTheLinesCap(t *testing.T) {
+	b, store, _, rejects := newTestBuffer(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC))
+	store.err = errors.New("down")
+	for i := range errorLinesPerDay {
+		b.Add("desktop", testBuild, "navbar.js", "TypeError", i+1, 1)
+	}
+	if err := b.Flush(context.Background()); err == nil {
+		t.Fatal("Flush succeeded against a store that is down")
+	}
+	if b.Add("desktop", testBuild, "navbar.js", "TypeError", 99, 1) {
+		t.Error("a new line was taken over the put-back lines")
+	}
+	if *rejects != 0 {
+		t.Errorf("%d rejects, want 0", *rejects)
 	}
 }
 
@@ -166,7 +222,9 @@ func TestRefusedRowsAreReportedAsRejected(t *testing.T) {
 	b, store, _, rejects := newTestBuffer(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC))
 	store.refused = 4
 	for i := range 6 {
-		b.Add("desktop", testBuild, "navbar.js", "Error", i, 1)
+		if !b.Add("desktop", testBuild, Scripts()[i], "Error", i, 1) {
+			t.Fatalf("row %d refused", i)
+		}
 	}
 	if err := b.Flush(context.Background()); err != nil {
 		t.Fatal(err)
