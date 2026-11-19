@@ -16,6 +16,7 @@ import (
 	"time"
 	"weak"
 
+	"github.com/lib/pq"
 	"github.com/mtgban/go-mtgban/matcher"
 )
 
@@ -35,6 +36,9 @@ type Sales struct {
 	RecentOrders int32
 	// The first and last sale over the lookback.
 	FirstSale, LastSale time.Time
+	// The newest order's price per copy and its condition abbreviated, 0 and empty with none.
+	LastPrice     float64
+	LastCondition string
 	// The median sale price over the window, weighted by orders.
 	Price float64
 
@@ -118,6 +122,10 @@ type Snapshot struct {
 	Window int
 	// The price bands each card's pace is judged within.
 	Bands []Band
+	// The cards with a last sale price, and why there are none when the
+	// order table could not be read.
+	Priced int
+	Note   string
 
 	// The backend whose card ids key Cards, held weakly so a snapshot
 	// outliving a datastore reload does not keep the old backend alive
@@ -189,6 +197,13 @@ const LastQuery = `
 	   AND product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $3)
 	 GROUP BY 1, 2`
 
+// LastOrderQuery is the newest order per product and printing of one game, whatever its date.
+const LastOrderQuery = `
+	SELECT product_id, variant, order_date, condition, purchase_price::float8
+	  FROM tcgplayerlastsalemodel
+	 WHERE product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $1)
+	 ORDER BY product_id, variant`
+
 // salesRow is one row of WindowQuery.
 type salesRow struct {
 	ProductID            int64
@@ -204,6 +219,15 @@ type lastRow struct {
 	Variant   string
 	Last      time.Time
 	First     time.Time
+}
+
+// orderRow is a product and printing's newest order.
+type orderRow struct {
+	ProductID int64
+	Variant   string
+	At        time.Time
+	Condition string
+	Price     float64
 }
 
 // salesPair is a product in one printing, as the sales table keys it.
@@ -245,20 +269,19 @@ func (s *Store) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, game s
 		current = nil
 	}
 	if current != nil && current.Day.Equal(day) {
-		return fmt.Sprintf("%d cards over the %d days to %s, already loaded",
-			len(current.Cards), current.Window, day.Format(time.DateOnly)), ""
+		return alreadyLoadedLine(current), ""
 	}
 	if !due(current, s.failed.Load(), day, time.Now()) {
 		return "", ""
 	}
 
-	cards, bands, unmatched, err := query(ctx, db, b, game, day)
+	cards, bands, unmatched, priced, note, err := query(ctx, db, b, game, day)
 	if err != nil {
 		log.Println("sales velocity:", err)
 		s.failed.Store(&failure{Day: day, At: time.Now()})
 		return "", "failed to load " + day.Format(time.DateOnly) + ": " + err.Error()
 	}
-	snap := &Snapshot{Day: day, Cards: cards, Window: Window, Bands: bands, Backend: weak.Make(b)}
+	snap := &Snapshot{Day: day, Cards: cards, Window: Window, Bands: bands, Priced: priced, Note: note, Backend: weak.Make(b)}
 	s.current.Store(snap)
 	result = report(snap, unmatched)
 	log.Println("sales velocity:", result)
@@ -327,6 +350,51 @@ func readLastRows(ctx context.Context, q salesQuerier, game string, day time.Tim
 	return all, rows.Err()
 }
 
+// readOrderRows reads game's newest orders, per product and printing.
+func readOrderRows(ctx context.Context, q salesQuerier, game string) ([]orderRow, error) {
+	rows, err := q.QueryContext(ctx, LastOrderQuery, game)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var all []orderRow
+	for rows.Next() {
+		var row orderRow
+		var condition sql.NullString
+		err := rows.Scan(&row.ProductID, &row.Variant, &row.At, &condition, &row.Price)
+		if err != nil {
+			return nil, err
+		}
+		row.Condition = condition.String
+		// A timestamp without zone holds UTC, whatever location the driver gives it.
+		y, m, d := row.At.Date()
+		hh, mm, ss := row.At.Clock()
+		row.At = time.Date(y, m, d, hh, mm, ss, row.At.Nanosecond(), time.UTC)
+		all = append(all, row)
+	}
+	return all, rows.Err()
+}
+
+// ordersUnavailable is whether err is the order table missing or unreadable.
+func ordersUnavailable(err error) bool {
+	var pgErr *pq.Error
+	return errors.As(err, &pgErr) && (pgErr.Code == "42P01" || pgErr.Code == "42501")
+}
+
+// loadOrders runs read, turning an absent or unreadable table into no orders and a note.
+func loadOrders(ctx context.Context, read func() ([]orderRow, error)) ([]orderRow, string, error) {
+	orders, err := read()
+	if err == nil {
+		return orders, "", nil
+	}
+	var pgErr *pq.Error
+	if ctx.Err() == nil && ordersUnavailable(err) && errors.As(err, &pgErr) {
+		return nil, "last sale prices unavailable: " + pgErr.Message, nil
+	}
+	return nil, "", err
+}
+
 // cardMatcher resolves a product and printing to b's card id, "" for none.
 func cardMatcher(b *matcher.Backend) func(productID int64, variant string) string {
 	return func(productID int64, variant string) string {
@@ -342,8 +410,22 @@ func cardMatcher(b *matcher.Backend) func(productID int64, variant string) strin
 	}
 }
 
-// readSales reads game's window and lookback ending on day in one read-only snapshot.
-func readSales(ctx context.Context, db *sql.DB, game string, day time.Time) ([]salesRow, []lastRow, error) {
+// readSales reads game's window and lookback in one snapshot, then its newest
+// orders; the note says why there are none.
+func readSales(ctx context.Context, db *sql.DB, game string, day time.Time) ([]salesRow, []lastRow, []orderRow, string, error) {
+	rows, last, err := readSnapshot(ctx, db, game, day)
+	if err != nil {
+		return nil, nil, nil, "", err
+	}
+	orders, note, err := loadOrders(ctx, func() ([]orderRow, error) { return readOrderRows(ctx, db, game) })
+	if err != nil {
+		return nil, nil, nil, "", err
+	}
+	return rows, last, orders, note, nil
+}
+
+// readSnapshot reads the window and the lookback in one read-only repeatable read.
+func readSnapshot(ctx context.Context, db *sql.DB, game string, day time.Time) ([]salesRow, []lastRow, error) {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	if err != nil {
 		return nil, nil, err
@@ -362,21 +444,33 @@ func readSales(ctx context.Context, db *sql.DB, game string, day time.Time) ([]s
 }
 
 // query reads game's sales to day, ends the transaction, then keys them by b's
-// cards and grades their pace.
-func query(ctx context.Context, db *sql.DB, b *matcher.Backend, game string, day time.Time) (map[string]*Sales, []Band, int, error) {
-	rows, last, err := readSales(ctx, db, game, day)
+// cards and grades their pace. It also returns the cards with a last sale
+// price, and the note on why there are none.
+func query(ctx context.Context, db *sql.DB, b *matcher.Backend, game string, day time.Time) (map[string]*Sales, []Band, int, int, string, error) {
+	rows, last, orders, note, err := readSales(ctx, db, game, day)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, 0, 0, "", err
 	}
-	cards, unmatched := build(rows, last, cardMatcher(b))
+	cards, unmatched := build(rows, last, orders, cardMatcher(b))
 	if len(cards) == 0 {
-		return nil, nil, unmatched, fmt.Errorf("no cards matched in %d pairs to %s, keeping the previous load", len(last), day.Format(time.DateOnly))
+		return nil, nil, unmatched, 0, "", fmt.Errorf("no cards matched in %d pairs to %s, keeping the previous load", len(last), day.Format(time.DateOnly))
 	}
-	return cards, grade(cards), unmatched, nil
+	return cards, grade(cards), unmatched, pricedCount(cards), note, nil
+}
+
+// pricedCount is the cards with a last sale price.
+func pricedCount(cards map[string]*Sales) int {
+	n := 0
+	for _, v := range cards {
+		if v.LastPrice > 0 {
+			n++
+		}
+	}
+	return n
 }
 
 // build keys the pairs by card uuid and counts the pairs no card matches.
-func build(rows []salesRow, last []lastRow, match func(productID int64, variant string) string) (map[string]*Sales, int) {
+func build(rows []salesRow, last []lastRow, orders []orderRow, match func(productID int64, variant string) string) (map[string]*Sales, int) {
 	cards := map[string]*Sales{}
 	resolved := map[salesPair]string{}
 	unmatched := 0
@@ -412,6 +506,32 @@ func build(rows []salesRow, last []lastRow, match func(productID int64, variant 
 			v.FirstSale = row.First
 		}
 	}
+	// The newest order per card, picked before any date moves; a pair with no
+	// card entry is not a sales pair, so it neither makes one nor counts.
+	newest := map[*Sales]orderRow{}
+	for _, o := range orders {
+		key := salesPair{o.ProductID, o.Variant}
+		cardID, seen := resolved[key]
+		if !seen {
+			cardID = match(o.ProductID, o.Variant)
+			// A miss stays unrecorded, so a sales pair of it is still counted unmatched.
+			if cardID != "" {
+				resolved[key] = cardID
+			}
+		}
+		v := cards[cardID]
+		if cardID == "" || v == nil || o.Price <= 0 || startOfDay(o.At).Before(v.LastSale) {
+			continue
+		}
+		if best, ok := newest[v]; !ok || o.At.After(best.At) {
+			newest[v] = o
+		}
+	}
+	for v, o := range newest {
+		v.LastSale = startOfDay(o.At)
+		v.LastPrice = o.Price
+		v.LastCondition = shortCondition(o.Condition)
+	}
 	for _, row := range rows {
 		v := entry(row.ProductID, row.Variant)
 		if v == nil {
@@ -427,6 +547,59 @@ func build(rows []salesRow, last []lastRow, match func(productID int64, variant 
 		v.Days = max(v.Days, row.Days)
 	}
 	return cards, unmatched
+}
+
+// startOfDay is t's UTC date at midnight, as the lookback's dates scan.
+func startOfDay(t time.Time) time.Time {
+	y, m, d := t.UTC().Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
+// The conditions' short forms, shared so every card holds one string of each.
+const (
+	condNM  = "NM"
+	condLP  = "LP"
+	condMP  = "MP"
+	condHP  = "HP"
+	condDMG = "DMG"
+)
+
+// shortCondition is TCGplayer's grade abbreviated, anything else as sent.
+func shortCondition(condition string) string {
+	switch condition {
+	case "Near Mint":
+		return condNM
+	case "Lightly Played":
+		return condLP
+	case "Moderately Played":
+		return condMP
+	case "Heavily Played":
+		return condHP
+	case "Damaged":
+		return condDMG
+	}
+	return condition
+}
+
+// priceText is the last sale's price and condition, "$12.34 LP", empty with no price.
+func priceText(v Sales) string {
+	if v.LastPrice <= 0 {
+		return ""
+	}
+	price := fmt.Sprintf("$%.2f", v.LastPrice)
+	if c := v.LastCondition; c != "" {
+		price += " " + c
+	}
+	return price
+}
+
+// lastSaleText is the last sale's price, condition and date, as the details print it.
+func lastSaleText(v Sales) string {
+	date := v.LastSale.Format(time.DateOnly)
+	if price := priceText(v); price != "" {
+		return price + " · " + date
+	}
+	return date
 }
 
 // bandEdges split the cards, by price in dollars, into the bands a pace is
@@ -536,8 +709,23 @@ func (s *Snapshot) For(cardID string) (Sales, bool) {
 
 // report is a load's line on the admin dashboard.
 func report(snap *Snapshot, unmatched int) string {
-	return fmt.Sprintf("%d cards over the %d days to %s, %d not matched",
-		len(snap.Cards), snap.Window, snap.Day.Format(time.DateOnly), unmatched)
+	return fmt.Sprintf("%d cards over the %d days to %s, %d not matched%s",
+		len(snap.Cards), snap.Window, snap.Day.Format(time.DateOnly), unmatched, pricedSuffix(snap.Priced, snap.Note))
+}
+
+// alreadyLoadedLine is the dashboard line for a load that finds snap's day loaded.
+func alreadyLoadedLine(snap *Snapshot) string {
+	return fmt.Sprintf("%d cards over the %d days to %s, already loaded%s",
+		len(snap.Cards), snap.Window, snap.Day.Format(time.DateOnly), pricedSuffix(snap.Priced, snap.Note))
+}
+
+// pricedSuffix is the dashboard line's count of priced cards and its note, if any.
+func pricedSuffix(priced int, note string) string {
+	line := fmt.Sprintf(", %d with a last sale price", priced)
+	if note != "" {
+		line += "; " + note
+	}
+	return line
 }
 
 // paceLine is the details' line on how a card sells against its price band,
@@ -578,6 +766,9 @@ func text(v Sales, window int, notes ...string) (rate, detail string) {
 		zero := "no sale in the window"
 		if !v.LastSale.IsZero() {
 			zero += "; last sold " + v.LastSale.Format(time.DateOnly)
+			if price := priceText(v); price != "" {
+				zero += " for " + price
+			}
 		}
 		return "0/day", head + "\n" + zero
 	}
@@ -600,7 +791,7 @@ func text(v Sales, window int, notes ...string) (rate, detail string) {
 		}
 	}
 	if !v.LastSale.IsZero() {
-		lines = append(lines, "|last sale|"+v.LastSale.Format(time.DateOnly))
+		lines = append(lines, "|last sale|"+lastSaleText(v))
 	}
 	return rate, strings.Join(lines, "\n")
 }

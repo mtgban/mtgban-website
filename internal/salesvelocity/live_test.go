@@ -96,9 +96,19 @@ func TestSalesVelocityLive(t *testing.T) {
 	}
 	lastTook := time.Since(start)
 
+	start = time.Now()
+	orders, err := readOrderRows(ctx, db, game)
+	orderCount := fmt.Sprint(len(orders))
+	if ordersUnavailable(err) {
+		orderCount = "n/a"
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	ordersTook := time.Since(start)
+
 	match := cardMatcher(b)
 	start = time.Now()
-	cards, unmatched := build(rows, last, match)
+	cards, unmatched := build(rows, last, orders, match)
 	bands := grade(cards)
 	buildTook := time.Since(start)
 	if len(cards) == 0 {
@@ -147,9 +157,10 @@ func TestSalesVelocityLive(t *testing.T) {
 	fmt.Printf("| newest sale day | %d | 1 |\n", dayTook.Milliseconds())
 	fmt.Printf("| %d-day window | %d | %d |\n", Window, rowsTook.Milliseconds(), len(rows))
 	fmt.Printf("| last sale over %d days | %d | %d |\n", lookback, lastTook.Milliseconds(), len(last))
+	fmt.Printf("| last orders | %d | %s |\n", ordersTook.Milliseconds(), orderCount)
 	fmt.Printf("| match and build (cards) | %d | %d |\n\n", buildTook.Milliseconds(), len(cards))
-	fmt.Print("| entries | zero | unmatched pairs | this game's pairs unmatched |\n|---:|---:|---:|---:|\n")
-	fmt.Printf("| %d | %d | %d | %d of %d |\n\n", len(cards), zero, unmatched, gameUnmatched, gamePairs)
+	fmt.Print("| entries | with a price | zero | unmatched pairs | this game's pairs unmatched |\n|---:|---:|---:|---:|---:|\n")
+	fmt.Printf("| %d | %d | %d | %d | %d of %d |\n\n", len(cards), pricedCount(cards), zero, unmatched, gameUnmatched, gamePairs)
 
 	// Each band's cards with a sale in the window, and the slowest rate of each pace.
 	counts := make([]int, len(bands))

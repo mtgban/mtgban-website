@@ -1,11 +1,16 @@
 package salesvelocity
 
 import (
+	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // snapshotOf is a load of cards.
@@ -55,7 +60,7 @@ func TestBuild(t *testing.T) {
 		return ids[salesPair{productID, variant}]
 	}
 
-	cards, unmatched := build(rows, last, match)
+	cards, unmatched := build(rows, last, nil, match)
 	if unmatched != 2 {
 		t.Errorf("unmatched: got %d, want 2", unmatched)
 	}
@@ -78,6 +83,83 @@ func TestBuild(t *testing.T) {
 	for pair, n := range asked {
 		if n != 1 {
 			t.Errorf("%v: matched %d times, want once", pair, n)
+		}
+	}
+}
+
+// TestBuildOrders attaches the newest order to a card with a sale in the lookback.
+func TestBuildOrders(t *testing.T) {
+	day := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
+	at := func(m time.Month, d, h int) time.Time { return time.Date(2026, m, d, h, 4, 0, 0, time.UTC) }
+	ids := map[salesPair]string{{1, "Normal"}: "card", {2, "Normal"}: "card", {3, "Normal"}: "other"}
+	match := func(productID int64, variant string) string { return ids[salesPair{productID, variant}] }
+	one := []lastRow{{ProductID: 1, Variant: "Normal", Last: day(11, 17)}}
+	two := []lastRow{
+		{ProductID: 1, Variant: "Normal", Last: day(11, 17)},
+		{ProductID: 2, Variant: "Normal", Last: day(11, 17)},
+	}
+	for _, tc := range []struct {
+		desc      string
+		last      []lastRow
+		orders    []orderRow
+		want      Sales
+		unmatched int
+		cards     int
+	}{
+		{"same day", one, []orderRow{{1, "Normal", at(11, 17, 15), "Lightly Played", 12.34}},
+			Sales{LastSale: day(11, 17), LastPrice: 12.34, LastCondition: "LP"}, 0, 1},
+		{"a later day moves the date", one, []orderRow{{1, "Normal", time.Date(2026, 11, 18, 2, 0, 0, 0, time.UTC), "Near Mint", 3}},
+			Sales{LastSale: day(11, 18), LastPrice: 3, LastCondition: "NM"}, 0, 1},
+		{"an earlier day is left out", one, []orderRow{{1, "Normal", at(11, 10, 1), "Near Mint", 3}},
+			Sales{LastSale: day(11, 17)}, 0, 1},
+		{"the later of two pairs", two, []orderRow{
+			{1, "Normal", at(11, 17, 10), "Near Mint", 5},
+			{2, "Normal", at(11, 17, 12), "Near Mint", 6},
+		}, Sales{LastSale: day(11, 17), LastPrice: 6, LastCondition: "NM"}, 0, 1},
+		{"the same instant keeps the first", two, []orderRow{
+			{1, "Normal", at(11, 17, 10), "Near Mint", 5},
+			{2, "Normal", at(11, 17, 10), "Near Mint", 6},
+		}, Sales{LastSale: day(11, 17), LastPrice: 5, LastCondition: "NM"}, 0, 1},
+		{"a matched pair with no lookback row", one, []orderRow{{3, "Normal", at(11, 17, 10), "Near Mint", 5}},
+			Sales{LastSale: day(11, 17)}, 0, 1},
+		{"no price", one, []orderRow{{1, "Normal", at(11, 17, 10), "Near Mint", 0}},
+			Sales{LastSale: day(11, 17)}, 0, 1},
+		{"a moved date does not disqualify the other pair", two, []orderRow{
+			{1, "Normal", at(11, 18, 3), "Near Mint", 7},
+			{2, "Normal", at(11, 17, 3), "Near Mint", 4},
+		}, Sales{LastSale: day(11, 18), LastPrice: 7, LastCondition: "NM"}, 0, 1},
+	} {
+		cards, unmatched := build(nil, tc.last, tc.orders, match)
+		if unmatched != tc.unmatched || len(cards) != tc.cards {
+			t.Errorf("%s: %d cards, %d unmatched; want %d, %d", tc.desc, len(cards), unmatched, tc.cards, tc.unmatched)
+		}
+		got := cards["card"]
+		if got == nil || got.LastSale != tc.want.LastSale || got.LastPrice != tc.want.LastPrice || got.LastCondition != tc.want.LastCondition {
+			t.Errorf("%s: got %+v, want %+v", tc.desc, got, tc.want)
+		}
+	}
+}
+
+// TestBuildOrdersUnmatched counts a pair no card matches once, by its sales row.
+func TestBuildOrdersUnmatched(t *testing.T) {
+	at := time.Date(2026, 11, 17, 10, 4, 0, 0, time.UTC)
+	match := func(int64, string) string { return "" }
+	last := []lastRow{{ProductID: 9, Variant: "Normal", Last: time.Date(2026, 11, 17, 0, 0, 0, 0, time.UTC)}}
+	orders := []orderRow{{9, "Normal", at, "Near Mint", 5}}
+	cards, unmatched := build(nil, last, orders, match)
+	if unmatched != 1 || len(cards) != 0 {
+		t.Errorf("got %d cards, %d unmatched; want 0, 1", len(cards), unmatched)
+	}
+}
+
+// TestShortCondition abbreviates TCGplayer's grades and leaves the rest as sent.
+func TestShortCondition(t *testing.T) {
+	for in, want := range map[string]string{
+		"Near Mint": "NM", "Lightly Played": "LP", "Moderately Played": "MP",
+		"Heavily Played": "HP", "Damaged": "DMG", "Unopened": "Unopened", "": "",
+	} {
+		if got := shortCondition(in); got != want {
+			t.Errorf("%q: got %q, want %q", in, got, want)
 		}
 	}
 }
@@ -281,11 +363,70 @@ func TestReport(t *testing.T) {
 		Day:    time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC),
 		Cards:  map[string]*Sales{"a": {Copies: 3}, "b": {Copies: 9}, "c": {}},
 		Window: Window,
+		Priced: 2,
 	}
 	got := report(snap, 7)
-	want := "3 cards over the 30 days to 2026-10-12, 7 not matched"
+	want := "3 cards over the 30 days to 2026-10-12, 7 not matched, 2 with a last sale price"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+	got = alreadyLoadedLine(snap)
+	want = "3 cards over the 30 days to 2026-10-12, already loaded, 2 with a last sale price"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	note := `last sale prices unavailable: relation "tcgplayerlastsalemodel" does not exist`
+	snap.Priced, snap.Note = 0, note
+	got = alreadyLoadedLine(snap)
+	want = "3 cards over the 30 days to 2026-10-12, already loaded, 0 with a last sale price; " + note
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	got = report(snap, 3)
+	want = "3 cards over the 30 days to 2026-10-12, 3 not matched, 0 with a last sale price; " + note
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// TestOrdersUnavailable tolerates a missing table and a denied read, nothing else.
+func TestOrdersUnavailable(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want bool
+	}{
+		{&pq.Error{Code: "42P01"}, true},
+		{&pq.Error{Code: "42501"}, true},
+		{fmt.Errorf("x: %w", &pq.Error{Code: "42P01"}), true},
+		{fmt.Errorf("x: %w", &pq.Error{Code: "42501"}), true},
+		{&pq.Error{Code: "57014"}, false},
+		{sql.ErrNoRows, false},
+		{nil, false},
+	} {
+		if got := ordersUnavailable(tc.err); got != tc.want {
+			t.Errorf("%v: got %v, want %v", tc.err, got, tc.want)
+		}
+	}
+}
+
+// TestLoadOrders reads the orders, or loads without them on an absent table.
+func TestLoadOrders(t *testing.T) {
+	ctx := context.Background()
+	rows := []orderRow{{ProductID: 1, Variant: "Normal", Price: 2.5}}
+	got, note, err := loadOrders(ctx, func() ([]orderRow, error) { return rows, nil })
+	if err != nil || note != "" || !slices.Equal(got, rows) {
+		t.Errorf("rows: got %v, %q, %v", got, note, err)
+	}
+	got, note, err = loadOrders(ctx, func() ([]orderRow, error) {
+		return nil, &pq.Error{Code: "42P01", Message: `relation "tcgplayerlastsalemodel" does not exist`}
+	})
+	if err != nil || got != nil || note != `last sale prices unavailable: relation "tcgplayerlastsalemodel" does not exist` {
+		t.Errorf("absent: got %v, %q, %v", got, note, err)
+	}
+	boom := errors.New("boom")
+	got, note, err = loadOrders(ctx, func() ([]orderRow, error) { return nil, boom })
+	if !errors.Is(err, boom) || got != nil || note != "" {
+		t.Errorf("other: got %v, %q, %v", got, note, err)
 	}
 }
 
@@ -301,6 +442,22 @@ func TestQueries(t *testing.T) {
 				t.Errorf("%s: missing %q", name, part)
 			}
 		}
+	}
+}
+
+// TestLastOrderQuery reads one game's newest orders, whatever their date.
+func TestLastOrderQuery(t *testing.T) {
+	for _, part := range []string{
+		"tcgplayerlastsalemodel",
+		"ORDER BY product_id, variant",
+		"product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $1)",
+	} {
+		if !strings.Contains(LastOrderQuery, part) {
+			t.Errorf("missing %q", part)
+		}
+	}
+	if strings.Contains(LastOrderQuery, "BETWEEN") || strings.Contains(LastOrderQuery, "$2") {
+		t.Error("the order query is bound by a date")
 	}
 }
 
@@ -350,6 +507,18 @@ func TestText(t *testing.T) {
 			head + "|copies|2\n|orders|2\n|days with a sale|1\n|last sale|2026-10-11"},
 		{"zero", Sales{LastSale: time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)}, 30, "0/day",
 			head + "no sale in the window; last sold 2026-09-02"},
+		{"a price and condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 12.34, LastCondition: "LP"}, 30, "2.3/day",
+			head + "|copies|69\n|orders|31\n|days with a sale|18\n|last sale|$12.34 LP · 2026-10-11"},
+		{"a price with no condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 12.34}, 30, "2.3/day",
+			head + "|copies|69\n|orders|31\n|days with a sale|18\n|last sale|$12.34 · 2026-10-11"},
+		{"a price and an unabbreviated condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 89.99, LastCondition: "Unopened"}, 30, "2.3/day",
+			head + "|copies|69\n|orders|31\n|days with a sale|18\n|last sale|$89.99 Unopened · 2026-10-11"},
+		{"a price under a dollar", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 0.5}, 30, "2.3/day",
+			head + "|copies|69\n|orders|31\n|days with a sale|18\n|last sale|$0.50 · 2026-10-11"},
+		{"zero with a price", Sales{LastSale: time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC), LastPrice: 12.34, LastCondition: "LP"}, 30, "0/day",
+			head + "no sale in the window; last sold 2026-08-02 for $12.34 LP"},
+		{"zero with a price and no condition", Sales{LastSale: time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC), LastPrice: 12.34}, 30, "0/day",
+			head + "no sale in the window; last sold 2026-08-02 for $12.34"},
 		{"another window", Sales{Copies: 7, Orders: 7, Days: 5, LastSale: last}, 7, "1.0/day",
 			"**Sold on TCGplayer, last 7 days**\n|copies|7\n|orders|7\n|days with a sale|5\n|last sale|2026-10-11"},
 	} {
