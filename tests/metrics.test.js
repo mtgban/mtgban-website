@@ -250,6 +250,18 @@ test('counts add up in memory and each one pushes the timer back', () => {
     expect(p.fetches[0].body).toEqual([LOAD, { n: 'ui.x', v: 'a', c: 2 }, { n: 'ui.x', s: 'menu', v: 'b', c: 1 }]);
 });
 
+test('a key sent at 10 drops the armed timer, so nothing bumped after it goes out early', () => {
+    const p = load(NO_LOAD);
+    for (let i = 0; i < 10; i++) p.track('ui.x');
+    expect(p.fetches.map((f) => f.body)).toEqual([[{ n: 'ui.x', c: 10 }]]);
+    expect(p.live()).toEqual([]);
+    p.track('ui.y');
+    expect(p.live().map((t) => t.ms)).toEqual([10000]);
+    p.fire();
+    expect(p.fetches.map((f) => f.body)).toEqual([[{ n: 'ui.x', c: 10 }], [{ n: 'ui.y', c: 1 }]]);
+    expect(p.live()).toEqual([]);
+});
+
 test('hiding the page sends once, by beacon, as a string', () => {
     for (const type of ['pagehide', 'visibilitychange', 'both']) {
         const p = load();

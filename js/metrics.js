@@ -359,9 +359,9 @@
         }
     }
 
+    // flushTimer sends the buffer; take clears the debounce timer, which a send at MAX_COUNT leaves armed.
     function flushTimer() {
         try {
-            timer = 0;
             var entries = take();
             if (!entries.length) return;
             if (offline()) {
