@@ -235,6 +235,8 @@ func countEntry(r *http.Request, d observability.Dims, v observability.Validator
 	case !rowOK:
 		rejectChecked()
 	case d.Bot, FeatureErrors == nil: // the table has no bot column; the count above keeps it
+	case !today.mayAddErrorRow(address, d.Device, build, scope, value, line): // past the address's new rows for the day
+		rejectChecked()
 	case !FeatureErrors.Add(d.Device, build, scope, value, line, n):
 		rejectChecked()
 	}

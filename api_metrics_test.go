@@ -903,10 +903,9 @@ func TestMetricsAPICapsErrorEntriesPerPost(t *testing.T) {
 	withOpenBeaconLimiter(t)
 	rows := withFeatureCounter(t)
 	errs := withFeatureErrors(t)
-	classes := observability.ErrorClasses() // one class an entry, so no place reaches its lines cap
 	var entries []string
 	for i := range metricsMaxErrorEntries + 5 {
-		entries = append(entries, errorEntry(classes[i], 1, i+1, testBuild))
+		entries = append(entries, errorEntry("TypeError", 1, i+1, testBuild))
 	}
 	entries = append(entries, `{"n":"ui.load","s":"search","c":1}`)
 	postBeacon(t, beacon("["+strings.Join(entries, ",")+"]"))
@@ -914,36 +913,87 @@ func TestMetricsAPICapsErrorEntriesPerPost(t *testing.T) {
 		t.Errorf("%d error rows, want %d", len(got), metricsMaxErrorEntries)
 	}
 	counts := rows.rows()
-	var stored int64
-	for _, row := range find(counts, "ui.js.error") {
-		stored += row.N
-	}
-	if stored != metricsMaxErrorEntries {
-		t.Errorf("ui.js.error counted %d, want %d", stored, metricsMaxErrorEntries)
-	}
+	wantRow(t, counts, "navbar.js", "ui.js.error", "TypeError", metricsMaxErrorEntries)
 	wantRow(t, counts, "search", "ui.load", "", 1)
 	wantRow(t, counts, "", "metrics.client", "count", 5)
 	wantRow(t, counts, "", "metrics.client", "accepted", metricsMaxErrorEntries+1)
 	wantRow(t, counts, "", "metrics.rejected", "", 5)
 }
 
-// Made-up lines of one script and class add at most ErrorLinesPerDay rows; the rest keep their count only.
-func TestMetricsAPICapsTheLinesOfOnePlace(t *testing.T) {
+// One address starts at most errorRowsPerAddressDay error rows a day, however it varies script and class;
+// past that its errors keep their count only, a row it started still adds, and another address starts its own.
+func TestMetricsAPICapsNewErrorRowsPerAddress(t *testing.T) {
 	withOpenBeaconLimiter(t)
 	rows := withFeatureCounter(t)
 	errs := withFeatureErrors(t)
-	var entries []string
-	for i := range metricsMaxErrorEntries {
-		entries = append(entries, errorEntry("TypeError", 1, 100+i, testBuild))
+	scripts, classes := observability.Scripts(), observability.ErrorClasses()
+	entry := func(i int) string {
+		return fmt.Sprintf(`{"n":"ui.js.error","s":%q,"v":%q,"c":1,"l":%d,"b":%q}`, scripts[i%len(scripts)], classes[i%len(classes)], 1+i, testBuild)
 	}
-	postBeacon(t, beacon("["+strings.Join(entries, ",")+"]"))
-	if got := errs.rows(); len(got) != observability.ErrorLinesPerDay {
-		t.Errorf("%d error rows, want %d", len(got), observability.ErrorLinesPerDay)
+	const posts = 4
+	for p := range posts {
+		var entries []string
+		for i := range metricsMaxErrorEntries {
+			entries = append(entries, entry(p*metricsMaxErrorEntries+i))
+		}
+		postBeacon(t, beacon("["+strings.Join(entries, ",")+"]"))
+	}
+	postBeacon(t, beacon("["+entry(0)+"]")) // a row this address started still adds
+	other := beacon("[" + entry(1000) + "," + entry(0) + "]")
+	other.RemoteAddr = "203.0.113.9:40000"
+	postBeacon(t, other)
+
+	got := errs.rows()
+	if len(got) != errorRowsPerAddressDay+1 {
+		t.Fatalf("%d error rows, want %d: %+v", len(got), errorRowsPerAddressDay+1, got)
+	}
+	for _, r := range got {
+		want := int64(1)
+		if r.Line == 1 {
+			want = 3 // the first post, the repeat, and the other address
+		}
+		if r.Line > errorRowsPerAddressDay && r.Line != 1001 {
+			t.Errorf("row of line %d was started past the budget", r.Line)
+		}
+		if r.N != want {
+			t.Errorf("line %d n = %d, want %d", r.Line, r.N, want)
+		}
 	}
 	counts := rows.rows()
-	wantRow(t, counts, "navbar.js", "ui.js.error", "TypeError", metricsMaxErrorEntries)
-	wantRow(t, counts, "", "metrics.client", "accepted", metricsMaxErrorEntries)
-	wantRow(t, counts, "", "metrics.rejected", "", metricsMaxErrorEntries-observability.ErrorLinesPerDay)
+	var stored int64
+	for _, row := range find(counts, "ui.js.error") {
+		stored += row.N
+	}
+	if want := int64(posts*metricsMaxErrorEntries + 3); stored != want {
+		t.Errorf("ui.js.error counted %d, want %d", stored, want)
+	}
+	wantRow(t, counts, "", "metrics.rejected", "", (posts-1)*metricsMaxErrorEntries)
+}
+
+// The budget is per address and per UTC day, and a repeat never spends it.
+func TestAddressDayErrorRowBudget(t *testing.T) {
+	a := &addressDay{seed: maphash.MakeSeed()}
+	for i := range errorRowsPerAddressDay {
+		if !a.mayAddErrorRow("192.0.2.1", "desktop", testBuild, "navbar.js", "TypeError", i) {
+			t.Fatalf("row %d refused within the budget", i)
+		}
+	}
+	for _, script := range observability.Scripts() {
+		if a.mayAddErrorRow("192.0.2.1", "desktop", testBuild, script, "RangeError", 7) {
+			t.Fatalf("a new row on %s passed the budget", script)
+		}
+	}
+	for range 3 {
+		if !a.mayAddErrorRow("192.0.2.1", "desktop", testBuild, "navbar.js", "TypeError", 0) {
+			t.Fatal("a row the address started was refused")
+		}
+	}
+	if !a.mayAddErrorRow("192.0.2.2", "desktop", testBuild, "navbar.js", "RangeError", 7) {
+		t.Error("another address was refused its first row")
+	}
+	if !(&addressDay{seed: maphash.MakeSeed()}).mayAddErrorRow("192.0.2.1", "desktop", testBuild, "navbar.js", "RangeError", 7) {
+		t.Error("the next day's sketch refused the address")
+	}
 }
 
 // A row the store refuses is counted as rejected; its count stays accepted.

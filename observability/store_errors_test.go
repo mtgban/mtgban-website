@@ -57,22 +57,11 @@ func errorTestClient(t *testing.T) (*Client, string) {
 	return c, instance
 }
 
-// errRows builds desktop rows for lines from to to-1, each line in its own script and class,
-// so the lines cap of one place never refuses them.
+// errRows builds desktop navbar.js TypeError rows for lines from to to-1.
 func errRows(day time.Time, from, to int) []ErrorRow {
 	var out []ErrorRow
 	for i := from; i < to; i++ {
-		script, class := scripts[i%len(scripts)], errorClasses[(i/len(scripts))%len(errorClasses)]
-		out = append(out, ErrorRow{Day: day, Device: "desktop", Build: strings.Repeat("ab", 20), Script: script, Class: class, Line: i, N: 1})
-	}
-	return out
-}
-
-// placeRows builds rows of one device, build, script and class for the given lines.
-func placeRows(day time.Time, device, script, class string, lines ...int) []ErrorRow {
-	var out []ErrorRow
-	for _, l := range lines {
-		out = append(out, ErrorRow{Day: day, Device: device, Build: strings.Repeat("ab", 20), Script: script, Class: class, Line: l, N: 1})
+		out = append(out, ErrorRow{Day: day, Device: "desktop", Build: strings.Repeat("ab", 20), Script: "navbar.js", Class: "TypeError", Line: i, N: 1})
 	}
 	return out
 }
@@ -131,39 +120,6 @@ func TestUpsertErrorsCapsADayAt200Rows(t *testing.T) {
 	}
 	if n := countRows(t, c, instance, today); n != 200 {
 		t.Errorf("the first instance has %d rows, want 200 untouched", n)
-	}
-}
-
-// One device, build, script and class keeps at most errorLinesPerDay lines a day; other places, held lines and the next day are untouched.
-func TestUpsertErrorsCapsTheLinesOfOnePlace(t *testing.T) {
-	c, instance := errorTestClient(t)
-	ctx := context.Background()
-	day := time.Date(2001, 2, 5, 0, 0, 0, 0, time.UTC)
-
-	if refused := upsertErrs(t, c, instance, placeRows(day, "desktop", "navbar.js", "TypeError", 1, 2, 3, 4, 5)); refused != 2 {
-		t.Errorf("refused %d, want 2", refused)
-	}
-	if n := countRows(t, c, instance, day); n != errorLinesPerDay {
-		t.Errorf("%d rows, want %d", n, errorLinesPerDay)
-	}
-	// a later write of a held line still adds; a new line of the same place does not
-	if refused := upsertErrs(t, c, instance, placeRows(day, "desktop", "navbar.js", "TypeError", 2, 9)); refused != 1 {
-		t.Errorf("refused %d, want 1 (the new line only)", refused)
-	}
-	var n int64
-	if err := c.db.QueryRowContext(ctx, `SELECT n FROM feature_errors WHERE instance = $1 AND line = 2`, instance).Scan(&n); err != nil || n != 2 {
-		t.Errorf("line 2 n = %d (%v), want 2", n, err)
-	}
-	var others []ErrorRow
-	others = append(others, placeRows(day, "mobile", "navbar.js", "TypeError", 9)...)
-	others = append(others, placeRows(day, "desktop", "utils.js", "TypeError", 9)...)
-	others = append(others, placeRows(day, "desktop", "navbar.js", "RangeError", 9)...)
-	others = append(others, placeRows(day.AddDate(0, 0, 1), "desktop", "navbar.js", "TypeError", 9)...)
-	if refused := upsertErrs(t, c, instance, others); refused != 0 {
-		t.Errorf("other places and the next day refused %d, want 0", refused)
-	}
-	if refused := upsertErrs(t, c, instance+"-b", placeRows(day, "desktop", "navbar.js", "TypeError", 7, 8, 9)); refused != 0 {
-		t.Errorf("a second instance refused %d, want 0", refused)
 	}
 }
 
