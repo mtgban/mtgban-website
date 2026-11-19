@@ -1261,6 +1261,19 @@
         api('GET', '/api/alerts/').then(function (list) { markBells(list || []); }).catch(function () {});
     }
 
+    // Upload's bells sit in Not bought, under every store's rows, so their
+    // alerts are read when that section first comes into view.
+    function markBellsOnSight() {
+        var section = document.getElementById('opt-not-bought');
+        if (!section || !window.IntersectionObserver) { markExistingBells(); return; }
+        var seen = new window.IntersectionObserver(function (entries) {
+            if (!entries.some(function (e) { return e.isIntersecting; })) return;
+            seen.disconnect();
+            markExistingBells();
+        });
+        seen.observe(section);
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         if (els()) {
             modal.addEventListener('click', onModalClick);
@@ -1286,7 +1299,7 @@
         var deleteAll = document.querySelector('.alerts-delete-all');
         if (deleteAll) deleteAll.addEventListener('click', onDeleteAllClick);
         initSort();
-        markExistingBells();
+        markBellsOnSight();
 
         var channelsBox = channelsHost();
         if (channelsBox) {
