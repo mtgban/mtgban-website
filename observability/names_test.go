@@ -228,7 +228,7 @@ func TestClientBeaconNames(t *testing.T) {
 func TestBeaconReasonNames(t *testing.T) {
 	for name, values := range map[string][]string{
 		"metrics.beacon": {"ok", "bad_body", "too_many"},
-		"metrics.client": {"accepted", "unknown", "family", "value", "count"},
+		"metrics.client": {"accepted", "unknown", "family", "value", "count", "daily"},
 	} {
 		n, ok := Lookup(name)
 		if !ok || n.Family != FamilyServer || n.Values != ValueEnum || n.Scope != ScopeNone || !slices.Equal(n.Enum, values) {

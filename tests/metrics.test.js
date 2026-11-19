@@ -271,9 +271,9 @@ test('becoming visible sends nothing', () => {
     expect(p.beacons).toEqual([]);
 });
 
-test('the caps: 50 a key, 40 characters, printable ASCII', () => {
+test('the caps: 10 a key, 40 characters, printable ASCII', () => {
     const p = load(NO_LOAD);
-    for (let i = 0; i < 60; i++) p.track('ui.many');
+    for (let i = 0; i < 9; i++) p.track('ui.many');
     p.track('ui.' + 'x'.repeat(38));
     p.track('ui.x', 'v'.repeat(41));
     p.track('ui.x', '', 's'.repeat(41));
@@ -283,7 +283,45 @@ test('the caps: 50 a key, 40 characters, printable ASCII', () => {
     p.track(undefined);
     p.track('ui.ok', 'v'.repeat(40), 's'.repeat(40));
     p.fire();
-    expect(p.fetches.map((f) => f.body)).toEqual([[{ n: 'ui.many', c: 50 }, { n: 'ui.ok', s: 's'.repeat(40), v: 'v'.repeat(40), c: 1 }]]);
+    expect(p.fetches.map((f) => f.body)).toEqual([[{ n: 'ui.many', c: 9 }, { n: 'ui.ok', s: 's'.repeat(40), v: 'v'.repeat(40), c: 1 }]]);
+});
+
+test('a key that reaches 10 is sent at once, with the rest of the buffer, and none of its count is lost', () => {
+    const p = load(NO_LOAD);
+    p.track('ui.other');
+    for (let i = 0; i < 25; i++) p.track('ui.many');
+    expect(p.fetches.map((f) => f.body)).toEqual([
+        [{ n: 'ui.other', c: 1 }, { n: 'ui.many', c: 10 }],
+        [{ n: 'ui.many', c: 10 }],
+    ]);
+    p.fire();
+    expect(p.fetches[2].body).toEqual([{ n: 'ui.many', c: 5 }]);
+    expect(p.sent().filter((e) => e.n === 'ui.many').reduce((a, e) => a + e.c, 0)).toBe(25);
+});
+
+test('a key that reaches 10 with no network is parked whole', () => {
+    const p = load({ ...NO_LOAD, online: false });
+    for (let i = 0; i < 23; i++) p.track('ui.many');
+    p.hide();
+    expect(p.fetches).toEqual([]);
+    expect(queued(p).e).toEqual([['ui.many', '', '', 10], ['ui.many', '', '', 10], ['ui.many', '', '', 3]]);
+});
+
+test('a queue holding a key more than once sends each in its own post', async () => {
+    const stored = { [KEY]: JSON.stringify({ d: 19999, e: [['ui.many', '', '', 10], ['ui.x', '', '', 1], ['ui.many', '', '', 4]] }) };
+    const p = load({ ...NO_LOAD, stored, day: 20000 });
+    expect(p.fetches.map((f) => f.body)).toEqual([
+        [{ n: 'ui.many', c: 10 }, { n: 'ui.x', c: 1 }],
+        [{ n: 'ui.many', c: 4 }],
+    ]);
+    await settle();
+    expect(queued(p)).toBe(null);
+});
+
+test('a queue an older script stored past 10 a key is sent in parts of 10', () => {
+    const stored = { [KEY]: JSON.stringify({ d: 19999, e: [['ui.many', '', '', 25]] }) };
+    const p = load({ ...NO_LOAD, stored, day: 20000 });
+    expect(p.fetches.map((f) => f.body)).toEqual([[{ n: 'ui.many', c: 10 }], [{ n: 'ui.many', c: 10 }], [{ n: 'ui.many', c: 5 }]]);
 });
 
 test('a buffer of 250 entries goes out whole, 50 a post, in order', () => {
@@ -481,9 +519,9 @@ test('a load with no network leaves the queue alone', () => {
     expect(p.m[KEY]).toBe(value);
 });
 
-test('the queue stops at 100 entries and 50 a key, and keeps its oldest day', () => {
+test('the queue stops at 100 entries and 10 an entry, and keeps its oldest day', () => {
     const e = [];
-    for (let i = 0; i < 100; i++) e.push(['ui.key', '', 'v' + i, 49]);
+    for (let i = 0; i < 100; i++) e.push(['ui.key', '', 'v' + i, 9]);
     const p = load({ stored: { [KEY]: JSON.stringify({ d: 19999, e }) }, online: false, day: 20000, cfg: { on: true, page: '', build: 'abc' } });
     p.track('ui.key', 'v0');
     p.track('ui.key', 'v0');
@@ -492,7 +530,7 @@ test('the queue stops at 100 entries and 50 a key, and keeps its oldest day', ()
     const q = queued(p);
     expect(q.d).toBe(19999);
     expect(q.e.length).toBe(100);
-    expect(q.e[0]).toEqual(['ui.key', '', 'v0', 50]);
+    expect(q.e[0]).toEqual(['ui.key', '', 'v0', 10]);
     expect(q.e.some((x) => x[0] === 'ui.new')).toBe(false);
 });
 

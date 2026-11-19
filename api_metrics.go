@@ -13,7 +13,7 @@ import (
 const (
 	metricsMaxBody    = 8 << 10 // bytes
 	metricsMaxEntries = 100
-	metricsMaxCount   = 50
+	metricsMaxCount   = 10 // js/metrics.js sends a key once it holds this many, so no reader's count is cut
 	metricsMaxString  = 40
 
 	metricsMaxErrorEntries = 5 // error entries a post may add, js/metrics.js sends no more
@@ -127,8 +127,9 @@ func (s *site) MetricsAPI(w http.ResponseWriter, r *http.Request) {
 	v := beaconValidators(s)
 	d := metricDims(r)
 	added := make(map[beaconKey]int64, len(entries))
+	today := addressDayFor(metricsNow())
 	for _, e := range entries {
-		countEntry(r, d, v, added, e)
+		countEntry(r, d, v, added, today, ip.String(), e)
 	}
 	observe(r, "metrics.beacon", outcome)
 }
@@ -187,8 +188,9 @@ func errorRow(scope string, line *int, build string) (l int, b, reason string) {
 	return l, b, ""
 }
 
-// countEntry stores one entry or counts why it was refused; added is this post's sums by key.
-func countEntry(r *http.Request, d observability.Dims, v observability.Validators, added map[beaconKey]int64, e beaconEntry) {
+// countEntry stores one entry or counts why it was refused; added is this post's sums by key,
+// and today is what each address has added to each name today.
+func countEntry(r *http.Request, d observability.Dims, v observability.Validators, added map[beaconKey]int64, today *addressDay, address string, e beaconEntry) {
 	isError := slices.Contains(errorNames, e.N)
 	if !isError && (e.L != nil || e.B != "") {
 		rejectChecked()
@@ -217,6 +219,11 @@ func countEntry(r *http.Request, d observability.Dims, v observability.Validator
 		return
 	}
 	n = min(n, metricsMaxCount-added[k])
+	if n = today.take(address, e.N, n); n == 0 {
+		rejectChecked()
+		observe(r, "metrics.client", "daily")
+		return
+	}
 	added[k] += n
 	addChecked(d, scope, e.N, value, n)
 	observe(r, "metrics.client", "accepted")

@@ -3,7 +3,10 @@
     var BAN = window.BAN = window.BAN || {};
     var ENDPOINT = '/api/metrics';
     var WAIT_MS = 10000;
-    var MAX_COUNT = 50;
+    // MAX_COUNT is the server's cap on a key a post; a key that reaches it is sent at once.
+    var MAX_COUNT = 10;
+    // QUEUE_COUNT is the most a stored queue element may hold: what scripts before the cap of 10 stored.
+    var QUEUE_COUNT = 50;
     var MAX_KEYS = 500;
     var POST_ENTRIES = 50;
     var POST_CHARS = 7500;
@@ -100,7 +103,11 @@
             var key = keyOf(name, scope, value, x);
             var e = buf[key];
             if (e) {
-                if (e.c < MAX_COUNT) e.c++;
+                e.c++;
+                if (e.c >= MAX_COUNT) {
+                    flushTimer();
+                    return true;
+                }
             } else {
                 if (order.length >= MAX_KEYS) return false;
                 buf[key] = { n: name, s: scope, v: value, c: 1, x: x };
@@ -159,20 +166,26 @@
         return silenced() ? [] : out;
     }
 
-    // posts splits entries into request bodies: 50 entries or 7,500 characters each, in order.
+    // posts splits entries into request bodies: 50 entries or 7,500 characters each, in order,
+    // and a key at most once a body, since the server adds at most MAX_COUNT to a key a post.
     function posts(entries) {
         var out = [];
         var run = [];
+        var keys = {};
         var size = 2;
         for (var i = 0; i < entries.length; i++) {
-            var one = JSON.stringify(entries[i]);
-            if (run.length && (run.length >= POST_ENTRIES || size + 1 + one.length > POST_CHARS)) {
+            var w = entries[i];
+            var one = JSON.stringify(w);
+            var key = keyOf(w.n, w.s || '', w.v || '', extraOf(w));
+            if (run.length && (run.length >= POST_ENTRIES || size + 1 + one.length > POST_CHARS || keys[key])) {
                 out.push('[' + run.join(',') + ']');
                 run = [];
+                keys = {};
                 size = 2;
             }
             size += one.length + (run.length ? 1 : 0);
             run.push(one);
+            keys[key] = true;
         }
         if (run.length) out.push('[' + run.join(',') + ']');
         return out;
@@ -187,7 +200,7 @@
         if (!Array.isArray(x) || (x.length !== 4 && x.length !== 5)) return false;
         if (!x[0] || !fits(x[0], 40) || !fits(x[1], 40) || !fits(x[2], 40)) return false;
         var c = x[3];
-        if (typeof c !== 'number' || c % 1 !== 0 || c < 1 || c > MAX_COUNT) return false;
+        if (typeof c !== 'number' || c % 1 !== 0 || c < 1 || c > QUEUE_COUNT) return false;
         if (x.length === 5) {
             var kept = cleanExtra(x[4]);
             if (!kept || JSON.stringify(kept) !== JSON.stringify(x[4])) return false;
@@ -226,7 +239,8 @@
         return x;
     }
 
-    // enqueue parks entries that could not be sent, merged into the one stored queue.
+    // enqueue parks entries that could not be sent, merged into the one stored queue;
+    // a key's element holds up to MAX_COUNT, and what is past it starts a new element.
     function enqueue(entries, day) {
         try {
             if (!entries || !entries.length || silenced()) return;
@@ -243,14 +257,19 @@
                 var w = entries[i];
                 var x = extraOf(w);
                 var key = keyOf(w.n, w.s || '', w.v || '', x);
+                var left = Math.min(QUEUE_COUNT, w.c);
                 var hit = at[key];
-                if (hit) {
-                    hit[3] = Math.min(MAX_COUNT, hit[3] + w.c);
-                } else if (list.length < QUEUE_MAX) {
-                    hit = [w.n, w.s || '', w.v || '', Math.min(MAX_COUNT, w.c)];
+                if (hit && hit[3] < MAX_COUNT) {
+                    var add = Math.min(left, MAX_COUNT - hit[3]);
+                    hit[3] += add;
+                    left -= add;
+                }
+                while (left > 0 && list.length < QUEUE_MAX) {
+                    hit = [w.n, w.s || '', w.v || '', Math.min(MAX_COUNT, left)];
                     if (x) hit.push(x);
                     list.push(hit);
                     at[key] = hit;
+                    left -= hit[3];
                 }
             }
             localStorage.setItem(QUEUE_KEY, JSON.stringify({ d: q ? Math.min(q.d, day) : day, e: list }));
@@ -272,7 +291,8 @@
             var entries = [];
             for (var i = 0; i < q.e.length; i++) {
                 var x = q.e[i];
-                entries.push(wire(x[0], x[1], x[2], x[3], x[4]));
+                // an element an older script stored past MAX_COUNT goes out in parts
+                for (var c = x[3]; c > 0; c -= MAX_COUNT) entries.push(wire(x[0], x[1], x[2], Math.min(MAX_COUNT, c), x[4]));
             }
             send(entries, q.d);
         } catch (e) {}

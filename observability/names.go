@@ -98,7 +98,7 @@ var names = []Name{
 	{Name: "metrics.flush_fail", Report: ReportInternal, Help: "Counter flushes that failed."},
 	{Name: "metrics.rejected", Report: ReportInternal, Help: "Counts the registry refused to store."},
 	{Name: "metrics.beacon", Values: ValueEnum, Enum: []string{"ok", "bad_body", "too_many"}, Report: ReportInternal, Help: "One client beacon request, by how its body read."},
-	{Name: "metrics.client", Values: ValueEnum, Enum: []string{"accepted", "unknown", "family", "value", "count"}, Report: ReportInternal, Help: "One entry of a client beacon: stored, or why it was refused."},
+	{Name: "metrics.client", Values: ValueEnum, Enum: []string{"accepted", "unknown", "family", "value", "count", "daily"}, Report: ReportInternal, Help: "One entry of a client beacon: stored, or why it was refused; daily is an address past its day's cap for the name."},
 	{Name: "page.view", Values: ValuePage, Report: ReportCandidate, Unit: UnitValue, Kind: "page", Area: "site", Help: "Page views, by page."},
 	{Name: "http.status", Report: ReportContext, Values: ValueEnum, Enum: []string{"2xx", "3xx", "4xx", "5xx"}, Scope: ScopeRoute, Help: "Responses by status class, per route."},
 	{Name: "http.duration", Report: ReportContext, Values: ValueBucket, Enum: []string{"<50ms", "<200ms", "<1s", "<5s", "5s+"}, Scope: ScopeRoute, Help: "Response time buckets, per route."},
