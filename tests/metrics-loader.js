@@ -5,7 +5,8 @@ export const KEY = 'mtgban_metrics_queue';
 export const DAY = 86400000;
 
 // Runs metrics.js on a page of fakes, with its timers and clock in the test's hands.
-// net is 'ok' (204), 'down' (fetch rejects) or the status a fetch resolves with.
+// net is 'ok' (204), 'down' (fetch rejects) or the status a fetch resolves with;
+// page.retryAfter, when set, is the Retry-After header of that response.
 export function loadMetrics({ cfg = { on: true, page: 'search', build: 'abc' }, ban, online = true, dnt, gpc, stored = {}, day = 20000, net = 'ok', beaconOk = true, storage = 'ok', nav = {}, win: winProps = {}, docProps = {}, globals = {} } = {}) {
     const m = { ...stored };
     const writes = [];
@@ -30,7 +31,8 @@ export function loadMetrics({ cfg = { on: true, page: 'search', build: 'abc' }, 
     const page = { m, writes, doc, win, document, navigator, window, beacons, fetches, net, day };
     const fetch = (url, opts) => {
         fetches.push({ url, opts, body: JSON.parse(opts.body) });
-        return page.net === 'down' ? Promise.reject(new TypeError('no network')) : Promise.resolve({ status: page.net === 'ok' ? 204 : page.net });
+        const headers = { get: (k) => (String(k).toLowerCase() === 'retry-after' && page.retryAfter !== undefined ? page.retryAfter : null) };
+        return page.net === 'down' ? Promise.reject(new TypeError('no network')) : Promise.resolve({ status: page.net === 'ok' ? 204 : page.net, headers });
     };
     const timers = [];
     const setTimeout = (fn, ms) => { timers.push({ fn, ms, live: true }); return timers.length; };

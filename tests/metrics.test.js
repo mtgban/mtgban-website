@@ -476,7 +476,7 @@ test('a refused beacon and a failed fetch are parked too', async () => {
     expect(queued(down).e).toEqual([['ui.load', 'search', '', 1]]);
 });
 
-test('a response of any status is not retried', async () => {
+test('a 204 is not retried', async () => {
     const p = load();
     p.fire();
     await settle();
@@ -722,8 +722,8 @@ test('the network coming back with a privacy signal on removes the queue unsent'
     expect(KEY in p.m).toBe(false);
 });
 
-test('a response with an error status is dropped, neither parked nor retried', async () => {
-    for (const net of [400, 413, 429, 500, 503]) {
+test('a response with an error status other than 429 is dropped, neither parked nor retried', async () => {
+    for (const net of [400, 413, 500, 503]) {
         const p = load({ net });
         p.track('ui.x');
         p.fire();
@@ -737,7 +737,57 @@ test('a response with an error status is dropped, neither parked nor retried', a
     }
 });
 
-test('only a rejected fetch or a refused beacon parks', async () => {
+test('a post refused as too many is parked and sent again after the default wait', async () => {
+    const p = load({ net: 429 });
+    p.track('ui.x');
+    p.fire();
+    await settle();
+    expect(p.fetches.length).toBe(1);
+    expect(queued(p).e).toEqual([['ui.load', 'search', '', 1], ['ui.x', '', '', 1]]);
+    expect(p.live().map((t) => t.ms)).toEqual([30000]);
+    p.net = 'ok';
+    p.fire();
+    expect(p.fetches.map((f) => f.body)).toEqual([[LOAD, { n: 'ui.x', c: 1 }], [LOAD, { n: 'ui.x', c: 1 }]]);
+    await settle();
+    expect(queued(p)).toBe(null);
+    expect(p.live()).toEqual([]);
+});
+
+test('the wait after a 429 follows Retry-After, kept between 5 seconds and 10 minutes', async () => {
+    for (const [header, ms] of [['12', 12000], [' 90 ', 90000], ['0', 5000], ['86400', 600000], ['soon', 30000], ['Wed, 21 Oct 2026 07:28:00 GMT', 30000], ['-3', 30000]]) {
+        const p = load({ net: 429 });
+        p.retryAfter = header;
+        p.fire();
+        await settle();
+        expect([header, p.live().map((t) => t.ms)]).toEqual([header, [ms]]);
+    }
+});
+
+test('many posts refused at once wait on one timer, and a refusal on the retry waits again', async () => {
+    const p = load({ ...NO_LOAD, net: 429 });
+    for (let i = 0; i < 120; i++) p.track('ui.key', 'v' + i);
+    p.fire();
+    await settle();
+    expect(p.fetches.length).toBe(3);
+    expect(queued(p).e.length).toBe(100); // the queue keeps its bound
+    expect(p.live().length).toBe(1);
+    p.fire();
+    expect(p.fetches.length).toBe(5);
+    expect(queued(p)).toBe(null);
+    await settle();
+    expect(queued(p).e.length).toBe(100);
+    expect(p.live().length).toBe(1);
+});
+
+test('a 429 with a privacy signal turned on parks nothing', async () => {
+    const p = load({ net: 429 });
+    p.fire();
+    p.navigator.doNotTrack = '1';
+    await settle();
+    expect(queued(p)).toBe(null);
+});
+
+test('only a rejected fetch, a refused beacon or a 429 parks', async () => {
     const rejected = load({ net: 'down' });
     rejected.fire();
     await settle();

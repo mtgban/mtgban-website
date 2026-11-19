@@ -17,6 +17,10 @@
     var QUEUE_DAYS = 7;
     var QUEUE_CHARS = 65536;
     var DAY_MS = 86400000;
+    // A post refused as too many is parked and the queue sent again after Retry-After, within these.
+    var RETRY_MS = 30000;
+    var RETRY_MIN_MS = 5000;
+    var RETRY_MAX_MS = 600000;
 
     // Stubs first, so a caller never throws whatever happens below.
     BAN.track = function () {};
@@ -48,6 +52,7 @@
     var buf = {};
     var order = [];
     var timer = 0;
+    var retryTimer = 0;
 
     // fits is the registry's rule for every string: 40 printable ASCII characters.
     function fits(s, max) {
@@ -302,16 +307,43 @@
         return navigator.onLine === false;
     }
 
-    // send posts each body by fetch; a rejected one is parked under day.
+    // send posts each body by fetch; a rejected one, or one refused as too many, is parked under day.
     function send(entries, day) {
         var bodies = posts(entries);
         for (var i = 0; i < bodies.length; i++) post(bodies[i], day);
+    }
+
+    // retryAfter reads a response's Retry-After seconds as a wait in ms, RETRY_MS when absent or unreadable.
+    function retryAfter(res) {
+        var ms = RETRY_MS;
+        try {
+            var h = res.headers && typeof res.headers.get === 'function' ? res.headers.get('Retry-After') : null;
+            if (h !== null && h !== undefined && /^\s*\d+\s*$/.test(String(h))) ms = parseInt(h, 10) * 1000;
+        } catch (e) {}
+        return Math.min(RETRY_MAX_MS, Math.max(RETRY_MIN_MS, ms));
+    }
+
+    // retryLater sends the queue once after the wait; one wait at a time.
+    function retryLater(ms) {
+        if (retryTimer) return;
+        retryTimer = setTimeout(function () {
+            retryTimer = 0;
+            sendQueue();
+        }, ms);
     }
 
     function post(body, day) {
         var park = function () {
             try {
                 enqueue(JSON.parse(body), day);
+            } catch (e) {}
+        };
+        // Only a refusal as too many is worth sending again; the server took or refused the rest for good.
+        var done = function (res) {
+            try {
+                if (!res || res.status !== 429) return;
+                park();
+                retryLater(retryAfter(res));
             } catch (e) {}
         };
         try {
@@ -321,7 +353,7 @@
                 keepalive: true,
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
-            }).then(null, park);
+            }).then(done, park);
         } catch (e) {
             park();
         }
