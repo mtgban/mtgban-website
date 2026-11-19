@@ -89,7 +89,7 @@
         <div class="page-standard upload-wide">
             <a class="back-link" href="/upload" data-track="ui.upload.result" data-track-value="back">&larr; Back to Uploader</a>
             <div class="page-header">
-                <h1>Results{{if and .UploadQuery (not (eq .UploadQuery "hashes"))}} from {{if .UploadSourceURL}}<a class="upload-source-link" href="{{.UploadSourceURL}}" target="_blank" rel="nofollow noopener">{{.UploadQuery}}</a>{{else}}{{.UploadQuery}}{{end}}{{end}}</h1>
+                <h1>Results{{if and .UploadQuery (not (eq .UploadQuery "hashes"))}} from {{if .UploadSourceURL}}<a class="upload-source-link" href="{{.UploadSourceURL}}" target="_blank" rel="nofollow noopener">{{.UploadQuery}}</a>{{else}}{{.UploadQuery}}{{end}}{{else if eq .UploadQuery "hashes"}}<span id="upload-pack-from" hidden></span>{{end}}</h1>
                 <p class="page-subtitle">
                     {{if .UploadEntries}}{{len .UploadEntries}} row{{if ne (len .UploadEntries) 1}}s{{end}} &middot; {{end}}{{if .UnpackedFrom}}contents of {{.UnpackedFrom}} sealed product{{if ne .UnpackedFrom 1}}s{{end}} &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
                     {{if .CanShare}}
