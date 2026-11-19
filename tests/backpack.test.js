@@ -48,7 +48,7 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], results, navMenu = false, sort, fetch, signedIn = false, timers, uploadMode, narrowBar = false } = {}) {
+function page({ store = [], mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], results, navMenu = false, sort, fetch, signedIn = false, timers, uploadMode, narrowBar = false, heading = false } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store) };
     if (uploadMode) m.uploadMode = uploadMode;
@@ -67,6 +67,8 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
         const row = el('div'); row.setAttribute('id', 'mobile-util'); row.appendChild(nav); body.appendChild(row);
         hamburger = el('button'); hamburger.classes.add('ban-nav-hamburger'); body.appendChild(hamburger);
     } else body.appendChild(nav);
+    // heading is the span Upload leaves beside Results on a page of hashes.
+    if (heading) { const from = el('span'); from.setAttribute('id', 'upload-pack-from'); from.hidden = true; body.appendChild(from); }
     if (navMenu) { const menu = el('div'); menu.setAttribute('id', 'nav-backpack-menu'); menu.hidden = true; body.appendChild(menu); }
     // Two result rows, each with an add and a minus button carrying the card id.
     const minus = [];
@@ -810,6 +812,32 @@ describe('taking from the backpack a send came from', () => {
         expect(confirms).toEqual(["Remove this store's ticked cards from Trades?"]);
         expect(live(p)).toEqual([[1, 'uuid-1', 2], [2, 'uuid-1', 2]]);
         expect(ids['backpack-toast'].textContent).toBe('Removed 1 copy from Trades');
+    });
+
+    test('the Upload page showing the send names its backpack beside Results', () => {
+        const session = sent();
+        const p = page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, heading: true });
+        expect(ids['upload-pack-from'].hidden).toBe(false);
+        expect(ids['upload-pack-from'].textContent).toBe(' from Trades');
+        p.m.mtgban_backpack_tabs = JSON.stringify([{ pack: 1 }, { pack: 2, name: 'Binder' }]);
+        p.fireStorage('mtgban_backpack_tabs');
+        expect(ids['upload-pack-from'].textContent).toBe(' from Binder');
+    });
+
+    test('the send page names no backpack once its backpack is deleted', () => {
+        const session = sent();
+        const p = page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, heading: true });
+        p.window.Backpack.deleteTab(2);
+        p.window.renderBackpack();
+        expect(ids['upload-pack-from'].hidden).toBe(true);
+        expect(ids['upload-pack-from'].textContent).toBe('');
+    });
+
+    test('an Upload page of other cards names no backpack', () => {
+        const session = sent();
+        page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-9'] }, heading: true });
+        expect(ids['upload-pack-from'].hidden).toBe(true);
+        expect(ids['upload-pack-from'].textContent).toBe('');
     });
 
     test('a page posting itself back still takes from the backpack sent', () => {

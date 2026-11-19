@@ -1555,7 +1555,18 @@
         searchBtn.disabled = entries.length === 0;
     }
 
+    // nameSent names, beside Results, the backpack a send's cards came from,
+    // and nothing once that backpack is deleted.
+    function nameSent() {
+        var el = document.getElementById("upload-pack-from");
+        if (!el) return;
+        var kept = sentPack && tabs().some(function (t) { return t.pack === sentPack; });
+        el.textContent = kept ? " from " + packName(sentPack) : "";
+        el.hidden = !kept;
+    }
+
     function render() {
+        nameSent();
         markRows();
         strikeLeftRows();
         markSections();
