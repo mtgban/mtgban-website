@@ -96,6 +96,16 @@ type errorKey struct {
 	line                         int
 }
 
+// errorGroup is an errorKey without its line: the place whose distinct lines are capped.
+type errorGroup struct {
+	day                          time.Time
+	device, build, script, class string
+}
+
+func (k errorKey) group() errorGroup {
+	return errorGroup{day: k.day, device: k.device, build: k.build, script: k.script, class: k.class}
+}
+
 // ErrorBuffer sums script error rows in memory and writes them off the request path.
 type ErrorBuffer struct {
 	store      ErrorStore
@@ -107,6 +117,7 @@ type ErrorBuffer struct {
 
 	mu      sync.Mutex
 	pending map[errorKey]int64
+	lines   map[errorGroup]int // distinct pending lines of each group, at most errorLinesPerDay
 	closed  bool
 }
 
@@ -123,10 +134,25 @@ func NewErrorBuffer(store ErrorStore, instance string, now func() time.Time, rej
 		maxPending: maxPendingErrors,
 		sem:        make(chan struct{}, 1),
 		pending:    map[errorKey]int64{},
+		lines:      map[errorGroup]int{},
 	}
 }
 
-// Add reports false, having stored nothing, when the buffer is full or closed.
+// admit reports whether k may be summed into pending, counting its line when it is new; b.mu is held.
+func (b *ErrorBuffer) admit(k errorKey) bool {
+	if _, ok := b.pending[k]; ok {
+		return true
+	}
+	g := k.group()
+	if len(b.pending) >= b.maxPending || b.lines[g] >= errorLinesPerDay {
+		return false
+	}
+	b.lines[g]++
+	return true
+}
+
+// Add reports false, having stored nothing, when the buffer is full or closed,
+// or when the key's device, build, script and class already hold errorLinesPerDay lines.
 func (b *ErrorBuffer) Add(device, build, script, class string, line int, n int64) bool {
 	if b == nil {
 		return false
@@ -134,10 +160,7 @@ func (b *ErrorBuffer) Add(device, build, script, class string, line int, n int64
 	k := errorKey{day: wholeDay(b.now()), device: device, build: build, script: script, class: class, line: line}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.closed {
-		return false
-	}
-	if _, ok := b.pending[k]; !ok && len(b.pending) >= b.maxPending {
+	if b.closed || !b.admit(k) {
 		return false
 	}
 	b.pending[k] += n
@@ -161,6 +184,7 @@ func (b *ErrorBuffer) Flush(ctx context.Context) (err error) {
 	b.mu.Lock()
 	taken := b.pending
 	b.pending = map[errorKey]int64{}
+	b.lines = map[errorGroup]int{}
 	b.mu.Unlock()
 	if len(taken) == 0 {
 		return nil
@@ -244,14 +268,13 @@ func (b *ErrorBuffer) Close(ctx context.Context) error {
 	}
 }
 
-// putBack merges unsent rows into pending, rejecting those past the cap or after Close.
+// putBack merges unsent rows into pending, rejecting those past either cap or after Close.
 func (b *ErrorBuffer) putBack(rows []ErrorRow) {
 	dropped := 0
 	b.mu.Lock()
 	for _, r := range rows {
 		k := errorKey{day: r.Day, device: r.Device, build: r.Build, script: r.Script, class: r.Class, line: r.Line}
-		_, ok := b.pending[k]
-		if b.closed || !ok && len(b.pending) >= b.maxPending {
+		if b.closed || !b.admit(k) {
 			dropped++
 			continue
 		}
