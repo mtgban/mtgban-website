@@ -684,9 +684,9 @@ override; phone UA detection via `mileusna/useragent`).
   The rate is coloured by the share of like-priced cards it outsells
   (`velocity-<pace>`), and an `↑` leads a card selling at least twice as
   fast in the window's last 7 days.
-  Arbitrage, Reverse, Global and upload's optimizer show a rate over `0.1/day`
-  as text in the INFO column, with the row's details as its tooltip, for
-  whoever reaches those pages.
+  Arbitrage, Reverse and Global show a rate over `0.1/day` as text beside
+  the card's name, upload's optimizer in the INFO column, with the row's
+  details as its tooltip, for whoever reaches those pages.
 
 ### 5.2 Upload (`upload.go`)
 

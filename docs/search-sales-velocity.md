@@ -83,7 +83,7 @@ the one below it, and ranks each card by the share of its band it outsells:
 Shares rather than set rates keep the colours right for every game, each
 grading its own cards. The details add a line naming the band and the share,
 `vs. cards at $10–30 | faster than 92%`. The search row, on both layouts, and
-the INFO column take the colour as a `velocity-<pace>` class.
+the other pages' rate take the colour as a `velocity-<pace>` class.
 
 The rate each pace starts from, by band, from `TestSalesVelocityLive`:
 
@@ -138,9 +138,9 @@ upsell lines.
 
 ## On the other pages
 
-Arbitrage, Reverse, Global and upload's optimizer show the rate as a line of
-text in the INFO column, beside Card Kingdom's signal where it shows, with the
-row's details as its tooltip. Upload's results table has no such column and shows
+Arbitrage, Reverse and Global show the rate as text beside the card's name, and
+upload's optimizer in the INFO column beside Card Kingdom's signal where it shows,
+each with the row's details as its tooltip. Upload's results table has no such column and shows
 no rate. A rate that prints as `0.1/day` or less is left out, being noise on these
 tables. Each page reads the loaded sales once and fills its rows' text from them
 (`cardMetadata.fillSales`), so the line costs only its own HTML. These pages

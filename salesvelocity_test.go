@@ -1457,7 +1457,8 @@ func TestNewspaperSalesJobRunsOnOneSite(t *testing.T) {
 
 // TestVelocityRateOnInfoPages shows the rate and its tooltip on arbitrage, Global
 // and upload's optimizer, whatever the reader's tier, on the card selling fast
-// enough alone, and none on upload's results.
+// enough alone, and none on upload's results. On arbitrage and Global the rate sits
+// on the name's line, and Global's singles have no INFO column.
 func TestVelocityRateOnInfoPages(t *testing.T) {
 	cards := closeVendors(t)
 	for _, name := range []string{"Arbitrage", "Global"} {
@@ -1554,15 +1555,27 @@ func TestVelocityRateOnInfoPages(t *testing.T) {
 		if name == "upload" && regexp.MustCompile(`ures-card-set[^\n]*bl-velocity`).MatchString(got) {
 			t.Error("upload: a rate on the results table")
 		}
-		if !strings.Contains(got, "INFO</th>") {
-			t.Errorf("%s: no INFO column", name)
+		hasInfo := strings.Contains(got, "INFO</th>")
+		if hasInfo == (name == "global") {
+			t.Errorf("%s: INFO column shown %v", name, hasInfo)
+		}
+		if name == "upload" {
+			continue
+		}
+		onName := false
+		for _, cell := range strings.Split(got, `<span class="card-name-line">`)[1:] {
+			cell, _, _ = strings.Cut(cell, "</td>")
+			onName = onName || strings.Contains(cell, `>2.3/day</span>`)
+		}
+		if !onName {
+			t.Errorf("%s: the rate is not on the name's line", name)
 		}
 	}
 }
 
-// TestVelocityRateSitsBesideCKSignal keeps INFO to one line for the signal and the
-// rate, with the rate's own tooltip, and the signal's line alone for a slow card.
-func TestVelocityRateSitsBesideCKSignal(t *testing.T) {
+// TestVelocityRateSitsBesideName puts the rate, with its own tooltip, on the card
+// name's line on arbitrage, and leaves INFO to CK's details and signal.
+func TestVelocityRateSitsBesideName(t *testing.T) {
 	render := func(notable bool) string {
 		vars := reversePageVars()
 		for id, card := range vars.Metadata {
@@ -1572,17 +1585,42 @@ func TestVelocityRateSitsBesideCKSignal(t *testing.T) {
 		}
 		return renderArbit(t, vars)
 	}
-	const signal = `<span class="bl-ck bl-ck-sell">Sell now</span>`
+	nameCell := regexp.MustCompile(`(?s)<span class="card-name-line">.*?</td>`)
 	got := render(true)
-	if !strings.Contains(got, `<span class="bl-ck-line">`+signal+`<span class="bl-velocity" title="`) || !strings.Contains(got, `>2.3/day</span></span>`) {
-		t.Error("the rate is not beside the signal")
+	if !strings.Contains(nameCell.FindString(got), `<span class="bl-velocity" title="`) {
+		t.Error("the rate is not on the name's line")
 	}
-	if !strings.Contains(render(false), `<span class="bl-ck-line">`+signal+`</span>`) {
-		t.Error("a slow card's signal shares its line")
+	if !strings.Contains(got, `<span class="bl-ck bl-ck-sell">Sell now</span></div>`) {
+		t.Error("INFO holds more than CK's signal after it")
+	}
+	if strings.Contains(render(false), `class="bl-velocity`) {
+		t.Error("a slow card shows a rate")
 	}
 }
 
-// TestVelocityRateCarriesPace marks the rate in INFO with its pace.
+// TestGlobalInfoColumn keeps INFO on Global for sealed, where it holds the
+// contents link, and leaves it off for singles.
+func TestGlobalInfoColumn(t *testing.T) {
+	for _, sealed := range []bool{false, true} {
+		got := renderArbit(t, PageVars{
+			ScraperShort: "TCGSealed",
+			ArbitVars:    ArbitVars{GlobalMode: true, SealedSource: sealed},
+			UserNav:      &NavElem{Short: "beta"},
+			Arb: []Arbitrage{{Name: "Store", Key: "ZZG", Arbit: []mtgban.ArbitEntry{{
+				CardID:         "item-a",
+				InventoryEntry: mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100},
+			}}}},
+			Metadata: map[string]GenericCard{"item-a": {Name: "Item A", Sealed: sealed}},
+		})
+		hasInfo := strings.Contains(got, "INFO</th>")
+		hasContents := strings.Contains(got, `class="arb-contents"`)
+		if hasInfo != sealed || hasContents != sealed {
+			t.Errorf("global, sealed %v: INFO %v, contents link %v", sealed, hasInfo, hasContents)
+		}
+	}
+}
+
+// TestVelocityRateCarriesPace marks the rate on arbitrage with its pace.
 func TestVelocityRateCarriesPace(t *testing.T) {
 	vars := reversePageVars()
 	for id, card := range vars.Metadata {
@@ -1592,9 +1630,9 @@ func TestVelocityRateCarriesPace(t *testing.T) {
 	}
 	got := renderArbit(t, vars)
 	if !strings.Contains(got, `<span class="bl-velocity velocity-fast" title="`) {
-		t.Error("the rate in INFO has no pace")
+		t.Error("the rate has no pace")
 	}
 	if !strings.Contains(got, `<span class="velocity-rising">&#8593;</span>2.3/day</span>`) {
-		t.Error("the rate in INFO has no arrow")
+		t.Error("the rate has no arrow")
 	}
 }
