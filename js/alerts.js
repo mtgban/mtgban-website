@@ -1238,13 +1238,19 @@
         if (action === 'enable') { enableEmailChannel(btn); return; }
     }
 
-    // Bells on result rows fill in, like the star, for cards that already have an alert.
-    function markBells(cardIds) {
+    // Bells on result rows fill in, like the star, for cards that already
+    // have an alert; a bell with data-side only for an alert on that side.
+    function markBells(list) {
         var bells = document.querySelectorAll('.alert-link[data-card-id], .m-actions-alert[data-card-id]');
         var set = {};
-        cardIds.forEach(function (id) { set[id] = true; });
+        list.forEach(function (a) {
+            set[a.card_id] = true;
+            set[a.side + ' ' + a.card_id] = true;
+        });
         Array.prototype.forEach.call(bells, function (b) {
-            var on = set[b.getAttribute('data-card-id')] === true;
+            var id = b.getAttribute('data-card-id');
+            var side = b.getAttribute('data-side');
+            var on = set[side ? side + ' ' + id : id] === true;
             b.classList.toggle('active', on);
             b.title = on ? 'Price alert set' : 'Set a price alert';
         });
@@ -1252,9 +1258,7 @@
 
     function markExistingBells() {
         if (!document.querySelector('.alert-link[data-card-id], .m-actions-alert[data-card-id]')) return;
-        api('GET', '/api/alerts/').then(function (list) {
-            markBells((list || []).map(function (a) { return a.card_id; }));
-        }).catch(function () {});
+        api('GET', '/api/alerts/').then(function (list) { markBells(list || []); }).catch(function () {});
     }
 
     document.addEventListener('DOMContentLoaded', function () {
