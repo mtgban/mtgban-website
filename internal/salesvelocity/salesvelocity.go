@@ -275,13 +275,12 @@ func (s *Store) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, game s
 		return "", ""
 	}
 
-	cards, bands, unmatched, priced, note, err := query(ctx, db, b, game, day)
+	snap, unmatched, err := query(ctx, db, b, game, day)
 	if err != nil {
 		log.Println("sales velocity:", err)
 		s.failed.Store(&failure{Day: day, At: time.Now()})
 		return "", "failed to load " + day.Format(time.DateOnly) + ": " + err.Error()
 	}
-	snap := &Snapshot{Day: day, Cards: cards, Window: Window, Bands: bands, Priced: priced, Note: note, Backend: weak.Make(b)}
 	s.current.Store(snap)
 	result = report(snap, unmatched)
 	log.Println("sales velocity:", result)
@@ -376,23 +375,14 @@ func readOrderRows(ctx context.Context, q salesQuerier, game string) ([]orderRow
 	return all, rows.Err()
 }
 
-// ordersUnavailable is whether err is the order table missing or unreadable.
-func ordersUnavailable(err error) bool {
+// ordersUnavailable is the note for err being the order table missing or
+// unreadable, empty for any other error.
+func ordersUnavailable(err error) string {
 	var pgErr *pq.Error
-	return errors.As(err, &pgErr) && (pgErr.Code == "42P01" || pgErr.Code == "42501")
-}
-
-// loadOrders runs read, turning an absent or unreadable table into no orders and a note.
-func loadOrders(ctx context.Context, read func() ([]orderRow, error)) ([]orderRow, string, error) {
-	orders, err := read()
-	if err == nil {
-		return orders, "", nil
+	if errors.As(err, &pgErr) && (pgErr.Code == "42P01" || pgErr.Code == "42501") {
+		return "last sale prices unavailable: " + pgErr.Message
 	}
-	var pgErr *pq.Error
-	if ctx.Err() == nil && ordersUnavailable(err) && errors.As(err, &pgErr) {
-		return nil, "last sale prices unavailable: " + pgErr.Message, nil
-	}
-	return nil, "", err
+	return ""
 }
 
 // cardMatcher resolves a product and printing to b's card id, "" for none.
@@ -410,18 +400,42 @@ func cardMatcher(b *matcher.Backend) func(productID int64, variant string) strin
 	}
 }
 
+// salesRead is what readSales read: the window, the lookback, the newest
+// orders, and the note on why there are none.
+type salesRead struct {
+	rows   []salesRow
+	last   []lastRow
+	orders []orderRow
+	note   string
+}
+
 // readSales reads game's window and lookback in one snapshot, then its newest
-// orders; the note says why there are none.
-func readSales(ctx context.Context, db *sql.DB, game string, day time.Time) ([]salesRow, []lastRow, []orderRow, string, error) {
+// orders, loading without them when their table is missing or unreadable.
+func readSales(ctx context.Context, db *sql.DB, game string, day time.Time) (salesRead, error) {
 	rows, last, err := readSnapshot(ctx, db, game, day)
 	if err != nil {
-		return nil, nil, nil, "", err
+		return salesRead{}, err
 	}
-	orders, note, err := loadOrders(ctx, func() ([]orderRow, error) { return readOrderRows(ctx, db, game) })
+	read := salesRead{rows: rows, last: last}
+	orders, err := readOrderRows(ctx, db, game)
+	read.orders, read.note, err = ordersOrNote(ctx, orders, err)
 	if err != nil {
-		return nil, nil, nil, "", err
+		return salesRead{}, err
 	}
-	return rows, last, orders, note, nil
+	return read, nil
+}
+
+// ordersOrNote is what an order read came to: its orders, or none and a note
+// when their table is missing or unreadable, or its error.
+func ordersOrNote(ctx context.Context, orders []orderRow, err error) ([]orderRow, string, error) {
+	if err == nil {
+		return orders, "", nil
+	}
+	note := ordersUnavailable(err)
+	if note == "" || ctx.Err() != nil {
+		return nil, "", err
+	}
+	return nil, note, nil
 }
 
 // readSnapshot reads the window and the lookback in one read-only repeatable read.
@@ -444,18 +458,21 @@ func readSnapshot(ctx context.Context, db *sql.DB, game string, day time.Time) (
 }
 
 // query reads game's sales to day, ends the transaction, then keys them by b's
-// cards and grades their pace. It also returns the cards with a last sale
-// price, and the note on why there are none.
-func query(ctx context.Context, db *sql.DB, b *matcher.Backend, game string, day time.Time) (map[string]*Sales, []Band, int, int, string, error) {
-	rows, last, orders, note, err := readSales(ctx, db, game, day)
+// cards and grades their pace: day's snapshot, and the pairs no card matched.
+func query(ctx context.Context, db *sql.DB, b *matcher.Backend, game string, day time.Time) (*Snapshot, int, error) {
+	read, err := readSales(ctx, db, game, day)
 	if err != nil {
-		return nil, nil, 0, 0, "", err
+		return nil, 0, err
 	}
-	cards, unmatched := build(rows, last, orders, cardMatcher(b))
+	cards, unmatched := build(read.rows, read.last, read.orders, cardMatcher(b))
 	if len(cards) == 0 {
-		return nil, nil, unmatched, 0, "", fmt.Errorf("no cards matched in %d pairs to %s, keeping the previous load", len(last), day.Format(time.DateOnly))
+		return nil, unmatched, fmt.Errorf("no cards matched in %d pairs to %s, keeping the previous load", len(read.last), day.Format(time.DateOnly))
 	}
-	return cards, grade(cards), unmatched, pricedCount(cards), note, nil
+	snap := &Snapshot{
+		Day: day, Cards: cards, Window: Window, Bands: grade(cards),
+		Priced: pricedCount(cards), Note: read.note, Backend: weak.Make(b),
+	}
+	return snap, unmatched, nil
 }
 
 // pricedCount is the cards with a last sale price.
@@ -555,28 +572,19 @@ func startOfDay(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
-// The conditions' short forms, shared so every card holds one string of each.
-const (
-	condNM  = "NM"
-	condLP  = "LP"
-	condMP  = "MP"
-	condHP  = "HP"
-	condDMG = "DMG"
-)
-
 // shortCondition is TCGplayer's grade abbreviated, anything else as sent.
 func shortCondition(condition string) string {
 	switch condition {
 	case "Near Mint":
-		return condNM
+		return "NM"
 	case "Lightly Played":
-		return condLP
+		return "LP"
 	case "Moderately Played":
-		return condMP
+		return "MP"
 	case "Heavily Played":
-		return condHP
+		return "HP"
 	case "Damaged":
-		return condDMG
+		return "DMG"
 	}
 	return condition
 }

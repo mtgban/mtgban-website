@@ -99,7 +99,7 @@ func TestSalesVelocityLive(t *testing.T) {
 	start = time.Now()
 	orders, err := readOrderRows(ctx, db, game)
 	orderCount := fmt.Sprint(len(orders))
-	if ordersUnavailable(err) {
+	if ordersUnavailable(err) != "" {
 		orderCount = "n/a"
 	} else if err != nil {
 		t.Fatal(err)
