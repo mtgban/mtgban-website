@@ -39,7 +39,7 @@ how much stored state readers keep (favorites, backpacks, presets,
 alerts and the like), as counts and size buckets.
 
 What is never counted: an email or its hash, a user or account id, an IP
-address (the beacon's rate limit keys on it in memory only), query text,
+address (the beacon's rate limit and daily cap key on it in memory only), query text,
 a card, a URL or any text a reader typed. A string the registry does not
 name for that slot is refused or folded to `other`, never stored as sent.
 
@@ -128,19 +128,28 @@ errors are placed as `other`. `TestScriptListMatchesTheJSDirectory` and
 ## Bounds
 
 - **The beacon** reads at most 8 KiB and 100 entries a post, takes a
-  count of at least 1 an entry, adds at most 50 to a key a post, and takes
+  count of at least 1 an entry, adds at most 10 to a key a post, and takes
   strings of up to 40
   printable ASCII characters. Only `ui.` names and the snapshot's two
-  `state.` names are taken from a browser. Past its method, origin and
+  `state.` names are taken from a browser. One client address adds at
+  most 1,000 to a name a UTC day, kept in a fixed-size count-min sketch
+  (1 MiB, no lock) that can only cap early on a collision; an entry past
+  it is cut to what is left. Past its method, origin and
   rate checks it always answers 204, and each refused entry is counted
-  by reason under `metrics.client`.
-- **The script** holds up to 500 keys, posts 50 entries at a time, and
+  by reason under `metrics.client` (`daily` for the address cap).
+- **The script** holds up to 500 keys, sends a key as soon as it holds
+  10, posts 50 entries at a time with a key at most once a post, and
   parks what it cannot send in one localStorage queue of up to 100
-  entries, dropped once its oldest day is more than a week old.
-- **Script errors**: 5 a page load, 20 error entries a post, 400 distinct
+  entries, dropped once its oldest day is more than a week old. A post
+  refused with 429 is parked too, and the queue is sent again after the
+  response's Retry-After (30 seconds without one, kept between 5 seconds
+  and 10 minutes); other error statuses are dropped.
+- **Script errors**: 5 a page load, 5 error entries a post, 3 distinct
+  lines a day for each device, build, script and class, 400 distinct
   rows in the buffer between writes, and 200 rows an instance a day. A
-  full day is a Health problem; the counts by script and class are still
-  kept.
+  line past its place's 3 or a full day keeps its count but adds no row;
+  a full day is a Health problem, and the counts by script and class are
+  still kept.
 - **The counter** holds up to 50,000 keys across its pending minutes and
   drops a minute it could not write within half an hour; both show on
   Health as `metrics.dropped` and `metrics.flush_fail`.
