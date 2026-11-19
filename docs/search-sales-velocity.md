@@ -19,6 +19,11 @@ signed-in cookie. Signed out, TCGplayer returns only the newest five sales, and
 the table's oldest rows were pulled that way, so they hold at most five
 orders a day; the window is past them.
 
+`tcgplayerlastsalemodel` holds one row per product and printing: the newest
+order through the end of the day before the pull, with its time, condition,
+per-copy item price, shipping and quantity. The same pull writes it, from
+pages it already fetches. Issue #1405.
+
 ## The metric
 
 Per card uuid, a printing in one finish:
@@ -29,7 +34,11 @@ Per card uuid, a printing in one finish:
   orders (`total_revenue` is no price: it ignores each sale's quantity);
 - the orders in the window's last 7 days, for its trend;
 - the days in that window with a sale;
-- the first and last sale over the 365 days ending on the same day.
+- the first and last sale over the 365 days ending on the same day;
+- the last sale's price and condition, from the newest order of the card's
+  pairs. It is used when it is not older than the last sale date above, which
+  it then replaces. That date can fall a day past the window's end, since the
+  order is written while that day's counts are still partial.
 
 The rate is the copies over 30, to one decimal.
 
@@ -38,11 +47,17 @@ The rate is the copies over 30, to one decimal.
 | State | When | Rate | Details |
 |---|---|---|---|
 | No data | no sale in 365 days | no row | none |
-| Zero | sales in the year, none in the window | `0/day` | `no sale in the window; last sold` and the date |
-| A rate | copies in the window | `2.3/day`, or `<0.1/day` under a tenth | copies, orders, days with a sale, last sale |
+| Zero | sales in the year, none in the window | `0/day` | `no sale in the window; last sold`, the date and, when known, `for` the price and condition |
+| A rate | copies in the window | `2.3/day`, or `<0.1/day` under a tenth | copies, orders, days with a sale, last sale with its price, condition and date |
 
 `text` (`internal/salesvelocity`) writes both. The details open with
-`Sold on TCGplayer, last 30 days`.
+`Sold on TCGplayer, last 30 days`. The row as rendered for a rate's last sale reads
+`last sale | $12.34 LP · 2026-11-17`, and a zero's line reads
+`no sale in the window; last sold 2026-08-02 for $12.34 LP`.
+
+The price is the item's, per copy, without shipping. Conditions print as NM,
+LP, MP, HP and DMG, any other as TCGplayer sends it. With no order on record
+the lines show the date alone.
 
 The row is a `<details>` on both layouts, showing the rate and opening on a
 click or tap to the details, so a phone reads what a desktop reads. A phone
@@ -186,7 +201,13 @@ of any game, and stops if the day before it is already loaded for the
 current datastore, or if its last load failed less than six hours ago. Two queries then run in one
 read-only transaction, their date bounds computed in Go from that day:
 the window grouped by product and printing, and the last sale per pair
-over the year.
+over the year. A third, `LastOrderQuery`, runs after the transaction ends:
+`tcgplayerlastsalemodel` is overwritten in place, and a failed statement
+would abort the transaction. It reads the newest order per pair, whatever
+its date. A missing table or a denied read loads the rates and dates
+without prices and says so on the job's dashboard row; that row also counts
+the cards with a price. The count and the note are kept on the snapshot, so
+the row keeps them on the loads that find the day already loaded.
 
 With no game column, the game's day query and the window and lookback keep
 to this deployment's game through the listings loader's semi-join on
@@ -255,6 +276,9 @@ it shows the semi-join kept to the game.
 | entries | zero | unmatched pairs | this game's pairs unmatched |
 |---:|---:|---:|---:|
 | 157501 | 16959 | 6479 | 6479 of 163985 |
+
+The last-orders row of the first table and the count of priced cards appear
+once the test is rerun against a filled table.
 
 ## Watching the pull
 
