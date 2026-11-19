@@ -1,6 +1,6 @@
 {{define "alerts-body"}}
 {{with .AlertsPage}}
-<div class="alerts-body" id="alerts-page" data-open-card="{{if not .Editing}}{{.FormCardID}}{{end}}" data-open-side="{{.FormSide}}" data-open-edit="{{if .Editing}}{{.Editing.ID}}{{end}}" data-alert-channels="{{.AllowedChannels}}">
+<div class="alerts-body" id="alerts-page" data-open-card="{{if not .Editing}}{{.FormCardID}}{{end}}" data-open-side="{{.FormSide}}" data-open-edit="{{if .Editing}}{{.Editing.ID}}{{end}}" data-open-remove="{{if .Removing}}{{.Removing}}{{end}}" data-alert-channels="{{.AllowedChannels}}">
 {{if not .SignedIn}}
     {{if .Unverified}}<p class="alerts-notice">Verify your Patreon email to use alerts, then sign out and back in here.</p>
     {{else}}<p class="alerts-notice">Sign in with Patreon to set price alerts.</p>{{end}}
