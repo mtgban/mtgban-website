@@ -142,9 +142,10 @@ errors are placed as `other`. `TestScriptListMatchesTheJSDirectory` and
   10, posts 50 entries at a time with a key at most once a post, and
   parks what it cannot send in one localStorage queue of up to 100
   entries, dropped once its oldest day is more than a week old. A post
-  refused with 429 is parked too, and the queue is sent again after the
-  response's Retry-After (30 seconds without one, kept between 5 seconds
-  and 10 minutes); other error statuses are dropped.
+  answered 429, or 502 to 504 by a proxy with no server behind it, is
+  parked too, and the queue is sent again after the response's
+  Retry-After (30 seconds without one, kept between 5 seconds and 10
+  minutes); other error statuses are dropped.
 - **Script errors**: 5 a page load, 5 error entries a post, 5 new rows
   a UTC day for each client address, 400 distinct rows in the buffer
   between writes, and 200 rows an instance a day. The address budget is

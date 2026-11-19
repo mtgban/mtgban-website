@@ -307,7 +307,7 @@
         return navigator.onLine === false;
     }
 
-    // send posts each body by fetch; a rejected one, or one refused as too many, is parked under day.
+    // send posts each body by fetch; a rejected one, or one answered 429 or 502 to 504, is parked under day.
     function send(entries, day) {
         var bodies = posts(entries);
         for (var i = 0; i < bodies.length; i++) post(bodies[i], day);
@@ -338,10 +338,11 @@
                 enqueue(JSON.parse(body), day);
             } catch (e) {}
         };
-        // Only a refusal as too many is worth sending again; the server took or refused the rest for good.
+        // A refusal as too many, or a proxy with no server behind it (502 to 504), is worth
+        // sending again; the server took or refused the rest for good.
         var done = function (res) {
             try {
-                if (!res || res.status !== 429) return;
+                if (!res || (res.status !== 429 && (res.status < 502 || res.status > 504))) return;
                 park();
                 retryLater(retryAfter(res));
             } catch (e) {}
