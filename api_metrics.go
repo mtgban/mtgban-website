@@ -5,7 +5,9 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"time"
 
+	"github.com/mtgban/mtgban-website/internal/dailycap"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/ratelimit"
 )
@@ -94,6 +96,22 @@ func checkEntry(e beaconEntry, v observability.Validators) (scope, value string,
 // metricsLimiter throttles beacons per client; the burst covers a restored window of tabs.
 var metricsLimiter = ratelimit.NewLimiter(1, 20)
 
+// metricsPerAddressDay is the most one client address may add to one name in a UTC day.
+// A reader's own day is far below it; it stops one address from moving a name's totals.
+// Posts at once can pass it by up to metricsMaxCount each: about 200 with the limiter's burst of 20.
+const metricsPerAddressDay = 1000
+
+// errorRowsPerAddressDay is the most new error rows one client address may start in a UTC day,
+// one post's worth; a row it already started still adds. With feature_errors keeping 200 rows
+// a day, filling the day takes 40 addresses, and no address can use up a script's rows.
+const errorRowsPerAddressDay = metricsMaxErrorEntries
+
+// metricsAddressCaps holds each client address to the two caps above.
+var metricsAddressCaps = dailycap.New(metricsPerAddressDay, errorRowsPerAddressDay)
+
+// metricsNow is the clock the daily cap reads.
+var metricsNow = time.Now
+
 // MetricsAPI stores a page script's counts; past the door checks it always answers 204.
 func (s *site) MetricsAPI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -127,7 +145,7 @@ func (s *site) MetricsAPI(w http.ResponseWriter, r *http.Request) {
 	v := beaconValidators(s)
 	d := metricDims(r)
 	added := make(map[beaconKey]int64, len(entries))
-	today := addressDayFor(metricsNow())
+	today := metricsAddressCaps.For(metricsNow())
 	for _, e := range entries {
 		countEntry(r, d, v, added, today, ip.String(), e)
 	}
@@ -190,7 +208,7 @@ func errorRow(scope string, line *int, build string) (l int, b, reason string) {
 
 // countEntry stores one entry or counts why it was refused; added is this post's sums by key,
 // and today is what each address has added to each name today.
-func countEntry(r *http.Request, d observability.Dims, v observability.Validators, added map[beaconKey]int64, today *addressDay, address string, e beaconEntry) {
+func countEntry(r *http.Request, d observability.Dims, v observability.Validators, added map[beaconKey]int64, today *dailycap.Day, address string, e beaconEntry) {
 	isError := slices.Contains(errorNames, e.N)
 	if !isError && (e.L != nil || e.B != "") {
 		rejectChecked()
@@ -219,7 +237,7 @@ func countEntry(r *http.Request, d observability.Dims, v observability.Validator
 		return
 	}
 	n = min(n, metricsMaxCount-added[k])
-	if n = today.take(address, e.N, n); n == 0 {
+	if n = today.Take(address, e.N, n); n == 0 {
 		rejectChecked()
 		observe(r, "metrics.client", "daily")
 		return
@@ -235,7 +253,7 @@ func countEntry(r *http.Request, d observability.Dims, v observability.Validator
 	case !rowOK:
 		rejectChecked()
 	case d.Bot, FeatureErrors == nil: // the table has no bot column; the count above keeps it
-	case !today.mayAddErrorRow(address, d.Device, build, scope, value, line): // past the address's new rows for the day
+	case !today.MayAddErrorRow(address, d.Device, build, scope, value, line): // past the address's new rows for the day
 		rejectChecked()
 	case !FeatureErrors.Add(d.Device, build, scope, value, line, n):
 		rejectChecked()

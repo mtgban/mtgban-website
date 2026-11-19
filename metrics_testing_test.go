@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/mtgban-website/internal/dailycap"
 	"github.com/mtgban/mtgban-website/observability"
 )
 
@@ -54,12 +55,13 @@ type fakeCounter struct {
 // clock as FeatureCounter, with observabilityInstance "test", for one test.
 func withFeatureCounter(t *testing.T) *fakeCounter {
 	t.Helper()
-	prevCounter, prevInstance, prevDay := FeatureCounter, observabilityInstance, metricsAddressDay.Load()
+	prevCounter, prevInstance, prevCaps := FeatureCounter, observabilityInstance, metricsAddressCaps
 	t.Cleanup(func() {
 		FeatureCounter, observabilityInstance = prevCounter, prevInstance
-		metricsAddressDay.Store(prevDay)
+		metricsAddressCaps = prevCaps
 	})
-	metricsAddressDay.Store(nil) // each test's address starts its day with nothing added
+	// each test's address starts its day with nothing added
+	metricsAddressCaps = dailycap.New(metricsPerAddressDay, errorRowsPerAddressDay)
 	now := time.Date(2026, 11, 11, 12, 0, 30, 0, time.UTC)
 	f := &fakeCounter{t: t, store: &memCounterStore{}}
 	f.counter = observability.NewCounter(f.store, "test", func() time.Time { return now })
