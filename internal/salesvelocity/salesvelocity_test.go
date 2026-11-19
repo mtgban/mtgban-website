@@ -389,44 +389,51 @@ func TestReport(t *testing.T) {
 	}
 }
 
-// TestOrdersUnavailable tolerates a missing table and a denied read, nothing else.
+// TestOrdersUnavailable notes a missing table and a denied read, nothing else.
 func TestOrdersUnavailable(t *testing.T) {
+	absent := `relation "tcgplayerlastsalemodel" does not exist`
 	for _, tc := range []struct {
 		err  error
-		want bool
+		want string
 	}{
-		{&pq.Error{Code: "42P01"}, true},
-		{&pq.Error{Code: "42501"}, true},
-		{fmt.Errorf("x: %w", &pq.Error{Code: "42P01"}), true},
-		{fmt.Errorf("x: %w", &pq.Error{Code: "42501"}), true},
-		{&pq.Error{Code: "57014"}, false},
-		{sql.ErrNoRows, false},
-		{nil, false},
+		{&pq.Error{Code: "42P01", Message: absent}, "last sale prices unavailable: " + absent},
+		{&pq.Error{Code: "42501", Message: "denied"}, "last sale prices unavailable: denied"},
+		{fmt.Errorf("x: %w", &pq.Error{Code: "42P01", Message: absent}), "last sale prices unavailable: " + absent},
+		{fmt.Errorf("x: %w", &pq.Error{Code: "42501", Message: "denied"}), "last sale prices unavailable: denied"},
+		{&pq.Error{Code: "57014"}, ""},
+		{sql.ErrNoRows, ""},
+		{nil, ""},
 	} {
 		if got := ordersUnavailable(tc.err); got != tc.want {
-			t.Errorf("%v: got %v, want %v", tc.err, got, tc.want)
+			t.Errorf("%v: got %q, want %q", tc.err, got, tc.want)
 		}
 	}
 }
 
-// TestLoadOrders reads the orders, or loads without them on an absent table.
-func TestLoadOrders(t *testing.T) {
+// TestOrdersOrNote keeps the orders, or loads without them on an absent table.
+func TestOrdersOrNote(t *testing.T) {
 	ctx := context.Background()
 	rows := []orderRow{{ProductID: 1, Variant: "Normal", Price: 2.5}}
-	got, note, err := loadOrders(ctx, func() ([]orderRow, error) { return rows, nil })
+	got, note, err := ordersOrNote(ctx, rows, nil)
 	if err != nil || note != "" || !slices.Equal(got, rows) {
 		t.Errorf("rows: got %v, %q, %v", got, note, err)
 	}
-	got, note, err = loadOrders(ctx, func() ([]orderRow, error) {
-		return nil, &pq.Error{Code: "42P01", Message: `relation "tcgplayerlastsalemodel" does not exist`}
-	})
+	// Rows read before the table went missing are dropped with it.
+	absent := &pq.Error{Code: "42P01", Message: `relation "tcgplayerlastsalemodel" does not exist`}
+	got, note, err = ordersOrNote(ctx, rows, absent)
 	if err != nil || got != nil || note != `last sale prices unavailable: relation "tcgplayerlastsalemodel" does not exist` {
 		t.Errorf("absent: got %v, %q, %v", got, note, err)
 	}
 	boom := errors.New("boom")
-	got, note, err = loadOrders(ctx, func() ([]orderRow, error) { return nil, boom })
+	got, note, err = ordersOrNote(ctx, nil, boom)
 	if !errors.Is(err, boom) || got != nil || note != "" {
 		t.Errorf("other: got %v, %q, %v", got, note, err)
+	}
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	got, note, err = ordersOrNote(cancelled, nil, absent)
+	if !errors.Is(err, absent) || got != nil || note != "" {
+		t.Errorf("cancelled: got %v, %q, %v", got, note, err)
 	}
 }
 
