@@ -24,6 +24,9 @@ type AlertsPageVars struct {
 	// reads it off the form's data-card-id attribute.
 	FormCardID string
 	Editing    *alerts.View
+	// Removing is the alert ?remove= named, whose Delete confirm the
+	// page's JS opens on arrival.
+	Removing int64
 	// AllowedChannels is the ACL's delivery channels, comma-joined, read
 	// off #alerts-page's data-alert-channels by the page's JS.
 	AllowedChannels string
@@ -102,19 +105,36 @@ func alertChannelList(v url.Values) string {
 }
 
 // alertsDeepLink names what the alerts page was opened on, "" for the list.
-func alertsDeepLink(edit, card string) string {
+func alertsDeepLink(edit, card, remove string) string {
 	switch {
 	case edit != "":
 		return "edit"
 	case card != "":
 		return "card"
+	case remove != "":
+		return "remove"
 	}
 	return ""
 }
 
+// alertsRemoving is the id of the listed alert ?remove= names, 0 for none.
+func alertsRemoving(views []alerts.View, remove string) int64 {
+	id, err := strconv.ParseInt(remove, 10, 64)
+	if err != nil {
+		return 0
+	}
+	for _, view := range views {
+		if view.ID == id {
+			return id
+		}
+	}
+	return 0
+}
+
 // Alerts renders the list, or the create form with ?card=, or the edit
-// form with ?edit=. enforceSigning has already let the reader in; what
-// they may do follows the ACL values their signature carries.
+// form with ?edit=; ?remove= lists them and asks to delete that one.
+// enforceSigning has already let the reader in; what they may do follows
+// the ACL values their signature carries.
 func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
 	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "Alerts", sig)
@@ -128,7 +148,7 @@ func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	vars.SignedIn = true
-	if v := alertsDeepLink(r.FormValue("edit"), r.FormValue("card")); v != "" && isPageView(r) {
+	if v := alertsDeepLink(r.FormValue("edit"), r.FormValue("card"), r.FormValue("remove")); v != "" && isPageView(r) {
 		observe(r, "alerts.deep_link", v)
 	}
 	api := s.alerts.API()
@@ -181,6 +201,11 @@ func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	vars.Alerts = views
+	remove := r.FormValue("remove")
+	vars.Removing = alertsRemoving(views, remove)
+	if remove != "" && vars.Removing == 0 {
+		vars.Error = "That alert no longer exists."
+	}
 	b := s.backend()
 	p := s.prices()
 	vars.Cards = cardMetadata{}

@@ -197,11 +197,43 @@ func TestAlertsPageRowsCarryTheHoverImage(t *testing.T) {
 }
 
 func TestAlertsDeepLink(t *testing.T) {
-	for _, c := range []struct{ edit, card, want string }{
-		{"12", "", "edit"}, {"", "abc", "card"}, {"12", "abc", "edit"}, {"", "", ""},
+	for _, c := range []struct{ edit, card, remove, want string }{
+		{"12", "", "", "edit"}, {"", "abc", "", "card"}, {"12", "abc", "", "edit"}, {"", "", "12", "remove"}, {"", "", "", ""},
 	} {
-		if got := alertsDeepLink(c.edit, c.card); got != c.want {
-			t.Errorf("alertsDeepLink(%q, %q) = %q, want %q", c.edit, c.card, got, c.want)
+		if got := alertsDeepLink(c.edit, c.card, c.remove); got != c.want {
+			t.Errorf("alertsDeepLink(%q, %q, %q) = %q, want %q", c.edit, c.card, c.remove, got, c.want)
+		}
+	}
+}
+
+// ?remove= names one of the reader's alerts, whose id the page hands its
+// JS to open the Delete confirm on.
+func TestAlertsPageRemoveLink(t *testing.T) {
+	views := []alerts.View{{Alert: alerts.Alert{ID: 3, CardID: "card-1", Status: alerts.StatusActive}}}
+	for _, c := range []struct {
+		remove string
+		want   int64
+	}{{"3", 3}, {"4", 0}, {"x", 0}, {"", 0}} {
+		if got := alertsRemoving(views, c.remove); got != c.want {
+			t.Errorf("alertsRemoving(%q) = %d, want %d", c.remove, got, c.want)
+		}
+	}
+
+	tmpl, err := template.New("").Funcs(funcMap).ParseFiles("templates/partials/alerts-body.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		removing int64
+		want     string
+	}{{3, `data-open-remove="3"`}, {0, `data-open-remove=""`}} {
+		vars := AlertsPageVars{SignedIn: true, Allowed: true, Allowance: 5, Alerts: views, Removing: c.removing}
+		var out strings.Builder
+		if err := tmpl.ExecuteTemplate(&out, "alerts-body", PageVars{AlertsPage: &vars}); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out.String(), c.want) {
+			t.Errorf("removing %d: page lacks %s", c.removing, c.want)
 		}
 	}
 }

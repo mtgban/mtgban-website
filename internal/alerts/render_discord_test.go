@@ -139,6 +139,7 @@ func TestAlertEmbedTruncatesLongDescription(t *testing.T) {
 		hits[i] = Quote{Store: longLabel, Price: 10}
 	}
 	a := Alert{
+		ID:     7,
 		CardID: "card-1", Side: SideRetail, Condition: "NM", ReferencePrice: 10,
 		Above: Threshold{Kind: KindAbs, Value: 12},
 		Card:  Card{Name: "Lightning Bolt", Set: "LEA", Number: "161", Finish: "nonfoil"},
@@ -149,8 +150,8 @@ func TestAlertEmbedTruncatesLongDescription(t *testing.T) {
 	if n > embedMaxDescription {
 		t.Fatalf("description = %d runes, want <= %d", n, embedMaxDescription)
 	}
-	if !strings.HasSuffix(e.Description, "[Manage alerts](https://mtgban.com/alerts)") {
-		t.Fatalf("description does not end with the manage link:\n%s", e.Description)
+	if !strings.HasSuffix(e.Description, "[Manage alerts](https://mtgban.com/alerts) · [Remove alert](https://mtgban.com/alerts?remove=7)") {
+		t.Fatalf("description does not end with the alerts links:\n%s", e.Description)
 	}
 }
 

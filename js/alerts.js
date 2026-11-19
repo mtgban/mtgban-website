@@ -790,15 +790,21 @@
             return;
         }
         if (action === 'delete') {
-            // js/confirm-dialog.js is callback-style: confirmDialog(message, onConfirm, opts).
-            if (typeof window.confirmDialog === 'function') {
-                window.confirmDialog('Delete this alert?', function () { runRowAction(id, action); }, { confirmLabel: 'Delete' });
-            } else if (window.confirm('Delete this alert?')) {
-                runRowAction(id, action);
-            }
+            confirmDelete(id);
             return;
         }
         runRowAction(id, action);
+    }
+
+    // confirmDelete asks before deleting alert id, naming its card when given.
+    function confirmDelete(id, name) {
+        var prompt = name ? 'Delete your ' + name + ' alert?' : 'Delete this alert?';
+        // js/confirm-dialog.js is callback-style: confirmDialog(message, onConfirm, opts).
+        if (typeof window.confirmDialog === 'function') {
+            window.confirmDialog(prompt, function () { runRowAction(id, 'delete'); }, { confirmLabel: 'Delete' });
+        } else if (window.confirm(prompt)) {
+            runRowAction(id, 'delete');
+        }
     }
 
     // ── Sorting the list on /alerts ─────────────────────────
@@ -1282,13 +1288,21 @@
             loadChannelsBox();
         }
 
-        // /alerts?card= and ?edit= open the dialog on arrival.
+        // /alerts?card= and ?edit= open the dialog on arrival, ?remove= the
+        // row's Delete confirm, dropped from the URL so the reload after it
+        // does not ask again.
         var page = document.getElementById('alerts-page');
         if (page) {
+            var removeId = page.getAttribute('data-open-remove');
             if (page.getAttribute('data-open-edit')) {
                 open({ alertId: page.getAttribute('data-open-edit') });
             } else if (page.getAttribute('data-open-card')) {
                 open({ cardId: page.getAttribute('data-open-card'), side: page.getAttribute('data-open-side') });
+            } else if (removeId) {
+                window.history.replaceState(null, '', window.location.pathname);
+                var row = document.querySelector('.alerts-table tr[data-id="' + removeId + '"]');
+                if (row) row.scrollIntoView({ block: 'center' });
+                confirmDelete(removeId, row && row.getAttribute('data-name'));
             }
         }
     });

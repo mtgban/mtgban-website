@@ -178,17 +178,17 @@ func renderDiscord(f Firing, label func(shorthand string) string) *discordgo.Mes
 	if len(prices) > 0 {
 		fmt.Fprintf(&b, "\n%s", strings.Join(prices, ", "))
 	}
-	manageLink := ""
+	links := ""
 	embedURL := ""
 	if siteURL != "" {
-		manageLink = fmt.Sprintf("[Manage alerts](%s/alerts)", siteURL)
+		links = fmt.Sprintf("[Manage alerts](%s/alerts) · [Remove alert](%s/alerts?remove=%d)", siteURL, siteURL, a.ID)
 		embedURL = cardURL(siteURL, a.CardID)
-		fmt.Fprintf(&b, "\n%s", manageLink)
+		fmt.Fprintf(&b, "\n%s", links)
 	}
 
 	desc := b.String()
 	if utf8.RuneCountInString(desc) > embedMaxDescription {
-		desc = truncateEmbedDescription(desc, manageLink, embedMaxDescription)
+		desc = truncateEmbedDescription(desc, links, embedMaxDescription)
 	}
 	return &discordgo.MessageEmbed{
 		Title:       "Price alert: " + a.Card.Name,
@@ -234,7 +234,7 @@ func parkedEmbed(parked []Moved, reason string) *discordgo.MessageEmbed {
 }
 
 // truncateEmbedDescription cuts s to limit runes total, at a line break
-// when one is near, keeping the manage-alerts link (if any) at the end.
+// when one is near, keeping the alerts links (if any) at the end.
 func truncateEmbedDescription(s, link string, limit int) string {
 	suffix := ""
 	if link != "" {
