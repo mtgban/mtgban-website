@@ -740,7 +740,7 @@ func TestOptimizerListsLeftovers(t *testing.T) {
 }
 
 // TestNotBoughtAlertBell draws a price alert bell on each Not bought row,
-// at the row's condition and copies, with the dialog it opens, for a reader whose tier
+// on the buylist side at the row's condition and copies, with the dialog it opens, for a reader whose tier
 // has alerts; Filtered out rows never get one.
 func TestNotBoughtAlertBell(t *testing.T) {
 	for _, can := range []bool{false, true} {
@@ -749,7 +749,7 @@ func TestNotBoughtAlertBell(t *testing.T) {
 			NotBought:     []LeftoverEntry{{CardID: "a", Condition: "SP", Quantity: 3}},
 			FilteredOut:   []LeftoverEntry{{CardID: "b", Quantity: 1, Store: "ZZW", Price: 1}},
 		}})
-		bell := strings.Contains(leftoverRows(out, "opt-not-bought"), `class="opt-move-btn opt-alert-btn alert-link" data-card-id="a" data-cond="SP" data-qty="3"`)
+		bell := strings.Contains(leftoverRows(out, "opt-not-bought"), `class="opt-move-btn opt-alert-btn alert-link" data-card-id="a" data-side="buylist" data-cond="SP" data-qty="3"`)
 		modal := strings.Contains(out, `id="alert-modal"`)
 		if bell != can || modal != can {
 			t.Errorf("CanAlerts %v: bell %v, dialog %v", can, bell, modal)
