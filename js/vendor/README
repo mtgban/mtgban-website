@@ -1,1 +1,2 @@
 fflate 0.8.2 min UMD build - https://unpkg.com/fflate@0.8.2/umd/index.js - MIT License (c) Arjun Barrett
+Chart.js 4.5.1 dist/chart.umd.min.js - https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js - MIT License (c) Chart.js Contributors - sha256 48444a82d4edcb5bec0f1965faacdde18d9c17db3063d042abada2f705c9f54a, the same bytes as the npm tarball

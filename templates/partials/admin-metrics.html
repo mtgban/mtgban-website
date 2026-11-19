@@ -46,7 +46,7 @@
 {{/* The chart scripts, desktop only, on a view that built a chart; html/template writes Charts as JSON. */}}
 {{define "admin-metrics-scripts"}}
 {{if .Metrics.Charts}}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+<script type="text/javascript" src="/js/vendor/chart.umd.min.js?hash={{.Hash}}" defer></script>
 <script>
     window.BAN_ADMIN_METRICS = { charts: {{.Metrics.Charts}} };
 </script>
