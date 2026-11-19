@@ -2008,6 +2008,17 @@ describe('the Upload results\' backpack pair', () => {
         expect([p.res.add.hidden, p.res.take.hidden]).toEqual([true, true]);
     });
 
+    test('a draw reads an unedited optimizer row\'s card once, for the take button', () => {
+        const p = page({ store: [{ id: 'a', qty: 1, t: 1, m: 1 }], results: [['a', 3]], sections: [[['a', 3]]] });
+        const tr = p.optSections[0].rows[0];
+        const read = tr.getAttribute.bind(tr);
+        let n = 0;
+        tr.getAttribute = (name) => { if (name === 'data-load-name') n++; return read(name); };
+        p.fireClick(p.res.remove);
+        expect(n).toBe(1);
+        expect([p.optSections[0].add.hidden, p.optSections[0].take.hidden]).toEqual([false, false]);
+    });
+
     test('an empty backpack reads the rows for the add button only', () => {
         for (const [store, reads] of [[[], 1], [[{ id: 'a', qty: 1, t: 1, m: 1 }], 2]]) {
             const p = page({ store, results: [['a', 1, 'NM']] });

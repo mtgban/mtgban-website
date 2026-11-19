@@ -802,7 +802,8 @@
     // left out.
     function rowsFor(btn) {
         var section = btn.closest(".opt-store");
-        if (section) return ticked(section).filter(function (tr) { return rowCard(tr).qty > 0; });
+        // Only a row whose copies were edited can be left with none
+        if (section) return ticked(section).filter(function (tr) { return tr.getAttribute("data-qty-edited") === null || rowCard(tr).qty > 0; });
         if (btn.getAttribute("data-pack-rows") !== "results" || typeof window.exportRows !== "function") return null;
         var view = window.currentExportView();
         if (view === "notfound") return [];
