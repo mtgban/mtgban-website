@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"hash/maphash"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +11,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -486,75 +484,14 @@ func TestMetricsAPICapsAnAddressADay(t *testing.T) {
 func TestMetricsAPICutsAPostAtTheDayCap(t *testing.T) {
 	withOpenBeaconLimiter(t)
 	rows := withFeatureCounter(t)
-	today := addressDayFor(metricsNow())
-	if got := today.take("198.51.100.7", "ui.load", metricsPerAddressDay-3); got != metricsPerAddressDay-3 {
+	today := metricsAddressCaps.For(metricsNow())
+	if got := today.Take("198.51.100.7", "ui.load", metricsPerAddressDay-3); got != metricsPerAddressDay-3 {
 		t.Fatalf("took %d, want %d", got, metricsPerAddressDay-3)
 	}
 	postBeacon(t, beacon(fmt.Sprintf(`[{"n":"ui.load","s":"search","c":%d}]`, metricsMaxCount)))
 	got := rows.rows()
 	wantRow(t, got, "search", "ui.load", "", 3)
 	wantRow(t, got, "", "metrics.client", "accepted", 1)
-}
-
-// The sketch never says less than an address added, however many share it.
-func TestAddressDayNeverUndercounts(t *testing.T) {
-	a := &addressDay{seed: maphash.MakeSeed()}
-	const addresses = 200_000
-	for i := range addresses {
-		if got := a.take(fmt.Sprintf("10.%d.%d.%d", i>>16, i>>8&255, i&255), "ui.load", 1); got != 1 {
-			t.Fatalf("address %d refused its first count", i)
-		}
-	}
-	heavy := "192.0.2.1"
-	total := int64(0)
-	for range 2 * metricsPerAddressDay {
-		total += a.take(heavy, "ui.load", 1)
-	}
-	if total > metricsPerAddressDay {
-		t.Errorf("one address added %d, past the cap of %d", total, metricsPerAddressDay)
-	}
-	if total < metricsPerAddressDay/2 {
-		t.Errorf("one address added only %d of %d with %d others in the sketch", total, metricsPerAddressDay, addresses)
-	}
-}
-
-// Posts at once from one address stay near the cap: each can pass it by at most its own count.
-func TestAddressDayHoldsUnderConcurrentPosts(t *testing.T) {
-	a := &addressDay{seed: maphash.MakeSeed()}
-	const workers = 8
-	var total atomic.Int64
-	var wg sync.WaitGroup
-	for range workers {
-		wg.Go(func() {
-			for range metricsPerAddressDay {
-				total.Add(a.take("192.0.2.1", "ui.load", 1))
-			}
-		})
-	}
-	wg.Wait()
-	if got := total.Load(); got < metricsPerAddressDay || got > metricsPerAddressDay+workers {
-		t.Errorf("added %d, want %d to %d", got, metricsPerAddressDay, metricsPerAddressDay+workers)
-	}
-}
-
-// A new UTC day starts a new sketch; the same day keeps it.
-func TestAddressDayTurnsAtMidnightUTC(t *testing.T) {
-	prev := metricsAddressDay.Load()
-	t.Cleanup(func() { metricsAddressDay.Store(prev) })
-	metricsAddressDay.Store(nil)
-	late := time.Date(2026, 11, 11, 23, 59, 59, 0, time.UTC)
-	a := addressDayFor(late)
-	if addressDayFor(late.Add(-time.Hour)) != a {
-		t.Error("the same UTC day started a new sketch")
-	}
-	b := addressDayFor(late.Add(2 * time.Second))
-	if b == a || b.day != a.day+1 {
-		t.Errorf("midnight UTC kept day %d, want %d", b.day, a.day+1)
-	}
-	// 8 PM in New York on the 11th is already the 12th in UTC
-	if addressDayFor(time.Date(2026, 11, 11, 20, 0, 1, 0, time.FixedZone("EST", -5*3600))) != b {
-		t.Error("a time in another zone was not read as UTC")
-	}
 }
 
 func TestMetricsSettingsIsCacheableJSON(t *testing.T) {
@@ -968,32 +905,6 @@ func TestMetricsAPICapsNewErrorRowsPerAddress(t *testing.T) {
 		t.Errorf("ui.js.error counted %d, want %d", stored, want)
 	}
 	wantRow(t, counts, "", "metrics.rejected", "", (posts-1)*metricsMaxErrorEntries)
-}
-
-// The budget is per address and per UTC day, and a repeat never spends it.
-func TestAddressDayErrorRowBudget(t *testing.T) {
-	a := &addressDay{seed: maphash.MakeSeed()}
-	for i := range errorRowsPerAddressDay {
-		if !a.mayAddErrorRow("192.0.2.1", "desktop", testBuild, "navbar.js", "TypeError", i) {
-			t.Fatalf("row %d refused within the budget", i)
-		}
-	}
-	for _, script := range observability.Scripts() {
-		if a.mayAddErrorRow("192.0.2.1", "desktop", testBuild, script, "RangeError", 7) {
-			t.Fatalf("a new row on %s passed the budget", script)
-		}
-	}
-	for range 3 {
-		if !a.mayAddErrorRow("192.0.2.1", "desktop", testBuild, "navbar.js", "TypeError", 0) {
-			t.Fatal("a row the address started was refused")
-		}
-	}
-	if !a.mayAddErrorRow("192.0.2.2", "desktop", testBuild, "navbar.js", "RangeError", 7) {
-		t.Error("another address was refused its first row")
-	}
-	if !(&addressDay{seed: maphash.MakeSeed()}).mayAddErrorRow("192.0.2.1", "desktop", testBuild, "navbar.js", "RangeError", 7) {
-		t.Error("the next day's sketch refused the address")
-	}
 }
 
 // A row the store refuses is counted as rejected; its count stays accepted.

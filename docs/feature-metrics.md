@@ -58,6 +58,7 @@ and `privacy_test.go` ties its retention and key names to the code.
 | `observability/counter.go`, `errors.go` | The minute counter and the script error buffer, each written to the database off the request path once a minute |
 | `metrics.go`, `metrics_http.go` | The site's side: a request's dimensions, `count` (the one door to the counter), the `observe*` helpers, the route labels and the status and duration wrapper |
 | `api_metrics.go` | `POST /api/metrics`, the beacon, and `GET /api/metrics/settings.json`, the preference settings the snapshot reads |
+| `internal/dailycap` | The count-min sketches behind the beacon's caps on one client address a UTC day |
 | `js/metrics.js` | The page script: marks, `BAN.track`, the offline queue, the snapshot, errors and timings |
 | `metrics_jobs.go`, `metrics_stock.go` | The nightly jobs: the fold, the stored-state counts and the page-visit roll-up |
 | `admin_metrics.go` | The admin Metrics section (`/admin?page=metrics`): Overview, Remove, Invest, Feature, Health and Explore |
