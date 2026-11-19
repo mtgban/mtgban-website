@@ -5,8 +5,8 @@ go 1.26.0
 toolchain go1.26.11
 
 require (
-	github.com/BlueMonday/go-scryfall v0.10.0
-	github.com/PuerkitoBio/goquery v1.13.0
+	github.com/BlueMonday/go-scryfall v0.11.0
+	github.com/PuerkitoBio/goquery v1.14.0
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/danielgtaylor/unistyle v0.0.0-20190218054314-fff153823f5f
 	github.com/google/uuid v1.6.0
@@ -24,7 +24,7 @@ require (
 	golang.org/x/oauth2 v0.38.0
 	golang.org/x/sync v0.25.0
 	golang.org/x/sys v0.50.0
-	golang.org/x/text v0.43.0
+	golang.org/x/text v0.44.0
 	golang.org/x/time v0.16.0
 	gopkg.in/Iwark/spreadsheet.v2 v2.0.0-20230915040305-7677e8164883
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
@@ -44,7 +44,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.62.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.62.0 // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
-	github.com/andybalholm/cascadia v1.3.4 // indirect
+	github.com/andybalholm/cascadia v1.3.5 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.47.1 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.33.6 // indirect
