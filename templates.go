@@ -584,7 +584,8 @@ var funcMap = template.FuncMap{
 		}
 		return ""
 	},
-	// velocity_rate is the rate a card sells at, for INFO, where it is worth showing.
+	// velocity_rate is the rate a card sells at, beside arbitrage's card name and
+	// in upload's INFO, where it is worth showing.
 	"velocity_rate": func(card GenericCard) template.HTML {
 		if !card.VelocityNotable {
 			return ""

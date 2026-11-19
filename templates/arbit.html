@@ -98,7 +98,9 @@
 {{$sealedSource := $.SealedSource}}
 {{/* INFO column: for singles it carries CK's P90/Highest (buylist_detail) and
      CK's signal (buylist_ck), with one tooltip for the lot; for sealed it instead holds the 🔎
-     link to the product's contents/decklist. Beside CK's signal, or alone, the rate the card sells at. */}}
+     link to the product's contents/decklist. Shown on every non-global table, and in global
+     mode only when sealed. The rate the card sells at sits beside its name. */}}
+{{$showInfo := or (not $.GlobalMode) $sealedSource}}
 <div class="page-standard arb-page arb-wide">
         <div id="hoverWrap" class="foil-wrap hoverWrap">
             <img id="hoverImage" class="hoverImage" src="{{card_art_placeholder}}"/>
@@ -423,7 +425,9 @@
                 <thead>
                 <tr>
                     <th><a href="javascript:sortBy('alpha', '{{.Name}}')">Card</a> / <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a></th>
-                    <th>INFO</th>
+                    {{if $showInfo}}
+                        <th>INFO</th>
+                    {{end}}
                     {{if not .HasNoConds}}
                         <th class="c">Cond</th>
                     {{end}}
@@ -478,11 +482,14 @@
                                     <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
                                     {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}
                                     {{buylist_badge $.ScraperShort $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}
+                                    {{velocity_rate $card}}
                                 </span>
                                 <span class="card-edition">{{$card.Edition}}{{if not $sealedSource}} · #{{$card.Number}}{{end}}{{if not $card.Sealed}}{{if $card.HasDeck}} · Decklist{{else if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}{{end}}</span>
                             </div>
                         </td>
-                        <td>{{if $card.Sealed}}<a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product" class="arb-contents"><span class="emoji">🔎</span></a>{{velocity_rate $card}}{{else if not $.GlobalMode}}{{$ckTip := buylist_title "CK" (grade "NM") "" $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}<div class="bl-info"{{if $ckTip}} title="{{plain_tip $ckTip}}" data-tip="{{$ckTip}}"{{end}}>{{buylist_detail $.ScraperShort $card.HotlistStore .BuylistEntry.BuyPrice $card.GoodBuylist $card.HighestBuylist true $card.CKSignal}}<span class="bl-ck-line">{{buylist_ck $card.CKSignal}}{{velocity_rate $card}}</span></div>{{else}}{{velocity_rate $card}}{{end}}</td>
+                        {{if $showInfo}}
+                        <td>{{if $card.Sealed}}<a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product" class="arb-contents"><span class="emoji">🔎</span></a>{{else if not $.GlobalMode}}{{$ckTip := buylist_title "CK" (grade "NM") "" $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}<div class="bl-info"{{if $ckTip}} title="{{plain_tip $ckTip}}" data-tip="{{$ckTip}}"{{end}}>{{buylist_detail $.ScraperShort $card.HotlistStore .BuylistEntry.BuyPrice $card.GoodBuylist $card.HighestBuylist true $card.CKSignal}}{{buylist_ck $card.CKSignal}}</div>{{end}}</td>
+                        {{end}}
                         {{if not $save.HasNoConds}}
                             <td>
                                 {{.InventoryEntry.Conditions}}
