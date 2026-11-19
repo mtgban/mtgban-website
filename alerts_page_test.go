@@ -4,7 +4,6 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"strings"
 	"testing"
 
@@ -196,29 +195,10 @@ func TestAlertsPageRowsCarryTheHoverImage(t *testing.T) {
 	}
 }
 
-func TestAlertsDeepLink(t *testing.T) {
-	for _, c := range []struct{ edit, card, remove, want string }{
-		{"12", "", "", "edit"}, {"", "abc", "", "card"}, {"12", "abc", "", "edit"}, {"", "", "12", "remove"}, {"", "", "", ""},
-	} {
-		if got := alertsDeepLink(c.edit, c.card, c.remove); got != c.want {
-			t.Errorf("alertsDeepLink(%q, %q, %q) = %q, want %q", c.edit, c.card, c.remove, got, c.want)
-		}
-	}
-}
-
 // ?remove= names one of the reader's alerts, whose id the page hands its
 // JS to open the Delete confirm on.
 func TestAlertsPageRemoveLink(t *testing.T) {
 	views := []alerts.View{{Alert: alerts.Alert{ID: 3, CardID: "card-1", Status: alerts.StatusActive}}}
-	for _, c := range []struct {
-		remove string
-		want   int64
-	}{{"3", 3}, {"4", 0}, {"x", 0}, {"", 0}} {
-		if got := alertsRemoving(views, c.remove); got != c.want {
-			t.Errorf("alertsRemoving(%q) = %d, want %d", c.remove, got, c.want)
-		}
-	}
-
 	tmpl, err := template.New("").Funcs(funcMap).ParseFiles("templates/partials/alerts-body.html")
 	if err != nil {
 		t.Fatal(err)
@@ -261,42 +241,16 @@ func TestAlertsPageCountsADeepLink(t *testing.T) {
 	})
 }
 
-// The Optimize button sends each alert whose card resolves, at the
-// copies it notes or 1, its target as the row's price, on the side most
-// of them are, buylist on a tie.
-func TestAlertOptimizeRows(t *testing.T) {
-	sell := alerts.Alert{CardID: "a", Side: alerts.SideBuylist, Condition: "NM", ReferencePrice: 10,
-		Above: alerts.Threshold{Kind: alerts.KindPct, Value: 20}, Below: alerts.Threshold{Kind: alerts.KindAbs, Value: 5}}
-	buy := alerts.Alert{CardID: "b", Side: alerts.SideRetail, Condition: "SP", Quantity: 3, ReferencePrice: 10,
-		Below: alerts.Threshold{Kind: alerts.KindAbs, Value: 7.5}}
-	gone := alerts.Alert{CardID: "gone", Side: alerts.SideBuylist, Condition: "NM",
-		Above: alerts.Threshold{Kind: alerts.KindAbs, Value: 3}}
-	// The same card and grade as sell, watched on retail.
-	rebuy := alerts.Alert{CardID: "a", Side: alerts.SideRetail, Condition: "NM", Quantity: 2,
-		Below: alerts.Threshold{Kind: alerts.KindAbs, Value: 8}}
-	cards := cardMetadata{"a": {UUID: "a"}, "b": {UUID: "b"}}
-
-	for name, tc := range map[string]struct {
-		alerts      []alerts.Alert
-		want        []alertOptimizeRow
-		wantBuylist bool
-	}{
-		"a tie opens buylist":   {[]alerts.Alert{sell, buy, gone}, []alertOptimizeRow{{"a", 1, "NM", "12.00"}, {"b", 3, "SP", "7.50"}}, true},
-		"most are retail":       {[]alerts.Alert{sell, buy, buy}, []alertOptimizeRow{{"a", 1, "NM", "12.00"}, {"b", 3, "SP", "7.50"}}, false},
-		"one card, both sides":  {[]alerts.Alert{rebuy, sell}, []alertOptimizeRow{{"a", 1, "NM", "12.00"}}, true},
-		"one card, retail wins": {[]alerts.Alert{sell, rebuy, buy}, []alertOptimizeRow{{"a", 2, "NM", "8.00"}, {"b", 3, "SP", "7.50"}}, false},
-	} {
-		views := make([]alerts.View, len(tc.alerts))
-		for i, a := range tc.alerts {
-			views[i] = alerts.View{Alert: a}
-		}
-		rows, buylist := alertOptimizeRows(views, cards)
-		if !slices.Equal(rows, tc.want) {
-			t.Errorf("%s: rows = %v, want %v", name, rows, tc.want)
-		}
-		if buylist != tc.wantBuylist {
-			t.Errorf("%s: opens on buylist %v, want %v", name, buylist, tc.wantBuylist)
-		}
+// An alert whose card the datastore no longer has stays out of Optimize.
+func TestLiveAlerts(t *testing.T) {
+	views := []alerts.View{
+		{Alert: alerts.Alert{ID: 1, CardID: "a"}},
+		{Alert: alerts.Alert{ID: 2, CardID: "gone"}},
+		{Alert: alerts.Alert{ID: 3, CardID: "b"}},
+	}
+	live := liveAlerts(views, cardMetadata{"a": {UUID: "a"}, "b": {UUID: "b"}})
+	if len(live) != 2 || live[0].ID != 1 || live[1].ID != 3 {
+		t.Errorf("live = %+v, want alerts 1 and 3", live)
 	}
 }
 
@@ -308,10 +262,10 @@ func TestAlertsPageOffersOptimize(t *testing.T) {
 		t.Fatal(err)
 	}
 	one := []alerts.View{{Alert: alerts.Alert{ID: 1, CardID: "card-1", Status: alerts.StatusActive}}}
-	rows := []alertOptimizeRow{{"card-1", 4, "SP", "12.00"}}
+	rows := []alerts.OptimizeRow{{CardID: "card-1", Quantity: 4, Condition: "SP", Price: "12.00"}}
 	for name, tc := range map[string]struct {
 		canUpload bool
-		rows      []alertOptimizeRow
+		rows      []alerts.OptimizeRow
 		want      bool
 	}{
 		"can upload":      {true, rows, true},
