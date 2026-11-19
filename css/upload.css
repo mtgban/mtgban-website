@@ -1792,6 +1792,11 @@ body:not(:has(#panel-optimizer.active)) :is(.res-sort-btn, .res-sort-sep) { disp
 
     /* Optimizer table: switch to auto layout */
     .opt-table { table-layout: auto; }
+    /* which can outgrow its section: the section scrolls it sideways, so
+       the page keeps the screen's width and fixed dialogs center on it.
+       Its headers then cannot stick to the page, and would cover rows. */
+    .opt-store { overflow-x: auto; }
+    .opt-table thead { position: static; }
 
     /* Reload bar: full width at bottom */
     .ures-reload-bar { left: 16px; right: 16px; }
