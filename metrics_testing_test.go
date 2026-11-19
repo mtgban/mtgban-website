@@ -54,10 +54,12 @@ type fakeCounter struct {
 // clock as FeatureCounter, with observabilityInstance "test", for one test.
 func withFeatureCounter(t *testing.T) *fakeCounter {
 	t.Helper()
-	prevCounter, prevInstance := FeatureCounter, observabilityInstance
+	prevCounter, prevInstance, prevDay := FeatureCounter, observabilityInstance, metricsAddressDay.Load()
 	t.Cleanup(func() {
 		FeatureCounter, observabilityInstance = prevCounter, prevInstance
+		metricsAddressDay.Store(prevDay)
 	})
+	metricsAddressDay.Store(nil) // each test's address starts its day with nothing added
 	now := time.Date(2026, 11, 11, 12, 0, 30, 0, time.UTC)
 	f := &fakeCounter{t: t, store: &memCounterStore{}}
 	f.counter = observability.NewCounter(f.store, "test", func() time.Time { return now })

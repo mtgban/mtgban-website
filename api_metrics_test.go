@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"hash/maphash"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -99,9 +101,9 @@ func TestCheckEntry(t *testing.T) {
 		reason       string
 	}{
 		{"one load", beaconEntry{N: "ui.load", S: "search", C: 1}, "search", "", 1, ""},
-		{"the top count", beaconEntry{N: "ui.load", S: "search", C: 50}, "search", "", 50, ""},
-		{"a count over the cap is stored as the cap", beaconEntry{N: "ui.load", S: "search", C: 5000}, "search", "", 50, ""},
-		{"a huge count is stored as the cap", beaconEntry{N: "ui.load", S: "search", C: 1 << 62}, "search", "", 50, ""},
+		{"the top count", beaconEntry{N: "ui.load", S: "search", C: metricsMaxCount}, "search", "", metricsMaxCount, ""},
+		{"a count over the cap is stored as the cap", beaconEntry{N: "ui.load", S: "search", C: 5000}, "search", "", metricsMaxCount, ""},
+		{"a huge count is stored as the cap", beaconEntry{N: "ui.load", S: "search", C: 1 << 62}, "search", "", metricsMaxCount, ""},
 		{"an unknown page folds to other", beaconEntry{N: "ui.load", S: "/wp-login.php", C: 1}, "other", "", 1, ""},
 		{"no count", beaconEntry{N: "ui.load", S: "search"}, "", "", 0, "count"},
 		{"a negative count", beaconEntry{N: "ui.load", S: "search", C: -3}, "", "", 0, "count"},
@@ -432,8 +434,8 @@ func TestMetricsAPICountsAKeyOncePerPost(t *testing.T) {
 	})
 	t.Run("repeats that pass the cap", func(t *testing.T) {
 		rows := withFeatureCounter(t)
-		body := `[{"n":"ui.load","s":"search","c":30},{"n":"ui.load","s":"search","c":30},` +
-			`{"n":"ui.load","s":"search","c":1},{"n":"ui.load","s":"/a","c":40},{"n":"ui.load","s":"/b","c":40}]`
+		body := `[{"n":"ui.load","s":"search","c":6},{"n":"ui.load","s":"search","c":6},` +
+			`{"n":"ui.load","s":"search","c":1},{"n":"ui.load","s":"/a","c":8},{"n":"ui.load","s":"/b","c":8}]`
 		if code := postBeacon(t, beacon(body)); code != http.StatusNoContent {
 			t.Fatalf("status %d, want 204", code)
 		}
@@ -450,6 +452,109 @@ func TestMetricsAPICountsAKeyOncePerPost(t *testing.T) {
 		}
 		wantRow(t, rows.rows(), "search", "ui.load", "", 4)
 	})
+}
+
+// One address adds at most metricsPerAddressDay to a name a UTC day; other names, addresses and the next day are untouched.
+func TestMetricsAPICapsAnAddressADay(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	day := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
+	prevNow := metricsNow
+	t.Cleanup(func() { metricsNow = prevNow })
+	metricsNow = func() time.Time { return day }
+
+	full := fmt.Sprintf(`[{"n":"ui.load","s":"search","c":%d}]`, metricsMaxCount)
+	for range metricsPerAddressDay / metricsMaxCount {
+		postBeacon(t, beacon(full))
+	}
+	postBeacon(t, beacon(full))
+	postBeacon(t, beacon(`[{"n":"ui.load","s":"other","c":1},{"n":"ui.scope.clear","c":1}]`))
+	other := beacon(full)
+	other.RemoteAddr = "203.0.113.9:40000"
+	postBeacon(t, other)
+	day = day.Add(12 * time.Hour) // the next UTC day
+	postBeacon(t, beacon(`[{"n":"ui.load","s":"search","c":1}]`))
+
+	got := rows.rows()
+	wantRow(t, got, "search", "ui.load", "", metricsPerAddressDay+metricsMaxCount+1)
+	wantRow(t, got, "", "ui.scope.clear", "", 1)
+	wantRow(t, got, "", "metrics.client", "daily", 2) // the post past the cap, and the other page's load
+	wantRow(t, got, "", "metrics.rejected", "", 2)
+}
+
+// A post that would pass the day's cap is cut to what is left, not refused whole.
+func TestMetricsAPICutsAPostAtTheDayCap(t *testing.T) {
+	withOpenBeaconLimiter(t)
+	rows := withFeatureCounter(t)
+	today := addressDayFor(metricsNow())
+	if got := today.take("198.51.100.7", "ui.load", metricsPerAddressDay-3); got != metricsPerAddressDay-3 {
+		t.Fatalf("took %d, want %d", got, metricsPerAddressDay-3)
+	}
+	postBeacon(t, beacon(fmt.Sprintf(`[{"n":"ui.load","s":"search","c":%d}]`, metricsMaxCount)))
+	got := rows.rows()
+	wantRow(t, got, "search", "ui.load", "", 3)
+	wantRow(t, got, "", "metrics.client", "accepted", 1)
+}
+
+// The sketch never says less than an address added, however many share it.
+func TestAddressDayNeverUndercounts(t *testing.T) {
+	a := &addressDay{seed: maphash.MakeSeed()}
+	const addresses = 200_000
+	for i := range addresses {
+		if got := a.take(fmt.Sprintf("10.%d.%d.%d", i>>16, i>>8&255, i&255), "ui.load", 1); got != 1 {
+			t.Fatalf("address %d refused its first count", i)
+		}
+	}
+	heavy := "192.0.2.1"
+	total := int64(0)
+	for range 2 * metricsPerAddressDay {
+		total += a.take(heavy, "ui.load", 1)
+	}
+	if total > metricsPerAddressDay {
+		t.Errorf("one address added %d, past the cap of %d", total, metricsPerAddressDay)
+	}
+	if total < metricsPerAddressDay/2 {
+		t.Errorf("one address added only %d of %d with %d others in the sketch", total, metricsPerAddressDay, addresses)
+	}
+}
+
+// Posts at once from one address stay near the cap: each can pass it by at most its own count.
+func TestAddressDayHoldsUnderConcurrentPosts(t *testing.T) {
+	a := &addressDay{seed: maphash.MakeSeed()}
+	const workers = 8
+	var total atomic.Int64
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Go(func() {
+			for range metricsPerAddressDay {
+				total.Add(a.take("192.0.2.1", "ui.load", 1))
+			}
+		})
+	}
+	wg.Wait()
+	if got := total.Load(); got < metricsPerAddressDay || got > metricsPerAddressDay+workers {
+		t.Errorf("added %d, want %d to %d", got, metricsPerAddressDay, metricsPerAddressDay+workers)
+	}
+}
+
+// A new UTC day starts a new sketch; the same day keeps it.
+func TestAddressDayTurnsAtMidnightUTC(t *testing.T) {
+	prev := metricsAddressDay.Load()
+	t.Cleanup(func() { metricsAddressDay.Store(prev) })
+	metricsAddressDay.Store(nil)
+	late := time.Date(2026, 11, 11, 23, 59, 59, 0, time.UTC)
+	a := addressDayFor(late)
+	if addressDayFor(late.Add(-time.Hour)) != a {
+		t.Error("the same UTC day started a new sketch")
+	}
+	b := addressDayFor(late.Add(2 * time.Second))
+	if b == a || b.day != a.day+1 {
+		t.Errorf("midnight UTC kept day %d, want %d", b.day, a.day+1)
+	}
+	// 8 PM in New York on the 11th is already the 12th in UTC
+	if addressDayFor(time.Date(2026, 11, 11, 20, 0, 1, 0, time.FixedZone("EST", -5*3600))) != b {
+		t.Error("a time in another zone was not read as UTC")
+	}
 }
 
 func TestMetricsSettingsIsCacheableJSON(t *testing.T) {
