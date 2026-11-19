@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -2526,7 +2527,7 @@ func TestHealthCarriesTheCounterHelp(t *testing.T) {
 }
 
 func TestChartsLoadOnTheMetricsViewsOnly(t *testing.T) {
-	const tag = "chart.js@4.5.1/dist/chart.umd.min.js"
+	const tag = "/js/vendor/chart.umd.min.js?hash="
 	v := &MetricsView{View: "explore", Explore: &MetricsExplore{Name: "http.status", LineID: "metrics-explore"},
 		Charts: []MetricsChart{{ID: "metrics-explore", Kind: "line", Labels: []string{"11-10"}, Series: []MetricsSeries{{Label: "http.status", Data: []int64{7}}}}}}
 	on := metricsPage(t, v)
@@ -2561,23 +2562,35 @@ func TestChartsLoadOnTheMetricsViewsOnly(t *testing.T) {
 	}
 }
 
-// The pinned tag is search.html's, so the two cannot drift apart.
+// vendoredChartSHA256 is jsDelivr's chart.js@4.5.1/dist/chart.umd.min.js, the same bytes as the npm tarball's.
+const vendoredChartSHA256 = "48444a82d4edcb5bec0f1965faacdde18d9c17db3063d042abada2f705c9f54a"
+
+// The metrics section loads its own copy of the chart library, the version search.html pins, and no CDN script.
 func TestChartTagMatchesSearch(t *testing.T) {
-	// the whole tag, so an attribute added to search's (integrity, crossorigin) must be copied here too
-	tag := regexp.MustCompile(`<script[^>]*chart\.js@[^>]*></script>`)
+	tag := regexp.MustCompile(`<script[^>]*chart\.js@([0-9.]+)[^>]*></script>`)
 	search, errS := os.ReadFile("templates/search.html")
 	admin, errA := os.ReadFile("templates/partials/admin-metrics.html")
 	mobile, errM := os.ReadFile("js/mobile-chart.js")
-	if errS != nil || errA != nil || errM != nil {
-		t.Fatalf("reading the pins: %v %v %v", errS, errA, errM)
+	vendored, errV := os.ReadFile("js/vendor/chart.umd.min.js")
+	if errS != nil || errA != nil || errM != nil || errV != nil {
+		t.Fatalf("reading the pins: %v %v %v %v", errS, errA, errM, errV)
 	}
-	s, a := tag.FindAll(search, -1), tag.FindAll(admin, -1)
-	if len(s) != 1 || len(a) != 1 || !bytes.Equal(s[0], a[0]) {
-		t.Errorf("search's tag %q, the metrics section's %q", s, a)
+	s := tag.FindAllSubmatch(search, -1)
+	if len(s) != 1 {
+		t.Fatalf("search.html has %d chart.js tags, want 1", len(s))
+	}
+	if sum := fmt.Sprintf("%x", sha256.Sum256(vendored)); sum != vendoredChartSHA256 {
+		t.Errorf("js/vendor/chart.umd.min.js has sha256 %s, want %s", sum, vendoredChartSHA256)
+	}
+	if want := []byte("Chart.js v" + string(s[0][1]) + "\n"); !bytes.Contains(vendored[:min(len(vendored), 200)], want) {
+		t.Errorf("js/vendor/chart.umd.min.js is not chart.js %s, the version search.html pins", s[0][1])
+	}
+	if bytes.Contains(admin, []byte("cdn.jsdelivr.net")) || bytes.Count(admin, []byte(`src="/js/vendor/chart.umd.min.js?hash={{.Hash}}" defer`)) != 1 {
+		t.Error("the metrics section must load chart.js from /js/vendor and nothing from a CDN")
 	}
 	// the phone chart loads the same version by URL
 	url := regexp.MustCompile(`https://cdn\.jsdelivr\.net/npm/chart\.js@[0-9.]+/dist/chart\.umd\.min\.js`)
-	if u := url.Find(mobile); len(s) == 0 || u == nil || !bytes.Contains(s[0], u) {
+	if u := url.Find(mobile); u == nil || !bytes.Contains(s[0][0], u) {
 		t.Errorf("js/mobile-chart.js loads %q, search %q", u, s)
 	}
 }
