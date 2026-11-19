@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -24,7 +25,13 @@ func TestTokenRoundTripAndTamper(t *testing.T) {
 	if _, err := VerifyToken([]byte("other-secret-other-secret-other!"), s, now); !errors.Is(err, ErrBadToken) {
 		t.Errorf("wrong secret: %v", err)
 	}
-	flipped := s[:len(s)-2] + "AA"
+	body, sig, _ := strings.Cut(s, ".")
+	mac, err := base64.RawURLEncoding.DecodeString(sig)
+	if err != nil || len(mac) == 0 {
+		t.Fatalf("token %q has no MAC: %v", s, err)
+	}
+	mac[0] ^= 1
+	flipped := body + "." + base64.RawURLEncoding.EncodeToString(mac)
 	if _, err := VerifyToken(secret, flipped, now); !errors.Is(err, ErrBadToken) {
 		t.Errorf("tamper: %v", err)
 	}
