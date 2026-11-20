@@ -458,32 +458,32 @@
                                     {{end}}
                                     {{if $card.Sealed}}
                                         {{if $card.Booster}}
-                                            <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate opening a booster pack" data-track="ui.result.icon" data-track-value="unpack" data-track-scope="header"><span class="emoji">&#127873;</span></a>
+                                            <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate booster pack" data-track="ui.result.icon" data-track-value="unpack" data-track-scope="header"><span class="emoji">&#127873;</span></a>
                                         {{end}}
                                         {{if $card.HasDeck}}
-                                            <a href='/search/decklist/tcgplayer/{{$card.UUID}}' title="Download a TCGplayer-formatted decklist" data-track="ui.result.icon" data-track-value="decklist_tcg" data-track-scope="header"><img width=28 height=28 alt="TCGplayer decklist" src="/img/misc/decklist.png"></a>
-                                            <a href='/search/decklist/cardmarket/{{$card.UUID}}' title="Download a Cardmarket-formatted decklist" data-track="ui.result.icon" data-track-value="decklist_mkm" data-track-scope="header"><img width=28 height=28 alt="Cardmarket decklist" src="/img/misc/decklist-mkm.png"></a>
+                                            <a href='/search/decklist/tcgplayer/{{$card.UUID}}' title="TCGplayer decklist" data-track="ui.result.icon" data-track-value="decklist_tcg" data-track-scope="header"><img width=28 height=28 alt="TCGplayer decklist" src="/img/misc/decklist.png"></a>
+                                            <a href='/search/decklist/cardmarket/{{$card.UUID}}' title="Cardmarket decklist" data-track="ui.result.icon" data-track-value="decklist_mkm" data-track-scope="header"><img width=28 height=28 alt="Cardmarket decklist" src="/img/misc/decklist-mkm.png"></a>
                                         {{end}}
-                                        <a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product" data-track="ui.result.icon" data-track-value="contents" data-track-scope="header"><span class="emoji">&#128270;</span></a>
+                                        <a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search contents" data-track="ui.result.icon" data-track-value="contents" data-track-scope="header"><span class="emoji">&#128270;</span></a>
                                     {{else if $.HasAvailable}}
-                                        <a href='/sealed?q=container:"{{$card.Name}}"' title="Search which products can contain a reprint" data-track="ui.result.icon" data-track-value="find_in_sealed" data-track-scope="header"><span class="emoji">&#128214;</span></a>
+                                        <a href='/sealed?q=container:"{{$card.Name}}"' title="Find in sealed products" data-track="ui.result.icon" data-track-value="find_in_sealed" data-track-scope="header"><span class="emoji">&#128214;</span></a>
                                     {{end}}
-                                    <span class="emoji" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard" data-track="ui.result.icon" data-track-value="copy_name" data-track-scope="header">&#128221;</span>
+                                    <span class="emoji" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy card name" data-track="ui.result.icon" data-track-value="copy_name" data-track-scope="header">&#128221;</span>
                                     {{if not $card.Sealed}}
-                                        <a href="{{$card.DeckboxURL}}" title="Open the Deckbox page for this card" target=_blank data-track="ui.result.icon" data-track-value="deckbox" data-track-scope="header"><img width=22 height=22 alt="" src="/img/logo/deckbox.webp"></a>
+                                        <a href="{{$card.DeckboxURL}}" title="Open on Deckbox" target=_blank data-track="ui.result.icon" data-track-value="deckbox" data-track-scope="header"><img width=22 height=22 alt="" src="/img/logo/deckbox.webp"></a>
                                     {{end}}
                                     {{if $card.CKRestockURL}}
-                                        <a href="{{$card.CKRestockURL}}" title="Set a Restock Notice at CardKingdom" target=_blank data-track="ui.result.icon" data-track-value="ck_restock" data-track-scope="header"><span class="emoji">&#127984;</span></a>
+                                        <a href="{{$card.CKRestockURL}}" title="Card Kingdom restock notice" target=_blank data-track="ui.result.icon" data-track-value="ck_restock" data-track-scope="header"><span class="emoji">&#127984;</span></a>
                                     {{end}}
                                     {{if $card.ScryfallURL}}
-                                        <a href="{{$card.ScryfallURL}}" title="Check this card on Scryfall.com" target=_blank data-track="ui.result.icon" data-track-value="scryfall" data-track-scope="header"><img width=28 height=28 alt="" src="/img/logo/scryfall.svg"></a>
+                                        <a href="{{$card.ScryfallURL}}" title="Open on Scryfall" target=_blank data-track="ui.result.icon" data-track-value="scryfall" data-track-scope="header"><img width=28 height=28 alt="" src="/img/logo/scryfall.svg"></a>
                                     {{end}}
                                     {{if $card.TCGId}}
-                                        <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="Manage your TCGplayer inventory" target=_blank data-track="ui.result.icon" data-track-value="tcg_inventory" data-track-scope="header"><img width=22 height=25 alt="" src="/img/logo/tcgapp.png"></a>
+                                        <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="TCGplayer inventory" target=_blank data-track="ui.result.icon" data-track-value="tcg_inventory" data-track-scope="header"><img width=22 height=25 alt="" src="/img/logo/tcgapp.png"></a>
                                     {{end}}
                                     {{if not $.DisableChart}}
                                         {{if eq $.ChartIDsCSV ""}}
-                                            <a href="?chart={{$card.ChartID}}" title="See historical data" data-track="ui.result.icon" data-track-value="chart_view" data-track-scope="header">&#128200;</a>
+                                            <a href="?chart={{$card.ChartID}}" title="Price history" data-track="ui.result.icon" data-track-value="chart_view" data-track-scope="header">&#128200;</a>
                                         {{else if slice_has $.ChartIDs $card.ChartID}}
                                             {{if or $.ModalMode (gt (len $.ChartIDs) 1)}}
                                             <a class="chart-remove-link" data-card-id="{{$card.ChartID}}" href="?chart={{csv_without $.ChartIDsCSV $card.ChartID}}" title="Remove from this chart" data-track="ui.result.icon" data-track-value="chart_remove" data-track-scope="header">&#128200;&#10134;</a>
@@ -500,7 +500,7 @@
                                     {{/* Shown only when the screen is narrow enough that the sidebar
                                          preview is hidden; opens the card art in a lightbox. */}}
                                     <button type="button" class="qi-view-image" title="View image" onclick="window.showCardImageFromBtn && showCardImageFromBtn(this)" data-track="ui.result.icon" data-track-value="view_image" data-track-scope="header"><i data-lucide="image"></i></button>
-                                    <button class="fav-btn" data-card-id="{{$cardId}}" onclick="window.toggleFavorite && toggleFavorite(this)" title="Toggle favorite" data-track="ui.result.icon" data-track-value="star_add" data-track-scope="header"><i data-lucide="star"></i></button>
+                                    <button class="fav-btn" data-card-id="{{$cardId}}" onclick="window.toggleFavorite && toggleFavorite(this)" title="Favorite" data-track="ui.result.icon" data-track-value="star_add" data-track-scope="header"><i data-lucide="star"></i></button>
                                     {{/* backpack.js lists the grades below the backpack on hover; the minus is the collapsed menu's. */}}
                                     <div class="pack-wrap"{{if $card.Sealed}} data-sealed{{end}}>
                                         <button type="button" class="pack-btn" data-card-id="{{$cardId}}" onclick="window.addToBackpack && addToBackpack(this)" title="Add to backpack" data-track="ui.result.icon" data-track-value="pack_add" data-track-scope="header"><i data-lucide="backpack"></i><span class="pack-btn-count" hidden></span></button>

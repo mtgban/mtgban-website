@@ -252,7 +252,7 @@
                     {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
                     {{range $card.Treatments}}<a class="m-badge treatment" href="?q=is:{{.}}" onclick="event.stopPropagation()" data-track="ui.result.link" data-track-value="treatment">{{index $card.PromoLabels .}}</a>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
-                    <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.toggleFavorite && toggleFavorite(this);" title="Add to favorites" data-track="ui.result.icon" data-track-value="star_add" data-track-scope="header"><i data-lucide="star"></i></button>
+                    <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.toggleFavorite && toggleFavorite(this);" title="Favorite" data-track="ui.result.icon" data-track-value="star_add" data-track-scope="header"><i data-lucide="star"></i></button>
                     <button type="button" class="m-pack-btn pack-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.addToBackpack && addToBackpack(this);" title="Add to backpack" data-track="ui.result.icon" data-track-value="pack_add" data-track-scope="header"><i data-lucide="backpack"></i><span class="pack-btn-count" hidden></span></button>
                     <button type="button" class="m-pack-btn m-pack-minus pack-minus-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.takeFromBackpack && takeFromBackpack(this);" title="Remove from backpack" hidden data-track="ui.result.icon" data-track-value="pack_take" data-track-scope="header"><i data-lucide="circle-minus"></i></button>
                     {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); window.showChartDrawer && showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history" data-track="ui.result.icon" data-track-value="chart_view" data-track-scope="header"><i data-lucide="chart-line"></i></button>{{end}}
@@ -313,7 +313,7 @@
                 {{end}}
                 {{if $card.CKRestockURL}}
                     <a class="m-actions-item" href="{{$card.CKRestockURL}}" target="_blank" rel="noopener" onclick="window.closeActionsMenus && closeActionsMenus()" data-track="ui.result.icon" data-track-value="ck_restock" data-track-scope="menu">
-                        <i data-lucide="bell"></i><span>CardKingdom restock notice</span>
+                        <i data-lucide="bell"></i><span>Card Kingdom restock notice</span>
                     </a>
                 {{end}}
                 {{if $card.ScryfallURL}}
