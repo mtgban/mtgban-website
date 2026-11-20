@@ -83,3 +83,34 @@ func TestMobileSearchNamesSealedSortStores(t *testing.T) {
 		wantSortStoreOptions(t, id, selectOptions(out, id))
 	}
 }
+
+func TestOptimizerNamesSealedStores(t *testing.T) {
+	entries := []OptimizedUploadEntry{{CardID: "a", Quantity: 1}}
+	keys := []string{"ZZSAME", "ZZSAMESEALED"}
+	out := renderUpload(t, PageVars{
+		StoreNames: map[string]string{"ZZSAME": "Same Store", "ZZSAMESEALED": "Same Store"},
+		UploadVars: UploadVars{
+			AllScraperKeys:    keys,
+			SealedScraperKeys: []string{"ZZSAMESEALED"},
+			Optimized:         map[string][]OptimizedUploadEntry{"ZZSAME": entries, "ZZSAMESEALED": entries},
+			OptimizedKeys:     keys,
+			OptimizedTotals:   map[string]float64{"ZZSAME": 1, "ZZSAMESEALED": 1},
+			FilteredOut: []LeftoverEntry{
+				{CardID: "b", Quantity: 1, Store: "ZZSAME", Price: 1},
+				{CardID: "c", Quantity: 1, Store: "ZZSAMESEALED", Price: 1},
+			},
+		},
+	})
+	for _, want := range []string{
+		`<span class="toc-store">Same Store</span>`,
+		`<span class="toc-store">Same Store (Sealed)</span>`,
+		`<h3>Same Store</h3>`,
+		`<h3>Same Store (Sealed)</h3>`,
+		`<td>Same Store</td>`,
+		`<td>Same Store (Sealed)</td>`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the optimizer lacks %s", want)
+		}
+	}
+}

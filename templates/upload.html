@@ -71,7 +71,7 @@
                 <td class="opt-set" data-sort="{{$card.Edition}}&#9;{{$card.Name}}">
                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 20 "Class" ""}} {{$card.SetCode}} #{{$card.Number}}{{if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}
                 </td>
-                <td>{{with .Store}}{{index $root.StoreNames .}}{{end}}</td>
+                <td>{{with .Store}}{{storeLabel (index $root.StoreNames .) (slice_has $root.SealedScraperKeys .)}}{{end}}</td>
                 <td class="opt-offer" data-sort="{{if .Store}}{{printf "%.2f" .Price}}{{end}}">{{if .Store}}<span class="offer">$ <a href="/go/b/{{.Store}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a></span>{{end}}</td>
                 <td class="opt-loaded" data-sort="{{if .Loaded}}{{printf "%.2f" .Loaded}}{{end}}"><span class="loaded-wrap"><span class="loaded">{{if .Loaded}}$ {{if $root.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Loaded}}</a>{{else}}{{printf "%.2f" .Loaded}}{{end}}{{end}}</span><span class="loaded-qty">&times;{{.Quantity}}</span><span class="opt-icons">{{if and .Loaded (not $root.IgnorePrices)}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}{{template "offer-link" dict "Notes" .Notes "Opt" true}}</span></span></td>
                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}" data-sort="{{if .Spread}}{{printf "%.2f" .Spread}}{{end}}">{{if .Spread}}{{printf "%.2f" .Spread}}%{{end}}</td>
@@ -980,15 +980,16 @@
                 {{$entries := index $.Optimized .}}
                 {{if $entries}}
                     {{$total := index $.OptimizedTotals .}}
+                    {{$label := storeLabel (index $.StoreNames .) (slice_has $.SealedScraperKeys .)}}
                     <div class="opt-toc-cell">
                     <a class="opt-toc-item" href="#opt-{{.}}" data-track="ui.optimizer" data-track-value="toc_jump">
-                        <span class="toc-store"{{with index $.CustomTips .}} title="{{.}}"{{end}}>{{index $.StoreNames .}}</span>
+                        <span class="toc-store"{{with index $.CustomTips .}} title="{{.}}"{{end}}>{{$label}}</span>
                         {{$qty := index $.OptimizedQuantities .}}
                         <span class="toc-stats">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
                         <span class="toc-total">$ {{printf "%.2f" $total}}</span>
                     </a>
                     {{if and $.CanChangeStores (or (and (slice_has $picked .) (gt (len $picked) 1)) (and (slice_has $pickedSealed .) (gt (len $pickedSealed) 1)))}}
-                        <button type="button" class="opt-toc-drop" data-store="{{.}}" title="Price this list again without {{index $.StoreNames .}}" aria-label="Drop {{index $.StoreNames .}}" onclick="window.dropOptStore && dropOptStore(this)" data-track="ui.optimizer" data-track-value="store_drop">&times;</button>
+                        <button type="button" class="opt-toc-drop" data-store="{{.}}" title="Price this list again without {{$label}}" aria-label="Drop {{$label}}" onclick="window.dropOptStore && dropOptStore(this)" data-track="ui.optimizer" data-track-value="store_drop">&times;</button>
                     {{end}}
                     </div>
                 {{end}}
@@ -1031,7 +1032,7 @@
                                 <span>&#9660;</span>
                             {{end}}
                         </div>
-                        <h3{{with index $.CustomTips .}} title="{{.}}"{{end}}>{{index $.StoreNames .}}</h3>
+                        <h3{{with index $.CustomTips .}} title="{{.}}"{{end}}>{{storeLabel (index $.StoreNames .) (slice_has $.SealedScraperKeys .)}}</h3>
                         <div class="opt-header-actions">
                         {{if and (not $.IsBuylist) (eq $sourceKey "CK")}}
                             <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
