@@ -200,22 +200,22 @@
     <optgroup label="Buylists">
         {{if $p.CanUploadCustom}}<option value="CUSTOM">Custom buylist</option>{{end}}
         {{range $p.UploadVendorKeys}}{{$name := index $p.StoreNames .}}{{if $name}}
-        <option value="{{.}}">{{$name}}</option>
+        <option value="{{.}}">{{storeLabel $name (index $p.SealedStores .)}}</option>
         {{end}}{{end}}
     </optgroup>
     <optgroup label="Sealed buylists">
         {{range $p.UploadSealedVendorKeys}}{{$name := index $p.StoreNames .}}{{if $name}}
-        <option value="{{.}}">{{$name}}</option>
+        <option value="{{.}}">{{storeLabel $name (index $p.SealedStores .)}}</option>
         {{end}}{{end}}
     </optgroup>
     <optgroup label="Retailers">
         {{range $p.UploadSellerKeys}}{{$name := index $p.StoreNames .}}{{if $name}}
-        <option value="{{.}}">{{$name}}</option>
+        <option value="{{.}}">{{storeLabel $name (index $p.SealedStores .)}}</option>
         {{end}}{{end}}
     </optgroup>
     <optgroup label="Sealed retailers">
         {{range $p.UploadSealedSellerKeys}}{{$name := index $p.StoreNames .}}{{if $name}}
-        <option value="{{.}}">{{$name}}</option>
+        <option value="{{.}}">{{storeLabel $name (index $p.SealedStores .)}}</option>
         {{end}}{{end}}
     </optgroup>
 </select>
