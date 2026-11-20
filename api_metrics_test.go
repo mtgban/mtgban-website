@@ -452,7 +452,7 @@ func TestMetricsAPICountsAKeyOncePerPost(t *testing.T) {
 	})
 }
 
-// One address adds at most metricsPerAddressDay to a name a UTC day; other names, addresses and the next day are untouched.
+// One address adds at most metricsDailyCap to a name a UTC day; other names, addresses and the next day are untouched.
 func TestMetricsAPICapsAnAddressADay(t *testing.T) {
 	withOpenBeaconLimiter(t)
 	rows := withFeatureCounter(t)
@@ -462,7 +462,7 @@ func TestMetricsAPICapsAnAddressADay(t *testing.T) {
 	metricsNow = func() time.Time { return day }
 
 	full := fmt.Sprintf(`[{"n":"ui.load","s":"search","c":%d}]`, metricsMaxCount)
-	for range metricsPerAddressDay / metricsMaxCount {
+	for range metricsDailyCap / metricsMaxCount {
 		postBeacon(t, beacon(full))
 	}
 	postBeacon(t, beacon(full))
@@ -474,7 +474,7 @@ func TestMetricsAPICapsAnAddressADay(t *testing.T) {
 	postBeacon(t, beacon(`[{"n":"ui.load","s":"search","c":1}]`))
 
 	got := rows.rows()
-	wantRow(t, got, "search", "ui.load", "", metricsPerAddressDay+metricsMaxCount+1)
+	wantRow(t, got, "search", "ui.load", "", metricsDailyCap+metricsMaxCount+1)
 	wantRow(t, got, "", "ui.scope.clear", "", 1)
 	wantRow(t, got, "", "metrics.client", "daily", 2) // the post past the cap, and the other page's load
 	wantRow(t, got, "", "metrics.rejected", "", 2)
@@ -485,8 +485,8 @@ func TestMetricsAPICutsAPostAtTheDayCap(t *testing.T) {
 	withOpenBeaconLimiter(t)
 	rows := withFeatureCounter(t)
 	today := metricsAddressCaps.For(metricsNow())
-	if got := today.Take("198.51.100.7", "ui.load", metricsPerAddressDay-3); got != metricsPerAddressDay-3 {
-		t.Fatalf("took %d, want %d", got, metricsPerAddressDay-3)
+	if got := today.Take("198.51.100.7", "ui.load", metricsDailyCap-3); got != metricsDailyCap-3 {
+		t.Fatalf("took %d, want %d", got, metricsDailyCap-3)
 	}
 	postBeacon(t, beacon(fmt.Sprintf(`[{"n":"ui.load","s":"search","c":%d}]`, metricsMaxCount)))
 	got := rows.rows()
@@ -857,7 +857,7 @@ func TestMetricsAPICapsErrorEntriesPerPost(t *testing.T) {
 	wantRow(t, counts, "", "metrics.rejected", "", 5)
 }
 
-// One address starts at most errorRowsPerAddressDay error rows a day, however it varies script and class;
+// One address starts at most errorRowsDailyCap error rows a day, however it varies script and class;
 // past that its errors keep their count only, a row it started still adds, and another address starts its own.
 func TestMetricsAPICapsNewErrorRowsPerAddress(t *testing.T) {
 	withOpenBeaconLimiter(t)
@@ -881,15 +881,15 @@ func TestMetricsAPICapsNewErrorRowsPerAddress(t *testing.T) {
 	postBeacon(t, other)
 
 	got := errs.rows()
-	if len(got) != errorRowsPerAddressDay+1 {
-		t.Fatalf("%d error rows, want %d: %+v", len(got), errorRowsPerAddressDay+1, got)
+	if len(got) != errorRowsDailyCap+1 {
+		t.Fatalf("%d error rows, want %d: %+v", len(got), errorRowsDailyCap+1, got)
 	}
 	for _, r := range got {
 		want := int64(1)
 		if r.Line == 1 {
 			want = 3 // the first post, the repeat, and the other address
 		}
-		if r.Line > errorRowsPerAddressDay && r.Line != 1001 {
+		if r.Line > errorRowsDailyCap && r.Line != 1001 {
 			t.Errorf("row of line %d was started past the budget", r.Line)
 		}
 		if r.N != want {

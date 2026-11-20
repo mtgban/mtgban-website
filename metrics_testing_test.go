@@ -61,7 +61,7 @@ func withFeatureCounter(t *testing.T) *fakeCounter {
 		metricsAddressCaps = prevCaps
 	})
 	// each test's address starts its day with nothing added
-	metricsAddressCaps = dailycap.New(metricsPerAddressDay, errorRowsPerAddressDay)
+	metricsAddressCaps = dailycap.New(metricsDailyCap, errorRowsDailyCap)
 	now := time.Date(2026, 11, 11, 12, 0, 30, 0, time.UTC)
 	f := &fakeCounter{t: t, store: &memCounterStore{}}
 	f.counter = observability.NewCounter(f.store, "test", func() time.Time { return now })
