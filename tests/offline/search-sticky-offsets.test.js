@@ -57,6 +57,35 @@ test('the results column starts on the line its headers pin to', () => {
     expect(margin).toContain('--content-padding-slack');
 });
 
+test('the page keeps the slack that margin takes back, phones included', () => {
+    // main.css drops the slack from .page-content below 768px. The margin
+    // above then starts the grid a slack above the navbar line, and the
+    // phone sort bar, sticky on that line, covers the blurb by as much.
+    const pad = declaration('.page-content:has(.search-layout)', 'padding-top');
+    expect(pad, 'expected the search page to restate its padding-top').toBeTruthy();
+    expect(pad).toContain('--nav-height');
+    expect(pad).toContain('--content-padding-slack');
+});
+
+test('below 900px the bars bleed exactly to their column\'s padding', () => {
+    // A bleed wider than the padding it cancels runs past the screen and
+    // makes a phone page that much wider than its viewport.
+    const block = phoneBlock();
+    const value = (selector, prop) => {
+        const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const m = block.match(new RegExp(`(?:^|[};{]|\\*/)\\s*${esc}\\s*\\{[^}]*?(?:^|[;{\\s])${prop}\\s*:\\s*([^;]+);`));
+        expect(m, `expected ${selector} to set ${prop} below 900px`).toBeTruthy();
+        return m[1].trim().split(/\s+/);
+    };
+    const [sidebarTop, sidebarSide] = value('.search-sidebar', 'padding');
+    const [barTop, barSide] = value('.sidebar-search', 'margin');
+    expect(barTop).toBe(`-${sidebarTop}`);
+    expect(barSide).toBe(`-${sidebarSide}`);
+    const [, resultsSide] = value('.search-results', 'padding');
+    expect(value('.result-header-cover', 'margin-left')[0]).toBe(`-${resultsSide}`);
+    expect(value('.result-header-cover', 'margin-right')[0]).toBe(`-${resultsSide}`);
+});
+
 test('a header pins exactly one cover below the navbar', () => {
     // The cover masks the band between the navbar and a pinned header, so the
     // header has to pin exactly its height lower - they are one stack.
