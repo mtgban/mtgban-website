@@ -1259,6 +1259,18 @@
 .ures-index .idx-label { color: var(--text-dim); font-size: var(--text-xs); }
 .ures-index .idx-val { flex: 1; text-align: right; }
 
+@media (max-width: 560px) {
+    .ures-table.phone-cards .ures-card-cell { min-width: 0; }
+    /* The Card header's width is set inline for the desktop table */
+    .ures-table.phone-cards > thead > tr > th { width: auto !important; }
+    .ures-table.phone-cards .ures-index { flex-direction: row; flex-wrap: wrap; gap: 0 12px; }
+    .ures-table.phone-cards .ures-index > span { gap: 4px; }
+    .ures-table.phone-cards th .ures-index-note { display: none; }
+    .ures-table.phone-cards th .sort-ties-btn { float: none; }
+    .ures-table.phone-cards .ures-totals-row { background: var(--surface-2); border-top: 2px solid var(--border-moderate); }
+    .ures-table.phone-cards .ures-totals-row td { background: none; border-top: 0; }
+}
+
 /* The Cond badge sits on the same row, so say out loud that the index
    prices are the one thing on it that the condition does not move. */
 .ures-index-note {
