@@ -727,9 +727,10 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	sig := verifiedSignature(r)
 
 	pageVars := genPageNav(s, r, "Search", sig)
-	pageVars.CanAlerts, pageVars.CanFixSearch = searchReader(s, r)
+	pageVars.AlertChannelList = readerAlertChannels(s, r)
+	pageVars.CanAlerts = pageVars.AlertChannelList != ""
+	pageVars.CanFixSearch = canFixSearch(r)
 	pageVars.CanVelocity = newspaperTier(sig)
-	pageVars.AlertChannelList = alertChannelList(parseSig(sig))
 
 	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(r, sig)
 
@@ -1085,23 +1086,22 @@ func searchPreview(r *http.Request, b *matcher.Backend, allKeys []string, result
 	})
 }
 
-// searchReader is what the page offers this reader: the alerts link when the
-// navbar offers alerts and their tier has an allowance, and the admins' Fix
-// toggle.
-func searchReader(s *site, r *http.Request) (canAlerts, canFix bool) {
-	sig := verifiedSignature(r)
-
-	// Admins get a per-result "Fix" toggle that surfaces a Fix link on every
-	// store, deep-linking into the overrides builder.
-	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
-	return readerCanAlert(s, r), canAdmin || (DevMode && !SigCheck)
+// canFixSearch says the reader gets the admins' per-result "Fix" toggle, which
+// surfaces a Fix link on every store, deep-linking into the overrides builder.
+func canFixSearch(r *http.Request) bool {
+	canAdmin, _ := strconv.ParseBool(GetParamFromSig(verifiedSignature(r), "Admin"))
+	return canAdmin || (DevMode && !SigCheck)
 }
 
-// readerCanAlert says the navbar offers alerts and the reader's tier has an
-// allowance, so a page may offer the alert link.
-func readerCanAlert(s *site, r *http.Request) bool {
+// readerAlertChannels is the delivery channels the alert modal offers the
+// reader, comma-joined, "" when the page may not offer them the alert link:
+// the navbar leaves alerts out, or their tier has no allowance or no channel.
+func readerAlertChannels(s *site, r *http.Request) string {
 	sigParams := parseSig(verifiedSignature(r))
-	return navOffers(s, sigParams, "Alerts") && alertAllowance(sigParams) > 0
+	if !navOffers(s, sigParams, "Alerts") || alertAllowance(sigParams) <= 0 {
+		return ""
+	}
+	return alertChannelList(sigParams)
 }
 
 // fillSearchPrefs puts the reader's search preferences on the page: from

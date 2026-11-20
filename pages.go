@@ -433,9 +433,9 @@ type PageVars struct {
 	// Alerts page payload (nil elsewhere)
 	AlertsPage *AlertsPageVars
 
-	// CanAlerts says the reader's ACL grants the Alerts page and an
-	// allowance, so Search's results and Upload's Not bought rows may
-	// offer the alert link.
+	// CanAlerts says the reader's ACL grants the Alerts page, an
+	// allowance and a delivery channel, so Search's results and Upload's
+	// Not bought rows may offer the alert link.
 	CanAlerts bool
 	// AlertChannelList is the delivery channels the alert modal offers,
 	// read off #alert-modal's data-alert-channels by js/alerts.js.
