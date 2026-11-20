@@ -2931,31 +2931,102 @@ body.modal-embed .cp-overlay {
     fill: var(--darkeryellow, gold);
 }
 
-/* The backpack's minus pops up below it while the pointer is over either,
-   or the keyboard is on one, so the row never reflows. */
+/* The backpack's grade list pops up below it while the pointer is over
+   either, or the keyboard is on one, so the row never reflows. Its minus
+   column sits under the button: the margin is its border, its padding and
+   half a minus. The row's own minus is the collapsed menu's. */
 .result-quick-icons .pack-wrap {
     position: relative;
     display: inline-flex;
 }
 
-.result-quick-icons .pack-wrap > .pack-minus-btn {
+.result-quick-icons .pack-wrap > .pack-minus-btn { display: none; }
+
+.result-quick-icons .pack-wrap > .pack-grades {
     display: none;
     position: absolute;
     top: 100%;
     left: 50%;
-    transform: translateX(-50%);
+    margin-left: -12px;
     z-index: 5;
-    padding: 0.25em;
+    padding: 2px;
     background: var(--search-surface-1);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: var(--radius-sm, 6px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.result-quick-icons .pack-wrap:hover > .pack-minus-btn:not([hidden]),
-.result-quick-icons .pack-wrap:has(:focus-visible) > .pack-minus-btn:not([hidden]) {
-    display: inline-flex;
+.result-quick-icons .pack-wrap:hover > .pack-grades,
+.result-quick-icons .pack-wrap:has(:focus-visible) > .pack-grades {
+    display: block;
 }
+
+.result-quick-icons .pack-grade {
+    display: grid;
+    grid-template-columns: 18px 25px 12px;
+    align-items: center;
+    height: 19px;
+    font-size: 11px;
+    color: var(--greytext);
+}
+
+.result-quick-icons .pack-grade.held { color: var(--normal); font-weight: 600; }
+
+.result-quick-icons .pack-grade-minus,
+.result-quick-icons .pack-grade-plus {
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--greytext);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.result-quick-icons .pack-grade-minus { grid-column: 1; }
+.result-quick-icons .pack-grade-minus[hidden] { display: none; }
+.result-quick-icons .pack-grade-plus { grid-column: 3; }
+
+.result-quick-icons .pack-grade-minus:hover,
+.result-quick-icons .pack-grade-plus:hover {
+    background: var(--search-row-hover);
+    color: var(--normal);
+}
+
+/* Doubled with .pack-grade so the result row's span rules (size, colour) lose. */
+.result-quick-icons .pack-grade .pack-grade-name,
+.result-quick-icons .pack-grade .pack-grade-name:hover {
+    grid-column: 2;
+    justify-self: start;
+    position: relative;
+    padding-left: 1px;
+    font-size: inherit;
+    color: inherit;
+    cursor: default;
+}
+
+.result-quick-icons .pack-grade .pack-grade-count,
+.result-quick-icons .pack-grade .pack-grade-count:hover {
+    position: absolute;
+    top: -3px;
+    left: 100%;
+    min-width: 10px;
+    padding: 0 2px;
+    box-sizing: border-box;
+    border-radius: 5px;
+    background: var(--dodgerblue-fill);
+    color: #fff;
+    font-size: 8px;
+    font-weight: 400;
+    line-height: 10px;
+    text-align: center;
+}
+
+.result-quick-icons .pack-grade .pack-grade-count[hidden] { display: none; }
 
 /* In the collapsed menu the pair is two plain rows, the minus once the card
    is in; after the rules above so it wins their ties. */
@@ -2973,13 +3044,7 @@ body.modal-embed .cp-overlay {
         padding: 7px 10px;
         border-radius: var(--radius-sm, 6px);
     }
-    .result-quick-icons .qi-actions .pack-wrap > .pack-minus-btn:not([hidden]) {
-        position: static;
-        transform: none;
-        background: none;
-        border: none;
-        box-shadow: none;
-    }
+    .result-quick-icons .qi-actions .pack-wrap > .pack-grades { display: none; }
     .result-quick-icons .qi-actions .pack-wrap > button:hover { background: var(--search-row-hover); }
 }
 

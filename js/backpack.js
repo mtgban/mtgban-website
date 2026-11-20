@@ -312,14 +312,14 @@
 
     function toastCeiling() { toast(MAX_QTY + " copies is the most for one product"); }
 
-    // add puts one more NM copy of the row's card in the active backpack; a
-    // removed card comes back as one copy.
-    function add(data) {
+    // add puts one more copy of the row's card in the active backpack, NM
+    // unless cond names a grade; a removed card comes back as one copy.
+    function add(data, cond) {
         if (!data || !data.id) return false;
         var list = read();
         var t = now();
         var p = active();
-        var k = key({ id: data.id, pack: p });
+        var k = key({ id: data.id, cond: cond, pack: p });
         var idx = find(list, k);
         if (idx >= 0 && !list[idx].del) {
             var next = Math.min(MAX_QTY, list[idx].qty + 1);
@@ -334,7 +334,7 @@
             list.unshift({
                 id: data.id, name: data.name || "", edition: data.edition || "", set: data.set || "",
                 number: data.number || "", finishTag: data.finishTag || "", finishClass: data.finishClass || "",
-                img: data.img || "", cw: !!data.cw, cond: "NM", pack: p, qty: 1, t: t, m: t
+                img: data.img || "", cw: !!data.cw, cond: cond || "NM", pack: p, qty: 1, t: t, m: t
             });
         }
         save(list);
@@ -604,6 +604,68 @@
             b.hidden = !qty;
             describe(b, qty > 1 ? "Remove one" + (other[id] ? " NM" : "") + from : other[id] ? "Remove NM" + from : "Remove from " + (name || "backpack"));
         });
+        var held = {};
+        inPack(active()).forEach(function (e) { held[e.id + "|" + e.cond] = e.qty; });
+        document.querySelectorAll(".pack-grade").forEach(function (row) {
+            var cond = row.getAttribute("data-cond");
+            var qty = held[row.parentNode.getAttribute("data-card-id") + "|" + cond];
+            row.classList.toggle("held", !!qty);
+            var less = row.children[0], n = row.children[1].children[0], more = row.children[2];
+            less.hidden = !qty;
+            describe(less, "Remove one " + cond + from);
+            describe(more, "Add one " + cond + to);
+            n.textContent = qty ? String(qty) : "";
+            n.hidden = !qty;
+        });
+    }
+
+    // gradeList builds the list under a result row's backpack button the
+    // first time the pointer or the keyboard reaches it: a minus, the grade
+    // with its copies in the active backpack, and a plus, for each grade; a
+    // sealed product has the one. Its buttons take no Tab stop: the arrows
+    // walk them from the row's button, and Escape goes back to it.
+    function gradeList(wrap) {
+        var btn = wrap.querySelector(".pack-btn");
+        if (!btn || wrap.querySelector(".pack-grades")) return;
+        var id = btn.getAttribute("data-card-id");
+        var list = text("div", "pack-grades");
+        list.setAttribute("data-card-id", id);
+        (wrap.getAttribute("data-sealed") === null ? CONDS : CONDS.slice(0, 1)).forEach(function (cond) {
+            var row = text("div", "pack-grade");
+            row.setAttribute("data-cond", cond);
+            var less = text("button", "pack-grade-minus", "\u2212"), more = text("button", "pack-grade-plus", "+");
+            var name = text("span", "pack-grade-name", cond);
+            name.appendChild(text("span", "pack-grade-count"));
+            [less, more].forEach(function (b) { b.setAttribute("type", "button"); b.setAttribute("tabindex", "-1"); });
+            less.addEventListener("click", function () {
+                var k = key({ id: id, cond: cond, pack: active() });
+                var e = live().filter(function (x) { return key(x) === k; })[0];
+                if (!e) return;
+                if (window.BAN && window.BAN.track) window.BAN.track("ui.result.icon", "pack_grade_take", "header");
+                var focused = document.activeElement === less;
+                setQty(k, e.qty - 1);
+                render();
+                if (focused && less.hidden) more.focus();
+            });
+            more.addEventListener("click", function () {
+                var data = window.CardRow && window.CardRow.read ? window.CardRow.read(btn) : null;
+                if (!add(data && data.id ? data : { id: id, name: "" }, cond)) return;
+                if (window.BAN && window.BAN.track) window.BAN.track("ui.result.icon", "pack_grade_add", "header");
+                render();
+            });
+            row.append(less, name, more);
+            list.appendChild(row);
+        });
+        wrap.appendChild(list);
+        wrap.addEventListener("keydown", function (ev) {
+            var stops = [btn].concat(Array.prototype.filter.call(list.querySelectorAll("button"), function (b) { return !b.hidden; }));
+            var at = stops.indexOf(document.activeElement);
+            var to = ev.key === "Escape" ? 0 : ev.key === "ArrowDown" ? at + 1 : ev.key === "ArrowUp" ? at - 1 : -1;
+            if (at < 0 || to < 0 || to >= stops.length || to === at) return;
+            ev.preventDefault();
+            stops[to].focus();
+        });
+        markRows();
     }
 
     function markNav() {
@@ -1713,6 +1775,19 @@
         var nav = document.getElementById("nav-backpack");
         if (nav) nav.addEventListener("click", toggle);
         document.addEventListener("keydown", onKey);
+        // The hint the search template's row buttons are described by
+        if (document.querySelectorAll(".pack-wrap").length) {
+            var hint = text("span", "", "Down arrow for grades");
+            hint.setAttribute("id", "pack-grades-hint");
+            hint.hidden = true;
+            document.body.appendChild(hint);
+        }
+        ["mouseover", "focusin"].forEach(function (name) {
+            document.addEventListener(name, function (ev) {
+                var wrap = ev.target && ev.target.closest && ev.target.closest(".pack-wrap");
+                if (wrap) gradeList(wrap);
+            });
+        });
         // After the row's own handler has marked it, as upload-optimizer.js counts it
         document.addEventListener("change", function (ev) {
             if (ev.target && ev.target.closest && ev.target.closest(".opt-store")) markSections();
