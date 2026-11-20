@@ -168,7 +168,6 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
         window, document, m, sm, rows, minus, nav, navCount, hamburger, stored, key, pendingIds, optSections, res, tracked,
         fireClick: (target) => (docListeners.click || []).forEach((fn) => fn({ target })),
         fireOver: (target) => (docListeners.mouseover || []).forEach((fn) => fn({ target })),
-        fireFocusin: (target) => (docListeners.focusin || []).forEach((fn) => fn({ target })),
         fireChange: (target) => (docListeners.change || []).forEach((fn) => fn({ target })),
         fireStorage: (key = 'mtgban_backpack') => storageListeners.forEach((fn) => fn({ key })),
         firePageshow: (persisted) => pageshowListeners.forEach((fn) => fn({ persisted })),
@@ -2152,12 +2151,12 @@ describe("a result row's grade list", () => {
     const shown = (list) => list.children.map((r) => (r.children[0].hidden ? '' : '-') + r.getAttribute('data-cond') + r.children[1].children[0].textContent);
     const over = (p, i) => { p.fireOver(p.rows[i]); return listOf(p, i); };
 
-    test('nothing is built until the pointer or the keyboard reaches the button', () => {
+    test('nothing is built until the pointer reaches the button', () => {
         const p = page({ store: two });
         expect(listOf(p, 0)).toBe(null);
         expect(shown(over(p, 0))).toEqual(['-NM1', '-SP2', 'MP', 'HP', 'PO']);
-        p.fireFocusin(p.rows[1]);
-        expect(shown(listOf(p, 1))).toEqual(['NM', 'SP', 'MP', 'HP', 'PO']);
+        expect(listOf(p, 1)).toBe(null);
+        expect(shown(over(p, 1))).toEqual(['NM', 'SP', 'MP', 'HP', 'PO']);
         p.fireOver(p.rows[0]);
         expect(p.rows[0].parentNode.querySelectorAll('.pack-grades').length).toBe(1);
     });
@@ -2182,43 +2181,15 @@ describe("a result row's grade list", () => {
         expect(p.rows[1].children[0].hidden).toBe(true);
     });
 
-    test('a minus takes a copy of its grade, and the last one hands focus to its plus', () => {
+    test('a minus takes a copy of its grade, the last one too', () => {
         const p = page({ store: two });
         const list = over(p, 0);
         const less = list.children[1].children[0];
-        less.focus();
         less.click();
         expect(shown(list)).toEqual(['-NM1', '-SP1', 'MP', 'HP', 'PO']);
-        expect(p.document.activeElement).toBe(less);
         less.click();
         expect(shown(list)).toEqual(['-NM1', 'SP', 'MP', 'HP', 'PO']);
-        expect(p.document.activeElement).toBe(list.children[1].children[2]);
         expect(p.stored().filter((e) => !e.del).map((e) => e.cond || 'NM')).toEqual(['NM']);
-    });
-
-    test('the buttons take no Tab stop; the arrows walk them and Escape goes back', () => {
-        const p = page({ store: two });
-        const list = over(p, 0);
-        const wrap = p.rows[0].parentNode;
-        const press = (key) => { let prevented = false; wrap.listeners.keydown.forEach((fn) => fn({ key, preventDefault() { prevented = true; } })); return prevented; };
-        expect(list.querySelectorAll('button').map((b) => b.getAttribute('tabindex'))).toEqual(Array(10).fill('-1'));
-        p.rows[0].focus();
-        expect(press('ArrowUp')).toBe(false);
-        expect(press('Escape')).toBe(false);
-        const walk = ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowUp'].map((k) => { press(k); return p.document.activeElement; });
-        const [nm, sp, mp] = list.children;
-        expect(walk).toEqual([nm.children[0], nm.children[2], sp.children[0], sp.children[2], mp.children[2], sp.children[2]]);
-        expect(press('Escape')).toBe(true);
-        expect(p.document.activeElement).toBe(p.rows[0]);
-        list.children[4].children[2].focus();
-        expect(press('ArrowDown')).toBe(false);
-    });
-
-    test('the hint the row buttons are described by is there before any list', () => {
-        const p = page();
-        expect(ids['pack-grades-hint'].textContent).toBe('Down arrow for grades');
-        expect(ids['pack-grades-hint'].hidden).toBe(true);
-        expect(listOf(p, 0)).toBe(null);
     });
 
     test('a sealed product lists the one grade', () => {

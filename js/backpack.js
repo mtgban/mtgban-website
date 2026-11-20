@@ -620,10 +620,9 @@
     }
 
     // gradeList builds the list under a result row's backpack button the
-    // first time the pointer or the keyboard reaches it: a minus, the grade
-    // with its copies in the active backpack, and a plus, for each grade; a
-    // sealed product has the one. Its buttons take no Tab stop: the arrows
-    // walk them from the row's button, and Escape goes back to it.
+    // first time the pointer reaches it: a minus, the grade with its copies
+    // in the active backpack, and a plus, for each grade; a sealed product
+    // has the one.
     function gradeList(wrap) {
         var btn = wrap.querySelector(".pack-btn");
         if (!btn || wrap.querySelector(".pack-grades")) return;
@@ -636,16 +635,14 @@
             var less = text("button", "pack-grade-minus", "\u2212"), more = text("button", "pack-grade-plus", "+");
             var name = text("span", "pack-grade-name", cond);
             name.appendChild(text("span", "pack-grade-count"));
-            [less, more].forEach(function (b) { b.setAttribute("type", "button"); b.setAttribute("tabindex", "-1"); });
+            [less, more].forEach(function (b) { b.setAttribute("type", "button"); });
             less.addEventListener("click", function () {
                 var k = key({ id: id, cond: cond, pack: active() });
                 var e = live().filter(function (x) { return key(x) === k; })[0];
                 if (!e) return;
                 if (window.BAN && window.BAN.track) window.BAN.track("ui.result.icon", "pack_grade_take", "header");
-                var focused = document.activeElement === less;
                 setQty(k, e.qty - 1);
                 render();
-                if (focused && less.hidden) more.focus();
             });
             more.addEventListener("click", function () {
                 var data = window.CardRow && window.CardRow.read ? window.CardRow.read(btn) : null;
@@ -657,14 +654,6 @@
             list.appendChild(row);
         });
         wrap.appendChild(list);
-        wrap.addEventListener("keydown", function (ev) {
-            var stops = [btn].concat(Array.prototype.filter.call(list.querySelectorAll("button"), function (b) { return !b.hidden; }));
-            var at = stops.indexOf(document.activeElement);
-            var to = ev.key === "Escape" ? 0 : ev.key === "ArrowDown" ? at + 1 : ev.key === "ArrowUp" ? at - 1 : -1;
-            if (at < 0 || to < 0 || to >= stops.length || to === at) return;
-            ev.preventDefault();
-            stops[to].focus();
-        });
         markRows();
     }
 
@@ -1775,18 +1764,9 @@
         var nav = document.getElementById("nav-backpack");
         if (nav) nav.addEventListener("click", toggle);
         document.addEventListener("keydown", onKey);
-        // The hint the search template's row buttons are described by
-        if (document.querySelectorAll(".pack-wrap").length) {
-            var hint = text("span", "", "Down arrow for grades");
-            hint.setAttribute("id", "pack-grades-hint");
-            hint.hidden = true;
-            document.body.appendChild(hint);
-        }
-        ["mouseover", "focusin"].forEach(function (name) {
-            document.addEventListener(name, function (ev) {
-                var wrap = ev.target && ev.target.closest && ev.target.closest(".pack-wrap");
-                if (wrap) gradeList(wrap);
-            });
+        document.addEventListener("mouseover", function (ev) {
+            var wrap = ev.target && ev.target.closest && ev.target.closest(".pack-wrap");
+            if (wrap) gradeList(wrap);
         });
         // After the row's own handler has marked it, as upload-optimizer.js counts it
         document.addEventListener("change", function (ev) {

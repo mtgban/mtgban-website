@@ -2932,9 +2932,9 @@ body.modal-embed .cp-overlay {
 }
 
 /* The backpack's grade list pops up below it while the pointer is over
-   either, or the keyboard is on one, so the row never reflows. Its minus
-   column sits under the button: the margin is its border, its padding and
-   half a minus. The row's own minus is the collapsed menu's. */
+   either, so the row never reflows. Its minus column sits under the
+   button: the margin is its border, its padding and half a minus. The
+   row's own minus is the collapsed menu's. */
 .result-quick-icons .pack-wrap {
     position: relative;
     display: inline-flex;
@@ -2956,8 +2956,7 @@ body.modal-embed .cp-overlay {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.result-quick-icons .pack-wrap:hover > .pack-grades,
-.result-quick-icons .pack-wrap:has(:focus-visible) > .pack-grades {
+.result-quick-icons .pack-wrap:hover > .pack-grades {
     display: block;
 }
 
