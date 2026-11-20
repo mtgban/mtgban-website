@@ -215,6 +215,11 @@ body.light-theme .navbar-v2[data-tier="modern"] {
 .light-theme .nav2-search input:focus {
     border-color: rgba(30,144,255,0.45);
 }
+/* iOS zooms the page into a focused field under 16px, and this one is
+   focused on every load. */
+@media (pointer: coarse) {
+    .nav2-search input { font-size: 16px; }
+}
 /* ── Section buttons (Search / Sealed / Upload / Tools) ──── */
 .nav2-sections {
     display: flex; align-items: center; gap: 2px;
