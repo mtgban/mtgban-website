@@ -534,6 +534,9 @@ func TestSettingsModalTieOrderListsSealedStores(t *testing.T) {
 				t.Errorf("%v: the custom order lists no %s", tc.grants, shorthand)
 			}
 		}
+		if !strings.Contains(order, `<option value="ZZBUYSEALED">ZZBUYSEALED Store (Sealed)</option>`) {
+			t.Errorf("%v: the custom order does not name ZZBUYSEALED sealed", tc.grants)
+		}
 		if strings.Contains(order, `<option value="CUSTOM">`) != tc.custom {
 			t.Errorf("%v: the custom order lists the custom buylist: %v, want %v", tc.grants, !tc.custom, tc.custom)
 		}
