@@ -606,30 +606,47 @@
         });
         var held = {};
         inPack(active()).forEach(function (e) { held[e.id + "|" + e.cond] = e.qty; });
-        document.querySelectorAll(".pack-grade").forEach(function (row) {
-            var cond = row.getAttribute("data-cond");
-            var qty = held[row.parentNode.getAttribute("data-card-id") + "|" + cond];
-            row.classList.toggle("held", !!qty);
-            var less = row.children[0], n = row.children[1].children[0], more = row.children[2];
-            less.hidden = !qty;
-            describe(less, "Remove one " + cond + from);
-            describe(more, "Add one " + cond + to);
-            n.textContent = qty ? String(qty) : "";
-            n.hidden = !qty;
+        document.querySelectorAll(".pack-grades").forEach(function (list) {
+            var id = list.getAttribute("data-card-id");
+            var rows = list.querySelectorAll(".pack-grade");
+            // NM down to the lowest grade held, or to where the arrow got
+            var last = parseInt(list.getAttribute("data-shown"), 10) || 0;
+            Array.prototype.forEach.call(rows, function (row, i) {
+                if (held[id + "|" + row.getAttribute("data-cond")]) last = Math.max(last, i);
+            });
+            Array.prototype.forEach.call(rows, function (row, i) {
+                var cond = row.getAttribute("data-cond");
+                var qty = held[id + "|" + cond];
+                row.hidden = i > last;
+                row.classList.toggle("held", !!qty);
+                var less = row.children[0], n = row.children[1].children[0], more = row.children[2];
+                less.hidden = !qty;
+                describe(less, "Remove one " + cond + from);
+                describe(more, "Add one " + cond + to);
+                n.textContent = qty ? String(qty) : "";
+                n.hidden = !qty;
+            });
+            list.setAttribute("data-last", String(last));
+            var next = list.querySelector(".pack-grade-next");
+            if (!next) return;
+            next.hidden = last >= rows.length - 1;
+            if (!next.hidden) describe(next, "Show " + rows[last + 1].getAttribute("data-cond"));
         });
     }
 
     // gradeList builds the list under a result row's backpack button the
     // first time the pointer reaches it: a minus, the grade with its copies
     // in the active backpack, and a plus, for each grade; a sealed product
-    // has the one.
+    // has the one. markRows shows NM down to the lowest grade held, and the
+    // arrow under them one more a click, until the pointer leaves.
     function gradeList(wrap) {
         var btn = wrap.querySelector(".pack-btn");
         if (!btn || wrap.querySelector(".pack-grades")) return;
         var id = btn.getAttribute("data-card-id");
         var list = text("div", "pack-grades");
         list.setAttribute("data-card-id", id);
-        (wrap.getAttribute("data-sealed") === null ? CONDS : CONDS.slice(0, 1)).forEach(function (cond) {
+        var conds = wrap.getAttribute("data-sealed") === null ? CONDS : CONDS.slice(0, 1);
+        conds.forEach(function (cond) {
             var row = text("div", "pack-grade");
             row.setAttribute("data-cond", cond);
             var less = text("button", "pack-grade-minus", "\u2212"), more = text("button", "pack-grade-plus", "+");
@@ -641,6 +658,8 @@
                 var e = live().filter(function (x) { return key(x) === k; })[0];
                 if (!e) return;
                 if (window.BAN && window.BAN.track) window.BAN.track("ui.result.icon", "pack_grade_take", "header");
+                // A grade emptied stays listed while the pointer is here
+                list.setAttribute("data-shown", list.getAttribute("data-last"));
                 setQty(k, e.qty - 1);
                 render();
             });
@@ -653,7 +672,22 @@
             row.append(less, name, more);
             list.appendChild(row);
         });
+        if (conds.length > 1) {
+            var next = text("button", "pack-grade-next");
+            next.setAttribute("type", "button");
+            icon(next, "chevron-down");
+            next.addEventListener("click", function () {
+                if (window.BAN && window.BAN.track) window.BAN.track("ui.result.icon", "pack_grade_show", "header");
+                list.setAttribute("data-shown", String(parseInt(list.getAttribute("data-last"), 10) + 1));
+                markRows();
+            });
+            list.appendChild(next);
+        }
         wrap.appendChild(list);
+        wrap.addEventListener("mouseleave", function () {
+            list.removeAttribute("data-shown");
+            markRows();
+        });
         markRows();
     }
 
@@ -1277,10 +1311,11 @@
         sortBar.append(sortSel, sortDirBtn);
     }
 
-    // The panel's lucide icons, drawn here because it opens on the pages that
-    // skip the lucide bundle too.
+    // The panel's and the grade list's lucide icons, drawn here because the
+    // panel opens on the pages that skip the lucide bundle too.
     var ICONS = {
         "search": '<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
+        "chevron-down": '<path d="m6 9 6 6 6-6"/>',
         "undo-2": '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/>',
         "trash-2": '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
         "arrow-up-narrow-wide": '<path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="M11 12h4"/><path d="M11 16h7"/><path d="M11 20h10"/>',
