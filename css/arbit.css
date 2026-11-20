@@ -767,6 +767,7 @@ button.arb-filter-reset:disabled {
     /* Section header tighter */
     .arb-section-name { font-size: var(--text-lg); }
     .arb-load-btns { width: 100%; justify-content: flex-start; }
+    .arb-page .page-header { flex-wrap: wrap; }
 
     /* Edition filter full width */
     .arb-edition-filter { width: 100%; }
