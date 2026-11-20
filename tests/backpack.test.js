@@ -78,7 +78,8 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
         const btn = el('button'); btn.classes.add('pack-btn'); btn.setAttribute('data-card-id', id);
         const count = el('span'); count.classes.add('pack-btn-count'); count.hidden = true; btn.appendChild(count);
         const less = el('button'); less.classes.add('pack-minus-btn'); less.setAttribute('data-card-id', id); less.hidden = true;
-        row.append(btn, less); body.appendChild(row);
+        const wrap = el('div'); wrap.classes.add('pack-wrap');
+        wrap.append(btn, less); row.appendChild(wrap); body.appendChild(row);
         minus.push(less);
         return btn;
     });
@@ -166,6 +167,8 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
     return {
         window, document, m, sm, rows, minus, nav, navCount, hamburger, stored, key, pendingIds, optSections, res, tracked,
         fireClick: (target) => (docListeners.click || []).forEach((fn) => fn({ target })),
+        fireOver: (target) => (docListeners.mouseover || []).forEach((fn) => fn({ target })),
+        fireFocusin: (target) => (docListeners.focusin || []).forEach((fn) => fn({ target })),
         fireChange: (target) => (docListeners.change || []).forEach((fn) => fn({ target })),
         fireStorage: (key = 'mtgban_backpack') => storageListeners.forEach((fn) => fn({ key })),
         firePageshow: (persisted) => pageshowListeners.forEach((fn) => fn({ persisted })),
@@ -2139,6 +2142,118 @@ describe('the navbar switcher', () => {
         p.window.Backpack.addTab();
         p.window.renderBackpack();
         expect(picks()).toEqual(['Backpack 1:2', 'Backpack 2:0*']);
+    });
+});
+
+describe("a result row's grade list", () => {
+    const two = [{ id: 'uuid-1', name: 'One', qty: 1, t: 1, m: 1 }, { id: 'uuid-1', name: 'One', cond: 'SP', qty: 2, t: 2, m: 2 }];
+    const listOf = (p, i) => p.rows[i].parentNode.querySelector('.pack-grades');
+    // shown reads a list as its grades, each with its copies and a minus when held.
+    const shown = (list) => list.children.map((r) => (r.children[0].hidden ? '' : '-') + r.getAttribute('data-cond') + r.children[1].children[0].textContent);
+    const over = (p, i) => { p.fireOver(p.rows[i]); return listOf(p, i); };
+
+    test('nothing is built until the pointer or the keyboard reaches the button', () => {
+        const p = page({ store: two });
+        expect(listOf(p, 0)).toBe(null);
+        expect(shown(over(p, 0))).toEqual(['-NM1', '-SP2', 'MP', 'HP', 'PO']);
+        p.fireFocusin(p.rows[1]);
+        expect(shown(listOf(p, 1))).toEqual(['NM', 'SP', 'MP', 'HP', 'PO']);
+        p.fireOver(p.rows[0]);
+        expect(p.rows[0].parentNode.querySelectorAll('.pack-grades').length).toBe(1);
+    });
+
+    test('a plus adds a copy in its grade, a first one too', () => {
+        const p = page({ store: two });
+        const list = over(p, 0);
+        list.children[1].children[2].click();
+        list.children[3].children[2].click();
+        expect(shown(list)).toEqual(['-NM1', '-SP3', 'MP', '-HP1', 'PO']);
+        const hp = p.stored().find((e) => e.cond === 'HP');
+        expect([hp.id, hp.name, hp.qty, hp.pack || 1]).toEqual(['uuid-1', 'Card uuid-1', 1, 1]);
+        expect(p.rows[0].children[0].textContent).toBe('1');
+        expect(p.navCount.textContent).toBe('5');
+    });
+
+    test('a plus on a card not held adds it in that grade only', () => {
+        const p = page();
+        over(p, 1).children[2].children[2].click();
+        expect(shown(listOf(p, 1))).toEqual(['NM', 'SP', '-MP1', 'HP', 'PO']);
+        expect(p.rows[1].classes.has('active')).toBe(true);
+        expect(p.rows[1].children[0].hidden).toBe(true);
+    });
+
+    test('a minus takes a copy of its grade, and the last one hands focus to its plus', () => {
+        const p = page({ store: two });
+        const list = over(p, 0);
+        const less = list.children[1].children[0];
+        less.focus();
+        less.click();
+        expect(shown(list)).toEqual(['-NM1', '-SP1', 'MP', 'HP', 'PO']);
+        expect(p.document.activeElement).toBe(less);
+        less.click();
+        expect(shown(list)).toEqual(['-NM1', 'SP', 'MP', 'HP', 'PO']);
+        expect(p.document.activeElement).toBe(list.children[1].children[2]);
+        expect(p.stored().filter((e) => !e.del).map((e) => e.cond || 'NM')).toEqual(['NM']);
+    });
+
+    test('the buttons take no Tab stop; the arrows walk them and Escape goes back', () => {
+        const p = page({ store: two });
+        const list = over(p, 0);
+        const wrap = p.rows[0].parentNode;
+        const press = (key) => { let prevented = false; wrap.listeners.keydown.forEach((fn) => fn({ key, preventDefault() { prevented = true; } })); return prevented; };
+        expect(list.querySelectorAll('button').map((b) => b.getAttribute('tabindex'))).toEqual(Array(10).fill('-1'));
+        p.rows[0].focus();
+        expect(press('ArrowUp')).toBe(false);
+        expect(press('Escape')).toBe(false);
+        const walk = ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowUp'].map((k) => { press(k); return p.document.activeElement; });
+        const [nm, sp, mp] = list.children;
+        expect(walk).toEqual([nm.children[0], nm.children[2], sp.children[0], sp.children[2], mp.children[2], sp.children[2]]);
+        expect(press('Escape')).toBe(true);
+        expect(p.document.activeElement).toBe(p.rows[0]);
+        list.children[4].children[2].focus();
+        expect(press('ArrowDown')).toBe(false);
+    });
+
+    test('the hint the row buttons are described by is there before any list', () => {
+        const p = page();
+        expect(ids['pack-grades-hint'].textContent).toBe('Down arrow for grades');
+        expect(ids['pack-grades-hint'].hidden).toBe(true);
+        expect(listOf(p, 0)).toBe(null);
+    });
+
+    test('a sealed product lists the one grade', () => {
+        const p = page({ store: two });
+        p.rows[0].parentNode.setAttribute('data-sealed', '');
+        expect(shown(over(p, 0))).toEqual(['-NM1']);
+    });
+
+    test('a plus and a minus count when a copy moved', () => {
+        const p = page({ store: two });
+        const list = over(p, 0);
+        list.children[2].children[0].click(); // MP holds nothing to take
+        list.children[2].children[2].click();
+        list.children[2].children[0].click();
+        expect(p.tracked.filter((t) => t[0] === 'ui.result.icon')).toEqual([['ui.result.icon', 'pack_grade_add', 'header'], ['ui.result.icon', 'pack_grade_take', 'header']]);
+    });
+
+    test('the buttons act on the active backpack and name it', () => {
+        const p = page({ store: two, tabs: 2, navMenu: true, tabList: [{ pack: 1, name: 'Trades' }, { pack: 2 }] });
+        const list = over(p, 0);
+        expect(list.children[1].children[0].getAttribute('title')).toBe('Remove one SP from Trades');
+        expect(list.children[1].children[2].getAttribute('title')).toBe('Add one SP to Trades');
+        ids['nav-backpack-menu'].children[1].click();
+        expect(shown(list)).toEqual(['NM', 'SP', 'MP', 'HP', 'PO']);
+        list.children[1].children[2].click();
+        expect(shown(list)).toEqual(['NM', '-SP1', 'MP', 'HP', 'PO']);
+        expect(p.stored().find((e) => e.pack === 2).cond).toBe('SP');
+    });
+
+    test('a change from another tab reaches a built list', () => {
+        const p = page({ store: two });
+        const list = over(p, 0);
+        p.m.mtgban_backpack = JSON.stringify([{ id: 'uuid-1', name: 'One', cond: 'PO', qty: 4, t: 3, m: 3 }]);
+        p.fireStorage();
+        expect(shown(list)).toEqual(['NM', 'SP', 'MP', 'HP', '-PO4']);
     });
 });
 
