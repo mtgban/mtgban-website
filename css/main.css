@@ -486,7 +486,10 @@ body:not([data-theme-pref])    .theme-icon-system {
 
 .ban-nav-mobile-menu {
     position: fixed; top: 0; right: 0; z-index: 260;
-    width: 280px; height: 100vh;
+    /* The visible height, padding included, so the view toggle at the end
+       scrolls into view above Safari's toolbar. */
+    box-sizing: border-box;
+    width: 280px; height: 100vh; height: 100dvh;
     background: var(--navbackground);
     border-left: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     padding: 20px;
@@ -555,6 +558,11 @@ body:not([data-theme-pref])    .theme-icon-system {
     text-decoration: none;
 }
 .ban-nav-mobile-ext a img { width: 22px; height: 22px; opacity: 0.7; }
+.ban-nav-view-toggle {
+    display: block;
+    padding: 12px 14px;
+    font-size: 0.85rem; color: var(--greytext); text-decoration: none;
+}
 
 /* Responsive: collapse to hamburger */
 @media (max-width: 900px) {
