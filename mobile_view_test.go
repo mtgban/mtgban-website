@@ -77,9 +77,7 @@ func TestSearchOffersAlertsOnAPhone(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/search", nil)
 	req.AddCookie(&http.Cookie{Name: "MobileView", Value: "true"})
-	pageVars := genPageNav(s, req, "Search", "")
-	pageVars.CanAlerts, pageVars.CanFixSearch = searchReader(s, req)
-	if !pageVars.CanAlerts {
+	if readerAlertChannels(s, req) == "" {
 		t.Error("a phone whose navbar leaves Alerts out gets no alerts link")
 	}
 }

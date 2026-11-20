@@ -180,3 +180,35 @@ func TestAlertChannelsHideEmailWithoutAMailer(t *testing.T) {
 		t.Errorf("with a key: %v, want both", got)
 	}
 }
+
+// readerAlertChannels names the channels only for a reader the page may
+// offer the alert link: an allowance with no usable channel reads as none.
+func TestReaderAlertChannels(t *testing.T) {
+	withSigMode(t, false, false)
+	s := newSite()
+	s.alerts.SetStore(&alerts.Store{})
+
+	for _, tc := range []struct {
+		name    string
+		params  map[string]string
+		mailKey string
+		want    string
+	}{
+		{"a channel", map[string]string{"Alerts": "true", "AlertsMax": "2", "AlertChannels": "discord"}, "", "discord"},
+		{"both, with a mail key", map[string]string{"Alerts": "true", "AlertsMax": "2", "AlertChannels": "discord,email"}, "key", "discord,email"},
+		{"no key: signed before the property", map[string]string{"Alerts": "true", "AlertsMax": "2"}, "", "discord"},
+		{"empty list", map[string]string{"Alerts": "true", "AlertsMax": "2", "AlertChannels": ""}, "", ""},
+		{"unknown channel", map[string]string{"Alerts": "true", "AlertsMax": "2", "AlertChannels": "sms"}, "", ""},
+		{"email, no mail key", map[string]string{"Alerts": "true", "AlertsMax": "2", "AlertChannels": "email"}, "", ""},
+		{"a channel, no allowance", map[string]string{"Alerts": "true", "AlertChannels": "discord"}, "", ""},
+		{"a channel, no page", map[string]string{"AlertsMax": "2", "AlertChannels": "discord"}, "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("RESEND_API_KEY", tc.mailKey)
+			got := readerAlertChannels(s, alertsRequest("GET", "/search", testSig(tc.params)))
+			if got != tc.want {
+				t.Errorf("channels = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
