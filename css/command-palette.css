@@ -719,3 +719,10 @@ body.dark-theme .cp-result-icon img[src*="cardconduit"] {
 .cp-spinner svg {
     animation: cp-spin 0.9s linear infinite;
 }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .cp-save-modal-input {
+        font-size: 16px;
+    }
+}

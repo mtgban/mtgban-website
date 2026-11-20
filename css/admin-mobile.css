@@ -733,3 +733,10 @@
     font-weight: 600;
     cursor: pointer;
 }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .m-admin-tool input[type="text"] {
+        font-size: 16px;
+    }
+}

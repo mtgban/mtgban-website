@@ -877,3 +877,14 @@ td.admin-stale-date { color: var(--adanger); font-weight: 600; }
     background: var(--dodgerblue-fill);
     color: #fff;
 }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .admin-grant-form input[type="email"],
+    .admin-grant-form input[type="text"],
+    .admin-tool input[type="text"],
+    .admin-grants input,
+    .admin-metrics-review input[type="text"] {
+        font-size: 16px;
+    }
+}

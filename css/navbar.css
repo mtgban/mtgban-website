@@ -854,3 +854,10 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
     .nav2-scope-examples { display: none; }
     .nav2-scope-autocomplete { flex: 1 1 auto; }
 }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .nav2-scope-box {
+        font-size: 16px;
+    }
+}

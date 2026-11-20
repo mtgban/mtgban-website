@@ -994,3 +994,11 @@ body.settings-open {
     .settings-modal-header { flex-wrap: wrap; gap: 0.5em; }
     .settings-search { margin-left: 0; flex-basis: 100%; }
 }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .settings-search input,
+    .settings-inline-num {
+        font-size: 16px;
+    }
+}
