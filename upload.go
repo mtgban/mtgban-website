@@ -1642,7 +1642,7 @@ func writeTagCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, hashTag s
 	case "SCG":
 		err = UUID2SCGCSV(p, csvWriter, hashes, hashesQtys)
 	case "TCG":
-		err = UUID2TCGCSV(b, p, csvWriter, hashes, hashesQtys, hashesCond)
+		err = UUID2TCGCSV(b, p, csvWriter, hashes, hashesQtys, hashesCond, nil)
 	}
 	if err != nil {
 		dropDownloadHeaders(w)
@@ -1718,6 +1718,7 @@ func writeTCGplayerCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, upl
 	csvWriter := csv.NewWriter(w)
 
 	var ids, qtys, conds []string
+	var loaded []float64
 	for i := range uploadedData {
 		if uploadedData[i].CardID == "" {
 			continue
@@ -1729,9 +1730,10 @@ func writeTCGplayerCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, upl
 		ids = append(ids, uploadedData[i].CardID)
 		qtys = append(qtys, fmt.Sprintf("%d", qty))
 		conds = append(conds, string(uploadedData[i].OriginalCondition))
+		loaded = append(loaded, uploadedData[i].OriginalPrice)
 	}
 
-	err := UUID2TCGCSV(b, p, csvWriter, ids, qtys, conds)
+	err := UUID2TCGCSV(b, p, csvWriter, ids, qtys, conds, loaded)
 	if err != nil {
 		dropDownloadHeaders(w)
 	}
