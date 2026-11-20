@@ -24,6 +24,11 @@ line is:
 | where the fixed sidebar starts | `--search-sidebar-top` | `--nav-height`, *without* the slack |
 | the column's top padding | `.search-results` `padding-top` | `--result-cover-height` |
 
+The negative margin only works while `.page-content` pads by the slack.
+`main.css` drops the slack below 768px, so the search page restates the
+padding: without it the grid starts a slack above the navbar, and the
+sticky sort bar, pinned on the line, covers that much of the results.
+
 **A sticky offset never moves anything else.** A header whose static
 position sits *above* its own sticky `top` is painted lower than the space it
 left behind, and covers whatever follows it — the variant row — by exactly
