@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -118,6 +119,35 @@ func TestBestOffers(t *testing.T) {
 		got := bestOffers(tc.offers, tc.blMode, tc.percMargin, uploadtie.Breaker{})
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// A buylist's margin is the one posted or saved, and the page's 10% when
+// neither names one; a 0 posted is no margin.
+func TestUploadMarginDefault(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		form   url.Values
+		cookie string
+		want   float64
+	}{
+		{"nothing posted or saved", url.Values{}, "", 0.9},
+		{"not a number", url.Values{"margin": {"x"}}, "", 0.9},
+		{"negative", url.Values{"margin": {"-5"}}, "", 0.9},
+		{"NaN", url.Values{"margin": {"NaN"}}, "", 0.9},
+		{"posted", url.Values{"margin": {"25"}}, "", 0.75},
+		{"zero", url.Values{"margin": {"0"}}, "", 1},
+		{"saved", url.Values{}, "5", 0.95},
+		{"option off", url.Values{"minmargin": {""}}, "", 1},
+	} {
+		cookies := map[string]string{}
+		if tc.cookie != "" {
+			cookies["UploadMargin"] = tc.cookie
+		}
+		st := readUploadSettings(uploadRequest(t, "/upload", tc.form, cookies), true)
+		if math.Abs(st.percMargin-tc.want) > 1e-9 {
+			t.Errorf("%s: margin %v, want %v", tc.name, st.percMargin, tc.want)
 		}
 	}
 }
