@@ -203,10 +203,10 @@ func TestDecklistCSVBytes(t *testing.T) {
 		export decklistExport
 		want   string
 	}{
-		{"tcgplayer", UUID2TCGCSV, "TCGplayer Id,Product Line,Set Name,Product Name,Title,Number,Rarity,Condition,TCG Market Price,TCG Direct Low,TCG Low Price With Shipping,TCG Low Price,Total Quantity,Add to Quantity,TCG Marketplace Price,Photo URL\n" +
-			"111,,,,,,,Near Mint,1.50,1.40,,1.10,,4,1.50,\n" +
-			"222,,,,,,,Lightly Played Foil,7.00,0.00,,0.00,,2,7.00,\n" +
-			"112,,,,,,,Lightly Played,1.25,0.00,,0.00,,1,1.25,\n"},
+		{"tcgplayer", UUID2TCGCSV, "TCGplayer Id,Product Line,Set Name,Product Name,Title,Number,Rarity,Condition,TCG Market Price,TCG Direct Low,TCG Low Price With Shipping,TCG Low Price,Total Quantity,Add to Quantity,My Store Price,TCG Marketplace Price,My Store Reserve Quantity,Photo URL\n" +
+			"111,,,,,,,Near Mint,1.50,1.40,,1.10,,4,,1.50,,\n" +
+			"222,,,,,,,Lightly Played Foil,7.00,0.00,,0.00,,2,,7.00,,\n" +
+			"112,,,,,,,Lightly Played,1.25,0.00,,0.00,,1,,1.25,,\n"},
 		{"cardmarket", UUID2MKMCSV, "cardmarketId,quantity,name,set,setCode,cn,condition,language,isFoil,isPlayset,isSigned,price,comment,nameDE,nameES,nameFR,nameIT,rarity,listedAt\n" +
 			"5001,4,Fixture Card Alpha,Fixture Edition Alpha,FIXTUREA,1,NM,English,,,,0.90,,,,,,Rare,\n" +
 			"5002,2,\"Fixture, Card \"\"Beta\"\"\",,FIXTUREA,2,EX,,Y,,,3.30,,,,,,,\n" +
