@@ -2125,6 +2125,16 @@ describe('the navbar switcher', () => {
         expect(p.document.activeElement).toBe(ids['backpack-close']);
     });
 
+    test('picking the active one leaves an open panel as it is', () => {
+        const p = page({ store: two, tabs: 2, navMenu: true });
+        menu().children[0].click();
+        ids['backpack-empty-after'].checked = true;
+        menu().children[0].click();
+        expect(ids['backpack-panel'].classes.has('open')).toBe(true);
+        expect(ids['backpack-empty-after'].checked).toBe(true);
+        expect(p.tracked.filter((t) => t[0] === 'ui.backpack.panel')).toEqual([['ui.backpack.panel', 'open']]);
+    });
+
     test('a re-render from another tab keeps the focused pick focused', () => {
         const p = page({ store: two, tabs: 2, navMenu: true });
         menu().children[1].focus();

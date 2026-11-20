@@ -671,8 +671,8 @@
     // markNavMenu fills the switcher the navbar button shows on hover while
     // there are backpacks to pick from: picking one sends the result rows'
     // buttons there, without opening the panel, and picking the active one
-    // opens it. Its title would cover it, so markNav's aria-label names the
-    // button; a rebuild keeps a focused pick.
+    // opens the panel if it is shut. Its title would cover it, so markNav's
+    // aria-label names the button; a rebuild keeps a focused pick.
     function markNavMenu(btn) {
         var menu = document.getElementById("nav-backpack-menu");
         if (!menu) return;
@@ -692,7 +692,10 @@
             b.setAttribute("data-pack", String(t.pack));
             b.append(text("span", "nav2-backpack-pick-name", t.name), text("span", "nav2-backpack-pick-count", String(copies[t.pack] || 0)));
             b.addEventListener("click", function () {
-                if (on) { open(); return; }
+                if (on) {
+                    if (!panel || !panel.classList.contains("open")) open();
+                    return;
+                }
                 if (window.BAN && window.BAN.track) window.BAN.track("ui.backpack", "switch_menu");
                 setActive(t.pack);
                 render();
