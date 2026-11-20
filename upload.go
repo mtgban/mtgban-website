@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"maps"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -1835,9 +1836,12 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 
 	percMargin := 1.0
 	if useMargin {
-		if v := uploadFloatSetting(r, "margin", "UploadMargin"); v >= 0 {
-			percMargin = 1 - v/100.0
+		// A margin neither posted nor saved, or not a number, is the page's 10%
+		margin, err := strconv.ParseFloat(getUploadSetting(r, "margin", "UploadMargin"), 64)
+		if err != nil || math.IsNaN(margin) || margin < 0 {
+			margin = defaultUploadMargin
 		}
+		percMargin = 1 - margin/100.0
 	}
 
 	visualPerc := VisualPercSpread
