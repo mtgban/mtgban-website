@@ -58,6 +58,15 @@ func firstCSV(keys []string, n int) string {
 	return strings.Join(keys[:n], ",")
 }
 
+// storeLabel is a store's name in a picker that lists sealed stores
+// beside singles ones, which can share a name.
+func storeLabel(name string, sealed bool) string {
+	if sealed {
+		return name + " (Sealed)"
+	}
+	return name
+}
+
 func csvWithout(csv, drop string) string {
 	parts := strings.Split(csv, ",")
 	out := parts[:0]
@@ -341,6 +350,7 @@ var funcMap = template.FuncMap{
 		}
 		return b.String()
 	},
+	"storeLabel": storeLabel,
 	"slice_has": func(s []string, p string) bool {
 		return slices.Contains(s, p)
 	},
