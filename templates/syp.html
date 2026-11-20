@@ -4,6 +4,7 @@
          stylesheet keeps the two looking alike; it is only the template that
          needed separating. */}}
     <link rel="stylesheet" type="text/css" href="/css/arbit.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/phone-cards.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
 {{end}}
 
@@ -39,7 +40,7 @@
          table entirely. */}}
     {{range .Arb}}
         <div class="arb-table-wrap">
-            <table class="table-data arb-table" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
+            <table class="table-data arb-table phone-cards" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
                 <thead>
                     <tr>
                         <th><a href="?page=syp&sort=alpha" data-track="ui.news.syp" data-track-value="sort">Card</a> / <a href="?page=syp&sort=edition" data-track="ui.news.syp" data-track-value="sort">Edition</a></th>
@@ -53,7 +54,7 @@
                     {{range .Arbit}}
                         {{$card := (index $.Metadata .CardID)}}
                         <tr onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),'{{$card.ImageURL}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});hw.toggleAttribute('data-sealed',{{$card.Sealed}});">
-                            <td>
+                            <td class="pc-card">
                                 <div class="arb-card-cell">
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 24 "Class" "set-icon"}}
                                     <span class="card-name-line">
@@ -64,10 +65,10 @@
                                     <span class="card-edition">{{$card.Edition}} &middot; #{{$card.Number}}{{if $card.HasDeck}} &middot; Decklist{{else if $card.Etched}} &middot; Etched{{else if $card.Foil}} &middot; Foil{{end}}</span>
                                 </div>
                             </td>
-                            <td>{{.InventoryEntry.Conditions}}</td>
-                            <td>{{.InventoryEntry.Quantity}}</td>
-                            <td class="m">$ {{printf "%.2f" .InventoryEntry.Price}}</td>
-                            <td>
+                            <td class="pc-key" data-label="Cond">{{.InventoryEntry.Conditions}}</td>
+                            <td class="pc-key" data-label="Qty">{{.InventoryEntry.Quantity}}</td>
+                            <td class="m pc-key" data-label="Sell Price">$ {{printf "%.2f" .InventoryEntry.Price}}</td>
+                            <td class="pc-act">
                                 <div class="arb-quick-links">
                                     {{if ne .InventoryEntry.URL ""}}
                                         <a class="arb-qlink buy" href="{{.InventoryEntry.URL}}" target="_blank" rel="nofollow" data-track="ui.news.syp" data-track-value="buy_link">Buy</a>
