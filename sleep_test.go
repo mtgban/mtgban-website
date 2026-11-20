@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"maps"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/salesvelocity"
+	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
 
 func TestSleepersLayoutSkipsPlaytest(t *testing.T) {
@@ -299,5 +302,42 @@ func TestSleeperCacheWaiterAsksAfterAPanic(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the waiter never answered")
+	}
+}
+
+// The Ocean Gap presets name their stores as the store data does, in both
+// views, and by shorthand when a store isn't loaded.
+func TestSleepGapPresetsUseStoreNames(t *testing.T) {
+	names := map[string]string{
+		"TCGLow": "TCG Low", "MKMLow": "MKM Low", "MKMTrend": "MKM Trend",
+		"CK": "Card Kingdom", "SCG": "Star City Games", "MP": "Mana Pool",
+	}
+	presets := [][2]string{{"TCGLow", "MKMLow"}, {"TCGLow", "MKMTrend"}, {"MKMTrend", "CK"}, {"MKMTrend", "SCG"}, {"MKMTrend", "MP"}}
+	views := map[bool]struct{ block, pair string }{
+		false: {"sleep-index", `<span class="ref-name">%s</span> <span class="vs">vs</span> <span class="target-name">%s</span>`},
+		true:  {"m-sleep-index", `<span>%s</span><span class="m-sleep-vs">vs</span><span>%s</span>`},
+	}
+	for mobile, view := range views {
+		baseName, files := renderTemplateFiles("sleep.html", mobile)
+		tmpl, err := tmplparse.ParseFiles(baseName, files, funcMap)
+		if err != nil {
+			t.Fatalf("mobile %v: %v", mobile, err)
+		}
+		for _, storeNames := range []map[string]string{names, nil} {
+			var b bytes.Buffer
+			if err := tmpl.ExecuteTemplate(&b, view.block, PageVars{StoreNames: storeNames}); err != nil {
+				t.Fatalf("mobile %v: %v", mobile, err)
+			}
+			out := strings.Join(strings.Fields(b.String()), " ")
+			for _, preset := range presets {
+				ref, target := preset[0], preset[1]
+				if storeNames != nil {
+					ref, target = names[ref], names[target]
+				}
+				if want := fmt.Sprintf(view.pair, ref, target); !strings.Contains(out, want) {
+					t.Errorf("mobile %v, names %v: no preset %q vs %q", mobile, storeNames != nil, ref, target)
+				}
+			}
+		}
 	}
 }

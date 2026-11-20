@@ -1054,7 +1054,7 @@ window.__BAN_GUIDE = {
                     { value: 'Hotlist',                 short: 'Most buylist growth over past 3 months' },
                     { value: 'Sales Velocity',          short: 'Copies sold a day on TCGplayer' },
                     { value: 'Ocean Gap',               short: 'Head-to-head seller comparison' },
-                    { value: 'Ocean Gap presets',       short: 'TCGLow vs MKMLow / MKMTrend; MKMTrend vs CK / SCG / Manapool' },
+                    { value: 'Ocean Gap presets',       short: 'TCG Low vs MKM Low / MKM Trend; MKM Trend vs Card Kingdom / Star City Games / Mana Pool' },
                     { value: 'Custom comparison',       short: 'Pick any reference seller and target seller (tier-gated)' }
                 ],
                 examples: [
