@@ -30,6 +30,12 @@
     flex-wrap: wrap;
     padding: 10px 14px;
     border-bottom: 1px solid var(--border-subtle);
+    container-type: inline-size;
+}
+
+/* The toolbar needs 604px on one line under 768px: narrower, it wraps */
+@container (width < max(610px, 35.9rem)) {
+    .sets-toolbar .toolbar-sep { display: none; }
 }
 
 .sets-filter-input {
@@ -338,7 +344,7 @@ tr.child-row td:first-child {
     .sets-page h1 { font-size: var(--text-6xl); }
 
     /* Filter input full width */
-    .sets-filter-input { width: 100%; }
+    .sets-filter-input { width: 100%; box-sizing: border-box; }
     .sets-toolbar { flex-direction: column; align-items: stretch; }
     .sets-toolbar-spacer { display: none; }
     .sets-sort-group { justify-content: flex-start; }

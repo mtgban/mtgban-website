@@ -21,6 +21,10 @@
 .screener-filter-bar {
     gap: 5px;
 }
+/* That row is 1302px with the Editions group: narrower, it wraps */
+@container (width < max(1310px, 77.1rem)) {
+    .screener-filter-bar .toolbar-sep { display: none; }
+}
 .screener-filter-bar .news-fg {
     gap: 4px;
 }
