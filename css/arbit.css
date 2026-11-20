@@ -772,6 +772,11 @@ button.arb-filter-reset:disabled {
     .arb-edition-filter { width: 100%; }
 }
 
+@media (max-width: 560px) {
+    /* An INFO cell with no buylist facts takes no room on a card */
+    .arb-table.phone-cards td:has(> .bl-info:only-child:empty) { display: none; }
+}
+
 /* ── Row removal ── */
 tr.arb-removed td { opacity: 0.45; }
 tr.arb-removed td:last-child { opacity: 1; }

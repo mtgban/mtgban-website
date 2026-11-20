@@ -1,5 +1,6 @@
 {{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/arbit.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/phone-cards.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
 {{end}}
 
@@ -421,7 +422,7 @@
             </div>
 
             <div class="arb-table-wrap">
-            <table class="table-data arb-table filterable" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
+            <table class="table-data arb-table filterable phone-cards" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
                 <thead>
                 <tr>
                     <th><a href="javascript:sortBy('alpha', '{{.Name}}')">Card</a> / <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a></th>
@@ -475,7 +476,7 @@
                 {{range $n, $row := .Arbit}}
                     {{$card := (index $.Metadata .CardID)}}
                     <tr data-arb-id="{{.CardID}}" data-load-idx="{{$n}}" data-load-qty="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}" data-load-name="{{$card.Name}}" data-load-ckid="{{$card.CKBuylistID}}" data-load-tcgid="{{$card.TCGId}}" data-load-set="{{$card.SetCode}}" data-load-number="{{$card.Number}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),'{{$card.ImageURL}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});hw.toggleAttribute('data-sealed',{{$card.Sealed}});">
-                        <td>
+                        <td class="pc-card">
                             <div class="arb-card-cell">
                                 {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 24 "Class" "set-icon"}}
                                 <span class="card-name-line">
@@ -491,23 +492,23 @@
                         <td>{{if $card.Sealed}}<a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product" class="arb-contents"><span class="emoji">🔎</span></a>{{else if not $.GlobalMode}}{{$ckTip := buylist_title "CK" (grade "NM") "" $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}<div class="bl-info"{{if $ckTip}} title="{{plain_tip $ckTip}}" data-tip="{{$ckTip}}"{{end}}>{{buylist_detail $.ScraperShort $card.HotlistStore .BuylistEntry.BuyPrice $card.GoodBuylist $card.HighestBuylist true $card.CKSignal}}{{buylist_ck $card.CKSignal}}</div>{{end}}</td>
                         {{end}}
                         {{if not $save.HasNoConds}}
-                            <td>
+                            <td data-label="Cond">
                                 {{.InventoryEntry.Conditions}}
                             </td>
                         {{end}}
                         {{if not $save.HasNoQty}}
-                            <td>
+                            <td data-label="Qty">
                                 {{.InventoryEntry.Quantity}}
                                 {{if ne .BuylistEntry.Quantity 0}}
                                     / {{.BuylistEntry.Quantity}}
                                 {{end}}
                             </td>
                         {{end}}
-                        <td class="m">
+                        <td class="m pc-key" data-label="{{if $.GlobalMode}}{{if $sealedSource}}{{$save.Name}}{{else}}{{index $.StoreNames $.ScraperShort}}{{end}}{{else}}Sell Price{{end}}">
                             $ {{printf "%.2f" .InventoryEntry.Price}}
                         </td>
                         {{if not $save.HasNoPrice}}
-                            <td class="m">
+                            <td class="m pc-key" data-label="{{if $.GlobalMode}}{{if $sealedSource}}{{index $.StoreNames $.ScraperShort}}{{else}}{{$save.Name}}{{end}}{{else}}Buy Price{{end}}">
                                 {{if eq .BuylistEntry.BuyPrice 0.0}}
                                     {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .ReferenceEntry.Price}}
                                     {{if and $.GlobalMode $.DirectStockNote (eq $scraperKey "TCGDirect")}}{{with direct_stock .CardID .ReferenceEntry.Conditions}}<span class="arb-direct-stock" title="{{$.DirectStockNote}}">{{.}} in stock</span>{{end}}{{end}}
@@ -517,31 +518,31 @@
                             </td>
                         {{end}}
                         {{if not $save.HasNoCredit}}
-                            <td class="m">
+                            <td class="m" data-label="Trade Price">
                                 $ {{printf "%.2f" (mulf .BuylistEntry.BuyPrice $save.CreditMultiplier)}}
                             </td>
                         {{end}}
                         {{if not $save.HasNoArbit}}
-                            <td class="m">
+                            <td class="m pc-key" data-label="Profit">
                                 {{if gt .Spread 0.0}}
                                     {{printf "%.2f" .Profitability}}
                                 {{else}}
                                     n/a
                                 {{end}}
                             </td>
-                            <td class="m">
+                            <td class="m" data-label="Diff">
                                 $ {{printf "%.2f" (shown .Difference)}}
                             </td>
-                            <td class="m {{if gt .Spread 0.0}}arb-spread-up{{else}}arb-spread-down{{end}}">
+                            <td class="m {{if gt .Spread 0.0}}arb-spread-up{{else}}arb-spread-down{{end}}" data-label="Spread">
                                 {{printf "%.2f" (shown .Spread)}} %
                             </td>
                             {{if not $.GlobalMode}}
-                                <td class="m">
+                                <td class="m" data-label="Ratio">
                                     {{printf "%.2f" .BuylistEntry.PriceRatio}} %
                                 </td>
                             {{end}}
                         {{end}}
-                        <td>
+                        <td class="pc-act">
                             <div class="arb-quick-links">
                                 {{if ne .InventoryEntry.URL ""}}
                                     <a class="arb-qlink buy" href="{{.InventoryEntry.URL}}" target="_blank" rel="nofollow">Buy</a>
@@ -556,7 +557,7 @@
                                 {{end}}
                             </div>
                         </td>
-                        <td class="c"><input type="checkbox" checked autocomplete="off" class="arb-row-check" onchange="window.toggleArbitRow && toggleArbitRow(this)"></td>
+                        <td class="c pc-act"><input type="checkbox" checked autocomplete="off" class="arb-row-check" onchange="window.toggleArbitRow && toggleArbitRow(this)"></td>
                     </tr>
                 {{end}}
 
