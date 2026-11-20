@@ -130,6 +130,28 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Under 768px the five columns cannot share the screen: the table takes the
+   width its numbers need and scrolls in its wrap, and headers wrap their
+   sort arrows. */
+@media (max-width: 768px) {
+    #screenerTable {
+        min-width: 540px;
+    }
+    #screenerTable th {
+        white-space: normal;
+    }
+    #screenerTable th.news-th-card {
+        width: 28%;
+    }
+    #screenerTable th.screener-pct {
+        width: 24%;
+    }
+    #screenerTable .screener-dollar,
+    #screenerTable .screener-pct {
+        padding-right: 8px;
+    }
+}
+
 /* A bit more row height so finish chips are not clipped. */
 #screenerTable td {
     padding-top: 10px;
@@ -204,6 +226,11 @@
     background: rgba(253, 239, 138, 0.15);
     color: #fdef8a;
     border: 1px solid rgba(253, 239, 138, 0.3);
+}
+.light-theme .result-badge.foil {
+    background: rgba(180, 160, 60, 0.12);
+    color: #8a7a20;
+    border-color: rgba(180, 160, 60, 0.3);
 }
 
 .result-badge.etched {
