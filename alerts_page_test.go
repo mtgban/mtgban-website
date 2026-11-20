@@ -295,3 +295,32 @@ func TestAlertsPageOffersOptimize(t *testing.T) {
 		}
 	}
 }
+
+// Signed out, the notice links to the Patreon sign-in where a client is set,
+// and stays plain text where none is.
+func TestAlertsPageSignInLink(t *testing.T) {
+	tmpl, err := template.New("").Funcs(funcMap).ParseFiles("templates/partials/alerts-body.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct {
+		ids  map[string]string
+		want bool
+	}{
+		"client":    {map[string]string{"ban": "client-1"}, true},
+		"no client": {nil, false},
+	} {
+		var out strings.Builder
+		if err := tmpl.ExecuteTemplate(&out, "alerts-body", PageVars{PatreonIDs: tc.ids, AlertsPage: &AlertsPageVars{}}); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		html := out.String()
+		got := strings.Contains(html, `getPatreonURL('client-1', 'ban')`) && strings.Contains(html, "Sign in with Patreon</a> to set price alerts.")
+		if got != tc.want {
+			t.Errorf("%s: sign-in link present %v, want %v:\n%s", name, got, tc.want, html)
+		}
+		if !strings.Contains(html, "to set price alerts.") {
+			t.Errorf("%s: the notice is missing:\n%s", name, html)
+		}
+	}
+}

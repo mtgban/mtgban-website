@@ -3,6 +3,8 @@
 <div class="alerts-body" id="alerts-page" data-open-card="{{if not .Editing}}{{.FormCardID}}{{end}}" data-open-side="{{.FormSide}}" data-open-edit="{{if .Editing}}{{.Editing.ID}}{{end}}" data-open-remove="{{if .Removing}}{{.Removing}}{{end}}" data-alert-channels="{{.AllowedChannels}}">
 {{if not .SignedIn}}
     {{if .Unverified}}<p class="alerts-notice">Verify your Patreon email to use alerts, then sign out and back in here.</p>
+    {{else if $.PatreonIDs}}
+        <p class="alerts-notice">{{range $ref, $id := $.PatreonIDs}}<a href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.account" data-track-value="login">Sign in with Patreon</a>{{end}} to set price alerts.</p>
     {{else}}<p class="alerts-notice">Sign in with Patreon to set price alerts.</p>{{end}}
 {{else}}
     {{if not .Allowed}}<p class="alerts-notice">Price alerts are not part of your tier. You can still pause or remove the alerts below.</p>
