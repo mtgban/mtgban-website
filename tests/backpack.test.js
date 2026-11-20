@@ -2113,6 +2113,16 @@ describe('the navbar switcher', () => {
         expect(p.stored().find((e) => e.id === 'uuid-1' && e.pack === 2).qty).toBe(1);
     });
 
+    test('picking the active one opens the panel on it', () => {
+        const p = page({ store: two, tabs: 2, navMenu: true });
+        menu().children[0].click();
+        expect(p.m.mtgban_backpack_active).toBe(undefined);
+        expect(picks()).toEqual(['Backpack 1:2*', 'Backpack 2:3']);
+        expect(ids['backpack-panel'].classes.has('open')).toBe(true);
+        expect(p.nav.getAttribute('aria-expanded')).toBe('true');
+        expect(p.document.activeElement).toBe(ids['backpack-close']);
+    });
+
     test('a re-render from another tab keeps the focused pick focused', () => {
         const p = page({ store: two, tabs: 2, navMenu: true });
         menu().children[1].focus();
