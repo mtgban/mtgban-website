@@ -63,6 +63,51 @@ func TestGenPageNavMarksTheMobileView(t *testing.T) {
 	}
 }
 
+// A desktop-only page shows a phone the desktop menu, whose view switch
+// names the view the toggle leads to from the reader's own view.
+func TestDesktopOnlyMenuNamesTheViewTheToggleLeadsTo(t *testing.T) {
+	withSigMode(t, true, false)
+	const iPhone = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+
+	for _, c := range []struct {
+		reader, cookie, agent, label, cookieAfter string
+	}{
+		{"mobile view", "true", "", "Switch to Desktop View", "false"},
+		{"desktop view", "false", "", "Switch to Mobile View", "true"},
+		{"a phone on auto-detect", "", iPhone, "Switch to Desktop View", "false"},
+		{"a desktop on auto-detect", "", "", "Switch to Mobile View", "true"},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/upload", nil)
+		toggle := httptest.NewRequest(http.MethodGet, "/toggle-mobile?redirect=%2Fupload", nil)
+		for _, r := range []*http.Request{req, toggle} {
+			if c.cookie != "" {
+				r.AddCookie(&http.Cookie{Name: "MobileView", Value: c.cookie})
+			}
+			if c.agent != "" {
+				r.Header.Set("User-Agent", c.agent)
+			}
+		}
+
+		pageVars := genPageNav(testSite, req, "Upload", "")
+		page := renderPage(t, "upload.html", pageVars.IsMobile, pageVars)
+		if !strings.Contains(page, c.label) {
+			t.Errorf("%s: the menu does not say %q", c.reader, c.label)
+		}
+
+		w := httptest.NewRecorder()
+		toggleMobileView(w, toggle)
+		got := ""
+		for _, ck := range w.Result().Cookies() {
+			if ck.Name == "MobileView" {
+				got = ck.Value
+			}
+		}
+		if got != c.cookieAfter {
+			t.Errorf("%s: %q sets MobileView=%q, want %q", c.reader, c.label, got, c.cookieAfter)
+		}
+	}
+}
+
 // The search page offers the alerts link on a phone as on a desktop: it
 // asks whether the navbar offers Alerts, not whether the phone's trimmed
 // navbar kept it.

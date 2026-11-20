@@ -181,7 +181,7 @@
         <a {{if .PatreonLogin}}style="display:none"{{end}} href="/discord" data-track="ui.nav.link" data-track-value="discord"><img src="/img/misc/discord.png" alt="Discord"></a>
     </div>
     <hr class="ban-nav-mobile-divider">
-    <a class="ban-nav-view-toggle" href="#" onclick="window.location='/toggle-mobile?redirect='+encodeURIComponent(window.location.pathname+window.location.search); return false;">Switch to Mobile View</a>
+    <a class="ban-nav-view-toggle" href="#" onclick="window.location='/toggle-mobile?redirect='+encodeURIComponent(window.location.pathname+window.location.search); return false;">Switch to {{if .MobileView}}Desktop{{else}}Mobile{{end}} View</a>
 </div>
 
 <script>
