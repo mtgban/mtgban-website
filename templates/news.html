@@ -1,6 +1,7 @@
 {{define "extra-css"}}
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" type="text/css" href="/css/news.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/phone-cards.css?hash={{.Hash}}">
 {{end}}
 
 {{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
@@ -163,7 +164,7 @@
         </form>
 
         <div class="news-table-wrap">
-            <table class="table-data news-table" id="newsTable" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
+            <table class="table-data news-table phone-cards" id="newsTable" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
                 <thead>
                     <tr>
                         {{range $i, $head := .Headings}}
@@ -193,7 +194,7 @@
                                 {{if $head.IsHidden}}
                                     {{/* skip hidden columns */}}
                                 {{else if eq $head.Title "Card Name"}}
-                                    <td class="news-td-card">
+                                    <td class="news-td-card pc-card">
                                         <div class="news-cc">
                                             {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 20 "Class" "set-icon"}}
                                             <div class="card-detail">
@@ -207,7 +208,7 @@
                                 {{else}}
                                     {{$val := $row.FieldValue $head.Field}}
                                     {{if not $head.IsHidden}}
-                                        <td class="{{if or $head.IsDollar $head.IsPerc $head.IsNum}}news-num{{end}} {{if eq $head.Title "Ranking"}}news-rank-col{{end}}">
+                                        <td class="{{if or $head.IsDollar $head.IsPerc $head.IsNum}}news-num{{end}} {{if eq $head.Title "Ranking"}}news-rank-col pc-rank{{else if $head.Key}}pc-key{{end}}"{{if ne $head.Title "Ranking"}} data-label="{{$head.Title}}"{{end}}>
                                             {{if and $head.IsNum (eq $head.Title "Ranking")}}
                                                 <span class="news-rank">{{$val}}</span>
                                             {{else if $head.IsDollar}}
