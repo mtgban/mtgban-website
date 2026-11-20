@@ -202,6 +202,12 @@
     border: 1px solid var(--border-subtle);
     border-radius: 12px 12px 0 0;
     border-bottom: none;
+    container-type: inline-size;
+}
+/* The bar needs 954px on one line: narrower, a divider lands at a line's
+   start or end. max() follows the root size up without dropping under it. */
+@container (width < max(960px, 56.5rem)) {
+    .news-filter-bar .toolbar-sep { display: none; }
 }
 .news-fg {
     display: flex;

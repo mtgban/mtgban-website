@@ -883,6 +883,17 @@
     gap: 0.5em;
     align-items: center;
     flex-wrap: wrap;
+    container-type: inline-size;
+}
+
+/* The buttons need 1086px on one line, 1267px with the Optimizer's tab and
+   sort button: narrower, a divider lands at a line's start or end. Their text
+   scales with the root and their padding does not, hence max() of both. */
+@container (width < max(1090px, 64.2rem)) {
+    .res-btn-sep { display: none; }
+}
+@container (width < max(1270px, 74.8rem)) {
+    .res-buttons-row:has(.res-tab + .res-tab) .res-btn-sep { display: none; }
 }
 
 .res-btn-sep {
