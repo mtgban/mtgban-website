@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -84,7 +85,7 @@ func (s *site) TCGHandler(w http.ResponseWriter, r *http.Request) {
 	setCSVDownloadHeaders(w, co.Name+".csv")
 
 	csvWriter := csv.NewWriter(w)
-	err = UUID2TCGCSV(b, p, csvWriter, data, nil, nil)
+	err = UUID2TCGCSV(b, p, csvWriter, data, nil, nil, nil)
 	if err != nil {
 		dropDownloadHeaders(w)
 		errorResponse(w, http.StatusInternalServerError, err.Error())
@@ -233,18 +234,21 @@ var tcgConditionMap = map[mtgban.Condition]string{
 	mtgban.PO: "Damaged",
 }
 
-// csvRow is one row of a marketplace CSV: a card in one condition, and its
-// quantity across every entry naming that pair.
+// csvRow is one row of a marketplace CSV: a card in one condition, its
+// quantity across every entry naming that pair, and the first price loaded
+// for it.
 type csvRow struct {
-	id   string
-	cond mtgban.Condition
-	qty  int
+	id    string
+	cond  mtgban.Condition
+	qty   int
+	price float64
 }
 
 // mergeCSVRows merges the entries naming the same card in the same condition
 // into one row, in first-seen order. qtys and conds, when present, are the
 // size of ids; a missing quantity counts as 1 and a missing condition as NM.
-func mergeCSVRows(ids, qtys, conds []string) []csvRow {
+// prices, when present, is the size of ids too.
+func mergeCSVRows(ids, qtys, conds []string, prices []float64) []csvRow {
 	var rows []csvRow
 	index := map[csvRow]int{}
 	for i, id := range ids {
@@ -267,6 +271,9 @@ func mergeCSVRows(ids, qtys, conds []string) []csvRow {
 			rows = append(rows, key)
 		}
 		rows[j].qty += quantity
+		if prices != nil && rows[j].price == 0 {
+			rows[j].price = prices[i]
+		}
 	}
 	return rows
 }
@@ -282,8 +289,10 @@ func mergeCSVRows(ids, qtys, conds []string) []csvRow {
 // TCGplayer's own catalog, so they always pass TCGplayer's name-match check
 // (our names don't always match theirs exactly, see commit 1e39d5d). Cards
 // missing from the catalog keep these columns blank - TCGplayer skips the
-// check when they're empty.
-func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds []string) error {
+// check when they're empty. A loaded price goes in My Store Price and TCG
+// Marketplace Price; where none was loaded, TCG Marketplace Price is
+// TCGplayer's market price and My Store Price stays blank.
+func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds []string, loaded []float64) error {
 	market, err := p.sellerInventory("TCGPlayer")
 	if err != nil {
 		return err
@@ -300,7 +309,7 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 		return err
 	}
 
-	for _, row := range mergeCSVRows(ids, qtys, conds) {
+	for _, row := range mergeCSVRows(ids, qtys, conds, loaded) {
 		id, cond := row.id, row.cond
 		var prices [3]float64
 
@@ -349,11 +358,16 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 		record = append(record, "")
 		record = append(record, fmt.Sprintf("%0.2f", prices[2]))
 		record = append(record, "")
+		var storePrice string
+		if row.price > 0 {
+			storePrice = fmt.Sprintf("%0.2f", row.price)
+		}
+		marketplacePrice := cmp.Or(row.price, prices[0])
 		record = append(record, fmt.Sprint(row.qty))
-		// My Store Price and its reserve are a Pro seller's own site: left
-		// blank, the import leaves them as they are
-		record = append(record, "")
-		record = append(record, fmt.Sprintf("%0.2f", prices[0]))
+		// My Store Price and its reserve are a Pro seller's own site: only
+		// a loaded price goes there, and a blank leaves it as it is
+		record = append(record, storePrice)
+		record = append(record, fmt.Sprintf("%0.2f", marketplacePrice))
 		record = append(record, "")
 		record = append(record, "")
 
@@ -441,7 +455,7 @@ func UUID2MKMCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 		return err
 	}
 
-	for _, row := range mergeCSVRows(ids, qtys, conds) {
+	for _, row := range mergeCSVRows(ids, qtys, conds, nil) {
 		id, cond := row.id, row.cond
 
 		co, err := b.GetUUID(id)

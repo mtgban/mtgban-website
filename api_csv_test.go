@@ -10,6 +10,8 @@ import (
 
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
+
+	"github.com/mtgban/mtgban-website/internal/docparse"
 )
 
 // TestSimplePrice2CSVTCGSKU checks that an upload export carries the SKU of
@@ -125,7 +127,7 @@ func TestCSVCondQtyIndexing(t *testing.T) {
 		condCol, qtyCol int
 		labels          map[mtgban.Condition]string
 	}{
-		{UUID2TCGCSV, 7, 13, tcgConditionMap},
+		{tcgDecklistCSV, 7, 13, tcgConditionMap},
 		{UUID2MKMCSV, 6, 1, mkmConditionMap},
 	} {
 		var buf bytes.Buffer
@@ -203,7 +205,7 @@ func TestDecklistCSVBytes(t *testing.T) {
 		export decklistExport
 		want   string
 	}{
-		{"tcgplayer", UUID2TCGCSV, "TCGplayer Id,Product Line,Set Name,Product Name,Title,Number,Rarity,Condition,TCG Market Price,TCG Direct Low,TCG Low Price With Shipping,TCG Low Price,Total Quantity,Add to Quantity,My Store Price,TCG Marketplace Price,My Store Reserve Quantity,Photo URL\n" +
+		{"tcgplayer", tcgDecklistCSV, "TCGplayer Id,Product Line,Set Name,Product Name,Title,Number,Rarity,Condition,TCG Market Price,TCG Direct Low,TCG Low Price With Shipping,TCG Low Price,Total Quantity,Add to Quantity,My Store Price,TCG Marketplace Price,My Store Reserve Quantity,Photo URL\n" +
 			"111,,,,,,,Near Mint,1.50,1.40,,1.10,,4,,1.50,,\n" +
 			"222,,,,,,,Lightly Played Foil,7.00,0.00,,0.00,,2,,7.00,,\n" +
 			"112,,,,,,,Lightly Played,1.25,0.00,,0.00,,1,,1.25,,\n"},
@@ -232,13 +234,78 @@ func TestDecklistCSVBytes(t *testing.T) {
 	}
 }
 
-// decklistExport is the shape of UUID2TCGCSV and UUID2MKMCSV.
+// decklistExport is the shape of tcgDecklistCSV and UUID2MKMCSV.
 type decklistExport func(*matcher.Backend, *prices, *csv.Writer, []string, []string, []string) error
+
+// tcgDecklistCSV is the TCGplayer export as a decklist calls it, with no
+// loaded prices.
+func tcgDecklistCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds []string) error {
+	return UUID2TCGCSV(b, p, w, ids, qtys, conds, nil)
+}
+
+// The TCGplayer export lists a row at the first price loaded for its card
+// and condition, in both price columns, and at the market price where none
+// was, leaving My Store Price blank.
+func TestTCGCSVWritesTheLoadedPrice(t *testing.T) {
+	b, p := decklistCSVFixture(t)
+	var buf bytes.Buffer
+	w := csv.NewWriter(&buf)
+	ids := []string{"FIXTUREA-1", "FIXTUREA-1", "FIXTUREA-1", "FIXTUREA-1"}
+	conds := []string{"NM", "NM", "NM", "SP"}
+	err := UUID2TCGCSV(b, p, w, ids, nil, conds, []float64{0, 2.5, 3, 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := csv.NewReader(&buf).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 3 {
+		t.Fatalf("got %d records, want a header and 2 rows", len(records))
+	}
+	for i, want := range [][2]string{{"2.50", "2.50"}, {"", "1.25"}} {
+		row := records[i+1]
+		if row[14] != want[0] || row[15] != want[1] {
+			t.Errorf("%s: My Store Price %q, TCG Marketplace Price %q, want %q", row[7], row[14], row[15], want)
+		}
+	}
+}
+
+// Uploaded again, the TCGplayer export loads the price it wrote.
+func TestTCGCSVRoundTripsItsPrice(t *testing.T) {
+	b, p := decklistCSVFixture(t)
+	var buf bytes.Buffer
+	ids := []string{"FIXTUREA-1", "FIXTUREA-1", "FIXTUREA-2"}
+	conds := []string{"NM", "SP", "SP"}
+	err := UUID2TCGCSV(b, p, csv.NewWriter(&buf), ids, nil, conds, []float64{2.5, 0, 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := csv.NewReader(&buf).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parser := &docparse.Parser{TCGSkuToUUID: func(sku string) string { return sku }}
+	indexMap, err := parser.ParseHeader(records[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range []float64{2.5, 1.25, 4} {
+		entry, err := parser.ParseRow(indexMap, records[i+1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if entry.OriginalPrice != want {
+			t.Errorf("row %d loads %v, want %v", i+1, entry.OriginalPrice, want)
+		}
+	}
+}
 
 // A write the client never got is an error, down to the last row.
 func TestDecklistCSVReportsAFailedWrite(t *testing.T) {
 	b, p := decklistCSVFixture(t)
-	for name, export := range map[string]decklistExport{"tcgplayer": UUID2TCGCSV, "cardmarket": UUID2MKMCSV} {
+	for name, export := range map[string]decklistExport{"tcgplayer": tcgDecklistCSV, "cardmarket": UUID2MKMCSV} {
 		for _, ids := range [][]string{nil, {"FIXTUREA-1"}, {"FIXTUREA-1", "FIXTUREA-2"}} {
 			err := export(b, p, csv.NewWriter(failingResponse{httptest.NewRecorder()}), ids, nil, nil)
 			if err == nil {
