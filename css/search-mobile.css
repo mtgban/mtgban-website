@@ -664,7 +664,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 
 .m-vendor-right {
     display: grid;
-    grid-template-columns: 6em var(--m-vendor-qty-width, 2em) 1.4em;
+    grid-template-columns: 5em var(--m-vendor-qty-width, 2em) 1.4em;
     align-items: center;
     flex-shrink: 0;
 }
@@ -2465,11 +2465,6 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     .m-vendor-row summary {
         min-height: 38px;
         padding: 0 0.75rem 0 0.5rem;
-    }
-
-    /* Narrower price column to fit landscape half-width; reserve chevron column on every row so prices align */
-    .m-vendor-right {
-        grid-template-columns: 5em var(--m-vendor-qty-width, 2em) 1.4em;
     }
 
     .m-vendor-name {
