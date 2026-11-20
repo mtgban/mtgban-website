@@ -369,6 +369,10 @@ type PageVars struct {
 
 	IsMobile bool
 
+	// MobileView is set on a desktop-only page for a reader in the mobile
+	// view, so the menu's view switch names the view it leads to.
+	MobileView bool
+
 	// GatewayURL is the API gateway's origin, for links to its account and admin pages.
 	GatewayURL string
 
@@ -583,6 +587,9 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		if pageVars.IsMobile {
 			pageVars.Nav = filterNavForMobile(pageVars.Nav)
 		}
+	}
+	if r != nil && activeTab != "" && desktopOnly(activeTab) {
+		pageVars.MobileView = isMobileRequest(r)
 	}
 
 	return pageVars
