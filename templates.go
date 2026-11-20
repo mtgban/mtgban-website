@@ -117,6 +117,24 @@ func tipCells(row string) []string {
 	return cells
 }
 
+// thousands writes n with a comma between each group of three digits.
+func thousands(n int) string {
+	digits := strconv.Itoa(n)
+	sign := ""
+	if n < 0 {
+		sign, digits = "-", digits[1:]
+	}
+	var b strings.Builder
+	b.WriteString(sign)
+	for i, d := range digits {
+		if i > 0 && (len(digits)-i)%3 == 0 {
+			b.WriteByte(',')
+		}
+		b.WriteRune(d)
+	}
+	return b.String()
+}
+
 // hasTipTable tells whether a tooltip holds a table.
 func hasTipTable(tip string) bool {
 	return strings.HasPrefix(tip, "|") || strings.Contains(tip, "\n|")
@@ -263,6 +281,7 @@ var funcMap = template.FuncMap{
 		return string(encoded)
 	},
 	"sourceLink": sourceLink,
+	"thousands":  thousands,
 	"inc": func(i, j int) int {
 		return i + j
 	},

@@ -227,6 +227,18 @@ func TestBuylistCKHelpers(t *testing.T) {
 	}
 }
 
+// TestThousands checks the counts template helper groups digits by three.
+func TestThousands(t *testing.T) {
+	for n, want := range map[int]string{
+		0: "0", 7: "7", 999: "999", 1000: "1,000", 106785: "106,785",
+		1567510: "1,567,510", -1234: "-1,234",
+	} {
+		if got := thousands(n); got != want {
+			t.Errorf("thousands(%d) = %q, want %q", n, got, want)
+		}
+	}
+}
+
 // TestTipHelpers checks a tooltip's ** marks become a data-tip beside a plain
 // title, and bold where a page writes the tooltip out in full.
 func TestTipHelpers(t *testing.T) {
