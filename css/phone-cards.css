@@ -1,0 +1,50 @@
+/* A wide table's rows as cards on phones, for the tables marked .phone-cards.
+   A row reads as its card and actions (.pc-card, .pc-act, .pc-rank), its key
+   figures (.pc-key), then the rest small, each named by its data-label. The
+   header row stays as one line of sort chips. */
+@media (max-width: 560px) {
+    .phone-cards, .phone-cards > thead, .phone-cards > tbody { display: block; }
+    .phone-cards > thead > tr {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding: 8px;
+        background: var(--surface-2);
+        border-bottom: 2px solid var(--border-subtle);
+    }
+    .phone-cards > thead > tr > th {
+        padding: 4px 8px;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        background: var(--surface-1);
+        flex: none;
+    }
+    .phone-cards > thead > tr > th:not(:has(a, button, input)):not([data-sort-method]) { display: none; }
+    .phone-cards > tbody > tr { display: flex; flex-wrap: wrap; align-items: baseline; padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); }
+    .phone-cards > tbody > tr::before, .phone-cards > tbody > tr::after { content: ""; flex-basis: 100%; order: 1; }
+    .phone-cards > tbody > tr::after { order: 3; }
+    .phone-cards > tbody > tr > td {
+        display: block;
+        order: 4;
+        padding: 0;
+        margin: 2px 12px 0 0;
+        border: 0;
+        text-align: left;
+        font-size: var(--text-sm);
+        white-space: nowrap;
+    }
+    .phone-cards > tbody > tr > td:empty { display: none; }
+    .phone-cards > tbody > tr > td[colspan] { flex: 1 1 100%; margin: 0; }
+    .phone-cards > tbody > tr > td[data-label]::before {
+        content: attr(data-label) " ";
+        font-size: var(--text-xs);
+        font-weight: 500;
+        color: var(--text-dim);
+    }
+    .phone-cards > tbody > tr > td.pc-card { order: 0; flex: 1 1 0; min-width: 40%; align-self: center; white-space: normal; margin: 0; }
+    .phone-cards > tbody > tr > td.pc-rank, .phone-cards > tbody > tr > td.pc-act { order: 0; align-self: center; margin: 0 8px 0 0; }
+    .phone-cards > tbody > tr > td.pc-act { margin: 0 0 0 8px; }
+    .phone-cards > tbody > tr > td.pc-key { order: 2; margin: 4px 8px 0 0; font-size: var(--text-base); font-weight: 600; }
+}
