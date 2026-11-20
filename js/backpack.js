@@ -444,6 +444,55 @@
         return copies;
     }
 
+    // shift moves counts[key] copies of each entry to backpack p as one undo
+    // step, joining the card in that grade there or starting it where there
+    // is room, and says how many copies went: none when one entry does not fit.
+    function shift(counts, p) {
+        var list = read();
+        var packRoom = MAX - inPack(p).length, allRoom = MAX * TABS - live().length;
+        var plan = [], blocked = "";
+        list.forEach(function (e) {
+            var k = key(e);
+            if (e.del || e.pack === p || !(counts[k] > 0)) return;
+            var n = Math.min(e.qty, counts[k]);
+            var to = key({ id: e.id, cond: e.cond, pack: p });
+            var j = find(list, to);
+            var joining = j >= 0 && !list[j].del;
+            if (joining && list[j].qty + n > MAX_QTY) { blocked = MAX_QTY + " copies is the most for one product"; return; }
+            if (!joining) {
+                // A split leaves the card in both, one more product in all
+                if (packRoom < 1) { blocked = packName(p) + " is full (" + MAX + " products)"; return; }
+                if (n < e.qty && allRoom < 1) { blocked = "Backpacks are full (" + MAX * TABS + " products in all)"; return; }
+                packRoom--;
+                if (n < e.qty) allRoom--;
+            }
+            plan.push({ e: e, k: k, to: to, n: n });
+        });
+        if (blocked) { toast(blocked); return 0; }
+        if (!plan.length) return 0;
+        remember(list, plan.reduce(function (ks, x) { return ks.concat([x.k, x.to]); }, []));
+        var t = now(), copies = 0;
+        plan.forEach(function (x) {
+            var j = find(list, x.to);
+            if (j >= 0 && !list[j].del) {
+                list[j].qty += x.n;
+                list[j].m = t;
+            } else {
+                var moved = JSON.parse(JSON.stringify(x.e));
+                moved.pack = p;
+                moved.qty = x.n;
+                moved.m = t;
+                if (j >= 0) list.splice(j, 1);
+                list.splice(find(list, x.k), 0, moved);
+            }
+            if (x.n === x.e.qty) x.e.del = t; else x.e.qty -= x.n;
+            x.e.m = t;
+            copies += x.n;
+        });
+        save(list);
+        return copies;
+    }
+
     // clear removes the entries keys names, or every entry in every backpack
     // without it.
     function clear(keys) {
@@ -840,7 +889,8 @@
 
     // markSections shows an add and take pair's take button while one of
     // its rows is a card in the backpack, and its add button while it has a
-    // row.
+    // row; an optimizer store's move button as its take button, while there
+    // is another backpack.
     function markSections() {
         var by = {};
         live().forEach(function (e) { by[key(e)] = true; });
@@ -853,6 +903,12 @@
         document.querySelectorAll(".pack-add-btn").forEach(function (b) {
             var rows = rowsFor(b);
             b.hidden = !rows || !rows.length;
+        });
+        // The move button wants another backpack too
+        var several = tabs().length > 1;
+        document.querySelectorAll(".pack-move-btn").forEach(function (b) {
+            var rows = several && !empty ? rowsFor(b) : null;
+            b.hidden = !rows || !Object.keys(picked(rows, active())).some(function (k) { return by[k]; });
         });
     }
 
@@ -996,6 +1052,32 @@
         // The dialog hands focus back to the button before it calls doTake
         if (typeof window.confirmDialog === "function") window.confirmDialog(ask, doTake, { confirmLabel: "Remove" });
         else if (window.confirm(ask)) doTake();
+    };
+
+    // fillPackMoveMenu lists, in an optimizer store's move menu, the
+    // backpacks other than the active one.
+    window.fillPackMoveMenu = function (menu) {
+        menu.textContent = "";
+        menu.appendChild(text("div", "opt-move-title", "Move to backpack"));
+        tabs().forEach(function (t) {
+            if (t.pack === active()) return;
+            var b = text("button", null, t.name);
+            b.type = "button";
+            b.setAttribute("data-pack", String(t.pack));
+            menu.appendChild(b);
+        });
+    };
+
+    // moveRowsToPack moves the copies the button's store section's ticked
+    // rows list from the active backpack to backpack p, as one undo step.
+    window.moveRowsToPack = function (btn, p) {
+        var rows = rowsFor(btn);
+        if (!rows) return;
+        var copies = shift(picked(rows, active()), p);
+        if (!copies) return;
+        if (window.BAN && window.BAN.track) window.BAN.track("ui.optimizer", "pack_move");
+        render();
+        toast("Moved " + copies + (copies === 1 ? " copy" : " copies") + " to " + packName(p));
     };
 
     // ---- sorting the panel ----
