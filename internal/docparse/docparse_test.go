@@ -4,6 +4,7 @@ import (
 	"errors"
 	"maps"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -96,6 +97,34 @@ func TestParseHeaderMtgbanExport(t *testing.T) {
 	for field, idx := range want {
 		if got, found := indexMap[field]; !found || got != idx {
 			t.Errorf("%s = %d (found %v), want %d", field, got, found, idx)
+		}
+	}
+}
+
+// TCGplayer's export lists its market prices first. The seller's price is
+// My Store Price, or Marketplace Price where that is blank or missing.
+func TestParseTCGplayerExportPrice(t *testing.T) {
+	p := &Parser{TCGSkuToUUID: func(sku string) string { return "uuid-" + sku }}
+	current := "TCGplayer Id,Product Line,Set Name,Product Name,Title,Number,Rarity,Condition,TCG Market Price,TCG Direct Low,TCG Low Price With Shipping,TCG Low Price,Total Quantity,Add to Quantity,My Store Price,TCG Marketplace Price,My Store Reserve Quantity,Photo URL"
+	old := "TCGplayer Id,Product Line,Set Name,Product Name,Title,Number,Rarity,Condition,TCG Market Price,TCG Direct Low,TCG Low Price With Shipping,TCG Low Price,Total Quantity,Add to Quantity,TCG Marketplace Price,Photo URL"
+	for _, tc := range []struct {
+		name, header, row string
+		want              float64
+	}{
+		{"My Store Price", current, "348918,Magic,Revised Edition,Underground Sea,,,R,Heavily Played,732.78,,721.99,720,,1,865,610,12,", 865},
+		{"blank My Store Price", current, "3035713,Magic,Revised Edition,Bayou,,,R,Moderately Played,,,450,450,,2,,450,0,", 450},
+		{"no My Store Price column", old, "348918,Magic,Revised Edition,Underground Sea,,,R,Heavily Played,732.78,,721.99,720,,1,610,", 610},
+	} {
+		indexMap, err := p.ParseHeader(strings.Split(tc.header, ","))
+		if err != nil {
+			t.Fatalf("%s: ParseHeader: %v", tc.name, err)
+		}
+		entry, err := p.ParseRow(indexMap, strings.Split(tc.row, ","))
+		if err != nil {
+			t.Fatalf("%s: ParseRow: %v", tc.name, err)
+		}
+		if entry.OriginalPrice != tc.want {
+			t.Errorf("%s: price %v, want %v", tc.name, entry.OriginalPrice, tc.want)
 		}
 	}
 }

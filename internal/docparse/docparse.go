@@ -260,6 +260,9 @@ func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 		return indexMap, ErrDecklist
 	}
 
+	// TCGplayer's own export lists its market prices before the seller's
+	storePrice, marketplacePrice := -1, -1
+
 	// Parse the header to understand where these fields are
 	for i, field := range first {
 		field = strings.ToLower(strings.TrimSpace(field))
@@ -319,6 +322,10 @@ func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 			if !found {
 				indexMap["conditions"] = i
 			}
+		case field == "my store price":
+			storePrice = i
+		case field == "tcg marketplace price":
+			marketplacePrice = i
 		case strings.Contains(field, "price") || strings.Contains(field, "low"):
 			_, found := indexMap["price"]
 			if !found {
@@ -361,6 +368,18 @@ func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 		indexMap["cardName"] = 0
 		p.logf("No Header map, decklist mode (comma in card name)")
 		return indexMap, ErrDecklist
+	}
+
+	// The seller's price is My Store Price, or Marketplace Price where that
+	// is blank or missing
+	switch {
+	case storePrice >= 0:
+		indexMap["price"] = storePrice
+		if marketplacePrice >= 0 {
+			indexMap["price_backup"] = marketplacePrice
+		}
+	case marketplacePrice >= 0:
+		indexMap["price"] = marketplacePrice
 	}
 
 	// If a clean quantity header was not found see if there is a backup option
@@ -578,6 +597,10 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 
 	idx, found = indexMap["price"]
 	if found && idx < len(record) {
+		res.OriginalPrice, _ = matcher.ParsePrice(record[idx])
+	}
+	idx, found = indexMap["price_backup"]
+	if found && idx < len(record) && res.OriginalPrice == 0 {
 		res.OriginalPrice, _ = matcher.ParsePrice(record[idx])
 	}
 
