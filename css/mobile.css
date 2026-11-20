@@ -644,3 +644,11 @@ body.has-scope .m-scope-row {
     letter-spacing: 0.04em;
     cursor: pointer;
 }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .m-nav-search-input,
+    .m-scope-box {
+        font-size: 16px;
+    }
+}

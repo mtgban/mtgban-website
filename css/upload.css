@@ -1952,3 +1952,12 @@ tr.opt-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
 /* A folded store keeps its header and hides the column labels and cards */
 .opt-store.folded tbody,
 .opt-store.folded thead tr + tr { display: none; }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .upload-preset-name,
+    .ures-edit-input,
+    .store-prompt-field input {
+        font-size: 16px;
+    }
+}

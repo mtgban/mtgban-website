@@ -515,3 +515,11 @@ body.mobile .alerts-sort .alert-input { flex: 1; }
 
 /* While editing, the side cannot change: the pills stay visible but inert. */
 .alert-modal .settings-pills.alert-locked { pointer-events: none; opacity: 0.6; }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .alert-input,
+    .alerts-sort .alert-input {
+        font-size: 16px;
+    }
+}

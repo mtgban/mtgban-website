@@ -433,3 +433,10 @@
     border: 1px solid var(--dodgerblue);
     border-radius: 4px;
 }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .m-news-filter-range input {
+        font-size: 16px;
+    }
+}

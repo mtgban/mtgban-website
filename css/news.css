@@ -526,3 +526,11 @@
 .edition-combobox-clear:hover { color: var(--normal); }
 .edition-combobox .autocomplete-items { display: none; }
 .edition-combobox.is-open .autocomplete-items { display: block; }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .news-filter-bar input[type="text"],
+    .news-filter-bar input.edition-combobox-display {
+        font-size: 16px;
+    }
+}

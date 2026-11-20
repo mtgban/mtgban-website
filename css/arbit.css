@@ -784,3 +784,12 @@ tr.arb-removed td:last-child { opacity: 1; }
 tr.arb-removed .card-name-line a { text-decoration: line-through; }
 tr.arb-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
 .arb-row-check { cursor: pointer; }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .arb-edition-filter,
+    .arb-filter-range input,
+    .arb-preset-name {
+        font-size: 16px;
+    }
+}

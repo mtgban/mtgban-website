@@ -354,3 +354,10 @@ tr.child-row td:first-child {
     .sets-name-cell a { font-size: var(--text-base); }
     .sets-name-cell .set-code { display: none; }
 }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .sets-filter-input {
+        font-size: 16px;
+    }
+}

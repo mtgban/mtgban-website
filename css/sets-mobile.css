@@ -348,3 +348,10 @@
 .m-set-card.filtered-out {
     display: none;
 }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .m-sets-filter {
+        font-size: 16px;
+    }
+}

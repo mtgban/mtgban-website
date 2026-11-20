@@ -573,3 +573,10 @@
 }
 .guide-copy-tab:hover { background: color-mix(in srgb, #FFBF00 12%, transparent); }
 .guide-copy-tab svg { width: 14px; height: 14px; }
+
+/* iOS zooms the page into a focused field under 16px. */
+@media (pointer: coarse) {
+    .guide-filter-input {
+        font-size: 16px;
+    }
+}
