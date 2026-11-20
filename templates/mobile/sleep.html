@@ -74,19 +74,19 @@
 
         <div class="m-sleep-gap-presets">
             <a class="m-sleep-gap-preset" href="?page=gap&ref=TCGLow&target=MKMLow" data-track="ui.sleepers.gap" data-track-value="preset">
-                <span>TCGLow</span><span class="m-sleep-vs">vs</span><span>MKMLow</span>
+                <span>{{or (index $.StoreNames "TCGLow") "TCGLow"}}</span><span class="m-sleep-vs">vs</span><span>{{or (index $.StoreNames "MKMLow") "MKMLow"}}</span>
             </a>
             <a class="m-sleep-gap-preset" href="?page=gap&ref=TCGLow&target=MKMTrend" data-track="ui.sleepers.gap" data-track-value="preset">
-                <span>TCGLow</span><span class="m-sleep-vs">vs</span><span>MKMTrend</span>
+                <span>{{or (index $.StoreNames "TCGLow") "TCGLow"}}</span><span class="m-sleep-vs">vs</span><span>{{or (index $.StoreNames "MKMTrend") "MKMTrend"}}</span>
             </a>
             <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=CK" data-track="ui.sleepers.gap" data-track-value="preset">
-                <span>MKMTrend</span><span class="m-sleep-vs">vs</span><span>Card Kingdom</span>
+                <span>{{or (index $.StoreNames "MKMTrend") "MKMTrend"}}</span><span class="m-sleep-vs">vs</span><span>{{or (index $.StoreNames "CK") "CK"}}</span>
             </a>
             <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=SCG" data-track="ui.sleepers.gap" data-track-value="preset">
-                <span>MKMTrend</span><span class="m-sleep-vs">vs</span><span>SCG</span>
+                <span>{{or (index $.StoreNames "MKMTrend") "MKMTrend"}}</span><span class="m-sleep-vs">vs</span><span>{{or (index $.StoreNames "SCG") "SCG"}}</span>
             </a>
             <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=MP" data-track="ui.sleepers.gap" data-track-value="preset">
-                <span>MKMTrend</span><span class="m-sleep-vs">vs</span><span>Manapool</span>
+                <span>{{or (index $.StoreNames "MKMTrend") "MKMTrend"}}</span><span class="m-sleep-vs">vs</span><span>{{or (index $.StoreNames "MP") "MP"}}</span>
             </a>
         </div>
 

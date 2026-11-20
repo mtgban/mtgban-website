@@ -86,33 +86,33 @@
 
             <div class="sleepers-comp-presets">
                 <a class="sleepers-comp-preset" href="?page=gap&ref=TCGLow&target=MKMLow" data-track="ui.sleepers.gap" data-track-value="preset">
-                    <span class="ref-name">TCGLow</span>
+                    <span class="ref-name">{{or (index $.StoreNames "TCGLow") "TCGLow"}}</span>
                     <span class="vs">vs</span>
-                    <span class="target-name">MKMLow</span>
+                    <span class="target-name">{{or (index $.StoreNames "MKMLow") "MKMLow"}}</span>
                     <span class="preset-arrow">&rarr;</span>
                 </a>
                 <a class="sleepers-comp-preset" href="?page=gap&ref=TCGLow&target=MKMTrend" data-track="ui.sleepers.gap" data-track-value="preset">
-                    <span class="ref-name">TCGLow</span>
+                    <span class="ref-name">{{or (index $.StoreNames "TCGLow") "TCGLow"}}</span>
                     <span class="vs">vs</span>
-                    <span class="target-name">MKMTrend</span>
+                    <span class="target-name">{{or (index $.StoreNames "MKMTrend") "MKMTrend"}}</span>
                     <span class="preset-arrow">&rarr;</span>
                 </a>
                 <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=CK" data-track="ui.sleepers.gap" data-track-value="preset">
-                    <span class="ref-name">MKMTrend</span>
+                    <span class="ref-name">{{or (index $.StoreNames "MKMTrend") "MKMTrend"}}</span>
                     <span class="vs">vs</span>
-                    <span class="target-name">Card Kingdom</span>
+                    <span class="target-name">{{or (index $.StoreNames "CK") "CK"}}</span>
                     <span class="preset-arrow">&rarr;</span>
                 </a>
                 <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=SCG" data-track="ui.sleepers.gap" data-track-value="preset">
-                    <span class="ref-name">MKMTrend</span>
+                    <span class="ref-name">{{or (index $.StoreNames "MKMTrend") "MKMTrend"}}</span>
                     <span class="vs">vs</span>
-                    <span class="target-name">SCG</span>
+                    <span class="target-name">{{or (index $.StoreNames "SCG") "SCG"}}</span>
                     <span class="preset-arrow">&rarr;</span>
                 </a>
                 <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=MP" data-track="ui.sleepers.gap" data-track-value="preset">
-                    <span class="ref-name">MKMTrend</span>
+                    <span class="ref-name">{{or (index $.StoreNames "MKMTrend") "MKMTrend"}}</span>
                     <span class="vs">vs</span>
-                    <span class="target-name">Manapool</span>
+                    <span class="target-name">{{or (index $.StoreNames "MP") "MP"}}</span>
                     <span class="preset-arrow">&rarr;</span>
                 </a>
             </div>
