@@ -137,6 +137,12 @@
     border-radius: 4px;
     color: var(--normal, #000);
 }
+/* A touch screen has no keyboard to press them on. */
+@media (hover: none) and (pointer: coarse) {
+    .guide-hero-shortcut {
+        display: none;
+    }
+}
 
 /* ── Tab strip ── */
 .guide-tabs {
