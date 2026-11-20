@@ -9,9 +9,8 @@ import (
 	"testing"
 )
 
-// greenCells renders the results table for one card and answers which
-// stores' prices came out green.
-func greenCells(t *testing.T, buylist bool, loaded float64, prices map[string]float64) []string {
+// resultsTable renders the results table for one card priced at two stores.
+func resultsTable(t *testing.T, buylist bool, loaded float64, prices map[string]float64) string {
 	t.Helper()
 	tmpl, err := template.New("upload.html").Funcs(funcMap).ParseFiles("templates/upload.html")
 	if err != nil {
@@ -36,8 +35,14 @@ func greenCells(t *testing.T, buylist bool, loaded float64, prices map[string]fl
 	if err != nil {
 		t.Fatalf("rendering the results table: %v", err)
 	}
+	return b.String()
+}
+
+// greenCells answers which stores' prices came out green.
+func greenCells(t *testing.T, buylist bool, loaded float64, prices map[string]float64) []string {
+	t.Helper()
 	var green []string
-	for _, m := range regexp.MustCompile(`class="ures-price best" data-sort="[^"]*">\s*<a href="[^"]*/(\w+)/card-1"`).FindAllStringSubmatch(b.String(), -1) {
+	for _, m := range regexp.MustCompile(`class="ures-price best(?: pc-key)?" data-label="[^"]*" data-sort="[^"]*">\s*<a href="[^"]*/(\w+)/card-1"`).FindAllStringSubmatch(resultsTable(t, buylist, loaded, prices), -1) {
 		green = append(green, m[1])
 	}
 	return green
@@ -81,8 +86,8 @@ func TestUploadYourPriceSortsUnpricedLast(t *testing.T) {
 			loaded float64
 			want   string
 		}{
-			{0, `<td class="ures-price" data-sort="">`},
-			{7.5, `<td class="ures-price" data-sort="7.50">`},
+			{0, `<td class="ures-price pc-key" data-label="Your Price" data-sort="">`},
+			{7.5, `<td class="ures-price pc-key" data-label="Your Price" data-sort="7.50">`},
 		} {
 			var b bytes.Buffer
 			err = tmpl.ExecuteTemplate(&b, table, map[string]any{
@@ -98,6 +103,31 @@ func TestUploadYourPriceSortsUnpricedLast(t *testing.T) {
 			if !strings.Contains(b.String(), tc.want) {
 				t.Errorf("%s, loaded %v: no %s", table, tc.loaded, tc.want)
 			}
+		}
+	}
+}
+
+// A phone's card shows one store beside your price: the most a buylist
+// pays, or the least a store asks, and never a store with no price.
+func TestUploadPhoneCardBestStore(t *testing.T) {
+	key := regexp.MustCompile(`class="ures-price[^"]* pc-key" data-label="[^"]*" data-sort="[^"]*">\s*<a href="[^"]*/(\w+)/card-1"`)
+	for _, tc := range []struct {
+		name    string
+		buylist bool
+		prices  map[string]float64
+		want    []string
+	}{
+		{"buylist", true, map[string]float64{"LOW": 8, "HIGH": 12}, []string{"HIGH"}},
+		{"retail", false, map[string]float64{"LOW": 8, "HIGH": 12}, []string{"LOW"}},
+		{"retail, one store unpriced", false, map[string]float64{"HIGH": 12}, []string{"HIGH"}},
+		{"no store priced", true, map[string]float64{}, nil},
+	} {
+		var got []string
+		for _, m := range key.FindAllStringSubmatch(resultsTable(t, tc.buylist, 10, tc.prices), -1) {
+			got = append(got, m[1])
+		}
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("%s: card shows %v, want %v", tc.name, got, tc.want)
 		}
 	}
 }

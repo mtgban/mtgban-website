@@ -1,5 +1,6 @@
 {{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/upload.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/phone-cards.css?hash={{.Hash}}">
     {{if .CanAlerts}}<link rel="stylesheet" type="text/css" href="/css/settings-modal.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/alerts.css?hash={{.Hash}}">{{end}}
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
@@ -517,7 +518,7 @@
 {{if eq .Noun "product"}}{{$kind = "sealed"}}{{$picked = .Root.EnabledSealedSellers}}{{end}}
 {{if and .Root.IsBuylist (eq $kind "singles")}}{{$picked = .Root.EnabledVendors}}{{end}}
 {{if and .Root.IsBuylist (eq $kind "sealed")}}{{$picked = .Root.EnabledSealedVendors}}{{end}}
-<table class="ures-table">
+<table class="ures-table phone-cards">
     <thead>
         <tr>
             <th style="width:380px;" data-sort-chain>Card <button type="button" class="sort-ties-btn" data-sort-area="results" title="Sort by card properties" aria-label="Sort by card properties">{{template "upload-icon" "arrow-down-wide-narrow"}}</button></th>
@@ -537,6 +538,10 @@
             {{$card := (index $root.Metadata .CardID)}}
             {{$scraperEntries := (index $root.ResultPrices (print .CardID .OriginalCondition))}}
             {{$loadedPrice := .OriginalPrice}}
+            {{/* The store a phone's card shows beside your price: the most a
+                 buylist pays, or the least a store asks. */}}
+            {{$top := ""}}{{$topPrice := 0.0}}
+            {{range $storeKeys}}{{$p := index $scraperEntries .}}{{if and (ne $p 0.0) (or (eq $topPrice 0.0) (and $root.IsBuylist (gt $p $topPrice)) (and (not $root.IsBuylist) (lt $p $topPrice)))}}{{$top = .}}{{$topPrice = $p}}{{end}}{{end}}
             {{/* The product a card came out of, and how many of it were
                  opened, travel with the row: they are what lets the sections
                  be rebuilt when the page posts itself back. */}}
@@ -546,7 +551,7 @@
                 data-k-cond="{{cond_rank .OriginalCondition}}"{{if .SortLead}} data-k-lead="{{.SortLead}}"{{end}}
                 data-card-name="{{$card.Name}}" data-edition="{{$card.Edition}}" data-set-code="{{$card.SetCode}}" data-number="{{$card.Number}}" data-image-url="{{$card.ImageURL}}" data-finish-tag="{{$card.FinishTag}}" data-finish-class="{{$card.FinishClass}}" data-has-warning="{{$card.HasContentWarning}}" data-grade="{{.OriginalCondition}}"
                 {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
-                <td data-sort="{{$card.Name}} {{$card.Edition}} {{$card.Number}}">
+                <td class="pc-card" data-sort="{{$card.Name}} {{$card.Edition}} {{$card.Number}}">
                     <div class="ures-card-cell">
                         <div class="foil-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}" data-etched="{{$card.Etched}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed')"{{end}}>
                             <img class="card-art" src="{{$card.ImageURL}}" loading="lazy">
@@ -568,14 +573,14 @@
                         {{if $canRemove}}<button type="button" class="ures-remove-btn" onclick="window.toggleRemoveRow && toggleRemoveRow(this)" title="Remove from results" aria-label="Remove from results">×</button>{{end}}
                     </div>
                 </td>
-                <td class="ures-price" data-sort="{{if ne .OriginalPrice 0.0}}{{printf "%.2f" .OriginalPrice}}{{end}}">{{if $canRemove}}<button type="button" class="ures-edit-btn" data-edit="price" title="Change your price">$ {{printf "%.2f" .OriginalPrice}}</button>{{else}}$ {{printf "%.2f" .OriginalPrice}}{{end}}{{template "offer-link" dict "Notes" .Notes}}</td>
+                <td class="ures-price pc-key" data-label="Your Price" data-sort="{{if ne .OriginalPrice 0.0}}{{printf "%.2f" .OriginalPrice}}{{end}}">{{if $canRemove}}<button type="button" class="ures-edit-btn" data-edit="price" title="Change your price">$ {{printf "%.2f" .OriginalPrice}}</button>{{else}}$ {{printf "%.2f" .OriginalPrice}}{{end}}{{template "offer-link" dict "Notes" .Notes}}</td>
                 {{/* upload-edit.js opens a menu from each button; a product's grade is not the reader's to set */}}
-                <td style="text-align:center" data-sort="{{cond_rank .OriginalCondition}}">{{if and $canRemove (not $card.Sealed)}}<button type="button" class="ures-edit-btn cond-badge{{if .IgnoredCondition}} ignored{{end}}" data-edit="cond" title="Change the condition"{{if .IgnoredCondition}} aria-description="Your settings ignore conditions"{{end}}>{{or .OriginalCondition .IgnoredCondition}}</button>{{else}}<span class="cond-badge">{{.OriginalCondition}}</span>{{end}}</td>
-                <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{if $canRemove}}<button type="button" class="ures-edit-btn ures-qty-btn" data-edit="qty" title="Change the copies">{{.Quantity}}</button>{{else}}{{.Quantity}}{{end}}</td>
+                <td style="text-align:center" data-label="Cond" data-sort="{{cond_rank .OriginalCondition}}">{{if and $canRemove (not $card.Sealed)}}<button type="button" class="ures-edit-btn cond-badge{{if .IgnoredCondition}} ignored{{end}}" data-edit="cond" title="Change the condition"{{if .IgnoredCondition}} aria-description="Your settings ignore conditions"{{end}}>{{or .OriginalCondition .IgnoredCondition}}</button>{{else}}<span class="cond-badge">{{.OriginalCondition}}</span>{{end}}</td>
+                <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)" data-label="Qty">{{if $canRemove}}<button type="button" class="ures-edit-btn ures-qty-btn" data-edit="qty" title="Change the copies">{{.Quantity}}</button>{{else}}{{.Quantity}}{{end}}</td>
                 {{range $storeKeys}}
                     {{$price := (index $scraperEntries .)}}
                     {{/* The legend's green: a buylist offer above the price the list came with. */}}
-                    <td class="ures-price {{if and $root.IsBuylist (ne $loadedPrice 0.0) (gt $price $loadedPrice)}}best{{end}}" data-sort="{{if ne $price 0.0}}{{printf "%.2f" $price}}{{end}}">
+                    <td class="ures-price {{if and $root.IsBuylist (ne $loadedPrice 0.0) (gt $price $loadedPrice)}}best{{end}}{{if eq . $top}} pc-key{{end}}" data-label="{{index $root.StoreNames .}}" data-sort="{{if ne $price 0.0}}{{printf "%.2f" $price}}{{end}}">
                         {{if ne $price 0.0}}
                             <a href="https://mtgban.com/go/{{if $root.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}" target="_blank">$ {{printf "%.2f" $price}}</a>
                         {{else}}
@@ -602,12 +607,12 @@
             </tr>
         {{end}}
         <tr class="ures-totals-row" data-sort-method="none">
-            <td><span class="ures-totals-label">Totals ({{.Quantity}} {{.Noun}}{{if ne .Quantity 1}}s{{end}})</span></td>
+            <td class="pc-card"><span class="ures-totals-label">Totals ({{.Quantity}} {{.Noun}}{{if ne .Quantity 1}}s{{end}})</span></td>
             <td></td>
             <td></td>
-            <td style="text-align:center;font-family:var(--font-mono);font-weight:700">{{.Quantity}}</td>
+            <td style="text-align:center;font-family:var(--font-mono);font-weight:700" data-label="Qty">{{.Quantity}}</td>
             {{range $storeKeys}}
-                <td class="ures-price" style="font-weight:700">
+                <td class="ures-price" style="font-weight:700" data-label="{{index $root.StoreNames .}}">
                     $ {{printf "%.2f" (index $totals .)}}
                     {{$missing := (index $missingCounts .)}}
                     {{if ne $missing 0}}
@@ -723,10 +728,10 @@
 {{end}}
 
 {{define "ures-notfound-table"}}
-<table class="ures-table">
+<table class="ures-table phone-cards">
     <thead>
         <tr>
-            <th style="width:380px;">Card</th>
+            <th style="width:380px;" data-sort-method="text">Card</th>
             <th class="r" data-sort-method="number" data-sort-descending>Your Price</th>
             <th class="c" data-sort-method="number">Cond</th>
             <th class="c" data-sort-method="number" data-sort-descending>Qty</th>
@@ -735,7 +740,7 @@
     <tbody>
         {{range .Entries}}
         <tr class="ures-error-row" data-hash="" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}" data-notes="{{.Notes}}">
-            <td data-sort="{{.Card.Name}}">
+            <td class="pc-card" data-sort="{{.Card.Name}}">
                 <div class="ures-card-cell">
                     <img src="{{card_back}}" loading="lazy">
                     <div class="ures-card-info">
@@ -744,9 +749,9 @@
                     </div>
                 </div>
             </td>
-            <td class="ures-price" data-sort="{{if ne .OriginalPrice 0.0}}{{printf "%.2f" .OriginalPrice}}{{end}}">$ {{printf "%.2f" .OriginalPrice}}{{template "offer-link" dict "Notes" .Notes}}</td>
-            <td style="text-align:center" data-sort="{{cond_rank .OriginalCondition}}"><span class="cond-badge">{{.OriginalCondition}}</span></td>
-            <td style="text-align:center">{{.Quantity}}</td>
+            <td class="ures-price pc-key" data-label="Your Price" data-sort="{{if ne .OriginalPrice 0.0}}{{printf "%.2f" .OriginalPrice}}{{end}}">$ {{printf "%.2f" .OriginalPrice}}{{template "offer-link" dict "Notes" .Notes}}</td>
+            <td style="text-align:center" data-label="Cond" data-sort="{{cond_rank .OriginalCondition}}"><span class="cond-badge">{{.OriginalCondition}}</span></td>
+            <td style="text-align:center" data-label="Qty">{{.Quantity}}</td>
         </tr>
         {{end}}
     </tbody>
