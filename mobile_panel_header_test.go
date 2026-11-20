@@ -59,18 +59,18 @@ func sealedPageVars(layout string, cardIDs ...string) PageVars {
 	return vars
 }
 
-// Expanded, the tab bar is not drawn, so the panels carry the names the
-// desktop column headers use - and the simulated values stop running into the
-// offers, because the offers now say where they begin.
+// Expanded, a sealed product's simulated values would run into its offers,
+// so the offers say where they begin; the buyers, with no index rows before
+// them, need nothing past the panel's own label.
 func TestMobileExpandedPanelsAreNamed(t *testing.T) {
 	out := renderMobileSearch(t, sealedPageVars("", "sealed-1"))
 
 	if strings.Contains(out, `class="m-tabs"`) {
 		t.Fatal("the tab bar is drawn on an expanded card, so the headers are redundant")
 	}
-	for _, name := range []string{"Sellers", "Buyers"} {
-		if got := strings.Count(out, `<div class="m-panel-header">`+name+`</div>`); got != 1 {
-			t.Errorf("got %d %q headers, want exactly 1", got, name)
+	for name, want := range map[string]int{"Sellers": 1, "Buyers": 0} {
+		if got := strings.Count(out, `<div class="m-panel-header">`+name+`</div>`); got != want {
+			t.Errorf("got %d %q headers, want %d", got, name, want)
 		}
 	}
 
@@ -89,6 +89,20 @@ func TestMobileExpandedPanelsAreNamed(t *testing.T) {
 		t.Errorf("the Sellers header should fall after the simulated rows and before "+
 			"the offers: reference=%d ev=%d header=%d offer=%d",
 			reference, ev, header, offer)
+	}
+}
+
+// A single's condition bands already mark where its offers begin, and the
+// panel's label names them, so it gets no header.
+func TestMobileSingleHasNoPanelHeader(t *testing.T) {
+	vars := sealedPageVars("", "single-1")
+	card := vars.Metadata["single-1"]
+	card.Sealed = false
+	vars.Metadata["single-1"] = card
+
+	out := renderMobileSearch(t, vars)
+	if strings.Contains(out, "m-panel-header") {
+		t.Error("a single got a panel header repeating its panel's label")
 	}
 }
 

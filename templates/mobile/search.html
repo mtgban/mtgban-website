@@ -386,16 +386,18 @@
             <div class="m-tab-panel{{if or $expanded (not $buyersTab)}} active{{end}}" id="sellers-{{$cardId}}">
                 {{/* The index rows come first and are references: market prices,
                      and on a sealed product the simulated expected values. What
-                     follows them is offers. Expanded there is no tab bar naming
-                     the panels, so name the offers where they begin, with the
-                     word the desktop column header uses - which is what stops a
-                     simulated value reading as a price to pay. */}}
+                     follows them is offers. A single's condition bands mark where
+                     they begin; a sealed product has none, so name the offers
+                     there, with the word the desktop column header uses - which
+                     is what stops a simulated value reading as a price to pay. */}}
                 {{$headed := false}}
+                {{$refs := false}}
                 {{$condsEntry := (index $.FoundSellers $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
                     {{if $entries}}
                         {{if eq $conditions "INDEX"}}
+                        {{$refs = true}}
                         <div class="m-cond-group{{if or $expanded (eq $defView "INDEX")}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
@@ -420,7 +422,7 @@
                             {{end}}
                         </div>
                         {{else}}
-                        {{if and $expanded (not $headed)}}
+                        {{if and $expanded $card.Sealed $refs (not $headed)}}
                             {{$headed = true}}
                             <div class="m-panel-header">Sellers</div>
                         {{end}}
@@ -489,6 +491,7 @@
             {{if or $hasBuyers $salesRow}}
             <div class="m-tab-panel{{if or $expanded $buyersTab}} active{{end}}" id="buyers-{{$cardId}}">
                 {{$headed := false}}
+                {{$refs := $salesRow}}
                 {{if $salesRow}}
                     {{if $.CanVelocity}}
                     <details class="m-vendor-row sales-velocity"{{if $.VelocityOpen}} open{{end}}>
@@ -511,6 +514,7 @@
                     {{$entries := (index $condsEntry $conditions)}}
                     {{if $entries}}
                         {{if eq $conditions "INDEX"}}
+                        {{$refs = true}}
                         <div class="m-cond-group{{if or $expanded (eq $defView "INDEX")}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
@@ -535,7 +539,7 @@
                             {{end}}
                         </div>
                         {{else}}
-                        {{if and $expanded (not $headed)}}
+                        {{if and $expanded $card.Sealed $refs (not $headed)}}
                             {{$headed = true}}
                             <div class="m-panel-header">Buyers</div>
                         {{end}}
