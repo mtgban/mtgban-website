@@ -757,7 +757,7 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 			"templates/partials/guide-faq.html",
 		)
 	}
-	if name == "home.html" || name == "search.html" || name == "upload_handoff.html" || name == "user.html" {
+	if name == "home.html" || name == "search.html" || name == "upload_handoff.html" || name == "user.html" || name == "alerts.html" {
 		files = append(files, "templates/partials/patreon-login.html")
 	}
 	if name == "alerts.html" {
