@@ -15,7 +15,9 @@ test('a card with TCGplayer counts gives every row the same count track', () => 
         .map(m => m[1].match(/grid-template-columns:\s*([^;]+);/))
         .filter(Boolean)
         .map(m => m[1].trim().split(/\s+(?![^(]*\))/));
-    expect(tracks.length).toBeGreaterThan(1);
+    // One rule for both orientations, so a phone's price column has one width.
+    expect(tracks.length).toBe(1);
+    expect(tracks[0][0]).toBe('5em');
     for (const columns of tracks) expect(columns[1]).toBe('var(--m-vendor-qty-width, 2em)');
 
     expect(css).not.toMatch(/\.m-vendor-right:has\(\.tcg-listings\)[^{]*\{[^}]*grid-template-columns/);
