@@ -96,18 +96,18 @@ func checkEntry(e beaconEntry, v observability.Validators) (scope, value string,
 // metricsLimiter throttles beacons per client; the burst covers a restored window of tabs.
 var metricsLimiter = ratelimit.NewLimiter(1, 20)
 
-// metricsPerAddressDay is the most one client address may add to one name in a UTC day.
+// metricsDailyCap is the most one client address may add to one name in a UTC day.
 // A reader's own day is far below it; it stops one address from moving a name's totals.
 // Posts at once can pass it by up to metricsMaxCount each: about 200 with the limiter's burst of 20.
-const metricsPerAddressDay = 1000
+const metricsDailyCap = 1000
 
-// errorRowsPerAddressDay is the most new error rows one client address may start in a UTC day,
+// errorRowsDailyCap is the most new error rows one client address may start in a UTC day,
 // one post's worth; a row it already started still adds. With feature_errors keeping 200 rows
 // a day, filling the day takes 40 addresses, and no address can use up a script's rows.
-const errorRowsPerAddressDay = metricsMaxErrorEntries
+const errorRowsDailyCap = metricsMaxErrorEntries
 
 // metricsAddressCaps holds each client address to the two caps above.
-var metricsAddressCaps = dailycap.New(metricsPerAddressDay, errorRowsPerAddressDay)
+var metricsAddressCaps = dailycap.New(metricsDailyCap, errorRowsDailyCap)
 
 // metricsNow is the clock the daily cap reads.
 var metricsNow = time.Now
