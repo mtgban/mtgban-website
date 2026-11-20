@@ -822,7 +822,7 @@
                         <select class="m-settings-select" id="m-set-sellers-priority" aria-label="Preferred retail store">
                             <option value="" selected>Default</option>
                             {{range $i, $key := .SellerKeys}}
-                            <option value="{{$key}}">{{index $.StoreNames $key}}</option>
+                            <option value="{{$key}}">{{storeLabel (index $.StoreNames $key) (index $.SealedStores $key)}}</option>
                             {{end}}
                         </select>
                     </div>
@@ -831,7 +831,7 @@
                         <select class="m-settings-select" id="m-set-vendors-priority" aria-label="Preferred buylist store">
                             <option value="" selected>Default</option>
                             {{range $i, $key := .VendorKeys}}
-                            <option value="{{$key}}">{{index $.StoreNames $key}}</option>
+                            <option value="{{$key}}">{{storeLabel (index $.StoreNames $key) (index $.SealedStores $key)}}</option>
                             {{end}}
                         </select>
                     </div>

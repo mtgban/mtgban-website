@@ -95,7 +95,7 @@
                 <select id="settings-sellers-priority" data-cookie="SearchSellersPriority">
                     <option value="">Reset to Default</option>
                     {{range $key := .SellerKeys}}
-                    <option value="{{$key}}">{{index $.StoreNames $key}}</option>
+                    <option value="{{$key}}">{{storeLabel (index $.StoreNames $key) (index $.SealedStores $key)}}</option>
                     {{end}}
                 </select>
             </div>
@@ -104,7 +104,7 @@
                 <select id="settings-vendors-priority" data-cookie="SearchVendorsPriority">
                     <option value="">Reset to Default</option>
                     {{range $key := .VendorKeys}}
-                    <option value="{{$key}}">{{index $.StoreNames $key}}</option>
+                    <option value="{{$key}}">{{storeLabel (index $.StoreNames $key) (index $.SealedStores $key)}}</option>
                     {{end}}
                 </select>
             </div>
