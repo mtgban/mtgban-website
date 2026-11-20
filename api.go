@@ -219,7 +219,9 @@ var tcgcsvHeader = []string{
 	"TCG Low Price",
 	"Total Quantity",
 	"Add to Quantity",
+	"My Store Price",
 	"TCG Marketplace Price",
+	"My Store Reserve Quantity",
 	"Photo URL",
 }
 
@@ -348,7 +350,11 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 		record = append(record, fmt.Sprintf("%0.2f", prices[2]))
 		record = append(record, "")
 		record = append(record, fmt.Sprint(row.qty))
+		// My Store Price and its reserve are a Pro seller's own site: left
+		// blank, the import leaves them as they are
+		record = append(record, "")
 		record = append(record, fmt.Sprintf("%0.2f", prices[0]))
+		record = append(record, "")
 		record = append(record, "")
 
 		err = w.Write(record)
