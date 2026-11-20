@@ -43,6 +43,8 @@ type Heading struct {
 	IsHidden bool
 	// This field can be sorted when filtered
 	ConditionalSort bool
+	// Shown large on a phone, where each row is a card
+	Key bool
 }
 
 type NewspaperResult struct {
@@ -743,18 +745,21 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort:  true,
 				Field:    "ck_retail_price",
 				IsDollar: true,
+				Key:      true,
 			},
 			{
 				Title:    "TCG Market",
 				CanSort:  true,
 				Field:    "tcg_market_price",
 				IsDollar: true,
+				Key:      true,
 			},
 			{
 				Title:    "CK Buylist",
 				CanSort:  true,
 				Field:    "ck_buy_price",
 				IsDollar: true,
+				Key:      true,
 			},
 		},
 		HasBucket:    true,
@@ -824,6 +829,7 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort:  true,
 				Field:    "current_price",
 				IsDollar: true,
+				Key:      true,
 			},
 		},
 		HasBucket: true,
@@ -880,6 +886,7 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort: true,
 				Field:   "sellers_Today",
 				IsNum:   true,
+				Key:     true,
 			},
 			{
 				Title:   "Last Week Sellers",
@@ -898,6 +905,7 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort: true,
 				Field:   "pct_gain_7d",
 				IsPerc:  true,
+				Key:     true,
 			},
 		},
 		Short: "Vendors \u2191",
@@ -953,6 +961,7 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort: true,
 				Field:   "sellers_Today",
 				IsNum:   true,
+				Key:     true,
 			},
 			{
 				Title:   "Last Week Sellers",
@@ -971,6 +980,7 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort: true,
 				Field:   "pct_drop_7d",
 				IsPerc:  true,
+				Key:     true,
 			},
 		},
 		Short: "Vendors \u2193",
@@ -1027,6 +1037,7 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort:  true,
 				Field:    "ck_buy_price",
 				IsDollar: true,
+				Key:      true,
 			},
 			{
 				Title:    "Yesterday",
@@ -1039,6 +1050,7 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort:  true,
 				Field:    "ck_buy_7d",
 				IsDollar: true,
+				Key:      true,
 			},
 			{
 				Title:    "Last Month",
@@ -1051,6 +1063,7 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort: true,
 				Field:   "pct_increase_7d",
 				IsPerc:  true,
+				Key:     true,
 			},
 		},
 		NeedsBuylist: true,
@@ -1108,6 +1121,7 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort:  true,
 				Field:    "ck_buy_price",
 				IsDollar: true,
+				Key:      true,
 			},
 			{
 				Title:    "Yesterday",
@@ -1120,6 +1134,7 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort:  true,
 				Field:    "ck_buy_7d",
 				IsDollar: true,
+				Key:      true,
 			},
 			{
 				Title:    "Last Month",
@@ -1132,6 +1147,7 @@ var newspaperPagesInitial = []NewspaperPage{
 				CanSort: true,
 				Field:   "pct_decrease_7d",
 				IsPerc:  true,
+				Key:     true,
 			},
 		},
 		NeedsBuylist: true,

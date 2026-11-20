@@ -471,6 +471,14 @@
     .news-upload-btn { width: 100%; text-align: center; }
 }
 
+@media (max-width: 560px) {
+    /* As a card the rank sits before the name, at its own width */
+    .news-table.phone-cards .news-rank-col { width: auto; }
+    /* A report's percentage is its headline: right of the name, as on mobile */
+    .news-table.phone-cards > tbody > tr > td.pc-key:has(> .news-perc) { order: 0; align-self: center; margin: 0 0 0 8px; }
+    .news-table.phone-cards > tbody > tr > td.pc-key:has(> .news-perc)::before { content: none; }
+}
+
 /* -- Edition combobox -- */
 .edition-combobox {
     position: relative;
