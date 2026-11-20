@@ -2246,9 +2246,11 @@ body.modal-embed .cp-overlay {
        cover the open menu; lift the header holding it one above the rest. */
     .result-header:has(.qi-open) { z-index: 102; }
 
-    /* This breakpoint still has the sidebar preview, so keep the image button
-       out of the dropdown (the grid rule below would otherwise reveal it). */
-    .qi-actions > .qi-view-image { display: none; }
+    /* While the sidebar preview shows, keep the image button out of the
+       dropdown (the grid rule below would otherwise reveal it). */
+    @media (min-width: 901px) {
+        .qi-actions > .qi-view-image { display: none; }
+    }
 
     /* Each action becomes an icon + label row. The icon sits in a fixed-width
        column so every label lines up regardless of icon kind (emoji text,
@@ -2295,6 +2297,8 @@ body.modal-embed .cp-overlay {
         gap: 10px;
         padding: 7px 10px;
     }
+    /* So does the image button's padding. */
+    .result-quick-icons .qi-actions > .qi-view-image { padding: 7px 10px; }
 
     /* The injected text labels — left-aligned in their column, normal size. */
     .qi-actions .qi-label {
