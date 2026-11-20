@@ -664,7 +664,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 
 .m-vendor-right {
     display: grid;
-    grid-template-columns: 6em 2em 1.4em;
+    grid-template-columns: 6em var(--m-vendor-qty-width, 2em) 1.4em;
     align-items: center;
     flex-shrink: 0;
 }
@@ -698,9 +698,11 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     color: var(--greytext);
     text-align: right;
 }
-/* TCGplayer's sellers/copies (tcglistings.go) need more than a quantity */
-.m-vendor-right:has(.tcg-listings) {
-    grid-template-columns: 6em 4.5em 1.4em;
+/* TCGplayer's sellers/copies (tcglistings.go) need more than a quantity,
+   and every row of the card makes the same room, so the prices stay in
+   one column. */
+.m-card:has(.tcg-listings) {
+    --m-vendor-qty-width: 4.5em;
 }
 
 /* Best price highlight */
@@ -2467,7 +2469,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 
     /* Narrower price column to fit landscape half-width; reserve chevron column on every row so prices align */
     .m-vendor-right {
-        grid-template-columns: 5em 2em 1.4em;
+        grid-template-columns: 5em var(--m-vendor-qty-width, 2em) 1.4em;
     }
 
     .m-vendor-name {
