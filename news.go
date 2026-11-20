@@ -1059,7 +1059,7 @@ var newspaperPagesInitial = []NewspaperPage{
 	},
 	{
 		Title:  "Greatest Decrease in Buylist Offer",
-		Desc:   "Buylist deecreases indicating a declining sales rate (eg, Less demand). These may be fleeting, do not base a purchase solely off this metric unless dropshipping",
+		Desc:   "Buylist decreases indicating a declining sales rate (eg, Less demand). These may be fleeting, do not base a purchase solely off this metric unless dropshipping",
 		Offset: 3,
 		Option: "greatest_decrease_buylist",
 		Query: `SELECT calc_date, tcgplayer_id,
