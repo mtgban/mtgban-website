@@ -132,13 +132,18 @@ function restoreOptUnticked() {
 // the page's other stores that offer for the card, best first, then Not
 // bought on a buylist, which has that section. It opens
 // under its button, or over it in the lower part of the window, and closes
-// on a pick or on a scroll, which would leave it behind its row.
+// on a pick or on a scroll, which would leave it behind its row. A store's
+// backpack menu is placed the same way and filled by backpack.js.
 document.addEventListener('beforetoggle', function(e) {
     var menu = e.target;
     if (!menu.classList || !menu.classList.contains('opt-move-menu') || e.newState !== 'open') return;
     var btn = document.querySelector('[popovertarget="' + menu.id + '"]');
     if (!btn) return;
-    fillMoveMenu(menu, btn.closest('tr'));
+    if (menu.classList.contains('pack-move-menu')) {
+        if (window.fillPackMoveMenu) fillPackMoveMenu(menu);
+    } else {
+        fillMoveMenu(menu, btn.closest('tr'));
+    }
     var r = btn.getBoundingClientRect();
     menu.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
     if (r.bottom > window.innerHeight * 0.6) {
@@ -216,7 +221,11 @@ document.addEventListener('click', function(e) {
         var menu = pick.closest('.opt-move-menu');
         var btn = document.querySelector('[popovertarget="' + menu.id + '"]');
         menu.hidePopover();
-        if (btn) moveOptRow(btn.closest('tr'), pick.dataset.store);
+        if (btn && menu.classList.contains('pack-move-menu')) {
+            if (window.moveRowsToPack) moveRowsToPack(btn, parseInt(pick.dataset.pack, 10));
+        } else if (btn) {
+            moveOptRow(btn.closest('tr'), pick.dataset.store);
+        }
     }
     if (e.target.closest && e.target.closest('.opt-copy')) {
         if (window.BAN && window.BAN.track) window.BAN.track('ui.optimizer', 'copy_name');

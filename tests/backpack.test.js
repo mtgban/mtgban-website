@@ -88,8 +88,9 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
         const section = el('div'); section.classes.add('opt-store');
         const add = el('button'); add.classes.add('pack-add-btn'); add.hidden = true;
         const take = el('button'); take.classes.add('pack-take-btn'); take.hidden = true;
+        const move = el('button'); move.classes.add('pack-move-btn'); move.hidden = true;
         const fold = el('button'); fold.classes.add('section-fold');
-        section.append(add, take, fold);
+        section.append(add, take, move, fold);
         rows.forEach(([id, qty, unticked, cond = '']) => {
             const tr = el('tr'); tr.setAttribute('data-opt-id', id); tr.setAttribute('data-opt-cond', cond); tr.setAttribute('data-load-qty', String(qty));
             Object.entries({ 'data-load-name': 'Card ' + id, 'data-load-set': 'S', 'data-load-number': '7', 'data-opt-edition': 'Set', 'data-opt-img': 'img/' + id, 'data-opt-finish-tag': '', 'data-opt-finish-class': '', 'data-opt-cw': 'false' }).forEach(([k, v]) => tr.setAttribute(k, v));
@@ -97,7 +98,7 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
             section.appendChild(tr);
         });
         body.appendChild(section);
-        return { section, add, take, fold, rows: section.children.filter((c) => c.tag === 'tr') };
+        return { section, add, take, move, fold, rows: section.children.filter((c) => c.tag === 'tr') };
     });
     // The results tab, when given: the toolbar's add and take pair, and its
     // rows of [id, qty, cond, removed] that exportRows hands out by view.
@@ -1854,6 +1855,79 @@ describe('taking an Upload store section out', () => {
         p.window.takeRowsFromBackpack(p.optSections[0].take);
         expect(p.m.mtgban_backpack).toBe(before);
         expect(p.window.Backpack.undo()).toBe(false);
+    });
+});
+
+describe('moving an Upload store section to another backpack', () => {
+    const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.pack || 1, e.id, e.cond || 'NM', e.qty]).sort();
+    const tabList = [{ pack: 1 }, { pack: 2, name: 'Trades' }, { pack: 3 }];
+
+    test('shows while a ticked row is in the open backpack and there is another', () => {
+        const store = [{ id: 'a', name: 'A', qty: 2, t: 1, m: 1 }];
+        const sections = [[['a', 1], ['b', 1]], [['b', 1]], [['a', 1, true]]];
+        expect(page({ store, tabs: 3, tabList, sections }).optSections.map((s) => s.move.hidden)).toEqual([false, true, true]);
+        expect(page({ store, sections }).optSections.map((s) => s.move.hidden)).toEqual([true, true, true]);
+    });
+
+    test('ticking and unticking a row shows and hides it', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], tabs: 3, tabList, sections: [[['a', 1]]] });
+        const s = p.optSections[0];
+        s.rows[0].classes.add('opt-removed');
+        p.fireChange(s.rows[0]);
+        expect(s.move.hidden).toBe(true);
+        s.rows[0].classes.delete('opt-removed');
+        p.fireChange(s.rows[0]);
+        expect(s.move.hidden).toBe(false);
+    });
+
+    test('the menu lists the other backpacks', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], tabs: 3, tabList, sections: [[['a', 1]]] });
+        const menu = p.document.createElement('div');
+        p.window.fillPackMoveMenu(menu);
+        expect(menu.children.map((b) => [b.getAttribute('data-pack'), b.textContent])).toEqual([[null, 'Move to backpack'], ['2', 'Trades'], ['3', 'Backpack 3']]);
+    });
+
+    test("moves the ticked rows' copies and leaves the rest, as one undo step", () => {
+        const store = [{ id: 'a', name: 'A', qty: 4, t: 3, m: 3 }, { id: 'b', name: 'B', qty: 1, t: 2, m: 2 }, { id: 'c', name: 'C', qty: 2, t: 1, m: 1 }, { id: 'a', name: 'A', pack: 2, qty: 1, t: 1, m: 1 }];
+        const p = page({ store, tabs: 3, tabList, sections: [[['a', 3], ['b', 1], ['c', 2, true], ['x', 1]]] });
+        p.window.moveRowsToPack(p.optSections[0].move, 2);
+        expect(live(p)).toEqual([[1, 'a', 'NM', 1], [1, 'c', 'NM', 2], [2, 'a', 'NM', 4], [2, 'b', 'NM', 1]]);
+        expect(ids['backpack-toast'].textContent).toBe('Moved 4 copies to Trades');
+        expect(p.tracked).toContainEqual(['ui.optimizer', 'pack_move']);
+        p.window.Backpack.undo();
+        expect(live(p)).toEqual([[1, 'a', 'NM', 4], [1, 'b', 'NM', 1], [1, 'c', 'NM', 2], [2, 'a', 'NM', 1]]);
+    });
+
+    test('rows without a grade take the card in its grades, best first', () => {
+        const store = [{ id: 'a', name: 'A', cond: 'SP', qty: 2, t: 2, m: 2 }, { id: 'a', name: 'A', qty: 1, t: 2, m: 2 }];
+        const p = page({ store, tabs: 3, tabList, sections: [[['a', 2]]] });
+        p.window.moveRowsToPack(p.optSections[0].move, 3);
+        expect(live(p)).toEqual([[1, 'a', 'SP', 1], [3, 'a', 'NM', 1], [3, 'a', 'SP', 1]]);
+    });
+
+    test('moving the last copy hides it', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], tabs: 3, tabList, sections: [[['a', 1]]] });
+        p.window.moveRowsToPack(p.optSections[0].move, 2);
+        expect(p.optSections[0].move.hidden).toBe(true);
+    });
+
+    test('a card that does not fit moves nothing', () => {
+        const store = [{ id: 'a', name: 'A', qty: 1, t: 2, m: 2 }, { id: 'b', name: 'B', qty: 1, t: 2, m: 2 }, { id: 'b', name: 'B', pack: 2, qty: 999, t: 1, m: 1 }];
+        const p = page({ store, tabs: 3, tabList, sections: [[['a', 1], ['b', 1]]] });
+        p.window.moveRowsToPack(p.optSections[0].move, 2);
+        expect(live(p)).toEqual([[1, 'a', 'NM', 1], [1, 'b', 'NM', 1], [2, 'b', 'NM', 999]]);
+        expect(ids['backpack-toast'].textContent).toBe('999 copies is the most for one product');
+    });
+
+    test('a full backpack, or all of them, says which', () => {
+        const store = [{ id: 'a', name: 'A', qty: 2, t: 2, m: 2 }, { id: 'b', name: 'B', pack: 2, qty: 1, t: 1, m: 1 }];
+        const p = page({ store, max: 1, tabs: 3, tabList, sections: [[['a', 1]]] });
+        p.window.moveRowsToPack(p.optSections[0].move, 2);
+        expect(ids['backpack-toast'].textContent).toBe('Trades is full (1 products)');
+        const q = page({ store: [store[0], { ...store[1], pack: 3 }], max: 1, tabs: 2, tabList, sections: [[['a', 1]]] });
+        q.window.moveRowsToPack(q.optSections[0].move, 2);
+        expect(live(q)).toEqual([[1, 'a', 'NM', 2], [3, 'b', 'NM', 1]]);
+        expect(ids['backpack-toast'].textContent).toBe('Backpacks are full (2 products in all)');
     });
 });
 
