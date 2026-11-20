@@ -18,7 +18,8 @@
     align-items: center;
     justify-content: center;
     flex: 1;
-    width: 100%;
+    /* Less the padding, so the whole box fits a phone's width. */
+    width: calc(100% - 48px);
     max-width: 680px;
     padding: 0 24px;
 }
@@ -277,7 +278,7 @@
 
 /* ═══ Footer — pinned to bottom ═══ */
 .landing-footer {
-    width: 100%;
+    width: calc(100% - 48px);
     max-width: 680px;
     padding: 0 24px 32px;
     display: flex;
@@ -358,7 +359,7 @@
     .landing-brand-text { font-size: 22px; }
     .landing-brand-game { font-size: 11px; letter-spacing: 0.1em; }
     .landing-search-wrap { display: flex; flex-direction: column; gap: 8px; }
-    .landing-search { font-size: 15px; padding: 14px 18px 14px 42px; }
+    .landing-search { font-size: 15px; padding: 14px 104px 14px 20px; }
     .landing-lucky {
         position: static;
         transform: none;
@@ -370,4 +371,10 @@
     .landing-tool { font-size: 12px; padding: 8px 14px; }
     .landing-login-btn { padding: 12px 24px; }
     .landing-footer { padding-bottom: 24px; }
+}
+
+/* iOS zooms the page into a focused field under 16px, and this one is
+   focused on every load. Wider screens give it 17px. */
+@media (max-width: 640px) and (pointer: coarse) {
+    .landing-search { font-size: 16px; }
 }
