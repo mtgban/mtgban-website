@@ -302,6 +302,35 @@ func TestTCGCSVRoundTripsItsPrice(t *testing.T) {
 	}
 }
 
+// A row loaded at its file's market price, which the page posts back with
+// an "m", is exported as one with no price of its own.
+func TestTCGCSVLeavesOutTheFilesMarketPrice(t *testing.T) {
+	b, p := decklistCSVFixture(t)
+	ids := []string{"FIXTUREA-1", "FIXTUREA-1"}
+	uploadedData, err := loadHashes(ids, nil, []string{"NM", "SP"}, []string{"9.99m", "9.99"}, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	err = writeTCGplayerCSV(rec, b, p, uploadedData, 1, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := csv.NewReader(rec.Body).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 3 {
+		t.Fatalf("got %d records, want a header and 2 rows", len(records))
+	}
+	for i, want := range [][2]string{{"", "1.50"}, {"9.99", "9.99"}} {
+		row := records[i+1]
+		if row[14] != want[0] || row[15] != want[1] {
+			t.Errorf("%s: My Store Price %q, TCG Marketplace Price %q, want %q", row[7], row[14], row[15], want)
+		}
+	}
+}
+
 // A write the client never got is an error, down to the last row.
 func TestDecklistCSVReportsAFailedWrite(t *testing.T) {
 	b, p := decklistCSVFixture(t)

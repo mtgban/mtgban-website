@@ -129,6 +129,10 @@ func TestParseTCGplayerExportPrice(t *testing.T) {
 		if entry.OriginalPrice != tc.want {
 			t.Errorf("%s: price %v, want %v", tc.name, entry.OriginalPrice, tc.want)
 		}
+		// Only the market column's 732.78 is not the seller's own
+		if entry.PriceIsMarket != (tc.want == 732.78) {
+			t.Errorf("%s: PriceIsMarket is %v", tc.name, entry.PriceIsMarket)
+		}
 	}
 }
 

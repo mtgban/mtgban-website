@@ -43,6 +43,9 @@ type Entry struct {
 	// Price as found in the source data
 	OriginalPrice float64
 
+	// OriginalPrice is the file's market price, its owner having set none
+	PriceIsMarket bool
+
 	// Condition as found in the source data
 	OriginalCondition mtgban.Condition
 
@@ -610,6 +613,7 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 	idx, found = indexMap["price_market"]
 	if found && idx < len(record) && res.OriginalPrice == 0 {
 		res.OriginalPrice, _ = matcher.ParsePrice(record[idx])
+		res.PriceIsMarket = res.OriginalPrice != 0
 	}
 
 	switch {

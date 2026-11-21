@@ -1734,6 +1734,11 @@ func writeTCGplayerCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, upl
 		ids = append(ids, uploadedData[i].CardID)
 		qtys = append(qtys, fmt.Sprintf("%d", qty))
 		conds = append(conds, string(uploadedData[i].OriginalCondition))
+		// The file's market price is not a price to list at
+		if uploadedData[i].PriceIsMarket {
+			loaded = append(loaded, 0)
+			continue
+		}
 		loaded = append(loaded, uploadedData[i].OriginalPrice)
 	}
 
@@ -3195,8 +3200,12 @@ func loadHashes(hashes, qtys, cond, prices, notes, from, fromQtys []string) ([]U
 			entry.OriginalCondition = mtgban.Condition(cond[i])
 		}
 
+		// A market price the row's owner never set is posted back with an
+		// "m" after it
 		if len(prices) > i {
-			entry.OriginalPrice, _ = strconv.ParseFloat(prices[i], 64)
+			price, isMarket := strings.CutSuffix(prices[i], "m")
+			entry.OriginalPrice, _ = strconv.ParseFloat(price, 64)
+			entry.PriceIsMarket = isMarket && entry.OriginalPrice != 0
 		}
 
 		// Carried so a row keeps what it knows about itself across a
