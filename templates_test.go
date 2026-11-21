@@ -300,6 +300,25 @@ func TestTipTables(t *testing.T) {
 	}
 }
 
+// TestTipPairs checks a header-less table's label and value pairs, and a
+// blank line ending a table so the rows after it start another.
+func TestTipPairs(t *testing.T) {
+	tip := "|copies|458|days|30/30\n|orders|391\n\n|last sale|$36.66 LP"
+	wantHTML := `<table class="tip-table"><tr><td class="tip-label">copies</td><td>458</td><td class="tip-label">days</td><td>30/30</td></tr>` +
+		`<tr><td class="tip-label">orders</td><td>391</td></tr></table>` +
+		`<table class="tip-table"><tr><td class="tip-label">last sale</td><td>$36.66 LP</td></tr></table>`
+	if got := string(tipHTML(tip)); got != wantHTML {
+		t.Errorf("tipHTML:\n%s\nwant:\n%s", got, wantHTML)
+	}
+	wantPlain := "copies: 458, days: 30/30\norders: 391\nlast sale: $36.66 LP"
+	if got := plainTip(tip); got != wantPlain {
+		t.Errorf("plainTip:\n%s\nwant:\n%s", got, wantPlain)
+	}
+	if got := string(tipHTML("one\n\ntwo\n|a|b")); got != "<div>one\n\ntwo</div>"+`<table class="tip-table"><tr><td class="tip-label">a</td><td>b</td></tr></table>` {
+		t.Errorf("tipHTML of a blank line in text: got %s, want it kept", got)
+	}
+}
+
 // TestBuylistPause executes the pause pill and its wait arrow the way search
 // calls them: on CK's last known NM offer only, the arrow when waiting pays.
 func TestBuylistPause(t *testing.T) {
