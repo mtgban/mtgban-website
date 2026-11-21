@@ -47,13 +47,17 @@ The rate is the copies over 30, to one decimal.
 | State | When | Rate | Details |
 |---|---|---|---|
 | No data | no sale in 365 days | no row | none |
-| Zero | sales in the year, none in the window | `0/day` | `no sale in the window; last sold`, the date and, when known, `for` the price and condition |
-| A rate | copies in the window | `2.3/day`, or `<0.1/day` under a tenth | copies, orders, days with a sale, last sale with its price, condition and date |
+| Zero | sales in the year, none in the window | `0/day` | `no sale in 30 days`, then the last sale with its price and condition when known |
+| A rate | copies in the window | `2.3/day`, or `<0.1/day` under a tenth | copies, orders, days with a sale, then the trend and the last sale with its price, condition and date |
 
-`text` (`internal/salesvelocity`) writes both. The details open with
-`Sold on TCGplayer, last 30 days`. The row as rendered for a rate's last sale reads
-`last sale | $12.34 LP · 2026-11-17`, and a zero's line reads
-`no sale in the window; last sold 2026-08-02 for $12.34 LP`.
+`text` (`internal/salesvelocity`) writes both. The counts sit two label and
+value pairs a row, `copies 458 · days 30/30` over `orders 391 · vs. $30–100
+top 1%`, and a rule sets the trend and the last sale off below them:
+`last sale | $12.34 LP · Nov 17`. The date carries its year only when that
+is not the year of the window's last day. The rule is a blank line in the
+tooltip format, which ends a table (`tipBlocks`, templates.go). The row's
+name says what the details count, so they have no heading; the other pages'
+tooltip adds `Sold on TCGplayer, last 30 days` (`salesvelocity.Heading`).
 
 The price is the item's, per copy, without shipping. Conditions print as NM,
 LP, MP, HP and DMG, any other as TCGplayer sends it. With no order on record
@@ -82,7 +86,7 @@ the one below it, and ranks each card by the share of its band it outsells:
 
 Shares rather than set rates keep the colours right for every game, each
 grading its own cards. The details add a line naming the band and the share,
-`vs. cards at $10–30 | faster than 92%`. The search row, on both layouts, and
+`vs. $10–30 | top 8%`, or `slowest` for a card no faster than any. The search row, on both layouts, and
 the other pages' rate take the colour as a `velocity-<pace>` class.
 
 The rate each pace starts from, by band, from `TestSalesVelocityLive`:
@@ -101,12 +105,12 @@ The rate each pace starts from, by band, from `TestSalesVelocityLive`:
 
 An arrow, `↑`, leads the rate of a card selling at least twice as fast in the
 window's last 7 days as in the 23 before them, with the details' line
-`last 7 days | 2.4× the pace before`. It counts orders rather than copies, so
+`last 7 days | 2.4× faster`, against those 23 days. It counts orders rather than copies, so
 one buyer taking a stack does not make a trend, and it needs 30 orders in the
 window: with fewer, chance alone moves a card that far too often. A card first
 sold in the window has no pace before it, so a new set's cards, all selling
 more each day of their first weeks, are left out rather than all marked.
-Past 5× the line reads `over 5×`: by then the days before hold an order or
+Past 5× the line reads `over 5× faster`: by then the days before hold an order or
 two, and a figure like 95× measures them rather than the trend.
 
 Only a rise is marked. A card slowing to half its pace is mostly chance at

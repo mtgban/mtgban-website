@@ -16,6 +16,7 @@ import (
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/palette"
+	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 	"github.com/mtgban/mtgban-website/observability"
 )
 
@@ -647,8 +648,9 @@ var funcMap = template.FuncMap{
 		if card.VelocityRising {
 			rising = `<span class="velocity-rising">&#8593;</span>`
 		}
+		tip := salesvelocity.Heading() + "\n" + card.VelocityDetail
 		return template.HTML(fmt.Sprintf(`<span class="bl-velocity%s" title="%s" data-tip="%s">%s%s</span>`,
-			pace, html.EscapeString(plainTip(card.VelocityDetail)), html.EscapeString(card.VelocityDetail), rising, html.EscapeString(card.Velocity)))
+			pace, html.EscapeString(plainTip(tip)), html.EscapeString(tip), rising, html.EscapeString(card.Velocity)))
 	},
 	// direct_stock is TCGplayer Direct's stock of a card in a grade, 0 where
 	// the last scrape did not see it.

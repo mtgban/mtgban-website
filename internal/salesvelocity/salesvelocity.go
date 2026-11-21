@@ -601,9 +601,13 @@ func priceText(v Sales) string {
 	return price
 }
 
-// lastSaleText is the last sale's price, condition and date, as the details print it.
-func lastSaleText(v Sales) string {
-	date := v.LastSale.Format(time.DateOnly)
+// lastSaleText is the last sale's price, condition and date, as the details
+// print it, the date with its year only when that is not day's.
+func lastSaleText(v Sales, day time.Time) string {
+	date := v.LastSale.Format("Jan 2")
+	if v.LastSale.Year() != day.Year() {
+		date = v.LastSale.Format("Jan 2, 2006")
+	}
 	if price := priceText(v); price != "" {
 		return price + " · " + date
 	}
@@ -736,22 +740,23 @@ func pricedSuffix(priced int, note string) string {
 	return line
 }
 
-// paceLine is the details' line on how a card sells against its price band,
-// empty for a card not graded or with no sale in the window.
-func paceLine(v Sales, bands []Band) string {
+// paceCells are the details' cells on how a card sells against its price
+// band, ending the orders row, empty for a card not graded or with no sale in
+// the window.
+func paceCells(v Sales, bands []Band) string {
 	if v.Pace == PaceNone || v.Copies == 0 || int(v.Band) >= len(bands) {
 		return ""
 	}
-	peers := "all cards"
+	peers := "all"
 	label := bands[v.Band].String()
 	if label != "" {
-		peers = "cards " + label
+		peers = strings.TrimPrefix(label, "at ")
 	}
-	faster := "among the slowest"
+	rank := "slowest"
 	if v.Outsells > 0 {
-		faster = "faster than " + strconv.Itoa(int(v.Outsells)) + "%"
+		rank = "top " + strconv.Itoa(max(100-int(v.Outsells), 1)) + "%"
 	}
-	return "|vs. " + peers + "|" + faster
+	return "|vs. " + peers + "|" + rank
 }
 
 // trendLine is the details' line on a card rising the times given, empty for
@@ -761,24 +766,30 @@ func trendLine(rising float64) string {
 		return ""
 	}
 	if rising > trendCap {
-		return fmt.Sprintf("|last %d days|over %d× the pace before", TrendDays, trendCap)
+		return fmt.Sprintf("|last %d days|over %d× faster", TrendDays, trendCap)
 	}
-	return fmt.Sprintf("|last %d days|%.1f× the pace before", TrendDays, rising)
+	return fmt.Sprintf("|last %d days|%.1f× faster", TrendDays, rising)
 }
 
-// text is a card's rate and its details (tip_html format) over window days,
-// with notes, its paceLine and trendLine, before the last sale.
-func text(v Sales, window int, notes ...string) (rate, detail string) {
-	head := fmt.Sprintf("**Sold on TCGplayer, last %d days**", window)
+// Heading names the details, for a tooltip showing them away from the sales row.
+func Heading() string {
+	return fmt.Sprintf("**Sold on TCGplayer, last %d days**", Window)
+}
+
+// text is a card's rate and its details (tip_html format) over the window of
+// days to day: the counts two pairs a row, pace ending the second, then after
+// a blank line, which rules them off, the trend and the last sale.
+func text(v Sales, window int, day time.Time, pace, trend string) (rate, detail string) {
+	last := ""
+	if !v.LastSale.IsZero() {
+		last = "|last sale|" + lastSaleText(v, day)
+	}
 	if v.Copies == 0 {
-		zero := "no sale in the window"
-		if !v.LastSale.IsZero() {
-			zero += "; last sold " + v.LastSale.Format(time.DateOnly)
-			if price := priceText(v); price != "" {
-				zero += " for " + price
-			}
+		detail = fmt.Sprintf("no sale in %d days", window)
+		if last != "" {
+			detail += "\n" + last
 		}
-		return "0/day", head + "\n" + zero
+		return "0/day", detail
 	}
 
 	perDay := v.PerDay(window)
@@ -788,18 +799,17 @@ func text(v Sales, window int, notes ...string) (rate, detail string) {
 	}
 
 	lines := []string{
-		head,
-		"|copies|" + strconv.Itoa(int(v.Copies)),
-		"|orders|" + strconv.Itoa(int(v.Orders)),
-		"|days with a sale|" + strconv.Itoa(int(v.Days)),
+		fmt.Sprintf("|copies|%d|days|%d/%d", v.Copies, v.Days, window),
+		"|orders|" + strconv.Itoa(int(v.Orders)) + pace,
 	}
-	for _, note := range notes {
-		if note != "" {
-			lines = append(lines, note)
-		}
+	if trend != "" || last != "" {
+		lines = append(lines, "")
 	}
-	if !v.LastSale.IsZero() {
-		lines = append(lines, "|last sale|"+lastSaleText(v))
+	if trend != "" {
+		lines = append(lines, trend)
+	}
+	if last != "" {
+		lines = append(lines, last)
 	}
 	return rate, strings.Join(lines, "\n")
 }
@@ -815,7 +825,7 @@ func (s *Snapshot) View(cardID string) (rate, detail string, notable bool) {
 	if !found {
 		return "", "", false
 	}
-	rate, detail = text(v, Window, paceLine(v, s.Bands), trendLine(s.rising(v)))
+	rate, detail = text(v, Window, s.Day, paceCells(v, s.Bands), trendLine(s.rising(v)))
 	return rate, detail, v.PerDay(Window) >= notableFloor
 }
 

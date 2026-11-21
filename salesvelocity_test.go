@@ -629,7 +629,7 @@ func TestSearchShowsSalesVelocity(t *testing.T) {
 		"velocity-card": {Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)},
 	})
 	for name, page := range velocityPages(t, velocityPageVars(true, true)) {
-		for _, want := range []string{"TCGplayer sales", "2.3/day", "Sold on TCGplayer, last 30 days", ">days with a sale<", ">2026-10-11<"} {
+		for _, want := range []string{"TCGplayer sales", "2.3/day", ">days<", ">18/30<", ">Oct 11<"} {
 			if strings.Count(page, want) != 1 {
 				t.Errorf("%s: want %q once, rendered:\n%s", name, want, page)
 			}
@@ -643,7 +643,7 @@ func TestSearchShowsSalesVelocity(t *testing.T) {
 		if strings.Count(page, velocityUpsell) != 1 {
 			t.Errorf("%s: want the upsell once, rendered:\n%s", name, page)
 		}
-		for _, mark := range []string{"TCGplayer sales", "2.3/day", "Sold on TCGplayer", "2026-10-11"} {
+		for _, mark := range []string{"TCGplayer sales", "2.3/day", "18/30", "Oct 11"} {
 			if strings.Contains(page, mark) {
 				t.Errorf("%s: %q shown to a reader without the newspaper tier", name, mark)
 			}
@@ -812,7 +812,7 @@ func TestOEmbedLeavesOutSalesVelocity(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("answered %d, want 200", w.Code)
 	}
-	for _, mark := range []string{"sales-velocity", "2.3/day", "Sold on TCGplayer", velocityUpsell} {
+	for _, mark := range []string{"sales-velocity", "2.3/day", ">copies<", velocityUpsell} {
 		if strings.Contains(w.Body.String(), mark) {
 			t.Errorf("the preview carries %q", mark)
 		}

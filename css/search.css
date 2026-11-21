@@ -1448,8 +1448,28 @@ body:has(.search-layout) {
 .sales-velocity-detail .tip-table td {
     padding: 0;
 }
-.sales-velocity-detail .tip-table td:last-child {
+.sales-velocity-detail .tip-table td:nth-child(4),
+.sales-velocity-detail .tip-table:not(:first-child) td:last-child {
     text-align: right;
+}
+/* Counts in two label and value pairs a row, the second pair pushed right;
+   the trend and last sale ruled off below them */
+.sales-velocity-detail .tip-table td:not(.tip-label) {
+    color: var(--normaltext);
+}
+.sales-velocity-detail .tip-table td {
+    white-space: nowrap;
+}
+.sales-velocity-detail .tip-table .tip-label {
+    padding-right: 8px;
+}
+.sales-velocity-detail .tip-table td:nth-child(2):not(:last-child) {
+    width: 100%;
+}
+.sales-velocity-detail .tip-table:not(:first-child) {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
 }
 .sales-velocity-upsell {
     padding: 3px 12px;
