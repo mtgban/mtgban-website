@@ -256,7 +256,7 @@
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);
     border-radius: 0 0 12px 12px;
-    overflow: hidden;
+    overflow-x: auto;
 }
 
 /* Table */
@@ -450,9 +450,6 @@
     .news-cc .set-icon { display: none; }
     .news-cc { min-width: 140px; }
     .news-table { font-size: var(--text-base); }
-
-    /* Horizontal scroll for data table */
-    .news-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
     /* Touch-friendly nav pills */
     .news-page-nav a { padding: 10px 16px; }
