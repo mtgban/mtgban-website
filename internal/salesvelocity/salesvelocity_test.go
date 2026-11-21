@@ -547,6 +547,8 @@ func TestViewPace(t *testing.T) {
 	last := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
 	s := snapshotOf(map[string]*Sales{
 		"fast":    {Copies: 69, Orders: 31, Days: 18, LastSale: last, Pace: PaceFastest, Band: 1, Outsells: 92},
+		"half":    {Copies: 9, Orders: 9, Days: 9, LastSale: last, Pace: PaceSteady, Band: 1, Outsells: 50},
+		"slow":    {Copies: 2, Orders: 2, Days: 2, LastSale: last, Pace: PaceSlow, Band: 1, Outsells: 20},
 		"slowest": {Copies: 1, Orders: 1, Days: 1, LastSale: last, Pace: PaceSlow},
 		"all":     {Copies: 1, Orders: 1, Days: 1, LastSale: last, Pace: PaceSlow},
 		"zero":    {LastSale: last, Pace: PaceSlow},
@@ -554,6 +556,8 @@ func TestViewPace(t *testing.T) {
 	s.Bands = []Band{{0, 30}, {30, 0}}
 	for card, want := range map[string]string{
 		"fast":    "|copies|69|days|18/30\n|orders|31|vs. $30+|top 8%\n\n|last sale|Oct 11",
+		"half":    "|copies|9|days|9/30\n|orders|9|vs. $30+|top 50%\n\n|last sale|Oct 11",
+		"slow":    "|copies|2|days|2/30\n|orders|2|vs. $30+|bottom 20%\n\n|last sale|Oct 11",
 		"slowest": "|copies|1|days|1/30\n|orders|1|vs. under $30|slowest\n\n|last sale|Oct 11",
 		"zero":    "no sale in 30 days\n|last sale|Oct 11",
 	} {

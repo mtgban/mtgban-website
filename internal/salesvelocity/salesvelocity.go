@@ -753,8 +753,10 @@ func paceCells(v Sales, bands []Band) string {
 		peers = strings.TrimPrefix(label, "at ")
 	}
 	rank := "slowest"
-	if v.Outsells > 0 {
+	if v.Outsells >= 50 {
 		rank = "top " + strconv.Itoa(max(100-int(v.Outsells), 1)) + "%"
+	} else if v.Outsells > 0 {
+		rank = "bottom " + strconv.Itoa(int(v.Outsells)) + "%"
 	}
 	return "|vs. " + peers + "|" + rank
 }

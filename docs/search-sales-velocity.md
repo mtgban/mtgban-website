@@ -86,8 +86,10 @@ the one below it, and ranks each card by the share of its band it outsells:
 
 Shares rather than set rates keep the colours right for every game, each
 grading its own cards. The details add a line naming the band and the share,
-`vs. $10–30 | top 8%`, or `slowest` for a card no faster than any. The search row, on both layouts, and
-the other pages' rate take the colour as a `velocity-<pace>` class.
+`vs. $10–30 | top 8%`, `bottom 20%` for a card that outsells fewer than half
+its band, 20 being the share it outsells, or `slowest` for one no faster than
+any. The search row, on both layouts, and the other pages' rate take the
+colour as a `velocity-<pace>` class.
 
 The rate each pace starts from, by band, from `TestSalesVelocityLive`:
 
