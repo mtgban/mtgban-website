@@ -21,14 +21,8 @@
 
 {{define "extra-scripts"}}
 {{if ne .Subtitle ""}}
-<script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
-<script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
 <script type="text/javascript" src="/js/edition-combobox.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/news-filters.js?hash={{.Hash}}" defer></script>
-<script>
-    var t = document.getElementById('newsTable');
-    if (t) new Tablesort(t);
-</script>
 {{end}}
 {{end}}
 
