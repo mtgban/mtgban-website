@@ -349,10 +349,17 @@ tr.child-row td:first-child {
     .sets-toolbar-spacer { display: none; }
     .sets-sort-group { justify-content: flex-start; }
 
-    /* Tighter table cells */
-    .sets-table th, .sets-table td { padding: 5px 8px; }
+    /* Tighter table cells, and finish tags that stack: the table fits a
+       375px phone instead of scrolling its Released column out of view */
+    .sets-table th, .sets-table td { padding: 5px 6px; }
+    .sets-finish { flex-wrap: wrap; }
     .sets-name-cell a { font-size: var(--text-base); }
     .sets-name-cell .set-code { display: none; }
+}
+
+/* A 360px phone (common on Android) needs 4px more on each side */
+@media (max-width: 380px) {
+    .sets-table th, .sets-table td { padding: 5px 4px; }
 }
 
 /* iOS zooms the page into a focused field under 16px. */
