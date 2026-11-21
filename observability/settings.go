@@ -107,7 +107,7 @@ var settings = []Setting{
 	{Name: "UploadMargin", Storage: "cookie", Path: "upload", Kind: "number", Default: "10", Class: "preference", Area: "upload", Fact: "upload.value_set", FactValue: "margin"},
 	{Name: "UploadMultiplier", Storage: "cookie", Path: "upload", Kind: "number", Default: "1", Class: "preference", Area: "upload", Fact: "upload.value_set", FactValue: "multiplier"},
 	{Name: "UploadMaxQty", Storage: "cookie", Path: "upload", Kind: "number", Default: "0", Class: "preference", Area: "upload", Fact: "upload.value_set", FactValue: "maxqty"},
-	{Name: "UploadSorting", Storage: "cookie", Path: "upload", Kind: "enum", Enum: []string{"setchrono", "setalpha", "alphabetical", "highprice", "highspread", "profitability"}, Class: "preference", Area: "upload", Fact: "upload.sorting"},
+	{Name: "UploadSorting", Storage: "cookie", Path: "upload", Kind: "enum", Enum: []string{"setchrono", "setalpha", "alphabetical", "highprice", "highspread", "profitability", "storeorder"}, Class: "preference", Area: "upload", Fact: "upload.sorting"},
 	{Name: "UploadPriceSource", Storage: "cookie", Path: "upload", Kind: "enum", Enum: []string{"credit", "marketCredit"}, Class: "preference", Area: "upload", Fact: "upload.price_source"},
 	{Name: "UploadAltPrice", Storage: "cookie", Path: "upload", Kind: "blob", Default: "TCGLow", Class: "preference", Area: "upload"},
 	{Name: "UploadTiebreak", Storage: "cookie", Path: "upload", Kind: "enum", Enum: []string{"credit", "marketCredit", "consolidate", "custom"}, Class: "preference", Area: "upload"},

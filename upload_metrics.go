@@ -48,7 +48,7 @@ var uploadURLHosts = map[string]string{
 var uploadFroms = []string{"search_sidebar", "favorites", "backpack", "news", "screener", "palette", "alerts", "results_reload", "upload_form"}
 
 // uploadSorts are the result sorts upload.sorting counts.
-var uploadSorts = []string{"highprice", "alphabetical", "setalpha", "setchrono", "highspread", "profitability"}
+var uploadSorts = []string{"highprice", "alphabetical", "setalpha", "setchrono", "highspread", "profitability", "storeorder"}
 
 // uploadOptions are the optimizer options, in upload.option's order, each with its flag.
 var uploadOptions = []struct {

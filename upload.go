@@ -38,6 +38,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
+	"github.com/mtgban/mtgban-website/internal/storeorder"
 	"github.com/mtgban/mtgban-website/internal/uploadsort"
 	"github.com/mtgban/mtgban-website/internal/uploadtie"
 	"github.com/mtgban/mtgban-website/internal/xlsread"
@@ -1048,6 +1049,9 @@ func moveOptions(stores []string, from string, prices map[string]float64, blMode
 // and the optimizer's sections.
 func fillUploadResults(pageVars *UploadVars, b *matcher.Backend, p *prices, reprintParents map[string]string, st uploadSettings, ids uploadIDs, prices uploadPrices, rows uploadRows, uploadedData []UploadEntry) {
 	sortResults(b, reprintParents, uploadedData, rows.optimizedResults, st.sorting)
+	if st.sorting == "storeorder" && pageVars.IsBuylist {
+		sortStoreOrder(b, p, rows.optimizedResults)
+	}
 	numberSortTies(uploadedData, rows.optimizedResults, st.sorting)
 
 	// Split sorted entries into singles, sealed, and not-found for the tabbed view
@@ -2805,6 +2809,34 @@ func sortResults(b *matcher.Backend, reprintParents map[string]string, uploadedD
 	}
 }
 
+// sortStoreOrder lays each buylist store's table out in the order its
+// invoice lists cards (internal/storeorder), leaving a store with no order
+// of its own as it came.
+func sortStoreOrder(b *matcher.Backend, p *prices, optimizedResults map[string][]OptimizedUploadEntry) {
+	for store, entries := range optimizedResults {
+		if !storeorder.Ordered(store) {
+			continue
+		}
+		bl, err := p.vendorBuylist(store)
+		if err != nil {
+			continue
+		}
+		rows := map[string]storeorder.Row{}
+		for _, entry := range entries {
+			var fields map[string]string
+			offers := bl[entry.CardID]
+			i := pricedEntry(offers, mtgban.NM)
+			if i >= 0 {
+				fields = offers[i].CustomFields
+			}
+			rows[entry.CardID] = storeorder.For(b, store, entry.CardID, fields)
+		}
+		slices.SortStableFunc(entries, func(x, y OptimizedUploadEntry) int {
+			return storeorder.Compare(store, rows[x.CardID], rows[y.CardID])
+		})
+	}
+}
+
 // sortTie is what sortResults orders a row by: rows with the same one are a
 // tie. Under a card-data sort only the same printing ties.
 type sortTie struct {
@@ -2838,7 +2870,7 @@ func optimizedTie(entry OptimizedUploadEntry, sorting string) (sortTie, bool) {
 			return sortTie{first: entry.Spread}, true
 		}
 		return sortTie{first: entry.Profitability, second: entry.Spread}, true
-	case "alphabetical", "setalpha", "setchrono":
+	case "alphabetical", "setalpha", "setchrono", "storeorder":
 		return sortTie{id: entry.CardID}, true
 	}
 	return sortTie{}, false

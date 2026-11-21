@@ -33,7 +33,7 @@
         SearchListingPriority: ['stores', 'prices', 'credit', 'market'],
         SearchBuylistSecondary: ['priceRatio', 'creditPrice', 'marketCredit'],
         SearchSealedContents: ['contents', 'decklist', 'variable'],
-        UploadSorting: ['setchrono', 'setalpha', 'alphabetical', 'highprice', 'highspread', 'profitability'],
+        UploadSorting: ['setchrono', 'setalpha', 'alphabetical', 'highprice', 'highspread', 'profitability', 'storeorder'],
         UploadPriceSource: ['credit', 'marketCredit'],
         UploadTiebreak: ['credit', 'marketCredit', 'consolidate', 'custom'],
         SearchDefaultTab: ['sellers', 'buyers'],
