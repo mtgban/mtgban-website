@@ -1995,7 +1995,6 @@ tr.opt-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
 /* The box and the buttons beside it, right of the offer */
 .opt-cards .opt-table tbody td:last-child { display: flex; align-items: center; gap: 4px; grid-row: 2; grid-column: 2; align-self: center; }
 .opt-cards .opt-move-btn { margin: 0; }
-.opt-cards .opt-leftovers td:last-child { padding-right: 0; }
 .opt-cards tr.opt-removed { background: none !important; }
 .opt-cards tr.opt-removed .opt-art { opacity: 0.35; filter: grayscale(1); }
 .opt-cards .opt-moved > td { background: none; }
