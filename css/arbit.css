@@ -756,7 +756,12 @@ button.arb-filter-reset:disabled {
 
     /* Selector bar: stack vertically */
     .arb-selector-bar { flex-direction: column; align-items: stretch; }
-    .arb-current-store { justify-content: center; }
+    /* Stacked, the pickers line up: every label takes the longest one's
+       room, and each select fills the rest of its row */
+    .arb-current-store { justify-content: flex-start; min-width: 0; }
+    .arb-current-store .store-type { min-width: 8em; }
+    .arb-current-store .arb-store-select,
+    #arbPresetSelect { flex: 1 1 0; width: 0; min-width: 0; }
     .arb-opts-link { margin-left: 0; justify-content: center; }
     .arb-alt-stores { flex-wrap: wrap; margin-left: 0; justify-content: center; }
 
@@ -764,7 +769,9 @@ button.arb-filter-reset:disabled {
     .arb-card-cell { min-width: 140px; gap: 4px; }
     .arb-card-cell .card-name-line a { font-size: var(--text-base); }
 
-    /* Section header tighter */
+    /* Section header tighter, and not stuck: with its load buttons on a row
+       of their own it would hold a fifth of a phone screen */
+    .arb-section-header { position: static; }
     .arb-section-name { font-size: var(--text-lg); }
     .arb-load-btns { width: 100%; justify-content: flex-start; }
     .arb-page .page-header { flex-wrap: wrap; }
