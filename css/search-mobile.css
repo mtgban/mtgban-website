@@ -698,10 +698,14 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     color: var(--greytext);
     text-align: right;
 }
-/* TCGplayer's sellers/copies (tcglistings.go) need more than a quantity,
-   and every row of the card makes the same room, so the prices stay in
-   one column. */
-.m-card:has(.tcg-listings) {
+/* TCGplayer's sellers/copies (tcglistings.go) need more than a quantity.
+   A flat row has no chevron, so the count takes that track too; under a
+   chevron (a store adjustment) every row of the card makes the room, so
+   the prices stay in one column. */
+.m-vendor-flat .m-vendor-qty:has(.tcg-listings) {
+    grid-column: span 2;
+}
+.m-card:has(summary .tcg-listings) {
     --m-vendor-qty-width: 4.5em;
 }
 
