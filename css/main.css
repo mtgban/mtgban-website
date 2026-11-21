@@ -1474,6 +1474,9 @@ table.tiers td div {
     padding-right: 12px;
     white-space: nowrap;
 }
+#ban-tooltip .tip-table td + .tip-label {
+    padding-left: 12px;
+}
 #ban-tooltip .tip-table .tip-num {
     padding-left: 12px;
     text-align: right;

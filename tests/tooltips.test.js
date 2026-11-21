@@ -497,3 +497,23 @@ test('a data-tip draws its tables, numbers after a header, labels without one, a
     expect(blocks[2].children[1].children[1].children[0].tagName).toBe('STRONG');
     expect(blocks[3].textContent).toBe('Measured on 12 nonfoils');
 });
+
+test('a data-tip labels every other column without a header, and a blank line ends a table', () => {
+    const page = loadPage();
+    const rate = page.el({
+        title: 'copies: 458, days: 30/30',
+        'data-tip': '|copies|458|days|30/30\n|orders|391\n\n|last sale|$36.66 LP',
+    }, page.body, '15.3/day');
+    const cells = row => row.children.map(cell => [cell.tagName, cell.className || '', cell.textContent]);
+
+    page.move(page.body, rate);
+    const blocks = page.tip().children;
+    expect(blocks.map(block => [block.tagName, block.className || ''])).toEqual([
+        ['TABLE', 'tip-table'], ['TABLE', 'tip-table'],
+    ]);
+    expect(blocks[0].children.map(cells)).toEqual([
+        [['TD', 'tip-label', 'copies'], ['TD', '', '458'], ['TD', 'tip-label', 'days'], ['TD', '', '30/30']],
+        [['TD', 'tip-label', 'orders'], ['TD', '', '391']],
+    ]);
+    expect(blocks[1].children.map(cells)).toEqual([[['TD', 'tip-label', 'last sale'], ['TD', '', '$36.66 LP']]]);
+});

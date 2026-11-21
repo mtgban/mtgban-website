@@ -37,19 +37,24 @@ function banTooltipPlace(rect, width, height, viewportWidth) {
 }
 
 // banTipBlocks splits a data-tip into its tables and the runs of lines
-// around them.
+// around them. A blank line after a table ends it.
 function banTipBlocks(text) {
     var blocks = [];
+    var ended = false;
     text.split('\n').forEach(function (line) {
         var last = blocks[blocks.length - 1];
-        if (line.indexOf('|#') === 0) {
+        if (line === '' && last && last.table) {
+            ended = true;
+        } else if (line.indexOf('|#') === 0) {
             blocks.push({ table: true, header: banTipCells(line.slice(2)), rows: [] });
+            ended = false;
         } else if (line.charAt(0) === '|') {
-            if (!last || !last.table) {
+            if (!last || !last.table || ended) {
                 last = { table: true, header: null, rows: [] };
                 blocks.push(last);
             }
             last.rows.push(banTipCells(line.slice(1)));
+            ended = false;
         } else {
             if (!last || last.table) {
                 last = { table: false, lines: [] };
@@ -134,14 +139,14 @@ function installTitleTooltips(document, window) {
     }
 
     // A table row of cells: after a header's first column numbers, a label as
-    // a header-less table's first.
+    // every other one of a header-less table's from its first.
     function tableRow(tag, cells, headed) {
         var tr = document.createElement('tr');
         cells.forEach(function (text, i) {
             var cell = document.createElement(tag);
             if (headed && i > 0) {
                 cell.className = 'tip-num';
-            } else if (!headed && i === 0) {
+            } else if (!headed && i % 2 === 0) {
                 cell.className = 'tip-label';
             }
             appendBold(cell, text);

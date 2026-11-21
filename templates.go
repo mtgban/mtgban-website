@@ -80,9 +80,11 @@ func csvWithout(csv, drop string) string {
 
 // A tooltip's text (js/tooltips.js) marks what it sets in bold with **, and
 // may hold tables: a line starting with | is a row of cells split on |, and
-// one starting with |# is a header row, which starts a new table. A table
-// with a header sets its other columns as numbers, one without sets its
-// first column as labels, and the text after a table is its footnote.
+// one starting with |# is a header row, which starts a new table, as does a
+// row after a blank line. A table with a header sets its other columns as
+// numbers, one without sets every other column from its first as labels, a
+// row holding label and value pairs, and the text after a table is its
+// footnote.
 
 // tipBlock is one of a tooltip's tables, or a run of its lines between them.
 type tipBlock struct {
@@ -95,17 +97,22 @@ type tipBlock struct {
 // tipBlocks splits a tooltip into its tables and the lines around them.
 func tipBlocks(tip string) []tipBlock {
 	var blocks []tipBlock
+	ended := false
 	for _, line := range strings.Split(tip, "\n") {
 		last := len(blocks) - 1
 		switch {
+		case line == "" && last >= 0 && blocks[last].table:
+			ended = true
 		case strings.HasPrefix(line, "|#"):
 			blocks = append(blocks, tipBlock{table: true, header: tipCells(line[2:])})
+			ended = false
 		case strings.HasPrefix(line, "|"):
-			if last < 0 || !blocks[last].table {
+			if last < 0 || !blocks[last].table || ended {
 				blocks = append(blocks, tipBlock{table: true})
 				last++
 			}
 			blocks[last].rows = append(blocks[last].rows, tipCells(line[1:]))
+			ended = false
 		default:
 			if last < 0 || blocks[last].table {
 				blocks = append(blocks, tipBlock{})
@@ -173,10 +180,22 @@ func plainTip(tip string) string {
 }
 
 // plainTipRow is a table row as a sentence, each cell after the first after
-// its column's header, which needs no plural that way.
+// its column's header, which needs no plural that way, or with no header its
+// label and value pairs: "copies: 458, days: 30/30".
 func plainTipRow(row, header []string) string {
 	if len(row) < 2 {
 		return strings.Join(row, "")
+	}
+	if header == nil {
+		pairs := make([]string, 0, (len(row)+1)/2)
+		for i := 0; i < len(row); i += 2 {
+			pair := row[i]
+			if i+1 < len(row) {
+				pair += ": " + row[i+1]
+			}
+			pairs = append(pairs, pair)
+		}
+		return strings.Join(pairs, ", ")
 	}
 	rest := make([]string, 0, len(row)-1)
 	for i, cell := range row[1:] {
@@ -227,12 +246,13 @@ func tipHTML(tip string) template.HTML {
 }
 
 // tipCellClass is the class of a table's column: a number after a header's
-// first column, a label as a header-less table's first one.
+// first column, a label as every other one of a header-less table's from its
+// first.
 func tipCellClass(column int, headed bool) string {
 	switch {
 	case headed && column > 0:
 		return ` class="tip-num"`
-	case !headed && column == 0:
+	case !headed && column%2 == 0:
 		return ` class="tip-label"`
 	}
 	return ""
