@@ -465,7 +465,7 @@ func TestMetricsListsStoresAndRoutes(t *testing.T) {
 
 func TestPageHasMobile(t *testing.T) {
 	for label, want := range map[string]bool{"search": true, "sets": true, "newspaper/syp": true, "home": true, "admin": true,
-		"arbit": false, "reverse": false, "global": false, "upload": false, "screener": false, "privacy": true,
+		"arbit": false, "reverse": false, "global": false, "upload": false, "screener": true, "privacy": true,
 		"upload/handoff": true, "alerts/confirm": true, "api-plans": true, "user": true} {
 		if got := pageHasMobile(label); got != want {
 			t.Errorf("pageHasMobile(%s) = %v, want %v", label, got, want)
