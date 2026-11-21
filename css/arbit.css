@@ -719,6 +719,8 @@ button.arb-filter-reset:disabled {
 /* Global: each price links to the store its label names */
 .arb-table .arb-price-link { color: var(--dodgerblue); text-decoration: none; }
 .arb-table .arb-price-link:hover { text-decoration: underline; }
+/* A flagged price inside one is still the link: its warning stays on hover */
+.arb-table .arb-price-link .arb-price-warn { cursor: pointer; }
 
 .arb-legend { display: flex; gap: 16px; font-size: var(--text-base); color: var(--text-dim); margin-top: 8px; }
 .arb-legend a { color: var(--text-dim); }
