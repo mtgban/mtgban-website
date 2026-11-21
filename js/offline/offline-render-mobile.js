@@ -181,7 +181,7 @@
             }
             rows.forEach(function (r, i) {
                 html += '<div class="m-vendor-row m-vendor-flat' + (i === 0 ? ' m-best-price' : '') + '">' +
-                    '<span class="m-vendor-name">' + escapeHtml(r.name) + (i === 0 ? '<span class="m-best-badge">Best</span>' : '') + '</span>' +
+                    '<span class="m-vendor-name"><span class="m-vendor-label">' + escapeHtml(r.name) + '</span>' + (i === 0 ? '<span class="m-best-badge">Best</span>' : '') + '</span>' +
                     '<span class="m-vendor-right">' +
                     '<span class="m-vendor-price">' + (r.price > 0 ? '$ ' + money(r.price) : 'n/a') + '</span>' +
                     '<span class="m-vendor-qty">' + (r.qty > 0 ? r.qty : '') + '</span>' +
@@ -228,7 +228,7 @@
                 var ratio = (cond === 'NM' && ref > 0) ? (r.price / ref) * 100 : 0;
                 var title = ratio > 0 ? ' title="Ratio: ' + ratio.toFixed(2) + '%"' : '';
                 html += '<div class="m-vendor-row m-vendor-flat' + (i === 0 ? ' m-best-price' : '') + '"' + title + '>' +
-                    '<span class="m-vendor-name">' + escapeHtml(r.name) + (i === 0 ? '<span class="m-best-badge">Best</span>' : '') + '</span>' +
+                    '<span class="m-vendor-name"><span class="m-vendor-label">' + escapeHtml(r.name) + '</span>' + (i === 0 ? '<span class="m-best-badge">Best</span>' : '') + '</span>' +
                     '<span class="m-vendor-right">' +
                     '<span class="m-vendor-price">' + (r.price > 0 ? '$ ' + money(r.price) : 'n/a') + '</span>' +
                     '<span class="m-vendor-qty">' + (cond === 'NM' && r.qty > 0 ? r.qty : '') + '</span>' +

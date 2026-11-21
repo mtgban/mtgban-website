@@ -649,6 +649,24 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     font-size: 0.9rem;
 }
 
+/* Only the store's name gives way to the ellipsis; the badges after it
+   (Best, hotlist, Card Kingdom's wait) stay whole */
+.m-vendor-name:has(> .m-vendor-link, > .m-vendor-label) {
+    display: flex;
+    align-items: baseline;
+    column-gap: 0.25em;
+}
+.m-vendor-name > .m-vendor-link,
+.m-vendor-name > .m-vendor-label {
+    min-width: 0;
+    overflow: hidden;
+    overflow: clip visible;
+    text-overflow: ellipsis;
+}
+.m-vendor-name > :not(.m-vendor-link, .m-vendor-label) {
+    flex: none;
+}
+
 .m-vendor-name.dim {
     opacity: 0.5;
 }
@@ -658,7 +676,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 .m-vendor-name.m-vendor-restricted {
     font-style: italic;
 }
-.m-vendor-restricted > :not(.m-vendor-link) {
+.m-vendor-restricted > :not(.m-vendor-link, .m-vendor-label) {
     font-style: normal;
 }
 
