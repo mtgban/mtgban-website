@@ -691,6 +691,21 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     flex: none;
 }
 
+/* On the narrowest phones a Card Kingdom state pill and Best leave the
+   name two letters; the row's own highlight already says Best. Hidden from
+   sight only, so a screen reader still reads it. */
+@media (max-width: 374px) {
+    .m-vendor-name:has(> .bl-pill) > .m-best-badge {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: 0;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}
+
 .m-vendor-name.dim {
     opacity: 0.5;
 }
