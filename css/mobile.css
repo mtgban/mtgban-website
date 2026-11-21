@@ -14,8 +14,8 @@
     z-index: 100;
 }
 
-/* The same tier wash as the desktop bar, shorter and a touch stronger so it
-   still reads at 48px. See css/navbar.css for why each tier is named twice. */
+/* The same flat tier colour as the desktop bar. See css/navbar.css for why
+   each tier is named twice. */
 .m-nav[data-tier="vintage"] { --tier-tint: 155, 89, 182; }
 .m-nav[data-tier="legacy"]  { --tier-tint: 52, 152, 219; }
 .m-nav[data-tier="modern"]  { --tier-tint: 231, 76, 60; }
@@ -33,12 +33,7 @@
 .m-nav[data-tier="root"],
 .m-nav[data-tier="mods"],
 .m-nav[data-tier="lost boys"] {
-    background-image: linear-gradient(
-        100deg,
-        rgba(var(--tier-tint), var(--tier-wash-near, 0.26)) 0%,
-        rgba(var(--tier-tint), var(--tier-wash-far, 0.12)) 34%,
-        rgba(var(--tier-tint), 0) 72%
-    );
+    background-color: color-mix(in srgb, rgb(var(--tier-tint)) 26%, var(--background));
     border-bottom-color: rgba(var(--tier-tint), 0.45);
 }
 

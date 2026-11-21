@@ -135,6 +135,7 @@ function loadTheme(window) {
     window.matchMedia = () => ({ matches: false, addEventListener() {} });
     const document = {
         body: { classList: { toggle() {} }, setAttribute() {} },
+        querySelector: () => null,
         querySelectorAll: (sel) => (sel === '.ban-theme-toggle' ? [button] : []),
     };
     const localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, v) };
@@ -149,6 +150,32 @@ test('the theme toggle reports the pref it lands on', () => {
     button.listeners.click(ev());
     button.listeners.click(ev());
     expect(calls).toEqual([['ui.theme', 'dark', 'toggle'], ['ui.theme', 'light', 'toggle'], ['ui.theme', 'system', 'toggle']]);
+});
+
+// Safari's strip above the page takes theme-color, so the tag follows the
+// bar's colour when the theme is applied and again when it is toggled.
+test('the theme hands the bar colour to theme-color', () => {
+    const meta = { content: '' };
+    const bar = { theme: 'light' };
+    const body = { classList: { toggle(cls, on) { if (on) bar.theme = cls.split('-')[0]; } }, setAttribute() {} };
+    const document = {
+        body,
+        querySelector: (sel) => (sel === 'meta[name="theme-color"]' ? meta : sel === '.navbar-v2, .m-nav' ? bar : null),
+        querySelectorAll: () => [],
+    };
+    const window = { matchMedia: () => ({ matches: false, addEventListener() {} }) };
+    const store = new Map();
+    const localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, v) };
+    const saved = globalThis.getComputedStyle;
+    globalThis.getComputedStyle = (el) => ({ backgroundColor: el === bar ? 'bar ' + bar.theme : 'page' });
+    try {
+        new Function('window', 'document', 'localStorage', nightmode)(window, document, localStorage);
+        expect(meta.content).toBe('bar light');
+        window.BANTheme.set('dark');
+        expect(meta.content).toBe('bar dark');
+    } finally {
+        globalThis.getComputedStyle = saved;
+    }
 });
 
 test('BANTheme.cycle makes no call of its own', () => {

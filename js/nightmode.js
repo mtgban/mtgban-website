@@ -28,6 +28,16 @@
         document.querySelectorAll('.ban-theme-toggle').forEach(function (b) {
             b.title = TITLES[p];
         });
+        paintThemeColor();
+    }
+
+    // Safari paints the strip above the page in theme-color: the bar's colour,
+    // which carries the reader's tier, or the page's where there is no bar.
+    function paintThemeColor() {
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (!meta) return;
+        var bar = document.querySelector('.navbar-v2, .m-nav') || document.body;
+        meta.content = getComputedStyle(bar).backgroundColor;
     }
 
     function set(p) {

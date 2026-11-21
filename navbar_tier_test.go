@@ -103,23 +103,23 @@ func TestEveryPickedTierHasItsColour(t *testing.T) {
 	}
 }
 
-// One tier still carries its own strength, and only in one theme: the light
-// bar's pale blue turns the red mauve at the strength the others take. The
-// dark bar carries all six the same, which is what "the red is too strong and
-// the others too muted" was.
-func TestTheRedIsCarriedHarderOnlyOnTheLightBar(t *testing.T) {
-	body, err := os.ReadFile("css/navbar.css")
-	if err != nil {
-		t.Fatal(err)
-	}
-	css := string(body)
+// Both bars fill with one flat colour, every tier at one strength over the
+// page background, so a tier looks the same in either view and the strip
+// Safari paints above the page can copy the bar's colour (js/nightmode.js).
+func TestBothBarsFillWithOneFlatTierColour(t *testing.T) {
+	const fill = "background-color: color-mix(in srgb, rgb(var(--tier-tint)) 26%, var(--background));"
+	for _, file := range []string{"css/navbar.css", "css/mobile.css"} {
+		body, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		css := string(body)
 
-	if !strings.Contains(css, `body.light-theme .navbar-v2[data-tier="modern"] {`) {
-		t.Error("the light bar no longer carries the red harder")
-	}
-	// Nothing outside that rule singles the red out, so the dark bar keeps all
-	// six at one strength.
-	if strings.Count(css, `[data-tier="modern"] {`) != 1 {
-		t.Error("the red carries its own strength somewhere else too")
+		if strings.Count(css, fill) != 1 {
+			t.Errorf("%s: the tiers do not share the one flat fill", file)
+		}
+		if strings.Contains(css, "rgba(var(--tier-tint), 0)") {
+			t.Errorf("%s: the tier still fades out across the bar", file)
+		}
 	}
 }
