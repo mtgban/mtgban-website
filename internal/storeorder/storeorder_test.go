@@ -188,6 +188,22 @@ func TestInvoices(t *testing.T) {
 	}
 }
 
+// TestFoilNamedCard files a foil of the card "Foil" under its edition's foil
+// heading, ahead of the edition's non-foils, with a variation after the name
+// or none. The variation is made up: only the name before it matters.
+func TestFoilNamedCard(t *testing.T) {
+	for _, title := range []string{"Foil", "Foil (Showcase)"} {
+		rows := []Row{
+			{Edition: "Prophecy", Title: "Avatar of Woe"},
+			{Edition: "Prophecy", Title: title, Foil: true},
+		}
+		slices.SortStableFunc(rows, func(a, b Row) int { return Compare("CK", a, b) })
+		if rows[0].Title != title {
+			t.Errorf("the non-foil %s comes before the foil %s", rows[0].Title, title)
+		}
+	}
+}
+
 // TestMissingFieldsLast files rows whose entry lacks the store's fields
 // after the rest, in the order they came.
 func TestMissingFieldsLast(t *testing.T) {
