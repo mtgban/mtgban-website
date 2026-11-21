@@ -414,7 +414,7 @@
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="seller">{{$entry.ScraperName}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}}</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
-                                        <span class="m-vendor-price">{{if or $entry.PriceUnit $entry.Price}}{{$entry.PriceLabel}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-price">{{if or $entry.PriceUnit $entry.Price}}{{$entry.PriceLabel}}{{else}}n/a{{end}}{{if and $entry.Secondary (not $entry.IsEV)}}<span class="m-vendor-secondary">$ {{printf "%.2f" $entry.Secondary}}</span>{{end}}</span>
                                         <span class="m-vendor-qty"></span>
                                     </span>
                                 </div>
@@ -531,7 +531,7 @@
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="buyer">{{$entry.ScraperName}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}}</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
-                                        <span class="m-vendor-price">{{if or $entry.PriceUnit $entry.Price}}{{$entry.PriceLabel}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-price">{{if or $entry.PriceUnit $entry.Price}}{{$entry.PriceLabel}}{{else}}n/a{{end}}{{if and $entry.Secondary (not $entry.IsEV)}}<span class="m-vendor-secondary">$ {{printf "%.2f" $entry.Secondary}}</span>{{end}}</span>
                                         <span class="m-vendor-qty"></span>
                                     </span>
                                 </div>

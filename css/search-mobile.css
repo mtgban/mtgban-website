@@ -696,6 +696,16 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     font-variant-numeric: tabular-nums;
 }
 
+/* An index's second price (CM Trend, TCG Market) under its first, in the
+   same column, so the name keeps its room */
+.m-vendor-secondary {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--greytext);
+}
+
 /* Buylist offer at or above Card Kingdom's P90 (mirrors desktop .price-best) */
 .m-vendor-price.m-price-best {
     color: var(--asuccess);
