@@ -189,6 +189,11 @@
 }
 
 /* ── The tiers side by side ── */
+/* Holds the cells' screen-reader text, which is absolute: unheld, it
+   escapes the sideways scroll below and widens the page */
+.user-compare {
+    position: relative;
+}
 .user-compare-table {
     width: 100%;
     margin-top: 0.75em;
