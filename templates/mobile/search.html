@@ -411,7 +411,7 @@
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat">
                                     <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="seller">{{$entry.ScraperName}}</a>{{else}}{{$entry.ScraperName}}{{end}}
+                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="seller">{{$entry.ScraperName}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}}</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
                                         <span class="m-vendor-price">{{if or $entry.PriceUnit $entry.Price}}{{$entry.PriceLabel}}{{else}}n/a{{end}}</span>
@@ -442,7 +442,7 @@
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
                                         <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                            {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="seller">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
+                                            {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="seller">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}} {{$entry.Country}}</span>{{end}}
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
@@ -469,7 +469,7 @@
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
                                     <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="seller">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
+                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="seller">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}} {{$entry.Country}}</span>{{end}}
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
@@ -528,7 +528,7 @@
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat">
                                     <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="buyer">{{$entry.ScraperName}}</a>{{else}}{{$entry.ScraperName}}{{end}}
+                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="buyer">{{$entry.ScraperName}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}}</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
                                         <span class="m-vendor-price">{{if or $entry.PriceUnit $entry.Price}}{{$entry.PriceLabel}}{{else}}n/a{{end}}</span>
@@ -564,7 +564,7 @@
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
                                         <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                            {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="buyer">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
+                                            {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="buyer">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}} {{$entry.Country}}</span>{{end}}
                                             {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseTip}}{{buylist_pause_wait $entry.Shorthand $conditions $card.CKPauseWait}}
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
@@ -613,7 +613,7 @@
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
                                     <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="buyer">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
+                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="buyer">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}} {{$entry.Country}}</span>{{end}}
                                         {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseTip}}{{buylist_pause_wait $entry.Shorthand $conditions $card.CKPauseWait}}
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                     </span>
