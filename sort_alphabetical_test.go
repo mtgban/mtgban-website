@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/mtgban-website/internal/natcmp"
 )
 
 // TestAlphabeticalSortUsesEnglishNames is the SOA case from the site: a
@@ -231,7 +232,7 @@ func TestNumberOrderIsOneOrder(t *testing.T) {
 	for _, tc := range []struct{ a, b string }{
 		{"800", "1553"}, {"1553", "1553★"}, {"800", "1553★"}, {"12", "A-5"}, {"9", "12a"},
 	} {
-		if cmpNaturally(tc.a, tc.b) >= 0 || cmpNaturally(tc.b, tc.a) <= 0 {
+		if natcmp.Compare(tc.a, tc.b) >= 0 || natcmp.Compare(tc.b, tc.a) <= 0 {
 			t.Errorf("%s should come before %s", tc.a, tc.b)
 		}
 	}
@@ -299,7 +300,7 @@ func TestPrefixedNumbersSortByPrefixFirst(t *testing.T) {
 			if !previous.releaseDate.Equal(current.releaseDate) {
 				continue
 			}
-			if cmpNaturally(previous.numberPrefix, current.numberPrefix) > 0 {
+			if natcmp.Compare(previous.numberPrefix, current.numberPrefix) > 0 {
 				t.Errorf("%s: %s sorts before %s on one date", code, previous.co.Number, current.co.Number)
 			}
 		}

@@ -28,6 +28,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
+	"github.com/mtgban/mtgban-website/internal/natcmp"
 	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 	"github.com/mtgban/mtgban-website/internal/siteorigin"
 	"github.com/mtgban/mtgban-website/internal/suggest"
@@ -3596,12 +3597,12 @@ func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
 		if valI != valJ {
 			return valI < valJ
 		}
-	} else if c := cmpNaturally(numI, numJ); c != 0 {
+	} else if c := natcmp.Compare(numI, numJ); c != 0 {
 		return c < 0
 	}
 
 	// Numbers sharing a value (1 and 1★, 3a and 3b) stay apart
-	natural := cmpNaturally(numI, numJ)
+	natural := natcmp.Compare(numI, numJ)
 	if natural != 0 {
 		return natural < 0
 	}
@@ -3638,44 +3639,6 @@ func finishOrder(co *matcher.CardObject) int {
 		return 1
 	}
 	return 0
-}
-
-// cmpNaturally orders collector numbers as a reader does: runs of digits by
-// their value and everything else as written, so 800 < 1553 < 1553★ and
-// 12 < A-5. Readings that tie fall back to the strings, keeping it total.
-func cmpNaturally(a, b string) int {
-	i, j := 0, 0
-	for i < len(a) && j < len(b) {
-		if !isDigit(a[i]) || !isDigit(b[j]) {
-			if a[i] != b[j] {
-				return cmp.Compare(a[i], b[j])
-			}
-			i++
-			j++
-			continue
-		}
-		startI, startJ := i, j
-		for i < len(a) && isDigit(a[i]) {
-			i++
-		}
-		for j < len(b) && isDigit(b[j]) {
-			j++
-		}
-		runI := strings.TrimLeft(a[startI:i], "0")
-		runJ := strings.TrimLeft(b[startJ:j], "0")
-		if len(runI) != len(runJ) {
-			return cmp.Compare(len(runI), len(runJ))
-		}
-		c := strings.Compare(runI, runJ)
-		if c != 0 {
-			return c
-		}
-	}
-	c := cmp.Compare(len(a)-i, len(b)-j)
-	if c != 0 {
-		return c
-	}
-	return strings.Compare(a, b)
 }
 
 // digitsValue is the value of a number's first run of digits, and whether
@@ -3744,7 +3707,7 @@ func cmpSets(sortingI, sortingJ *SortingData) bool {
 
 			// Numbers with a set code prefix sort by prefix, after the plain
 			// ones, so a prefix's digits never interleave two prefixes.
-			c := cmpNaturally(sortingI.numberPrefix, sortingJ.numberPrefix)
+			c := natcmp.Compare(sortingI.numberPrefix, sortingJ.numberPrefix)
 			if c != 0 {
 				return c < 0
 			}
