@@ -17,6 +17,7 @@ for _ in $(seq 1 120); do
   [ "$("$adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break
   sleep 2
 done
+[ "$("$adb" shell getprop sys.boot_completed | tr -d '\r')" = 1 ] || { echo "Android did not boot" >&2; exit 1; }
 # Chrome reads this file only while it is the debug app; this skips the
 # first-run screen without accepting Chrome's terms on the user's behalf.
 "$adb" shell 'echo "_ --disable-fre --no-default-browser-check --no-first-run --disable-signin-promo" > /data/local/tmp/chrome-command-line'
@@ -25,6 +26,7 @@ done
 # The DevTools socket exists only while Chrome is in front: open it.
 "$adb" shell am start -a android.intent.action.VIEW -d "${START_URL:-https://mtgban.com/}" com.android.chrome >/dev/null
 for _ in $(seq 1 30); do curl -sf localhost:9222/json/version >/dev/null && break; sleep 1; done
+curl -sf localhost:9222/json/version >/dev/null || { echo "Chrome's DevTools did not come up on localhost:9222" >&2; exit 1; }
 # Keep only the newest tab: android-cdp.py drives the first page tab, and a
 # background tab is frozen and won't navigate. Tab ids count up.
 for id in $(curl -s localhost:9222/json | python3 -I -c '

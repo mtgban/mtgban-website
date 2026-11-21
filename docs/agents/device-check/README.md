@@ -137,7 +137,7 @@ Shapes to look for, each one this method has found on the site:
 - **A box that clips instead of scrolling.** `overflow: hidden` on a table
   wrapper, with `overflow-x: auto` only inside a phone media query. The
   table loses its last columns at every width from the breakpoint up to its
-  own width, laptops included (Newspaper: 310px gone at 1180, 44 at 1440).
+  own width, laptops included.
   Check the wrapper's computed `overflow-x`; `scrollLeft` moves even on a
   hidden box.
 - **Absolutely positioned content escaping a scroll box.** Screen-reader
