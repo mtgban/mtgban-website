@@ -734,6 +734,8 @@
         }
         wrap.appendChild(list);
         wrap.addEventListener("mouseleave", function () {
+            // Nothing to fold back unless the arrow or a minus held a grade open
+            if (list.getAttribute("data-shown") == null) return;
             list.removeAttribute("data-shown");
             markRows();
         });
