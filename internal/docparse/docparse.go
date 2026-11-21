@@ -371,7 +371,11 @@ func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 	}
 
 	// The seller's price is My Store Price, or Marketplace Price where that
-	// is blank or missing
+	// is blank or missing, and the market price listed first where both are
+	market, foundMarket := indexMap["price"]
+	if foundMarket && (storePrice >= 0 || marketplacePrice >= 0) {
+		indexMap["price_market"] = market
+	}
 	switch {
 	case storePrice >= 0:
 		indexMap["price"] = storePrice
@@ -600,6 +604,10 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 		res.OriginalPrice, _ = matcher.ParsePrice(record[idx])
 	}
 	idx, found = indexMap["price_backup"]
+	if found && idx < len(record) && res.OriginalPrice == 0 {
+		res.OriginalPrice, _ = matcher.ParsePrice(record[idx])
+	}
+	idx, found = indexMap["price_market"]
 	if found && idx < len(record) && res.OriginalPrice == 0 {
 		res.OriginalPrice, _ = matcher.ParsePrice(record[idx])
 	}

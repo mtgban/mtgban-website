@@ -102,7 +102,8 @@ func TestParseHeaderMtgbanExport(t *testing.T) {
 }
 
 // TCGplayer's export lists its market prices first. The seller's price is
-// My Store Price, or Marketplace Price where that is blank or missing.
+// My Store Price, or Marketplace Price where that is blank or missing, and
+// TCG Market Price where both are.
 func TestParseTCGplayerExportPrice(t *testing.T) {
 	p := &Parser{TCGSkuToUUID: func(sku string) string { return "uuid-" + sku }}
 	current := "TCGplayer Id,Product Line,Set Name,Product Name,Title,Number,Rarity,Condition,TCG Market Price,TCG Direct Low,TCG Low Price With Shipping,TCG Low Price,Total Quantity,Add to Quantity,My Store Price,TCG Marketplace Price,My Store Reserve Quantity,Photo URL"
@@ -114,6 +115,8 @@ func TestParseTCGplayerExportPrice(t *testing.T) {
 		{"My Store Price", current, "348918,Magic,Revised Edition,Underground Sea,,,R,Heavily Played,732.78,,721.99,720,,1,865,610,12,", 865},
 		{"blank My Store Price", current, "3035713,Magic,Revised Edition,Bayou,,,R,Moderately Played,,,450,450,,2,,450,0,", 450},
 		{"no My Store Price column", old, "348918,Magic,Revised Edition,Underground Sea,,,R,Heavily Played,732.78,,721.99,720,,1,610,", 610},
+		{"blank seller prices", current, "348918,Magic,Revised Edition,Underground Sea,,,R,Heavily Played,732.78,,721.99,720,,1,,,0,", 732.78},
+		{"blank Marketplace Price, no My Store Price column", old, "348918,Magic,Revised Edition,Underground Sea,,,R,Heavily Played,732.78,,721.99,720,,1,,", 732.78},
 	} {
 		indexMap, err := p.ParseHeader(strings.Split(tc.header, ","))
 		if err != nil {
