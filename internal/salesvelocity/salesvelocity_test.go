@@ -294,8 +294,8 @@ func TestRising(t *testing.T) {
 		t.Error("Snapshot.Rising disagrees with Sales.Rising")
 	}
 	_, detail, _ := s.View("up")
-	if !strings.Contains(detail, "|days with a sale|20\n|last 7 days|2.0× the pace before") {
-		t.Errorf("up: no trend line before the last sale: %q", detail)
+	if !strings.Contains(detail, "|orders|37\n\n|last 7 days|2.0× faster") {
+		t.Errorf("up: no trend line under the rule: %q", detail)
 	}
 	_, detail, _ = s.View("new")
 	if strings.Contains(detail, "last 7 days") {
@@ -303,7 +303,7 @@ func TestRising(t *testing.T) {
 	}
 	// One order before the week makes 95×, which the details cap.
 	_, detail, _ = s.View("spike")
-	if !s.Rising("spike") || !strings.Contains(detail, "|last 7 days|over 5× the pace before") {
+	if !s.Rising("spike") || !strings.Contains(detail, "|last 7 days|over 5× faster") {
 		t.Errorf("spike: got %q", detail)
 	}
 }
@@ -492,51 +492,57 @@ func TestDayQueries(t *testing.T) {
 }
 
 // TestText words each state: a rate to one decimal, under a tenth, and
-// zero with the last sale.
+// zero with the last sale, the counts as pairs and the last sale after a rule.
 func TestText(t *testing.T) {
+	day := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
 	last := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
-	const head = "**Sold on TCGplayer, last 30 days**\n"
 	for _, tc := range []struct {
 		desc         string
 		v            Sales
 		window       int
+		pace, trend  string
 		rate, detail string
 	}{
-		{"a rate", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last}, 30, "2.3/day",
-			head + "|copies|69\n|orders|31\n|days with a sale|18\n|last sale|2026-10-11"},
-		{"rounded to one decimal", Sales{Copies: 74, Orders: 60, Days: 25, LastSale: last}, 30, "2.5/day",
-			head + "|copies|74\n|orders|60\n|days with a sale|25\n|last sale|2026-10-11"},
-		{"a whole number keeps its decimal", Sales{Copies: 60, Orders: 50, Days: 30, LastSale: last}, 30, "2.0/day",
-			head + "|copies|60\n|orders|50\n|days with a sale|30\n|last sale|2026-10-11"},
-		{"a tenth", Sales{Copies: 3, Orders: 3, Days: 3, LastSale: last}, 30, "0.1/day",
-			head + "|copies|3\n|orders|3\n|days with a sale|3\n|last sale|2026-10-11"},
-		{"under a tenth", Sales{Copies: 2, Orders: 2, Days: 1, LastSale: last}, 30, "<0.1/day",
-			head + "|copies|2\n|orders|2\n|days with a sale|1\n|last sale|2026-10-11"},
-		{"zero", Sales{LastSale: time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)}, 30, "0/day",
-			head + "no sale in the window; last sold 2026-09-02"},
-		{"a price and condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 12.34, LastCondition: "LP"}, 30, "2.3/day",
-			head + "|copies|69\n|orders|31\n|days with a sale|18\n|last sale|$12.34 LP · 2026-10-11"},
-		{"a price with no condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 12.34}, 30, "2.3/day",
-			head + "|copies|69\n|orders|31\n|days with a sale|18\n|last sale|$12.34 · 2026-10-11"},
-		{"a price and an unabbreviated condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 89.99, LastCondition: "Unopened"}, 30, "2.3/day",
-			head + "|copies|69\n|orders|31\n|days with a sale|18\n|last sale|$89.99 Unopened · 2026-10-11"},
-		{"a price under a dollar", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 0.5}, 30, "2.3/day",
-			head + "|copies|69\n|orders|31\n|days with a sale|18\n|last sale|$0.50 · 2026-10-11"},
-		{"zero with a price", Sales{LastSale: time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC), LastPrice: 12.34, LastCondition: "LP"}, 30, "0/day",
-			head + "no sale in the window; last sold 2026-08-02 for $12.34 LP"},
-		{"zero with a price and no condition", Sales{LastSale: time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC), LastPrice: 12.34}, 30, "0/day",
-			head + "no sale in the window; last sold 2026-08-02 for $12.34"},
-		{"another window", Sales{Copies: 7, Orders: 7, Days: 5, LastSale: last}, 7, "1.0/day",
-			"**Sold on TCGplayer, last 7 days**\n|copies|7\n|orders|7\n|days with a sale|5\n|last sale|2026-10-11"},
+		{"a rate", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last}, 30, "", "", "2.3/day",
+			"|copies|69|days|18/30\n|orders|31\n\n|last sale|Oct 11"},
+		{"rounded to one decimal", Sales{Copies: 74, Orders: 60, Days: 25, LastSale: last}, 30, "", "", "2.5/day",
+			"|copies|74|days|25/30\n|orders|60\n\n|last sale|Oct 11"},
+		{"a whole number keeps its decimal", Sales{Copies: 60, Orders: 50, Days: 30, LastSale: last}, 30, "", "", "2.0/day",
+			"|copies|60|days|30/30\n|orders|50\n\n|last sale|Oct 11"},
+		{"a tenth", Sales{Copies: 3, Orders: 3, Days: 3, LastSale: last}, 30, "", "", "0.1/day",
+			"|copies|3|days|3/30\n|orders|3\n\n|last sale|Oct 11"},
+		{"under a tenth", Sales{Copies: 2, Orders: 2, Days: 1, LastSale: last}, 30, "", "", "<0.1/day",
+			"|copies|2|days|1/30\n|orders|2\n\n|last sale|Oct 11"},
+		{"pace and trend", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last}, 30, "|vs. $30+|top 8%", "|last 7 days|2.1× faster", "2.3/day",
+			"|copies|69|days|18/30\n|orders|31|vs. $30+|top 8%\n\n|last 7 days|2.1× faster\n|last sale|Oct 11"},
+		{"no last sale", Sales{Copies: 69, Orders: 31, Days: 18}, 30, "", "", "2.3/day",
+			"|copies|69|days|18/30\n|orders|31"},
+		{"zero", Sales{LastSale: time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)}, 30, "", "", "0/day",
+			"no sale in 30 days\n|last sale|Sep 2"},
+		{"zero with no sale in the year", Sales{}, 30, "", "", "0/day", "no sale in 30 days"},
+		{"a sale last year", Sales{LastSale: time.Date(2025, 11, 20, 0, 0, 0, 0, time.UTC)}, 30, "", "", "0/day",
+			"no sale in 30 days\n|last sale|Nov 20, 2025"},
+		{"a price and condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 12.34, LastCondition: "LP"}, 30, "", "", "2.3/day",
+			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$12.34 LP · Oct 11"},
+		{"a price with no condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 12.34}, 30, "", "", "2.3/day",
+			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$12.34 · Oct 11"},
+		{"a price and an unabbreviated condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 89.99, LastCondition: "Unopened"}, 30, "", "", "2.3/day",
+			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$89.99 Unopened · Oct 11"},
+		{"a price under a dollar", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 0.5}, 30, "", "", "2.3/day",
+			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$0.50 · Oct 11"},
+		{"zero with a price", Sales{LastSale: time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC), LastPrice: 12.34, LastCondition: "LP"}, 30, "", "", "0/day",
+			"no sale in 30 days\n|last sale|$12.34 LP · Aug 2"},
+		{"another window", Sales{Copies: 7, Orders: 7, Days: 5, LastSale: last}, 7, "", "", "1.0/day",
+			"|copies|7|days|5/7\n|orders|7\n\n|last sale|Oct 11"},
 	} {
-		rate, detail := text(tc.v, tc.window)
+		rate, detail := text(tc.v, tc.window, day, tc.pace, tc.trend)
 		if rate != tc.rate || detail != tc.detail {
 			t.Errorf("%s: got %q, %q; want %q, %q", tc.desc, rate, detail, tc.rate, tc.detail)
 		}
 	}
 }
 
-// TestViewPace words a graded card's band in its details, before the last sale.
+// TestViewPace words a graded card's band in its details, ending the orders row.
 func TestViewPace(t *testing.T) {
 	last := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
 	s := snapshotOf(map[string]*Sales{
@@ -546,11 +552,10 @@ func TestViewPace(t *testing.T) {
 		"zero":    {LastSale: last, Pace: PaceSlow},
 	})
 	s.Bands = []Band{{0, 30}, {30, 0}}
-	const head = "**Sold on TCGplayer, last 30 days**\n"
 	for card, want := range map[string]string{
-		"fast":    head + "|copies|69\n|orders|31\n|days with a sale|18\n|vs. cards at $30+|faster than 92%\n|last sale|2026-10-11",
-		"slowest": head + "|copies|1\n|orders|1\n|days with a sale|1\n|vs. cards under $30|among the slowest\n|last sale|2026-10-11",
-		"zero":    head + "no sale in the window; last sold 2026-10-11",
+		"fast":    "|copies|69|days|18/30\n|orders|31|vs. $30+|top 8%\n\n|last sale|Oct 11",
+		"slowest": "|copies|1|days|1/30\n|orders|1|vs. under $30|slowest\n\n|last sale|Oct 11",
+		"zero":    "no sale in 30 days\n|last sale|Oct 11",
 	} {
 		_, detail, _ := s.View(card)
 		if detail != want {
@@ -562,7 +567,7 @@ func TestViewPace(t *testing.T) {
 	}
 	s.Bands = []Band{{}}
 	_, detail, _ := s.View("all")
-	if !strings.Contains(detail, "|vs. all cards|among the slowest\n") {
+	if !strings.Contains(detail, "|vs. all|slowest\n") {
 		t.Errorf("one band: got %q", detail)
 	}
 	if s.Pace("missing") != PaceNone || (*Snapshot)(nil).Pace("card") != PaceNone {
@@ -574,7 +579,7 @@ func TestViewPace(t *testing.T) {
 func TestView(t *testing.T) {
 	v := Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
 	s := snapshotOf(map[string]*Sales{"card": &v})
-	wantRate, wantDetail := text(v, Window)
+	wantRate, wantDetail := text(v, Window, s.Day, "", "")
 	rate, detail, _ := s.View("card")
 	if rate != wantRate || detail != wantDetail {
 		t.Errorf("card: got %q, %q; want %q, %q", rate, detail, wantRate, wantDetail)

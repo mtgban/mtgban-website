@@ -584,6 +584,30 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 .sales-velocity .m-vendor-price.velocity-fastest {
     font-weight: 700;
 }
+.sales-velocity .m-detail-note .tip-table {
+    width: 100%;
+}
+.sales-velocity .m-detail-note .tip-table td {
+    white-space: nowrap;
+}
+.sales-velocity .m-detail-note .tip-table td:not(.tip-label) {
+    color: var(--normaltext);
+}
+.sales-velocity .m-detail-note .tip-table td:nth-child(2):not(:last-child) {
+    width: 100%;
+}
+.sales-velocity .m-detail-note .tip-table td:nth-child(4),
+.sales-velocity .m-detail-note .tip-table:not(:first-child) td:last-child {
+    text-align: right;
+}
+.sales-velocity .m-detail-note .tip-table td + .tip-label {
+    padding-left: 0.75rem;
+}
+.sales-velocity .m-detail-note .tip-table:not(:first-child) {
+    margin-top: 0.3rem;
+    padding-top: 0.3rem;
+    border-top: 1px solid var(--border-subtle);
+}
 .m-vendor-row.sales-velocity-upsell {
     display: block;
     padding: 0.3rem 0.75rem;
