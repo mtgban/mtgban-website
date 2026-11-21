@@ -20,10 +20,26 @@
 /* Compact the bar so all controls plus the right-aligned actions fit one row. */
 .screener-filter-bar {
     gap: 5px;
+    position: relative;
 }
-/* That row is 1302px with the Editions group: narrower, it wraps */
+/* That row is 1302px with the Editions group: narrower, it wraps. Editions
+   can then land anywhere on a line, and a menu hung from it runs off one
+   side, so the menu spans the bar under that line, in columns. */
 @container (width < max(1310px, 77.1rem)) {
     .screener-filter-bar .toolbar-sep { display: none; }
+    .screener-filter-bar .screener-editions { position: static; }
+    .screener-filter-bar .screener-editions-menu {
+        top: auto;
+        left: 0;
+        right: 0;
+        width: auto;
+        max-width: none;
+        margin-top: 4px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(16em, 100%), 1fr));
+        column-gap: 16px;
+        align-content: start;
+    }
 }
 .screener-filter-bar .news-fg {
     gap: 4px;
