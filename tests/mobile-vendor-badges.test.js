@@ -25,3 +25,16 @@ test('a store name truncates alone and its badges stay whole', () => {
     const offline = read('js/offline/offline-render-mobile.js');
     expect(offline.match(/<span class="m-vendor-label">' \+ escapeHtml\(r\.name\) \+ '<\/span>' \+ \(i === 0 \? '<span class="m-best-badge">/g).length).toBe(2);
 });
+
+// Under 375px a state pill and Best together leave a store's name about two
+// letters, so Best steps aside there: the highlighted row still says it.
+test('Best gives way to a state pill on the narrowest phones', () => {
+    const css = read('css/search-mobile.css');
+    const block = css.match(/@media \(max-width: 374px\) \{\s*\.m-vendor-name:has\(> \.bl-pill\) > \.m-best-badge \{([^}]*)\}/);
+    expect(block, 'expected the narrow-phone rule').toBeTruthy();
+    // Out of sight and out of the layout, but still read aloud.
+    expect(block[1]).not.toMatch(/display:\s*none/);
+    expect(block[1]).toMatch(/position:\s*absolute;/);
+    expect(block[1]).toMatch(/width:\s*1px;/);
+    expect(block[1]).toMatch(/clip-path:\s*inset\(50%\);/);
+});
