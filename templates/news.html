@@ -98,8 +98,8 @@
                 {{if $.CanFilterByPrice}}
                 <div class="news-fg">
                     <span class="news-fl">Price</span>
-                    <input type="text" name="min_price" {{if $.FilterMinPrice}}value="{{$.FilterMinPrice}}"{{end}} placeholder="Min $">
-                    <input type="text" name="max_price" {{if $.FilterMaxPrice}}value="{{$.FilterMaxPrice}}"{{end}} placeholder="Max $">
+                    <input type="text" name="min_price" {{if $.FilterMinPrice}}value="{{$.FilterMinPrice}}"{{end}} placeholder="Min $" inputmode="decimal">
+                    <input type="text" name="max_price" {{if $.FilterMaxPrice}}value="{{$.FilterMaxPrice}}"{{end}} placeholder="Max $" inputmode="decimal">
                 </div>
                 <span class="toolbar-sep"></span>
                 {{end}}
