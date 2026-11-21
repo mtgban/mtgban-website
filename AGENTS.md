@@ -360,6 +360,16 @@ commit to this repo can complete on its own.
 plan for it. Read it there; this file does not copy it, since a copy goes
 stale the moment an item lands.
 
+## Task-specific guides
+
+- **Checking the site on phones and tablets, or at every width**: read
+  `docs/agents/device-check/README.md` before starting. It covers:
+  - the layout probe and the sweep that runs it over every page and width;
+  - iPhone and iPad Safari in the iOS Simulator;
+  - Chrome on an Android emulator, with JS over DevTools;
+  - the false positives each tool produces;
+  - proving a CSS fix on the live page before it deploys.
+
 ## Gotchas
 
 - `TestMain` loads `allprintings5.json` from the repo root; without it the
