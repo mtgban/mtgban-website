@@ -3193,6 +3193,54 @@ body.modal-embed .cp-overlay {
     .rows-index .price-row > .index-label-3 { grid-column: 4; }
 }
 
+/* The tight two-column band again, for every row of both columns: a row's
+   price cell stacks what follows the price (an index's second price, a
+   store's quantity or listings, a sealed index's Sim median and spread)
+   under it, so the price columns close up to one and the store names keep
+   their room. After the subgrid rules, which it overrides, as it does the
+   buyers' 7em track above. */
+@container search-results (560px < width <= 720px) {
+    .rows-main {
+        grid-template-columns: 1fr auto;
+    }
+    .rows-main .price-right {
+        grid-column: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: center;
+        line-height: 1.1;
+    }
+    .rows-main .price-right > .secondary,
+    .rows-main .price-right > .qty {
+        font-size: 0.8em;
+        opacity: 0.7;
+    }
+
+    .rows-index {
+        grid-template-columns: 1fr auto;
+    }
+    .rows-index .price-row > .index-label-2,
+    .rows-index .price-row > .index-label-3 { display: none; }
+    .rows-index .price-right.index-cols {
+        grid-column: 2;
+        grid-template-columns: auto auto;
+        justify-content: end;
+        justify-items: end;
+        gap: 0 0.5em;
+        line-height: 1.1;
+    }
+    .rows-index .index-cols > .price:first-child { grid-column: 1 / -1; }
+    .rows-index .index-cols > .price:nth-child(n+2) {
+        grid-template-columns: auto auto auto;
+        font-size: 0.75em;
+        opacity: 0.75;
+    }
+    /* Only under the EV header: without it the columns are not simulations. */
+    .rows-index:has(.index-label) .index-cols > .price:nth-child(2)::before { content: "Sim"; }
+    .rows-index:has(.index-label) .index-cols > .price:nth-child(3)::before { content: "±"; }
+}
+
 /* ── No-results suggestions (did you mean / broader searches) ── */
 .search-suggestions {
     margin-top: 1.5em;
