@@ -3195,9 +3195,8 @@ body.modal-embed .cp-overlay {
 
 /* The tight two-column band again, for every row of both columns: a row's
    price cell stacks what follows the price (an index's second price, a
-   store's quantity or listings, a sealed index's Sim median and spread)
-   under it, so the price columns close up to one and the store names keep
-   their room. After the subgrid rules, which it overrides, as it does the
+   store's quantity or listings) under it, so the price columns close up to
+   one and the store names keep their room. After the subgrid rules, which it overrides, as it does the
    buyers' 7em track above. */
 @container search-results (560px < width <= 720px) {
     .rows-main {
@@ -3222,15 +3221,15 @@ body.modal-embed .cp-overlay {
     }
     .rows-index .price-row > .index-label-2,
     .rows-index .price-row > .index-label-3 { display: none; }
-    .rows-index .price-right.index-cols {
-        grid-column: 2;
-        grid-template-columns: auto auto;
-        justify-content: end;
-        justify-items: end;
-        gap: 0 0.5em;
-        line-height: 1.1;
-    }
-    .rows-index .index-cols > .price:first-child { grid-column: 1 / -1; }
+    /* A sealed index's prices join the row's grid: EV beside the name, the
+       Sim median under the name and the spread under EV, so the price
+       column is only as wide as EV. */
+    .rows-index > .price-row { row-gap: 0; line-height: 1.1; }
+    .rows-index .price-right.index-cols { display: contents; }
+    .rows-index .price-row > .store-name { grid-row: 1; }
+    .rows-index .index-cols > .price:first-child { grid-column: 2; grid-row: 1; }
+    .rows-index .index-cols > .price:nth-child(2) { grid-column: 1; grid-row: 2; }
+    .rows-index .index-cols > .price:nth-child(3) { grid-column: 2; grid-row: 2; }
     .rows-index .index-cols > .price:nth-child(n+2) {
         grid-template-columns: auto auto auto;
         font-size: 0.75em;

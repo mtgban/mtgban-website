@@ -22,11 +22,15 @@ test('the band stacks a row\'s quantity and second price under its price', () =>
     expect(block).not.toMatch(/\.qty[^{]*\{[^}]*display: none/);
 });
 
-test('the band stacks a sealed index\'s Sim median and spread under its EV', () => {
+test('the band puts a sealed index\'s Sim median under its name and spread under its EV', () => {
     const block = bandBlock();
     expect(block).toMatch(/\.rows-index \{\n\s+grid-template-columns: 1fr auto;/);
     expect(block).toMatch(/\.index-label-2,\n\s+\.rows-index \.price-row > \.index-label-3 \{ display: none; \}/);
-    expect(block).toMatch(/\.index-cols > \.price:first-child \{ grid-column: 1 \/ -1; \}/);
+    // The prices join the row's grid, so the price column is only as wide as EV.
+    expect(block).toMatch(/\.rows-index \.price-right\.index-cols \{ display: contents; \}/);
+    expect(block).toMatch(/\.index-cols > \.price:first-child \{ grid-column: 2; grid-row: 1; \}/);
+    expect(block).toMatch(/\.index-cols > \.price:nth-child\(2\) \{ grid-column: 1; grid-row: 2; \}/);
+    expect(block).toMatch(/\.index-cols > \.price:nth-child\(3\) \{ grid-column: 2; grid-row: 2; \}/);
     // Labelled only under the EV header: a section without one is not simulated.
     expect(block).toMatch(/\.rows-index:has\(\.index-label\) \.index-cols > \.price:nth-child\(2\)::before \{ content: "Sim"; \}/);
     expect(block).toMatch(/\.rows-index:has\(\.index-label\) \.index-cols > \.price:nth-child\(3\)::before \{ content: "±"; \}/);
