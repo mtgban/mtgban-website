@@ -1838,12 +1838,13 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 
 	percMargin := 1.0
 	if useMargin {
-		// A margin neither posted nor saved, or not a number, is the page's 10%
+		// A margin neither posted nor saved, or not a number, is the page's
+		// 10%; one over 100 is 100, which lists every store
 		margin, err := strconv.ParseFloat(getUploadSetting(r, "margin", "UploadMargin"), 64)
 		if err != nil || math.IsNaN(margin) || margin < 0 {
 			margin = defaultUploadMargin
 		}
-		percMargin = 1 - margin/100.0
+		percMargin = 1 - min(margin, 100)/100.0
 	}
 
 	visualPerc := VisualPercSpread
