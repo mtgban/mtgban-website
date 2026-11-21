@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <meta name="theme-color" content="#ff0000">
+    <meta name="theme-color" content="#f8f8f8">
     <title>Upload too large - BAN</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=optional">
     <style>
@@ -88,7 +88,10 @@
             try {
                 var v = localStorage.getItem('theme');
                 var dark = v === 'dark' || (v !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                if (dark) document.documentElement.classList.add('dark');
+                if (dark) {
+                    document.documentElement.classList.add('dark');
+                    document.querySelector('meta[name="theme-color"]').content = '#161616';
+                }
             } catch (e) {}
         })();
     </script>
