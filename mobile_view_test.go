@@ -194,3 +194,24 @@ func TestSearchListsTheStoresOnlyForAPhone(t *testing.T) {
 		}
 	}
 }
+
+// A phone's menu lists the Screener and the TCG Syp List: both render in the
+// mobile layout (the Syp list as phone cards), and neither is desktop only.
+func TestPhoneMenuListsScreenerAndSyp(t *testing.T) {
+	nav := filterNavForMobile([]NavElem{
+		{Name: "Newspaper"}, {Name: "TCG Syp List"}, {Name: "Screener (Beta)"}, {Name: "Upload"},
+	})
+	var names []string
+	for _, n := range nav {
+		names = append(names, n.Name)
+	}
+	want := []string{"Newspaper", "TCG Syp List", "Screener (Beta)"}
+	if !slices.Equal(names, want) {
+		t.Errorf("phone menu %v, want %v", names, want)
+	}
+	for _, name := range []string{"TCG Syp List", "Screener (Beta)"} {
+		if desktopOnly(name) {
+			t.Errorf("%s is desktop only, so a phone menu link would leave the mobile view", name)
+		}
+	}
+}
