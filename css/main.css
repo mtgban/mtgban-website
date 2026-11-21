@@ -1129,7 +1129,7 @@ th nobr {
   white-space: normal;
 }
 
-/* Sortable table headers (tablesort library) */
+/* Sortable table headers: a th with role=columnheader shows its aria-sort (alerts, the upload optimizer) */
 th[role=columnheader]:not([data-sort-method='none']) {
     cursor: pointer;
     user-select: none;
