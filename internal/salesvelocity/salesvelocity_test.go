@@ -294,16 +294,16 @@ func TestRising(t *testing.T) {
 		t.Error("Snapshot.Rising disagrees with Sales.Rising")
 	}
 	_, detail, _ := s.View("up")
-	if !strings.Contains(detail, "|orders|37\n\n|last 7 days|2.0× faster") {
+	if !strings.Contains(detail, "|orders|37\n\n|7-day trend|2.0×") {
 		t.Errorf("up: no trend line under the rule: %q", detail)
 	}
 	_, detail, _ = s.View("new")
-	if strings.Contains(detail, "last 7 days") {
+	if strings.Contains(detail, "7-day trend") {
 		t.Errorf("new: a trend line: %q", detail)
 	}
 	// One order before the week makes 95×, which the details cap.
 	_, detail, _ = s.View("spike")
-	if !s.Rising("spike") || !strings.Contains(detail, "|last 7 days|over 5× faster") {
+	if !s.Rising("spike") || !strings.Contains(detail, "|7-day trend|over 5×") {
 		t.Errorf("spike: got %q", detail)
 	}
 }
@@ -513,8 +513,8 @@ func TestText(t *testing.T) {
 			"|copies|3|days|3/30\n|orders|3\n\n|last sale|Oct 11"},
 		{"under a tenth", Sales{Copies: 2, Orders: 2, Days: 1, LastSale: last}, 30, "", "", "<0.1/day",
 			"|copies|2|days|1/30\n|orders|2\n\n|last sale|Oct 11"},
-		{"pace and trend", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last}, 30, "|vs. $30+|top 8%", "|last 7 days|2.1× faster", "2.3/day",
-			"|copies|69|days|18/30\n|orders|31|vs. $30+|top 8%\n\n|last 7 days|2.1× faster\n|last sale|Oct 11"},
+		{"pace and trend", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last}, 30, "|vs. $30+|top 8%", "|7-day trend|2.1×", "2.3/day",
+			"|copies|69|days|18/30\n|orders|31|vs. $30+|top 8%\n\n|7-day trend|2.1×\n|last sale|Oct 11"},
 		{"no last sale", Sales{Copies: 69, Orders: 31, Days: 18}, 30, "", "", "2.3/day",
 			"|copies|69|days|18/30\n|orders|31"},
 		{"zero", Sales{LastSale: time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)}, 30, "", "", "0/day",
@@ -547,6 +547,8 @@ func TestViewPace(t *testing.T) {
 	last := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
 	s := snapshotOf(map[string]*Sales{
 		"fast":    {Copies: 69, Orders: 31, Days: 18, LastSale: last, Pace: PaceFastest, Band: 1, Outsells: 92},
+		"half":    {Copies: 9, Orders: 9, Days: 9, LastSale: last, Pace: PaceSteady, Band: 1, Outsells: 50},
+		"slow":    {Copies: 2, Orders: 2, Days: 2, LastSale: last, Pace: PaceSlow, Band: 1, Outsells: 20},
 		"slowest": {Copies: 1, Orders: 1, Days: 1, LastSale: last, Pace: PaceSlow},
 		"all":     {Copies: 1, Orders: 1, Days: 1, LastSale: last, Pace: PaceSlow},
 		"zero":    {LastSale: last, Pace: PaceSlow},
@@ -554,6 +556,8 @@ func TestViewPace(t *testing.T) {
 	s.Bands = []Band{{0, 30}, {30, 0}}
 	for card, want := range map[string]string{
 		"fast":    "|copies|69|days|18/30\n|orders|31|vs. $30+|top 8%\n\n|last sale|Oct 11",
+		"half":    "|copies|9|days|9/30\n|orders|9|vs. $30+|top 50%\n\n|last sale|Oct 11",
+		"slow":    "|copies|2|days|2/30\n|orders|2|vs. $30+|bottom 20%\n\n|last sale|Oct 11",
 		"slowest": "|copies|1|days|1/30\n|orders|1|vs. under $30|slowest\n\n|last sale|Oct 11",
 		"zero":    "no sale in 30 days\n|last sale|Oct 11",
 	} {

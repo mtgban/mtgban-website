@@ -86,8 +86,10 @@ the one below it, and ranks each card by the share of its band it outsells:
 
 Shares rather than set rates keep the colours right for every game, each
 grading its own cards. The details add a line naming the band and the share,
-`vs. $10–30 | top 8%`, or `slowest` for a card no faster than any. The search row, on both layouts, and
-the other pages' rate take the colour as a `velocity-<pace>` class.
+`vs. $10–30 | top 8%`, `bottom 20%` for a card that outsells fewer than half
+its band, 20 being the share it outsells, or `slowest` for one no faster than
+any. The search row, on both layouts, and the other pages' rate take the
+colour as a `velocity-<pace>` class.
 
 The rate each pace starts from, by band, from `TestSalesVelocityLive`:
 
@@ -105,12 +107,12 @@ The rate each pace starts from, by band, from `TestSalesVelocityLive`:
 
 An arrow, `↑`, leads the rate of a card selling at least twice as fast in the
 window's last 7 days as in the 23 before them, with the details' line
-`last 7 days | 2.4× faster`, against those 23 days. It counts orders rather than copies, so
+`7-day trend | 2.4×`, against those 23 days. It counts orders rather than copies, so
 one buyer taking a stack does not make a trend, and it needs 30 orders in the
 window: with fewer, chance alone moves a card that far too often. A card first
 sold in the window has no pace before it, so a new set's cards, all selling
 more each day of their first weeks, are left out rather than all marked.
-Past 5× the line reads `over 5× faster`: by then the days before hold an order or
+Past 5× the line reads `over 5×`: by then the days before hold an order or
 two, and a figure like 95× measures them rather than the trend.
 
 Only a rise is marked. A card slowing to half its pace is mostly chance at

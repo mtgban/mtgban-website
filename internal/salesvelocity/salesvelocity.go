@@ -753,8 +753,10 @@ func paceCells(v Sales, bands []Band) string {
 		peers = strings.TrimPrefix(label, "at ")
 	}
 	rank := "slowest"
-	if v.Outsells > 0 {
+	if v.Outsells >= 50 {
 		rank = "top " + strconv.Itoa(max(100-int(v.Outsells), 1)) + "%"
+	} else if v.Outsells > 0 {
+		rank = "bottom " + strconv.Itoa(int(v.Outsells)) + "%"
 	}
 	return "|vs. " + peers + "|" + rank
 }
@@ -766,9 +768,9 @@ func trendLine(rising float64) string {
 		return ""
 	}
 	if rising > trendCap {
-		return fmt.Sprintf("|last %d days|over %d× faster", TrendDays, trendCap)
+		return fmt.Sprintf("|%d-day trend|over %d×", TrendDays, trendCap)
 	}
-	return fmt.Sprintf("|last %d days|%.1f× faster", TrendDays, rising)
+	return fmt.Sprintf("|%d-day trend|%.1f×", TrendDays, rising)
 }
 
 // Heading names the details, for a tooltip showing them away from the sales row.
