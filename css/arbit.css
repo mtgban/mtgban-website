@@ -716,6 +716,9 @@ button.arb-filter-reset:disabled {
 .arb-qlink.buy:hover { background: rgba(30,144,255,0.18); text-decoration: none; }
 .arb-qlink.sell { background: rgba(210,153,34,0.08); color: var(--awarning); border: 1px solid rgba(210,153,34,0.15); }
 .arb-qlink.sell:hover { background: rgba(210,153,34,0.18); text-decoration: none; }
+/* Global: each price links to the store its label names */
+.arb-table .arb-price-link { color: var(--dodgerblue); text-decoration: none; }
+.arb-table .arb-price-link:hover { text-decoration: underline; }
 
 .arb-legend { display: flex; gap: 16px; font-size: var(--text-base); color: var(--text-dim); margin-top: 8px; }
 .arb-legend a { color: var(--text-dim); }

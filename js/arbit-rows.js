@@ -19,7 +19,8 @@
     document.addEventListener('click', function (e) {
         var t = e.target;
         if (!t || typeof t.closest !== 'function') return;
-        var link = t.closest('.arb-qlink');
+        // Arbitrage's Buy/Sell buttons, or a price Global links to its store.
+        var link = t.closest('.arb-qlink, .arb-price-link');
         if (link) {
             var section = link.closest('.arb-section');
             if (!section) return;

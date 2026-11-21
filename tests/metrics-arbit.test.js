@@ -48,8 +48,8 @@ test('the selects, the section, the reference link and the contents link carry w
     expect(tagsWith(arbit, 'location.hash = this.value')[0]).toContain('data-pick="jump"');
     expect(tagsWith(arbit, 'id="arbPresetSelect"')[0]).not.toContain('data-pick');
     expect(arbit).toContain('<div class="arb-section" data-fold data-store="{{$arb.Key}}">');
-    expect(tagsWith(arbit, 'href="{{.ReferenceEntry.URL}}"')[0]).toContain('class="arb-qlink buy ref"');
-    expect(tagsWith(arbit, 'href="{{.InventoryEntry.URL}}"')[0]).toContain('class="arb-qlink buy"');
+    expect(tagsWith(arbit, 'href="{{.ReferenceEntry.URL}}"').map((t) => t.match(/class="([^"]*)"/)[1])).toEqual(['arb-price-link buy ref']);
+    expect(tagsWith(arbit, 'href="{{.InventoryEntry.URL}}"').map((t) => t.match(/class="([^"]*)"/)[1])).toEqual(['arb-price-link buy', 'arb-qlink buy']);
     expect(tagsWith(arbit, 'title="Search what can be found in this product"')[0]).toContain('class="arb-contents"');
     expect(arbit).toContain('<script type="text/javascript" src="/js/arbit-rows.js?hash={{$.Hash}}" defer></script>');
 });
@@ -275,7 +275,7 @@ function inSection(classes, { store = 'CK', section = true, thead = false, type 
         closest: (sel) => {
             if (sel === '.arb-section') return section ? sec : null;
             if (sel === '.arb-section thead') return section && thead ? {} : null;
-            return classes.includes(sel.slice(1)) ? el : null;
+            return sel.split(',').some((one) => classes.includes(one.trim().slice(1))) ? el : null;
         },
     };
     return el;
@@ -292,6 +292,15 @@ test('a row link is told apart by its classes and carries the section store', ()
         ['ui.arbit.quick_link', 'buy', 'CK'], ['ui.arbit.quick_link', 'sell', 'CK'],
         ['ui.arbit.quick_link', 'buy_reference', 'SCG'], ['ui.arbit.quick_link', 'buy', 'other'],
     ]);
+});
+
+// Global's prices are its buy links, and count as the buttons they replace.
+test('a price link counts as the buy link it stands for', () => {
+    const { BAN, calls } = fakeBAN();
+    const fire = loadListeners('js/arbit-rows.js', { BAN });
+    fire('click', inSection(['arb-price-link', 'buy']));
+    fire('click', inSection(['arb-price-link', 'buy', 'ref'], { store: 'SCG' }));
+    expect(calls).toEqual([['ui.arbit.quick_link', 'buy', 'CK'], ['ui.arbit.quick_link', 'buy_reference', 'SCG']]);
 });
 
 test('a section store takes every shorthand the server accepts, and nothing else', () => {
