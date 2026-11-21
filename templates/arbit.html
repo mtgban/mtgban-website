@@ -467,7 +467,7 @@
                             <th class="c">Ratio</th>
                         {{end}}
                     {{end}}
-                    <th class="c">Links</th>
+                    {{if not $.GlobalMode}}<th class="c">Links</th>{{end}}
                     <th class="c"><input type="checkbox" checked autocomplete="off" title="Toggle all" onchange="window.toggleAllArbitRows && toggleAllArbitRows(this)"></th>
                 </tr>
                 </thead>
@@ -504,13 +504,23 @@
                                 {{end}}
                             </td>
                         {{end}}
-                        <td class="m pc-key" data-label="{{if $.GlobalMode}}{{if $sealedSource}}{{$save.Name}}{{else}}{{index $.StoreNames $.ScraperShort}}{{end}}{{else}}Sell Price{{end}}">
-                            $ {{printf "%.2f" .InventoryEntry.Price}}
+                        {{$invName := index $.StoreNames $.ScraperShort}}{{$refName := $save.Name}}
+                        {{if $sealedSource}}{{$invName = $save.Name}}{{$refName = index $.StoreNames $.ScraperShort}}{{end}}
+                        <td class="m pc-key" data-label="{{if $.GlobalMode}}{{$invName}}{{else}}Sell Price{{end}}">
+                            {{if and $.GlobalMode (ne .InventoryEntry.URL "")}}
+                                <a class="arb-price-link buy" href="{{.InventoryEntry.URL}}" target="_blank" rel="nofollow" title="Buy at {{$invName}}">$ {{printf "%.2f" .InventoryEntry.Price}}</a>
+                            {{else}}
+                                $ {{printf "%.2f" .InventoryEntry.Price}}
+                            {{end}}
                         </td>
                         {{if not $save.HasNoPrice}}
-                            <td class="m pc-key" data-label="{{if $.GlobalMode}}{{if $sealedSource}}{{index $.StoreNames $.ScraperShort}}{{else}}{{$save.Name}}{{end}}{{else}}Buy Price{{end}}">
+                            <td class="m pc-key" data-label="{{if $.GlobalMode}}{{$refName}}{{else}}Buy Price{{end}}">
                                 {{if eq .BuylistEntry.BuyPrice 0.0}}
-                                    {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .ReferenceEntry.Price}}
+                                    {{if and $.GlobalMode (ne .ReferenceEntry.URL "") (not $card.Sealed)}}
+                                        <a class="arb-price-link buy ref" href="{{.ReferenceEntry.URL}}" target="_blank" rel="nofollow" title="Buy at {{$refName}}">{{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .ReferenceEntry.Price}}</a>
+                                    {{else}}
+                                        {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .ReferenceEntry.Price}}
+                                    {{end}}
                                     {{if and $.GlobalMode $.DirectStockNote (eq $scraperKey "TCGDirect")}}{{with direct_stock .CardID .ReferenceEntry.Conditions}}<span class="arb-direct-stock" title="{{$.DirectStockNote}}">{{.}} in stock</span>{{end}}{{end}}
                                 {{else}}
                                     {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .BuylistEntry.BuyPrice}}
@@ -542,6 +552,7 @@
                                 </td>
                             {{end}}
                         {{end}}
+                        {{if not $.GlobalMode}}
                         <td class="pc-act">
                             <div class="arb-quick-links">
                                 {{if ne .InventoryEntry.URL ""}}
@@ -550,13 +561,9 @@
                                 {{if ne .BuylistEntry.URL ""}}
                                     <a class="arb-qlink sell" href="{{.BuylistEntry.URL}}" target="_blank" rel="nofollow">Sell</a>
                                 {{end}}
-                                {{if not (and $.GlobalMode $card.Sealed)}}
-                                    {{if ne .ReferenceEntry.URL ""}}
-                                        <a class="arb-qlink buy ref" href="{{.ReferenceEntry.URL}}" target="_blank" rel="nofollow">Buy</a>
-                                    {{end}}
-                                {{end}}
                             </div>
                         </td>
+                        {{end}}
                         <td class="c pc-act"><input type="checkbox" checked autocomplete="off" class="arb-row-check" onchange="window.toggleArbitRow && toggleArbitRow(this)"></td>
                     </tr>
                 {{end}}
