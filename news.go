@@ -1326,7 +1326,7 @@ func newsParseBound(s string) (*float64, error) {
 
 // newsPageBound is a bound from the page's form, whose links send 0 for none.
 func newsPageBound(s string) *float64 {
-	v, err := newsParseBound(s)
+	v, err := newsParseBound(formDecimal(s))
 	if err != nil || v == nil || *v == 0 {
 		return nil
 	}

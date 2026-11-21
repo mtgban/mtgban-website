@@ -466,8 +466,9 @@ func TestNewsParseBound(t *testing.T) {
 			t.Errorf("newsParseBound(%q) = %v, %v", tc.in, got, err)
 		}
 	}
-	// The page's links send 0 for an unset bound, and a bad one reads as none.
-	for in, want := range map[string]*float64{"": nil, "0": nil, "x": nil, "3": boundOf(3)} {
+	// The page's links send 0 for an unset bound, a bad one reads as none, and
+	// a decimal comma is a point.
+	for in, want := range map[string]*float64{"": nil, "0": nil, "x": nil, "3": boundOf(3), "2,5": boundOf(2.5), "1,000": boundOf(1000), "1,2,3": nil} {
 		got := newsPageBound(in)
 		if (got == nil) != (want == nil) || got != nil && *got != *want {
 			t.Errorf("newsPageBound(%q) = %v", in, got)

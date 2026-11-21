@@ -585,3 +585,29 @@ func TestCachedMoversCollapsesConcurrentBuilds(t *testing.T) {
 		}
 	}
 }
+
+// A comma is a decimal point before one or two digits and a thousands
+// separator before three; anything else is left to fail as a number.
+func TestFormDecimal(t *testing.T) {
+	for in, want := range map[string]string{
+		"":           "",
+		"25":         "25",
+		"2.5":        "2.5",
+		"2,5":        "2.5",
+		" 2,50 ":     "2.50",
+		"-2,5":       "-2.5",
+		"1,000":      "1000",
+		"1,000.50":   "1000.50",
+		"12,345,678": "12345678",
+		"1,2,3":      "1,2,3",
+		"1.000,50":   "1.000.50",
+		"1,0000":     "1,0000",
+		"1.234,567":  "1.234,567",
+		"1.5,000":    "1.5,000",
+	} {
+		got := formDecimal(in)
+		if got != want {
+			t.Errorf("formDecimal(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

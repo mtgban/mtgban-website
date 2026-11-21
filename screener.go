@@ -515,10 +515,10 @@ func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 	if kind != "sealed" && kind != "both" {
 		kind = "singles"
 	}
-	minPrice, _ := strconv.ParseFloat(r.FormValue("min_price"), 64)
-	minWas, _ := strconv.ParseFloat(r.FormValue("min_was"), 64)
-	minPct, _ := strconv.ParseFloat(r.FormValue("min_pct"), 64)
-	maxPct, _ := strconv.ParseFloat(r.FormValue("max_pct"), 64)
+	minPrice, _ := strconv.ParseFloat(formDecimal(r.FormValue("min_price")), 64)
+	minWas, _ := strconv.ParseFloat(formDecimal(r.FormValue("min_was")), 64)
+	minPct, _ := strconv.ParseFloat(formDecimal(r.FormValue("min_pct")), 64)
+	maxPct, _ := strconv.ParseFloat(formDecimal(r.FormValue("max_pct")), 64)
 	size := validPageSize(atoiDefault(r.FormValue("size"), 25))
 	selEditions := r.Form["edition"]
 	editionSet := map[string]bool{}

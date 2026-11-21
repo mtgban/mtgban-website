@@ -1827,3 +1827,27 @@ func keyruneClass(code string) string {
 func formatExpectedCount(count float64) string {
 	return strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", count), "0"), ".")
 }
+
+// formDecimal is a number as a form field sends it. A comma with one or two
+// digits after it is a decimal point, the only separator a phone's decimal
+// keypad has in some regions; commas before groups of three are dropped.
+func formDecimal(s string) string {
+	s = strings.TrimSpace(s)
+	whole, frac, found := strings.Cut(s, ",")
+	if !found {
+		return s
+	}
+	if (len(frac) == 1 || len(frac) == 2) && !strings.ContainsAny(frac, ",.") {
+		return whole + "." + frac
+	}
+	integer, decimals, _ := strings.Cut(s, ".")
+	if strings.Contains(decimals, ",") {
+		return s
+	}
+	for _, group := range strings.Split(integer, ",")[1:] {
+		if len(group) != 3 {
+			return s
+		}
+	}
+	return strings.ReplaceAll(s, ",", "")
+}
