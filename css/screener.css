@@ -129,12 +129,14 @@
     font-size: var(--text-xs);
 }
 
-/* Lock column widths so re-sorting does not reflow them. */
+/* Lock column widths so re-sorting does not reflow them. A header too wide
+   for its column drops its sort arrows under the label. */
 #screenerTable {
     table-layout: fixed;
 }
 #screenerTable th {
     width: 16%;
+    white-space: normal;
 }
 #screenerTable th.news-th-card {
     width: 36%;
@@ -151,14 +153,10 @@
 }
 
 /* Under 768px the five columns cannot share the screen: the table takes the
-   width its numbers need and scrolls in its wrap, and headers wrap their
-   sort arrows. */
+   width its numbers need and scrolls in its wrap. */
 @media (max-width: 768px) {
     #screenerTable {
         min-width: 540px;
-    }
-    #screenerTable th {
-        white-space: normal;
     }
     #screenerTable th.news-th-card {
         width: 28%;

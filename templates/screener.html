@@ -72,15 +72,15 @@
 
                 <div class="news-fg">
                     <span class="news-fl">Price</span>
-                    <input type="text" name="min_price" {{if .MinPrice}}value="{{.MinPrice}}"{{end}} placeholder="Now $">
-                    <input type="text" name="min_was" {{if .MinPriorPrice}}value="{{.MinPriorPrice}}"{{end}} placeholder="Was $">
+                    <input type="text" name="min_price" {{if .MinPrice}}value="{{.MinPrice}}"{{end}} placeholder="Now $" inputmode="decimal">
+                    <input type="text" name="min_was" {{if .MinPriorPrice}}value="{{.MinPriorPrice}}"{{end}} placeholder="Was $" inputmode="decimal">
                 </div>
                 <span class="toolbar-sep"></span>
 
                 <div class="news-fg">
                     <span class="news-fl">Change</span>
-                    <input type="text" name="min_pct" {{if .MinPct}}value="{{.MinPct}}"{{end}} placeholder="Min %">
-                    <input type="text" name="max_pct" {{if .MaxPct}}value="{{.MaxPct}}"{{end}} placeholder="Max %">
+                    <input type="text" name="min_pct" {{if .MinPct}}value="{{.MinPct}}"{{end}} placeholder="Min %" inputmode="decimal">
+                    <input type="text" name="max_pct" {{if .MaxPct}}value="{{.MaxPct}}"{{end}} placeholder="Max %" inputmode="decimal">
                 </div>
                 <span class="toolbar-sep"></span>
 
