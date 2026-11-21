@@ -55,8 +55,9 @@ compose-dev.yaml
 
 pg-data/
 
-# Claude Workspaces
-.claude
+# Claude Workspaces; the skills are checked in
+.claude/*
+!.claude/skills/
 
 # Visual parity harness package manifest (exempt from the *.json ignore above)
 !scripts/visual-diff/package.json
