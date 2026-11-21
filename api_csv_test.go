@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/csv"
+	"math"
 	"net/http/httptest"
 	"slices"
 	"strings"
@@ -245,14 +246,14 @@ func tcgDecklistCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, con
 
 // The TCGplayer export lists a row at the first price loaded for its card
 // and condition, in both price columns, and at the market price where none
-// was, leaving My Store Price blank.
+// finite and above zero was, leaving My Store Price blank.
 func TestTCGCSVWritesTheLoadedPrice(t *testing.T) {
 	b, p := decklistCSVFixture(t)
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	ids := []string{"FIXTUREA-1", "FIXTUREA-1", "FIXTUREA-1", "FIXTUREA-1"}
-	conds := []string{"NM", "NM", "NM", "SP"}
-	err := UUID2TCGCSV(b, p, w, ids, nil, conds, []float64{0, 2.5, 3, 0})
+	ids := []string{"FIXTUREA-1", "FIXTUREA-1", "FIXTUREA-1", "FIXTUREA-1", "FIXTUREA-1", "FIXTUREA-2", "FIXTUREA-2", "FIXTUREA-2"}
+	conds := []string{"NM", "NM", "NM", "SP", "SP", "SP", "SP", "SP"}
+	err := UUID2TCGCSV(b, p, w, ids, nil, conds, []float64{0, 2.5, 3, -5, 0, math.Inf(1), -5, 4})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,10 +261,10 @@ func TestTCGCSVWritesTheLoadedPrice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != 3 {
-		t.Fatalf("got %d records, want a header and 2 rows", len(records))
+	if len(records) != 4 {
+		t.Fatalf("got %d records, want a header and 3 rows", len(records))
 	}
-	for i, want := range [][2]string{{"2.50", "2.50"}, {"", "1.25"}} {
+	for i, want := range [][2]string{{"2.50", "2.50"}, {"", "1.25"}, {"4.00", "4.00"}} {
 		row := records[i+1]
 		if row[14] != want[0] || row[15] != want[1] {
 			t.Errorf("%s: My Store Price %q, TCG Marketplace Price %q, want %q", row[7], row[14], row[15], want)

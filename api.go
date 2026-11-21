@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -247,7 +248,8 @@ type csvRow struct {
 // mergeCSVRows merges the entries naming the same card in the same condition
 // into one row, in first-seen order. qtys and conds, when present, are the
 // size of ids; a missing quantity counts as 1 and a missing condition as NM.
-// prices, when present, is the size of ids too.
+// prices, when present, is the size of ids too, and a row takes the first
+// finite one above zero.
 func mergeCSVRows(ids, qtys, conds []string, prices []float64) []csvRow {
 	var rows []csvRow
 	index := map[csvRow]int{}
@@ -271,7 +273,7 @@ func mergeCSVRows(ids, qtys, conds []string, prices []float64) []csvRow {
 			rows = append(rows, key)
 		}
 		rows[j].qty += quantity
-		if prices != nil && rows[j].price == 0 {
+		if prices != nil && rows[j].price == 0 && prices[i] > 0 && !math.IsInf(prices[i], 1) {
 			rows[j].price = prices[i]
 		}
 	}
