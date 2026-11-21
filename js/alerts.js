@@ -882,7 +882,7 @@
     }
 
     // markSortHeaders puts the arrow on the sorted field's header, the
-    // aria-sort main.css draws for the tablesort tables.
+    // aria-sort main.css draws.
     function markSortHeaders(sort) {
         document.querySelectorAll('.alerts-table th[data-sort]').forEach(function (th) {
             if (th.getAttribute('data-sort') === sort.field) th.setAttribute('aria-sort', sort.dir === 'asc' ? 'ascending' : 'descending');
