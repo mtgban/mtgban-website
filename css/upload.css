@@ -1949,6 +1949,65 @@ tr.opt-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
     .upload-processing-spinner { animation-duration: 2.4s; }
 }
 
+/* ── Optimizer card view (upload-view.js sets .opt-cards on a store) ──
+   The same rows, each drawn as its card: the offer and the copies under the
+   image, the box and Move to button beside them. */
+.opt-art { display: none; }
+/* A leftover row names its condition in the Card column, which the cards hide */
+.opt-cond-note { display: none; }
+.opt-cards .opt-cond-note { display: inline; color: var(--text-dim); }
+.opt-cards .opt-art { display: block; }
+.opt-cards .opt-art img { display: block; width: 100%; height: auto; border-radius: var(--card-radius, 4.75% / 3.5%); }
+/* The card under the pointer is already drawn */
+#panel-optimizer:has(.opt-cards:hover) .hoverWrap { display: none !important; }
+/* A store's own switch, beside its fold */
+.opt-view-btn { padding: 2px; border: none; border-radius: 6px; background: transparent; color: var(--text-dim); cursor: pointer; display: flex; transition: all 0.15s; }
+.opt-view-btn:hover { background: var(--accent-muted); color: var(--ainfo); }
+.opt-view-btn.on { color: var(--ainfo); }
+.opt-view-btn svg { width: 16px; height: 16px; }
+.opt-cards .opt-table,
+.opt-cards .opt-table thead,
+.opt-cards .opt-table thead tr:first-child,
+.opt-cards .opt-table td.opt-store-head { display: block; }
+.opt-cards .opt-table colgroup,
+.opt-cards .opt-table thead tr + tr > th:not(:last-child) { display: none; }
+/* Of the column labels a store keeps its Toggle all box; the leftovers have none */
+.opt-cards .opt-table thead tr + tr { display: flex; justify-content: flex-end; }
+.opt-cards.opt-leftovers .opt-table thead tr + tr { display: none; }
+.opt-cards.opt-store:not(.folded) tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 14px 12px; padding: 12px; }
+.opt-cards .opt-table tbody tr { display: grid; grid-template-columns: 1fr auto; align-items: baseline; position: relative; background: none; }
+.opt-cards .opt-table tbody tr:hover { background: none; }
+.opt-cards .opt-table td { display: none; padding: 0; border: none; overflow: visible; }
+.opt-cards .opt-table td.opt-name { display: block; grid-column: 1 / -1; margin-bottom: 4px; }
+/* The name stays as the link stretched over the image, its text unseen */
+.opt-cards .opt-name-cell { display: block; height: 0; font-size: 0; line-height: 0; }
+.opt-cards .opt-name-cell .opt-copy,
+.opt-cards .opt-name-text > :not(a) { display: none; }
+.opt-cards .opt-table td.opt-offer { display: block; text-align: left; }
+.opt-cards .opt-offer .offer { min-width: 0; }
+.opt-cards .opt-table td.opt-loaded { display: block; grid-column: 1 / -1; text-align: left; font-size: var(--text-sm); }
+.opt-cards .opt-loaded .loaded-wrap { text-align: left; }
+.opt-cards .opt-loaded .loaded-qty { padding-left: 2px; }
+.opt-cards .opt-loaded .loaded,
+.opt-cards .opt-loaded .opt-icons { display: none; }
+.opt-cards .opt-loaded .loaded-qty { min-width: 0; }
+/* The box and the buttons beside it, right of the offer */
+.opt-cards .opt-table tbody td:last-child { display: flex; align-items: center; gap: 4px; grid-row: 2; grid-column: 2; align-self: center; }
+.opt-cards .opt-move-btn { margin: 0; }
+.opt-cards .opt-leftovers td:last-child { padding-right: 0; }
+.opt-cards tr.opt-removed { background: none !important; }
+.opt-cards tr.opt-removed .opt-art { opacity: 0.35; filter: grayscale(1); }
+.opt-cards .opt-moved > td { background: none; }
+.opt-cards .opt-moved .opt-art { outline: 2px solid var(--accent-border); outline-offset: 2px; border-radius: var(--card-radius, 4.75% / 3.5%); }
+@media (max-width: 640px) {
+    .opt-cards.opt-store:not(.folded) tbody { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px 8px; padding: 8px; }
+    .opt-cards .opt-table td.opt-offer, .opt-cards .opt-table td.opt-loaded { font-size: var(--text-xs); }
+    /* Too narrow for the offer beside the box: the box drops to the copies' line */
+    .opt-cards .opt-table td.opt-offer { grid-column: 1 / -1; }
+    .opt-cards .opt-table td.opt-loaded { grid-column: 1; }
+    .opt-cards .opt-table tbody td:last-child { grid-row: 3; }
+}
+
 /* A folded store keeps its header and hides the column labels and cards */
 .opt-store.folded tbody,
 .opt-store.folded thead tr + tr { display: none; }

@@ -135,7 +135,7 @@ const cookies = collect(SOURCES, [COOKIE_CALL, COOKIE_ASSIGN], COOKIE_INDIRECT, 
 const locals = collect(SOURCES, [LOCAL_WRITE], LOCAL_INDIRECT, null);
 
 test('the registry reads as the tests expect', () => {
-    expect(entries.length).toBe(109);
+    expect(entries.length).toBe(110);
     expect(notSettings.size).toBe(11);
 });
 
