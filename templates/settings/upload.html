@@ -156,7 +156,7 @@
                         {{end}}{{end}}
                     </optgroup>
                     <optgroup label="Retailers">
-                        {{range $.UploadSellerKeys}}{{$name := index $.StoreNames .}}{{if $name}}
+                        {{range $.UploadSellerKeys}}{{$name := index $.StoreNames .}}{{if and $name (not (slice_has $.UploadAltKeys .))}}
                         <option value="{{.}}">{{$name}}</option>
                         {{end}}{{end}}
                     </optgroup>

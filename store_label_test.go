@@ -114,3 +114,29 @@ func TestOptimizerNamesSealedStores(t *testing.T) {
 		}
 	}
 }
+
+// The custom buylist's reference picker lists a store once: a store-like
+// index (TCGplayer Direct, Card Trader) under Index, not again under
+// Retailers.
+func TestCustomReferenceListsEachStoreOnce(t *testing.T) {
+	signingEnabled(t, true)
+	store := func(shorthand, name string) mtgban.Seller {
+		return mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: name, Shorthand: shorthand})
+	}
+	withPrices(t, []mtgban.Seller{
+		store("TCGDirect", "TCGplayer Direct"),
+		store("CT", "Card Trader"),
+		store("ZZRETAIL", "Some Retailer"),
+	}, nil)
+	options := selectOptions(fetchSettingsModal(t, grantSig(t, "Upload", "UploadCustom")), "opt-customseller")
+	values := regexp.MustCompile(`<option value="([^"]+)"`).FindAllStringSubmatch(options, -1)
+	seen := map[string]int{}
+	for _, v := range values {
+		seen[v[1]]++
+	}
+	for _, key := range []string{"TCGDirect", "CT", "ZZRETAIL"} {
+		if seen[key] != 1 {
+			t.Errorf("%s listed %d times:\n%s", key, seen[key], options)
+		}
+	}
+}
