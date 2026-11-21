@@ -246,6 +246,8 @@
     vertical-align: middle;
     white-space: nowrap;
 }
+/* A job's result runs long: it wraps so the table fits its box */
+.admin-table td.admin-job-found { white-space: normal; overflow-wrap: anywhere; }
 /* Row stripes provided by .table-data in main.css */
 .admin-table a {
     color: var(--ainfo);
