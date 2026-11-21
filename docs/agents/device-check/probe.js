@@ -7,7 +7,9 @@
 //   small     visible text inputs under 16px (iOS zooms on focus)
 //   view      'mobile' when the mobile navbar is present
 (() => {
-  const W = innerWidth;
+  // Not innerWidth: Android Chrome grows that to the content of a page
+  // that overflows, and sw > W would never be true there.
+  const W = document.documentElement.clientWidth;
   const name = e => e.id ? '#' + e.id
     : (typeof e.className === 'string' && e.className.trim()
       ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.')
