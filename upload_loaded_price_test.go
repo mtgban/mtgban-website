@@ -134,3 +134,16 @@ func TestResultsRowGrade(t *testing.T) {
 		}
 	}
 }
+
+// A row loaded at its file's market price posts that price back with an "m"
+// after it, which is how loadHashes knows it is not the owner's.
+func TestResultsRowMarksAMarketPrice(t *testing.T) {
+	for want, market := range map[string]bool{`data-price="9.99m"`: true, `data-price="9.99"`: false} {
+		entries := []UploadEntry{{CardID: "a", OriginalPrice: 9.99, PriceIsMarket: market}}
+		out := renderUpload(t, PageVars{UploadVars: UploadVars{UploadEntries: entries, SinglesEntries: entries}})
+		row := regexp.MustCompile(`<tr data-hash="a"[^>]*>`).FindString(out)
+		if !strings.Contains(row, want) {
+			t.Errorf("PriceIsMarket %v: row %q lacks %s", market, row, want)
+		}
+	}
+}
