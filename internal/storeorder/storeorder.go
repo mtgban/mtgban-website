@@ -168,9 +168,15 @@ func cardKingdom(a, b Row) int {
 // ckFoilSection reports whether CK lists a foil under its edition's foil
 // heading ("Guildpact Foil"). A foil whose title names its finish, as Secret
 // Lair's "(1003 - Foil)" does, and any Promotional one stay under the plain
-// heading.
+// heading. The finish is looked for in the variation alone, the card "Foil"
+// having it in its name.
 func ckFoilSection(row Row) bool {
-	return row.Foil && row.Edition != "Promotional" && !strings.Contains(row.Title, "Foil")
+	var variation string
+	i := strings.Index(row.Title, " (")
+	if i >= 0 {
+		variation = row.Title[i:]
+	}
+	return row.Foil && row.Edition != "Promotional" && !strings.Contains(variation, "Foil")
 }
 
 func abuGames(a, b Row) int {
