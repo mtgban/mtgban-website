@@ -73,6 +73,7 @@ var settings = []Setting{
 	{Name: "mtgban_backpack_tabs", Storage: "local", Path: "root", Kind: "blob", Class: "preference", Area: "backpack"},
 	{Name: "mtgban_upload_presets", Storage: "local", Path: "root", Kind: "blob", Class: "preference", Area: "upload"},
 	{Name: "mtgban_upload_sort", Storage: "local", Path: "root", Kind: "blob", Default: `{"results":"","opt":""}`, Class: "preference", Area: "upload"},
+	{Name: "mtgban_upload_view", Storage: "local", Path: "root", Kind: "enum", Enum: []string{"rows", "cards"}, Default: "rows", Class: "preference", Area: "upload"},
 	{Name: "mtgban_arbit_presets", Storage: "local", Path: "root", Kind: "blob", Class: "preference", Area: "arbit"},
 	{Name: "mtgban_arbit_pins", Storage: "local", Path: "root", Kind: "blob", Class: "preference", Area: "arbit"},
 	{Name: "mtgban_news_filters", Storage: "local", Path: "root", Kind: "blob", Class: "preference", Area: "news"},
