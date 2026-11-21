@@ -1833,7 +1833,8 @@ body:not(:has(#panel-optimizer.active)) :is(.res-sort-btn, .res-sort-sep) { disp
 
 @media (max-width: 640px) {
     .res-header { flex-direction: column; }
-    .res-tabs { flex-direction: row; width: 100%; overflow-x: auto; }
+    /* Its padding and border inside the 100%, or it runs 10px past the page */
+    .res-tabs { flex-direction: row; width: 100%; box-sizing: border-box; overflow-x: auto; }
     .res-summary-stat .val { font-size: var(--text-lg); }
     .opt-toc { flex-direction: column; }
     .opt-toc-add { align-self: flex-start; }
