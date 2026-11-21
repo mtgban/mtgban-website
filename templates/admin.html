@@ -99,7 +99,7 @@
                         <td>{{.Name}}</td>
                         <td class="admin-mono{{if .Problem}} admin-stale-date{{end}}">{{if .Started.IsZero}}not run yet{{else}}<time class="admin-localtime" datetime="{{.Started.UTC.Format "2006-01-02T15:04:05Z"}}">{{.Started.Format "Jan 02 15:04"}}</time>{{end}}</td>
                         <td class="admin-mono">{{.TookText}}</td>
-                        <td class="admin-mono">{{.Result}}</td>
+                        <td class="admin-mono admin-job-found">{{.Result}}</td>
                         <td class="c admin-status">{{if .Problem}}<span class="admin-status-icon">🔴</span> <span class="admin-stale-badge">{{.Problem}}</span>{{else if .Running}}<span class="admin-status-icon">🔶</span> running{{else if not .Started.IsZero}}<span class="admin-status-icon">✅</span>{{end}}</td>
                     </tr>
                 {{end}}
