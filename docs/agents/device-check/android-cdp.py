@@ -33,6 +33,7 @@ def connect(url):
         head += s.recv(1)
     if b' 101 ' not in head.split(b'\r\n')[0]:
         raise SystemExit(head.decode(errors='replace'))
+    s.settimeout(None)
     return s
 
 def send(s, text):

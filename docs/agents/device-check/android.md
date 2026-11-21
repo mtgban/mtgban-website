@@ -26,6 +26,8 @@ echo no | avdmanager create avd -n mtgban_pixel8 -k "system-images;android-35;go
   `overflow: clip`. Say which version you measured on.
 - **Shells:** a shell without `/opt/homebrew/bin` on its PATH (the desktop
   app's `!` input) needs full paths: `/opt/homebrew/bin/sdkmanager`.
+- **adb** is `$ANDROID_SDK_ROOT/platform-tools/adb`, on no PATH: the
+  commands below name it `adb` for short.
 
 ## Each session
 

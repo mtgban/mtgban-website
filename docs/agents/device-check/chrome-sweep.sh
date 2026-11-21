@@ -33,8 +33,8 @@ import json, sys
 r = json.load(sys.stdin)
 for x in r["issues"]:
     x.pop("small", None)
-r["issues"] = [x for x in r["issues"] if len(x) > 2]
+r["issues"] = [x for x in r["issues"] if len(x) > 2 or "err" in x]
 print(json.dumps(r))'
 done
-cdp "document.cookie = 'MobileView=false; path=/; max-age=31536000'; 1" >/dev/null
+cdp "document.cookie = 'MobileView=; path=/; max-age=0'; 1" >/dev/null
 rm -f "$job"

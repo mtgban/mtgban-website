@@ -57,8 +57,9 @@ __run([
  '/reverse?source=CK', '/sleepers', '/alerts', '/user', '/api-plans', '/guide']
 ```
 
-The mobile view has no Screener, Upload, Arbitrage, Global or Reverse page
-of its own: those serve the desktop page.
+The mobile view has no Upload, Arbitrage, Global or Reverse page of its
+own: those serve the desktop page. The Screener has no mobile template
+either, and renders in the mobile layout.
 
 ## Headless Chrome: the fast way to sweep many sizes
 

@@ -27,7 +27,8 @@ window.__sweep = async (w, h, paths, settle = 1500) => {
 };
 // Drops the site's known off-canvas parts: the mobile menu and favourites toast.
 window.__issues = rs => rs.map(x => {
-  const o = {u: x.url, v: x.view};
+  const o = {u: x.url};
+  if (x.view) o.v = x.view;
   const off = (x.off || []).filter(s => !/^#m-menu@|^#m-fav-toast@/.test(s));
   const clipped = (x.clipped || []).filter(s => !s.includes('landing-popular'));
   if (x.sw > x.W) o.pageOverflow = x.sw - x.W;
@@ -37,7 +38,7 @@ window.__issues = rs => rs.map(x => {
   if (x.small && x.small.length) o.small = x.small.slice(0, 3);
   if (x.err) o.err = x.err;
   return o;
-}).filter(o => Object.keys(o).length > 2);
+}).filter(o => o.err || Object.keys(o).length > 2);
 window.__run = (plan, paths) => {
   window.__res = {};
   window.__done = false;
@@ -46,7 +47,7 @@ window.__run = (plan, paths) => {
       document.cookie = 'MobileView=' + (view === 'mobile') + '; path=/; max-age=31536000';
       window.__res[view + ' ' + w + 'x' + h] = window.__issues(await window.__sweep(w, h, paths));
     }
-    document.cookie = 'MobileView=false; path=/; max-age=31536000';
+    document.cookie = 'MobileView=; path=/; max-age=0';
     document.getElementById('__f')?.remove();
     window.__done = true;
   })();
