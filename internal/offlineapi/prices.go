@@ -2,10 +2,12 @@ package offlineapi
 
 import (
 	"compress/gzip"
+	"io"
 	"log"
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mtgban/mtgban-website/internal/offline"
@@ -33,6 +35,9 @@ func pickStores(enabled, picked []string) []string {
 	}
 	return out
 }
+
+// gzipWriters keeps compressors between price requests, about 1 MB each.
+var gzipWriters sync.Pool
 
 // servePrices builds, watermarks, and streams one set's payload. Reads the
 // backend once, so the set code it resolves and the prices it builds from
@@ -77,7 +82,14 @@ func (s *Service) servePrices(w http.ResponseWriter, r *http.Request, email, res
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Encoding", "gzip")
 	w.Header().Set("Cache-Control", "private, no-store")
-	gz := gzip.NewWriter(w)
+	gz, found := gzipWriters.Get().(*gzip.Writer)
+	if found {
+		gz.Reset(w)
+	} else {
+		gz = gzip.NewWriter(w)
+	}
 	gz.Write(data)
 	gz.Close()
+	gz.Reset(io.Discard)
+	gzipWriters.Put(gz)
 }
