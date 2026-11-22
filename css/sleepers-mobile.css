@@ -307,41 +307,38 @@
 
 /* Tier results */
 .m-sleep-tier {
-    display: flex;
-    gap: 0.5em;
-    margin-bottom: 0.75em;
-    align-items: flex-start;
+    padding: 0.35em;
+    border-radius: 8px;
+    margin-bottom: 0.5em;
 }
 
 .m-sleep-tier-label {
-    flex-shrink: 0;
-    width: 2em;
-    height: 2em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     font-weight: 800;
-    font-size: 1rem;
-    border-radius: 6px;
+    font-size: 0.85rem;
     color: #222;
-    margin-top: 0.25em;
+    padding: 0 0.15em 0.3em;
 }
 
 .m-sleep-tier-cards {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
     gap: 0.35em;
 }
 
-.m-sleep-card {
+.m-sleep-card,
+.m-sleep-card .foil-wrap {
     display: block;
 }
 
 .m-sleep-card img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
     transition: transform 100ms ease;
 }
 
-/* Matches the img's inline 8px, which does not read --card-radius. */
+/* Matches the img's 8px, which does not read --card-radius. */
 .m-sleep-card .foil-wrap[data-foil="true"]::after,
 .m-sleep-card .foil-wrap[data-etched="true"]::after {
     border-radius: 8px;
