@@ -85,9 +85,10 @@ the one below it, and ranks each card by the share of its band it outsells:
 | slow | less, or no sale in the window | red |
 
 Shares rather than set rates keep the colours right for every game, each
-grading its own cards. The details add a line naming the band and the share,
-`vs. $10–30 | top 8%`, or `slowest` for a card no faster than any. The search row, on both layouts, and
-the other pages' rate take the colour as a `velocity-<pace>` class.
+grading its own cards. The search row, on both layouts, and the other pages'
+rate take the colour as a `velocity-<pace>` class, and a tooltip on the rate
+names the band it was judged in: `Slow for a $10–30 card`, `Among the fastest
+$10–30 cards`. A phone, with no pointer to hover, shows the colour alone.
 
 The rate each pace starts from, by band, from `TestSalesVelocityLive`:
 
@@ -104,8 +105,8 @@ The rate each pace starts from, by band, from `TestSalesVelocityLive`:
 ## Its trend
 
 An arrow, `↑`, leads the rate of a card selling at least twice as fast in the
-window's last 7 days as in the 23 before them, with the details' line
-`7-day trend | 2.4×`, against those 23 days. It counts orders rather than copies, so
+window's last 7 days as in the 23 before them, and the details end their
+orders row with `7-day trend | 2.4×`, against those 23 days. It counts orders rather than copies, so
 one buyer taking a stack does not make a trend, and it needs 30 orders in the
 window: with fewer, chance alone moves a card that far too often. A card first
 sold in the window has no pace before it, so a new set's cards, all selling

@@ -608,7 +608,7 @@ func velocityPageVars(canVelocity, showUpsell bool) PageVars {
 			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
 			CanVelocity:  canVelocity,
 		},
-		Metadata: map[string]GenericCard{cardID: {Name: "Some Card", Edition: "Some Set", Velocity: rate, VelocityDetail: detail, VelocityPace: sales.Pace(cardID), VelocityRising: sales.Rising(cardID)}},
+		Metadata: map[string]GenericCard{cardID: {Name: "Some Card", Edition: "Some Set", Velocity: rate, VelocityDetail: detail, VelocityPace: sales.Pace(cardID), VelocityNote: sales.PaceNote(cardID), VelocityRising: sales.Rising(cardID)}},
 	}
 }
 
@@ -1573,6 +1573,27 @@ func TestVelocityRateOnInfoPages(t *testing.T) {
 	}
 }
 
+// TestSearchRateNamesItsBand puts the band a pace was judged in on the rate,
+// as its tooltip, on both layouts.
+func TestSearchRateNamesItsBand(t *testing.T) {
+	store := &salesvelocity.Store{}
+	store.Publish(&salesvelocity.Snapshot{
+		Day:    time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC),
+		Cards:  map[string]*salesvelocity.Sales{"velocity-card": {Copies: 69, Pace: salesvelocity.PaceSlow}},
+		Window: salesvelocity.Window,
+		Bands:  []salesvelocity.Band{{Low: 10, High: 30}},
+	})
+	setSalesVelocityStore(t, store)
+	for name, page := range velocityPages(t, velocityPageVars(true, true)) {
+		if !strings.Contains(page, ` velocity-slow" title="Slow for a $10–30 card">2.3/day</span>`) {
+			t.Errorf("%s: the rate does not name its band, rendered:\n%s", name, page)
+		}
+		if strings.Contains(page, "vs. ") {
+			t.Errorf("%s: the details still rank the card", name)
+		}
+	}
+}
+
 // TestVelocityRateSitsBesideName puts the rate, with its own tooltip, on the card
 // name's line on arbitrage, and leaves INFO to CK's details and signal.
 func TestVelocityRateSitsBesideName(t *testing.T) {
@@ -1626,6 +1647,7 @@ func TestVelocityRateCarriesPace(t *testing.T) {
 	for id, card := range vars.Metadata {
 		card.Velocity, card.VelocityDetail, card.VelocityNotable = "2.3/day", "**Sold**\n|copies|69", true
 		card.VelocityPace, card.VelocityRising = salesvelocity.PaceFast, true
+		card.VelocityNote = "Fast for a $10–30 card"
 		vars.Metadata[id] = card
 	}
 	got := renderArbit(t, vars)
@@ -1634,5 +1656,8 @@ func TestVelocityRateCarriesPace(t *testing.T) {
 	}
 	if !strings.Contains(got, `<span class="velocity-rising">&#8593;</span>2.3/day</span>`) {
 		t.Error("the rate has no arrow")
+	}
+	if !strings.Contains(got, "days**\nFast for a $10–30 card\n**Sold**") {
+		t.Error("the tooltip does not name the band under its heading")
 	}
 }

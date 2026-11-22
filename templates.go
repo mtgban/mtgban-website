@@ -649,6 +649,9 @@ var funcMap = template.FuncMap{
 			rising = `<span class="velocity-rising">&#8593;</span>`
 		}
 		tip := salesvelocity.Heading() + "\n" + card.VelocityDetail
+		if card.VelocityNote != "" {
+			tip = salesvelocity.Heading() + "\n" + card.VelocityNote + "\n" + card.VelocityDetail
+		}
 		return template.HTML(fmt.Sprintf(`<span class="bl-velocity%s" title="%s" data-tip="%s">%s%s</span>`,
 			pace, html.EscapeString(plainTip(tip)), html.EscapeString(tip), rising, html.EscapeString(card.Velocity)))
 	},
