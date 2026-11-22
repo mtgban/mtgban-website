@@ -331,6 +331,9 @@
             {{$hasSellers := (index $.FoundSellers $cardId)}}
             {{$hasBuyers := (index $.FoundVendors $cardId)}}
             {{$salesRow := and $card.Velocity (or $.CanVelocity $.ShowUpsell)}}
+            {{/* The Buyers panel's Sales mode, for any card that is not sealed */}}
+            {{$salesSwitch := not $card.Sealed}}
+            {{$hasSales := and $salesSwitch (index $.HasSales $cardId)}}
             {{/* Open whichever side has offers when the default one has none. */}}
             {{$buyersTab := or (and $defaultBuyers $hasBuyers) (not $hasSellers)}}
 
@@ -374,7 +377,7 @@
             {{if not $expanded}}
             <div class="m-tabs" data-card="{{$cardId}}">
                 {{if $hasSellers}}<button class="m-tab{{if not $buyersTab}} active{{end}}" data-target="sellers-{{$cardId}}" data-track="ui.row.tab" data-track-value="sellers">Sellers</button>{{end}}
-                {{if or $hasBuyers $salesRow}}<button class="m-tab{{if $buyersTab}} active{{end}}" data-target="buyers-{{$cardId}}" data-track="ui.row.tab" data-track-value="buyers">Buyers</button>{{end}}
+                {{if or $hasBuyers $salesRow $hasSales}}<button class="m-tab{{if $buyersTab}} active{{end}}" data-target="buyers-{{$cardId}}" data-track="ui.row.tab" data-track-value="buyers">Buyers</button>{{end}}
             </div>
             {{end}}
 
@@ -488,10 +491,11 @@
             {{end}}
 
             {{/* Buyers panel */}}
-            {{if or $hasBuyers $salesRow}}
-            <div class="m-tab-panel{{if or $expanded $buyersTab}} active{{end}}" id="buyers-{{$cardId}}">
+            {{if or $hasBuyers $salesRow $hasSales}}
+            <div class="m-tab-panel{{if or $expanded $buyersTab}} active{{end}}{{if $salesSwitch}} buyers-panel{{end}}" id="buyers-{{$cardId}}"{{if $salesSwitch}} data-buyers-mode="{{$.BuyersMode}}"{{end}}>
                 {{$headed := false}}
                 {{$refs := $salesRow}}
+                {{if $salesSwitch}}<div class="m-buyers-bar">{{template "buyers-switch" $.BuyersMode}}</div>{{end}}
                 {{if $salesRow}}
                     {{if $.CanVelocity}}
                     <details class="m-vendor-row sales-velocity"{{if $.VelocityOpen}} open{{end}}>
@@ -630,7 +634,10 @@
                     {{end}}
                 {{end}}
                 {{if and $hasSellers (not $hasBuyers)}}
-                <div class="m-vendor-row m-vendor-flat"><span class="m-vendor-name dim">No offers</span></div>
+                <div class="m-vendor-row m-vendor-flat m-buylist-none"><span class="m-vendor-name dim">No offers</span></div>
+                {{end}}
+                {{if $salesSwitch}}
+                <div class="m-sales-pane sales-pane" data-card="{{$cardId}}" data-pending></div>
                 {{end}}
             </div>
             {{end}}
@@ -1024,6 +1031,19 @@
 {{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}" defer></script>{{end}}
 <script type="text/javascript" src="/js/search-track.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-velocity.js?hash={{.Hash}}" defer></script>
+{{if not .CanSales}}
+{{/* The Sales pane of a reader not logged in, one copy the switch puts in each card */}}
+<template id="sales-login">
+    <div class="m-vendor-row m-vendor-locked sales-locked">
+        <span class="m-vendor-name dim">Log in to see recent sales</span>
+        <span class="m-locked-cta">
+            <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="sales_join">Join</a>
+            {{range $ref, $id := .PatreonIDs}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="sales_login">Log in</a>{{end}}
+        </span>
+    </div>
+</template>
+{{end}}
+<script type="text/javascript" src="/js/search-buyers.js?hash={{.Hash}}" defer></script>
 {{if not .DisableChart}}
 <script type="text/javascript" src="/js/mobile-chart.js?hash={{.Hash}}" defer></script>
 {{end}}

@@ -79,6 +79,8 @@ func routeLabel(pattern, path string) string {
 			return "data.chart"
 		case strings.HasPrefix(path, "/data/prices/"):
 			return "data.prices"
+		case strings.HasPrefix(path, "/data/sales/"):
+			return "data.sales"
 		}
 		return "data"
 	}
@@ -105,7 +107,7 @@ func navRouteLabel(pattern string) string {
 // routeLabelSet is every label routeLabel can return but "other", built on first use.
 var routeLabelSet = sync.OnceValue(func() map[string]bool {
 	set := map[string]bool{
-		"home": true, "debug": true, "data": true, "data.chart": true, "data.prices": true,
+		"home": true, "debug": true, "data": true, "data.chart": true, "data.prices": true, "data.sales": true,
 		"settings.values": true,
 	}
 	for _, label := range routeLabels {

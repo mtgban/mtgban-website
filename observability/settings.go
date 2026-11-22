@@ -46,6 +46,7 @@ var settings = []Setting{
 	{Name: "SearchDefaultTab", Storage: "cookie", Path: "root", Kind: "enum", Enum: []string{"sellers", "buyers"}, Default: "sellers", Class: "preference", Area: "search", Fact: "search.view", FactScope: "SearchDefaultTab"},
 	{Name: "SearchDefaultView", Storage: "cookie", Path: "root", Kind: "enum", Enum: []string{"NM", "SP", "MP", "HP", "PO", "INDEX"}, Default: "NM", Class: "preference", Area: "search", Fact: "search.view", FactScope: "SearchDefaultView"},
 	{Name: "SearchVelocityOpen", Storage: "cookie", Path: "root", Kind: "enum", Enum: []string{"open", "closed"}, Default: "closed", Class: "preference", Area: "search"},
+	{Name: "SearchBuyersMode", Storage: "cookie", Path: "root", Kind: "enum", Enum: []string{"buylist", "sales"}, Default: "buylist", Class: "preference", Area: "search"},
 	{Name: "MobileSearchLayout", Storage: "both", Mirror: "mtgban_search_layout", Path: "root", Kind: "enum", Enum: []string{"expanded", "compact"}, Default: "expanded", Class: "preference", Area: "search", Fact: "search.view", FactScope: "MobileSearchLayout"},
 	{Name: "SearchStoreFactors", Storage: "both", Mirror: "mtgban_store_factors", Path: "root", Kind: "blob", Class: "preference", Area: "search", Fact: "search.store_factors"},
 	{Name: "chartDateRange", Storage: "both", Mirror: "SearchChartRange", Path: "root", Kind: "number", Default: "180", Class: "preference", Area: "chart"},

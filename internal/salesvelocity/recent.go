@@ -86,6 +86,11 @@ func (s *RecentStore) Snapshot() *RecentSnapshot {
 	return s.current.Load()
 }
 
+// Publish makes snap the last load.
+func (s *RecentStore) Publish(snap *RecentSnapshot) {
+	s.current.Store(snap)
+}
+
 // RecentQuery is the orders of one game since an age and stamped after a
 // time, both naive UTC as the newspaper writes them.
 const RecentQuery = `
@@ -390,17 +395,22 @@ func newestOrders(kept, added []Order, cutoff uint32) []Order {
 	return out[:len(out):len(out)]
 }
 
-// Line is one order as the Sales pane prints it.
+// Line is one order as the Sales pane prints it: the date in full for
+// desktop, short for phones, and to the minute for its tooltip.
 type Line struct {
-	Date, Source, Price, Qty string
+	Date, Short, Time string
+	Source            string
+	Price, Qty        string
 }
 
 // recentSource is where every order here was sold.
 const recentSource = "TCGplayer"
 
-// Group is one grade's orders: the newest RecentShown, then the rest.
+// Group is one grade's orders: the average price per copy over all of
+// them, the newest RecentShown, then the rest.
 type Group struct {
 	Grade       string
+	Avg         string
 	Shown, More []Line
 }
 
@@ -415,7 +425,7 @@ func (r *Recent) Groups(today time.Time) []Group {
 		if len(orders) == 0 {
 			continue
 		}
-		g := Group{Grade: Grades[i]}
+		g := Group{Grade: Grades[i], Avg: averageText(orders)}
 		for j, o := range orders {
 			line := orderLine(o, today)
 			if j < RecentShown {
@@ -430,16 +440,41 @@ func (r *Recent) Groups(today time.Time) []Group {
 }
 
 // orderLine is o's date, where it sold, its price per copy and, above one
-// copy, the copies.
+// copy, the copies; the short date has its year only when it is not today's.
 func orderLine(o Order, today time.Time) Line {
 	at := time.Unix(int64(o.At), 0).UTC()
-	date := at.Format("Jan 2")
+	short := at.Format("Jan 2")
 	if at.Year() != today.UTC().Year() {
-		date = at.Format("Jan 2, 2006")
+		short = at.Format("Jan 2, 2006")
 	}
-	line := Line{Date: date, Source: recentSource, Price: fmt.Sprintf("$%d.%02d", o.Cents/100, o.Cents%100)}
+	line := Line{
+		Date:   at.Format(time.DateOnly),
+		Short:  short,
+		Time:   at.Format("2006-01-02 15:04 UTC"),
+		Source: recentSource,
+		Price:  centsText(uint64(o.Cents)),
+	}
 	if o.Qty > 1 {
 		line.Qty = fmt.Sprintf("×%d", o.Qty)
 	}
 	return line
+}
+
+// averageText is the average price of one copy over orders, weighted by
+// their copies.
+func averageText(orders []Order) string {
+	var cents, copies uint64
+	for _, o := range orders {
+		cents += uint64(o.Cents) * uint64(o.Qty)
+		copies += uint64(o.Qty)
+	}
+	if copies == 0 {
+		return ""
+	}
+	return centsText((cents + copies/2) / copies)
+}
+
+// centsText is cents as dollars, "12.34"; the page prints the sign.
+func centsText(cents uint64) string {
+	return fmt.Sprintf("%d.%02d", cents/100, cents%100)
 }

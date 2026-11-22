@@ -500,7 +500,7 @@ func TestEveryDataRouteRefusesWithAStatus(t *testing.T) {
 	h := enforceDataSigning(testSite, testSite.dataRoutes())
 	expired := url.QueryEscape(signedAs(t, url.Values{"UserEmail": {"sub@example.com"}}, time.Now().Add(-time.Hour)))
 
-	for _, p := range []string{"/data/chart/x", "/data/prices/x", "/data/unknown"} {
+	for _, p := range []string{"/data/chart/x", "/data/prices/x", "/data/sales/x", "/data/unknown"} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://mtgban.com"+p+"?sig="+expired, nil))
 		if rec.Code != http.StatusUnauthorized || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") {

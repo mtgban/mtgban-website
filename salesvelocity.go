@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"time"
 
@@ -66,6 +67,44 @@ func (s *site) loadRecentSales() {
 	result, problem := recentSalesStore.Load(ctx, NewNewspaperDB, b, game, time.Now())
 	if result != "" || problem != "" {
 		backgroundJobs.Report(jobRecentSales, result, problem)
+	}
+}
+
+// The Buyers column's two modes, as the SearchBuyersMode cookie stores them.
+const (
+	buyersBuylist = "buylist"
+	buyersSales   = "sales"
+)
+
+// buyersMode is the mode the reader chose, else the game's default for a
+// reader logged in to see sales, else the buylist. Sealed search has no
+// sales to show.
+func buyersMode(chosen, gameDefault string, canSales, sealed bool) string {
+	if sealed {
+		return buyersBuylist
+	}
+	switch chosen {
+	case buyersBuylist, buyersSales:
+		return chosen
+	}
+	if canSales && gameDefault == buyersSales {
+		return buyersSales
+	}
+	return buyersBuylist
+}
+
+// fillRecentSales sets the Buyers column's mode for the reader and which
+// cards have orders. The search draws no sales: the page fetches the panes
+// from /data/sales/ once it is on show in Sales, so no mode costs a search.
+func fillRecentSales(v *SearchVars, recent *salesvelocity.RecentSnapshot, r *http.Request, sig string, keys []string) {
+	v.CanSales = sig != "" || (DevMode && !SigCheck)
+	v.BuyersMode = buyersMode(readCookie(r, "SearchBuyersMode"), Config().SearchBuyersDefault, v.CanSales, v.IsSealed)
+	v.HasSales = map[string]bool{}
+	for _, cardID := range keys {
+		_, found := recent.For(cardID)
+		if found {
+			v.HasSales[cardID] = true
+		}
 	}
 }
 

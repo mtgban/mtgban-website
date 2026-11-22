@@ -668,8 +668,9 @@
                                     </div>
                                 </div>
                                 <!-- Buyers column -->
-                                <div class="result-col">
-                                    <div class="result-col-header">Buyers</div>
+                                {{$salesSwitch := not $card.Sealed}}
+                                <div class="result-col{{if $salesSwitch}} buyers-col{{end}}"{{if $salesSwitch}} data-buyers-mode="{{$.BuyersMode}}"{{end}}>
+                                    <div class="result-col-header">Buyers{{if $salesSwitch}}{{template "buyers-switch" $.BuyersMode}}{{end}}</div>
                                     {{if $card.Velocity}}
                                         {{if $.CanVelocity}}
                                             <details class="sales-velocity"{{if $.VelocityOpen}} open{{end}}>
@@ -754,6 +755,9 @@
                                         {{end}}
                                     {{end}}
                                     </div>
+                                    {{if $salesSwitch}}
+                                    <div class="sales-pane" data-card="{{$cardId}}" data-pending></div>
+                                    {{end}}
                                 </div>
                             </div>
                             <!-- Last sold placeholder (feature currently disabled) -->
@@ -823,6 +827,21 @@
 <script type="text/javascript" src="/js/search-quick-icons.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-track.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-velocity.js?hash={{.Hash}}" defer></script>
+{{if not .CanSales}}
+{{/* The Sales pane of a reader not logged in, one copy the switch puts in each card */}}
+<template id="sales-login">
+    <div class="price-row sales-locked">
+        <span class="store-name dim">Log in to see recent sales</span>
+        <span class="locked-cta">
+            <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="sales_join">Join</a>
+            {{range $ref, $id := .PatreonIDs}}
+                <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="sales_login">Log in</a>
+            {{end}}
+        </span>
+    </div>
+</template>
+{{end}}
+<script type="text/javascript" src="/js/search-buyers.js?hash={{.Hash}}" defer></script>
 
 <!-- Lightbox for the card image, used when the screen is too narrow to show
      the sidebar preview (see .qi-view-image / .card-image-modal). -->

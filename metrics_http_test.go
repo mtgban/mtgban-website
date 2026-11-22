@@ -182,6 +182,7 @@ func TestRouteLabel(t *testing.T) {
 		{"/", "/wp-login.php", "other"},
 		{"/data/", "/data/chart/abc", "data.chart"},
 		{"/data/", "/data/prices/", "data.prices"},
+		{"/data/", "/data/sales/abc", "data.sales"},
 		{"/data/", "/data/nope", "data"},
 		{"/data/", "/data/chart", "data"},
 		{"/search", "/search", "search"},

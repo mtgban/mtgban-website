@@ -508,7 +508,7 @@ value after each reconnect.
 |---|---|---|
 | `noSigning` | Home, Changelog, Account (`/user`), Guide, Privacy, Offline page, the shared favorites page (`/search/shared`), suggest/userstate/opensearch/palette APIs, `/api/load/datastore` | No checks; captures `?sig=` into cookie |
 | `enforceSigning` | All feature pages, and the downloads and raw record a search links to (`/search/decklist/`, `/search/export/`, `/search/raw/`) | Validates signature, expiry, per-page flag; 3 req/s per user email, or per invite signature once checked; POST only when `NavElem.CanPOST` |
-| `enforceDataSigning` | `/data/*`, what the site's own scripts fetch (`/data/chart/`, `/data/prices/`) | The same checks as `enforceSigning`; a refusal is a JSON error with 429 or 401 the script can test, not the error page |
+| `enforceDataSigning` | `/data/*`, what the site's own scripts fetch (`/data/chart/`, `/data/prices/`, `/data/sales/`) | The same checks as `enforceSigning`; a refusal is a JSON error with 429 or 401 the script can test, not the error page |
 | `enforceAPISigning` | `/api/mtgban/*`, `/api/v2/*`, `/api/load/*` (except `/api/load/datastore`) | JSON content-type; 10 req/s per IP (`ratelimit` token-bucket per IP via `x/time/rate`), keyed on the peer nginx appended last to X-Forwarded-For (read only when the socket peer is loopback or private), on App Platform on the client in the header `$BAN_CLIENT_IP_HEADER` names (`DO-Connecting-IP`), or for a request the API gateway signed, on the client it put first; an IPv6 address counts as its /64; HMAC-SHA1 validation via `apisig.Verify`, per-user secret from `Config.APIUserSecrets` falling back to `BAN_SECRET`; refusals are JSON errors with 401 or 429; a price request behind it, and the stores list, answer 503 the same way until the stores load, while the sets and finishes lists come from the datastore and are served regardless |
 
 Static assets (`/css/`, `/js/`, `/img/`, `/openapi/`) go through none of these four —
@@ -914,7 +914,9 @@ by those exact names; it keeps the sealed dump and per-set or per-card
 requests. An unknown dump name answers "Not found". A search answers
 sealed products, on any path, only to the `sealed` mode, as the sealed dump does. Other user APIs: `/search/decklist/tcgplayer/`,
 `/search/decklist/cardmarket/` (CSV exports keyed to store SKUs), `/data/prices/{ids}`
-(`BatchPricesAPI`, batch best-retail/best-buylist for ≤50 ids),
+(`BatchPricesAPI`, batch best-retail/best-buylist for ≤50 ids), `/data/sales/{ids}`
+(`SalesPaneAPI`, the Buyers column's Sales panes for ≤100 ids, from the recent
+orders in memory, ADR-0009),
 `/api/palette/*` (public metadata for the command palette), and
 `/api/mtgban/search/` (`SearchAPI`, which shares `searchPrices` with the
 site's `/search/export/`, `SearchExport`).
