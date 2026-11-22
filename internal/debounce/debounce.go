@@ -26,3 +26,21 @@ func Loop(signal <-chan struct{}, wait time.Duration, run func()) {
 		run()
 	}
 }
+
+// Batch runs `run` at most once per `wait`: the first signal starts the
+// window, every signal before it closes joins the same run, and a signal
+// during the run starts the next window. Unlike Loop, a steady stream of
+// signals cannot hold the run back past `wait`.
+func Batch(signal <-chan struct{}, wait time.Duration, run func()) {
+	for range signal {
+		timer := time.NewTimer(wait)
+		for waiting := true; waiting; {
+			select {
+			case <-signal:
+			case <-timer.C:
+				waiting = false
+			}
+		}
+		run()
+	}
+}
