@@ -29,8 +29,8 @@ func recentMatch(productID int64, variant string) string {
 }
 
 // buildRecent runs rows through a builder on top of base, nil for a full load.
-func buildRecent(base *RecentSnapshot, rows []recentRow, match func(productID int64, variant string) string, cutoff uint32) (*RecentSnapshot, recentStats) {
-	rb := newRecentBuilder(base, match, cutoff)
+func buildRecent(base *RecentSnapshot, rows []recentRow, match func(productID int64, variant string) string) (*RecentSnapshot, recentStats) {
+	rb := newRecentBuilder(base, match)
 	for _, row := range rows {
 		rb.add(row)
 	}
@@ -39,10 +39,6 @@ func buildRecent(base *RecentSnapshot, rows []recentRow, match func(productID in
 
 func row(product int64, variant, condition string, at time.Time, cents int64) recentRow {
 	return recentRow{ProductID: product, Variant: variant, Condition: condition, At: at, Cents: cents, Qty: 1, Pulled: recentNow}
-}
-
-func recentCutoff() uint32 {
-	return uint32(startOfDay(recentNow).AddDate(0, 0, -recentAge).Unix())
 }
 
 func dates(orders []Order) []string {
@@ -63,9 +59,10 @@ func TestBuildRecentGradesAndCuts(t *testing.T) {
 		row(1, "Foil", "Lightly Played", recentAt(2, 10), 900),
 		row(1, "Normal", "Unopened", recentAt(1, 10), 100),
 		row(9, "Normal", "Near Mint", recentAt(1, 10), 100),
-		row(1, "Normal", "Near Mint", recentAt(recentAge+1, 10), 100),
+		// Years old, and still the newest Heavily Played.
+		row(1, "Normal", "Heavily Played", recentAt(3*365, 10), 300),
 	)
-	snap, st := buildRecent(nil, rows, recentMatch, recentCutoff())
+	snap, st := buildRecent(nil, rows, recentMatch)
 
 	a, found := snap.For("card-a")
 	if !found {
@@ -75,6 +72,9 @@ func TestBuildRecentGradesAndCuts(t *testing.T) {
 	if len(nm) != recentDepth || nm[0] != recentAt(0, 10).Format("01-02T15") || nm[recentDepth-1] != recentAt(recentDepth-1, 10).Format("01-02T15") {
 		t.Errorf("NM orders = %v, want the newest %d, newest first", nm, recentDepth)
 	}
+	if len(a.Grades[3]) != 1 || a.Grades[3][0].Cents != 300 {
+		t.Errorf("HP orders = %+v, want the old one", a.Grades[3])
+	}
 	if len(a.Grades[4]) != 1 || a.Grades[4][0].Cents != 100 {
 		t.Errorf("PO orders = %+v, want the Damaged one", a.Grades[4])
 	}
@@ -82,8 +82,8 @@ func TestBuildRecentGradesAndCuts(t *testing.T) {
 	if foil == nil || len(foil.Grades[1]) != 1 {
 		t.Errorf("foil SP orders = %+v, want one", foil)
 	}
-	if st.unmatched != 1 || st.old != 1 || st.dropped["Unopened"] != 1 {
-		t.Errorf("stats = %+v, want 1 unmatched, 1 old, 1 Unopened dropped", st)
+	if st.unmatched != 1 || st.undated != 0 || st.dropped["Unopened"] != 1 {
+		t.Errorf("stats = %+v, want 1 unmatched, 1 Unopened dropped", st)
 	}
 	if !snap.Pulled.Equal(recentNow) {
 		t.Errorf("Pulled = %v, want the newest stamp read", snap.Pulled)
@@ -108,7 +108,7 @@ func TestBuildRecentKeepsDistinctOrdersAndDropsRepeats(t *testing.T) {
 		// The same order read again.
 		row(2, "Normal", "Near Mint", sameSecond, 500),
 	}
-	snap, _ := buildRecent(nil, rows, recentMatch, recentCutoff())
+	snap, _ := buildRecent(nil, rows, recentMatch)
 	b, _ := snap.For("card-b")
 	if got := len(b.Grades[0]); got != 4 {
 		t.Errorf("card-b NM holds %d orders, want 4: the repeat dropped, every distinct order kept", got)
@@ -116,7 +116,7 @@ func TestBuildRecentKeepsDistinctOrdersAndDropsRepeats(t *testing.T) {
 }
 
 func TestBuildRecentCutsABusyGradeAsItGoes(t *testing.T) {
-	rb := newRecentBuilder(nil, recentMatch, recentCutoff())
+	rb := newRecentBuilder(nil, recentMatch)
 	for d := range 5 * recentDepth {
 		rb.add(row(1, "Normal", "Near Mint", recentAt(d%300, d%24), 500))
 		if n := len(rb.added["card-a"].Grades[0]); n >= 2*recentDepth {
@@ -134,7 +134,7 @@ func TestBuildRecentIncrementalKeepsUntouchedCards(t *testing.T) {
 	base, _ := buildRecent(nil, []recentRow{
 		row(1, "Normal", "Near Mint", recentAt(3, 10), 500),
 		row(2, "Normal", "Near Mint", recentAt(3, 10), 500),
-	}, recentMatch, recentCutoff())
+	}, recentMatch)
 	before, _ := base.For("card-b")
 	oldA, _ := base.For("card-a")
 	oldOrders := oldA.Grades[0]
@@ -144,7 +144,7 @@ func TestBuildRecentIncrementalKeepsUntouchedCards(t *testing.T) {
 	again := row(1, "Normal", "Near Mint", recentAt(3, 10), 500)
 	fresh := row(1, "Normal", "Near Mint", recentAt(0, 10), 600)
 	fresh.Pulled = later
-	next, _ := buildRecent(base, []recentRow{again, fresh}, recentMatch, recentCutoff())
+	next, _ := buildRecent(base, []recentRow{again, fresh}, recentMatch)
 
 	after, _ := next.For("card-b")
 	if after != before {
@@ -209,7 +209,7 @@ func TestRecentGroups(t *testing.T) {
 }
 
 func TestRecentQueryReadsOnlyNewStamps(t *testing.T) {
-	for _, want := range []string{"FROM tcgplayerrecentsalemodel", "order_date >= $1", "pulled_at > $2", "game_name = $3"} {
+	for _, want := range []string{"FROM tcgplayerrecentsalemodel", "pulled_at > $1", "game_name = $2"} {
 		if !strings.Contains(RecentQuery, want) {
 			t.Errorf("RecentQuery lacks %q", want)
 		}

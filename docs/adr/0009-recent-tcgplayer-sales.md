@@ -40,18 +40,18 @@ What exists:
 
 ## Decision
 
-1. **The newspaper keeps the newest 10 orders per product, printing and
-   condition** in a new table, `tcgplayerrecentsalemodel`. Its columns are
+1. **The newspaper keeps the newest 20 orders per product, printing and
+   condition, whatever their age,** in a new table, `tcgplayerrecentsalemodel`. Its columns are
    `product_id`, `variant`, `condition`, `order_date`, `purchase_price`,
    `shipping_price`, `quantity`, `custom_listing_id` and `pulled_at`
    (stamped by the database's clock on insert, indexed). The key is `(product_id, variant,
    condition, order_date, purchase_price, quantity, custom_listing_id)`, so
    reading one order on two nights stores it once. The key is checked
    against one raw signed-in record before the table is created.
-2. **The pull writes only what changes the top 10.** The orders come from
+2. **The pull writes only what changes the top 20.** The orders come from
    pages it already reads, with no extra call and the same limit of the
    end of yesterday. Because a page is newest first, a group's orders on it
-   are that group's newest. So per group it takes the page's newest 10,
+   are that group's newest. So per group it takes the page's newest 20,
    inserts them with `ON CONFLICT DO NOTHING`, and trims only a product
    that gained a row. Every cut uses one order: date, price, quantity,
    listing id, newest first. A product with
@@ -63,20 +63,20 @@ What exists:
    night. A busier product's first page holds its newest 25, mostly in the
    condition that sells most. So the backfill takes the game's products
    with over 25 orders in the last 120 days of `tcgplayersalesdata`,
-   busiest first. For each condition still under 10, it reads with the
+   busiest first. For each condition still under 20, it reads with the
    request's `conditions` filter, empty in the pull today, until each
-   printing has 10 or the feed ends. It is a newspaper flag beside
+   printing has 20 or the feed ends. It is a newspaper flag beside
    `--backfill-from`. It runs signed in only, under the nightly's rate
    limits and with a progress file, and writes this table alone. A
-   condition with fewer than 10 sales in 120 days cannot fill. The run
-   logs, per game, how many groups reach 5 and 10. Before it runs, one
+   condition with fewer than 20 sales in 120 days cannot fill. The run
+   logs, per game, how many groups reach 5 and 20. Before it runs, one
    signed-in read must settle the condition ids and show that the filter
    holds. An agent may not call TCGplayer, so the user makes that read.
 4. **The site caches the orders in memory**, in `internal/salesvelocity`
    beside the velocity, with a store, snapshot and job row of their own.
-   - A full load reads the game's orders from the last 365 days, matches
-     each pair to a card id as the velocity does, and keeps 10 per card and
-     grade, newest first.
+   - A full load reads every order of the game, matches each pair to a
+     card id as the velocity does, and keeps 20 per card and grade, newest
+     first.
    - A load every three hours reads only the rows stamped after the newest
      stamp it has seen, less ten minutes, because concurrent writers commit
      out of order. The merge drops the repeats. It builds a new snapshot
@@ -143,7 +143,7 @@ What exists:
   condition and no single order.
 - **Keep N orders per printing rather than per condition**: rejected. NM
   crowds out the rest, and the reader asked for each condition's own five.
-- **Render both panes**: rejected. Up to 100 cards × 5 conditions × 10
+- **Render both panes**: rejected. Up to 100 cards × 5 conditions × 20
   orders, paid on every page for a pane most readers never open.
 - **Render the Sales pane in the search when the reader is in Sales**:
   rejected. With 14 orders on every card it made the search 39% slower
@@ -164,7 +164,7 @@ What exists:
   nights give 5 orders a product. The newest orders still arrive on the
   next clean night.
 - **An order TCGplayer later drops**, cancelled for instance, stays while it
-  ranks in its group's 10. Nothing reconciles a group against the feed.
+  ranks in its group's 20. Nothing reconciles a group against the feed.
 - **History starts at launch,** plus what the backfill recovers from 120
   days. A slow card's rarer conditions may stay under 5.
 - **Memory and load time are measured, not estimated.** The live test
@@ -172,10 +172,10 @@ What exists:
   and new snapshots both alive, before the switch ships. Magic had 157,501
   cards with a sale in a year. The order's own fields fit in about 12
   bytes, but slice headers and the map add more per card than that.
-- **The newspaper table** has at most 10 rows per product, printing and
-  condition within the year. Its key is about as large as its rows. Its
-  size is measured after the first nights. The sales run ends by deleting
-  rows older than 400 days.
+- **The newspaper table** has at most 20 rows per product, printing and
+  condition. Nothing deletes a row for its age, so a card that sold
+  years ago still shows its last orders. Its key is about as large as its
+  rows. Its size is measured after the first nights.
 - **Search time.** One snapshot read per request and one lookup per card,
   in either mode: measured with `BenchmarkSearchPage`, on master against
   the branch with benchstat. The panes cost their own request, after the

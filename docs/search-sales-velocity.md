@@ -310,8 +310,8 @@ neither check catches.
 Each card's newest TCGplayer orders per grade, for the Buyers column's Sales
 mode, load beside the velocity from the newspaper's
 `tcgplayerrecentsalemodel`. The `Recent sales` job runs every three hours
-and reads only the orders stamped since its last load, and the whole year
-once a day. The pull writes them once a day, over a few hours, so most
+and reads only the orders stamped since its last load, and every order of
+the game once a day. The pull writes them once a day, over a few hours, so most
 runs find nothing new.
 ADR-0009 has the design, and `TestRecentSalesLive` measures the load and its
 heap, the same way the velocity's live test does:
