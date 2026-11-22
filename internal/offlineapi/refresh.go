@@ -6,10 +6,11 @@ import (
 	"github.com/mtgban/mtgban-website/internal/debounce"
 )
 
-// refreshDebounce is the quiet window a burst of RequestRefresh calls must
-// settle for before the manifest is recomputed. A pipeline that reloads many
-// scrapers in a row triggers a single refresh. Overridable in tests.
-var refreshDebounce = 30 * time.Second
+// refreshWindow is how long the manifest waits after the first
+// RequestRefresh, so that store reloads landing a few minutes apart
+// re-version each set once. Offline prices lag the site by at most this.
+// Overridable in tests.
+var refreshWindow = 10 * time.Minute
 
 // RequestRefresh asks the background refresher to recompute the manifest soon.
 // Non-blocking: rapid calls coalesce into one pending signal.
@@ -28,5 +29,5 @@ func (s *Service) RequestRefresh() {
 // and recover a panic. It wraps every refresh rather than the loop, so one
 // that panics leaves the loop serving the next request.
 func (s *Service) StartRefresher(recovered func(job string, fn func()) func()) {
-	go debounce.Loop(s.refreshSignal, refreshDebounce, recovered("offline refreshManifest", s.refreshManifest))
+	go debounce.Batch(s.refreshSignal, refreshWindow, recovered("offline refreshManifest", s.refreshManifest))
 }

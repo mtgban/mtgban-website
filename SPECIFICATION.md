@@ -126,8 +126,9 @@ Boot sequence (`main()`):
    on it with the stores to load (`-stores` when it names any, else
    `scraper_config.stores`), then `s.runSealedAnalysis()`,
    `warmVariantCacheIfEnabled()`, `s.offline.RefreshManifest()`.
-7. `s.offline.StartRefresher(recovered)` — one debounced goroutine that
-   every runtime manifest refresh funnels through, each run through
+7. `s.offline.StartRefresher(recovered)` — one goroutine that every
+   runtime manifest refresh funnels through, batched to at most one per
+   `refreshWindow` (10 minutes) from the first request, each run through
    `recovered()` (recover.go), so a refresh that panics is reported and the
    loop serves the next one.
 8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, `s.startCrons()` in
@@ -256,7 +257,7 @@ on every request pings the channel once a window, not once a request,
 while a panic raised anywhere else still posts its own. net/http itself recovers a panic in any other handler,
 logging it and dropping the connection. Off the serving goroutines, these
 recover and report the same way under a `source job:` line: the cron jobs
-and each debounced offline refresh through `recovered()`; the Discord
+and each batched offline refresh through `recovered()`; the Discord
 handlers and the `$$` lookup's fetch, the newspaper refresh and the
 TCGplayer listings load a datastore load starts, the goroutines the admin page's `update`, `snapshot` and
 `tcgcsv` actions start, the scraper reloads a key-overrides save starts,
@@ -343,7 +344,7 @@ read, or its workflow state's names.
   catalog fragments, image metadata, and cached prices to the site's service
   worker for offline browsing: it loads persisted state at boot
   (`LoadPersisted()`), refreshes after scraper loads (`RefreshManifest()`),
-  and recomputes on a debounced background goroutine
+  and recomputes on a batched background goroutine
   (`RequestRefresh()`/`StartRefresher()`). Gated on `Config.Offline.ManifestPath`
   / `.ImagesPath` (`ManifestPathConfigured()`/`ImagesPathConfigured()`) — as of
   this writing none of the committed `config*.json` set either key, so on

@@ -18,9 +18,9 @@ func TestRequestRefreshDoesNotBlock(t *testing.T) {
 // A refresh that panics is recovered on its own, not with the loop around
 // it, so the refresher still serves the next request.
 func TestRefresherOutlivesAPanickingRefresh(t *testing.T) {
-	prev := refreshDebounce
-	refreshDebounce = time.Millisecond
-	t.Cleanup(func() { refreshDebounce = prev })
+	prev := refreshWindow
+	refreshWindow = time.Millisecond
+	t.Cleanup(func() { refreshWindow = prev })
 
 	s := NewService(Deps{
 		Datastore: func() (*matcher.Backend, time.Time) { panic("no datastore") },
