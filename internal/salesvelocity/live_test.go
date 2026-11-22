@@ -3,6 +3,7 @@ package salesvelocity
 import (
 	"cmp"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -22,45 +23,7 @@ import (
 //
 //	NEWSPAPER_LIVE=1 NEWSPAPER_LIVE_CONFIG=<absolute path> go test ./internal/salesvelocity -run TestSalesVelocityLive -v
 func TestSalesVelocityLive(t *testing.T) {
-	if os.Getenv("NEWSPAPER_LIVE") != "1" {
-		t.Skip("NEWSPAPER_LIVE not set; skipping the live sales velocity test")
-	}
-	datastore, err := os.Open("../../allprintings5.json")
-	if err != nil {
-		t.Skip("no local datastore: ", err)
-	}
-	defer datastore.Close()
-	b, err := matcher.Open(matcher.GameMagic, datastore)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	path := cmp.Or(os.Getenv("NEWSPAPER_LIVE_CONFIG"), "../../config.json")
-	blob, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
-	var cfg struct {
-		SQLConfig *timeseries.SQLConfig `json:"new_newspaper_sql_config"`
-	}
-	err = json.Unmarshal(blob, &cfg)
-	if err != nil {
-		t.Fatalf("parse %s: %v", path, err)
-	}
-	if cfg.SQLConfig == nil {
-		t.Fatalf("%s has no new_newspaper_sql_config", path)
-	}
-	db, err := cfg.SQLConfig.OpenDB()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	// One connection, so the read-only setting covers every query below.
-	db.SetMaxOpenConns(1)
-	_, err = db.Exec("SET default_transaction_read_only = on")
-	if err != nil {
-		t.Fatal(err)
-	}
+	b, db := liveNewspaper(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
@@ -68,7 +31,7 @@ func TestSalesVelocityLive(t *testing.T) {
 
 	start := time.Now()
 	var newest time.Time
-	err = db.QueryRowContext(ctx, DayQuery, game, Window).Scan(&newest)
+	err := db.QueryRowContext(ctx, DayQuery, game, Window).Scan(&newest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,4 +181,50 @@ func risingByChance(orders int32, start time.Time) float64 {
 		odds += math.Exp(lnN - lnK - lnNK + float64(k)*math.Log(p) + (n-float64(k))*math.Log(1-p))
 	}
 	return odds
+}
+
+// liveNewspaper opens the Magic datastore and a read-only connection to the
+// newspaper the config names, skipping unless NEWSPAPER_LIVE is set.
+func liveNewspaper(t *testing.T) (*matcher.Backend, *sql.DB) {
+	t.Helper()
+	if os.Getenv("NEWSPAPER_LIVE") != "1" {
+		t.Skip("NEWSPAPER_LIVE not set; skipping the live newspaper test")
+	}
+	datastore, err := os.Open("../../allprintings5.json")
+	if err != nil {
+		t.Skip("no local datastore: ", err)
+	}
+	defer datastore.Close()
+	b, err := matcher.Open(matcher.GameMagic, datastore)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path := cmp.Or(os.Getenv("NEWSPAPER_LIVE_CONFIG"), "../../config.json")
+	blob, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	var cfg struct {
+		SQLConfig *timeseries.SQLConfig `json:"new_newspaper_sql_config"`
+	}
+	err = json.Unmarshal(blob, &cfg)
+	if err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	if cfg.SQLConfig == nil {
+		t.Fatalf("%s has no new_newspaper_sql_config", path)
+	}
+	db, err := cfg.SQLConfig.OpenDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	// One connection, so the read-only setting covers every query below.
+	db.SetMaxOpenConns(1)
+	_, err = db.Exec("SET default_transaction_read_only = on")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b, db
 }
