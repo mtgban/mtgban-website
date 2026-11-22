@@ -94,6 +94,21 @@ func TestServiceWorkerPrecachesAnonymously(t *testing.T) {
 	}
 }
 
+// TestServeServiceWorkerEncodesGame keeps a game name inside its JS string.
+func TestServeServiceWorkerEncodesGame(t *testing.T) {
+	withConfigCopy(t)
+	config := *Config()
+	config.Game = `a';</script>"b`
+	liveConfig.Store(&config)
+
+	w := httptest.NewRecorder()
+	ServeServiceWorker(w, httptest.NewRequest("GET", "/sw.js", nil))
+	body := w.Body.String()
+	if !strings.Contains(body, `self.__GAME = "a';\u003c/script\u003e\"b";`+"\n") {
+		t.Errorf("game not encoded: %q", body[:min(len(body), 120)])
+	}
+}
+
 func TestServeServiceWorker(t *testing.T) {
 	r := httptest.NewRequest("GET", "/sw.js", nil)
 	w := httptest.NewRecorder()
@@ -120,7 +135,7 @@ func TestServeServiceWorker(t *testing.T) {
 		}
 		t.Errorf("body does not start with the build injection: %q", string(body[:n]))
 	}
-	if !strings.Contains(string(body), "self.__GAME = '"+string(Config().Game)+"';\n") {
+	if !strings.Contains(string(body), "self.__GAME = \""+string(Config().Game)+"\";\n") {
 		t.Error("body does not name the game whose card back the shell precaches")
 	}
 	if !strings.Contains(string(body), "mtgban-shell-") {

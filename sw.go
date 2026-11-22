@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 )
@@ -20,7 +21,9 @@ func ServeServiceWorker(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("self.__BUILD = '" + assetHash() + "';\n"))
 	// The card back the art fallback shows for a card whose image was never
 	// synced, precached so it is there offline too.
-	w.Write([]byte("self.__GAME = '" + string(Config().Game) + "';\n"))
+	// Encoded as a JS string, so nothing in the name can end the literal.
+	game, _ := json.Marshal(string(Config().Game))
+	w.Write([]byte("self.__GAME = " + string(game) + ";\n"))
 	if DevMode || BuildCommit == "" {
 		w.Write([]byte("self.__DEV = true;\n"))
 	}
