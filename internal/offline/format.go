@@ -31,10 +31,12 @@ package offline
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"time"
 )
@@ -111,6 +113,10 @@ func dollars(c uint64) float64 {
 type writer struct {
 	buf bytes.Buffer
 	tmp [binary.MaxVarintLen64]byte
+
+	// Scratch for one entry's stores and one map's tags, reused across
+	// entries: a set has tens of thousands of them.
+	stores, keys []string
 }
 
 func (w *writer) uv(v uint64) {
@@ -200,13 +206,14 @@ func encodeSection(w *writer, section map[string]map[string]*PriceEntry, storeId
 	for _, id := range uuids {
 		w.str(id)
 		byStore := section[id]
-		entryStores := make([]string, 0, len(byStore))
+		entryStores := w.stores[:0]
 		for s := range byStore {
 			entryStores = append(entryStores, s)
 		}
-		sort.Slice(entryStores, func(i, j int) bool {
-			return storeIdx[entryStores[i]] < storeIdx[entryStores[j]]
+		slices.SortFunc(entryStores, func(a, b string) int {
+			return cmp.Compare(storeIdx[a], storeIdx[b])
 		})
+		w.stores = entryStores
 
 		w.uv(uint64(len(entryStores)))
 		for _, s := range entryStores {
@@ -272,16 +279,17 @@ func encodeSection(w *writer, section map[string]map[string]*PriceEntry, storeId
 }
 
 func sortedTags(m map[string]uint64, keys []string) []string {
-	sort.Slice(keys, func(i, j int) bool { return m[keys[i]] < m[keys[j]] })
+	slices.SortFunc(keys, func(a, b string) int { return cmp.Compare(m[a], m[b]) })
 	return keys
 }
 
 func writeF64Map(w *writer, m map[string]float64, tagIdx map[string]uint64) {
-	keys := make([]string, 0, len(m))
+	keys := w.keys[:0]
 	for k := range m {
 		keys = append(keys, k)
 	}
 	keys = sortedTags(tagIdx, keys)
+	w.keys = keys
 	w.uv(uint64(len(keys)))
 	for _, k := range keys {
 		w.uv(tagIdx[k])
@@ -290,11 +298,12 @@ func writeF64Map(w *writer, m map[string]float64, tagIdx map[string]uint64) {
 }
 
 func writeIntMap(w *writer, m map[string]int, tagIdx map[string]uint64) {
-	keys := make([]string, 0, len(m))
+	keys := w.keys[:0]
 	for k := range m {
 		keys = append(keys, k)
 	}
 	keys = sortedTags(tagIdx, keys)
+	w.keys = keys
 	w.uv(uint64(len(keys)))
 	for _, k := range keys {
 		w.uv(tagIdx[k])
