@@ -216,9 +216,6 @@ func TestGrade(t *testing.T) {
 			t.Errorf("%s: got %v in band %d, want %v in band %d", tc.card, v.Pace, v.Band, tc.pace, tc.band)
 		}
 	}
-	if cards["cheap1"].Outsells != 0 || cards["rare20-0"].Outsells != 95 {
-		t.Errorf("outsells: got %v and %v, want 0 and 95", cards["cheap1"].Outsells, cards["rare20-0"].Outsells)
-	}
 
 	// A lowest band too small joins the one above it.
 	cards = map[string]*Sales{}
@@ -227,15 +224,6 @@ func TestGrade(t *testing.T) {
 	bands = grade(cards)
 	if !slices.Equal(bands, []Band{{0, 0}}) {
 		t.Errorf("one band: got %v", bands)
-	}
-
-	// Outselling 106 of 200 is 53%, which a float share times 100 puts at 52.99.
-	cards = map[string]*Sales{}
-	pricedCards(cards, "card", 200, 1)
-	grade(cards)
-	got := cards["card107"].Outsells
-	if got != 53 {
-		t.Errorf("card107: outsells %d%%, want 53%%", got)
 	}
 }
 
@@ -294,8 +282,8 @@ func TestRising(t *testing.T) {
 		t.Error("Snapshot.Rising disagrees with Sales.Rising")
 	}
 	_, detail, _ := s.View("up")
-	if !strings.Contains(detail, "|orders|37\n\n|7-day trend|2.0×") {
-		t.Errorf("up: no trend line under the rule: %q", detail)
+	if !strings.Contains(detail, "|orders|37|7-day trend|2.0×") {
+		t.Errorf("up: no trend ending the orders row: %q", detail)
 	}
 	_, detail, _ = s.View("new")
 	if strings.Contains(detail, "7-day trend") {
@@ -500,78 +488,97 @@ func TestText(t *testing.T) {
 		desc         string
 		v            Sales
 		window       int
-		pace, trend  string
+		trend        string
 		rate, detail string
 	}{
-		{"a rate", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last}, 30, "", "", "2.3/day",
+		{"a rate", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last}, 30, "", "2.3/day",
 			"|copies|69|days|18/30\n|orders|31\n\n|last sale|Oct 11"},
-		{"rounded to one decimal", Sales{Copies: 74, Orders: 60, Days: 25, LastSale: last}, 30, "", "", "2.5/day",
+		{"rounded to one decimal", Sales{Copies: 74, Orders: 60, Days: 25, LastSale: last}, 30, "", "2.5/day",
 			"|copies|74|days|25/30\n|orders|60\n\n|last sale|Oct 11"},
-		{"a whole number keeps its decimal", Sales{Copies: 60, Orders: 50, Days: 30, LastSale: last}, 30, "", "", "2.0/day",
+		{"a whole number keeps its decimal", Sales{Copies: 60, Orders: 50, Days: 30, LastSale: last}, 30, "", "2.0/day",
 			"|copies|60|days|30/30\n|orders|50\n\n|last sale|Oct 11"},
-		{"a tenth", Sales{Copies: 3, Orders: 3, Days: 3, LastSale: last}, 30, "", "", "0.1/day",
+		{"a tenth", Sales{Copies: 3, Orders: 3, Days: 3, LastSale: last}, 30, "", "0.1/day",
 			"|copies|3|days|3/30\n|orders|3\n\n|last sale|Oct 11"},
-		{"under a tenth", Sales{Copies: 2, Orders: 2, Days: 1, LastSale: last}, 30, "", "", "<0.1/day",
+		{"under a tenth", Sales{Copies: 2, Orders: 2, Days: 1, LastSale: last}, 30, "", "<0.1/day",
 			"|copies|2|days|1/30\n|orders|2\n\n|last sale|Oct 11"},
-		{"pace and trend", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last}, 30, "|vs. $30+|top 8%", "|7-day trend|2.1×", "2.3/day",
-			"|copies|69|days|18/30\n|orders|31|vs. $30+|top 8%\n\n|7-day trend|2.1×\n|last sale|Oct 11"},
-		{"no last sale", Sales{Copies: 69, Orders: 31, Days: 18}, 30, "", "", "2.3/day",
+		{"a trend", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last}, 30, "|7-day trend|2.1×", "2.3/day",
+			"|copies|69|days|18/30\n|orders|31|7-day trend|2.1×\n\n|last sale|Oct 11"},
+		{"no last sale", Sales{Copies: 69, Orders: 31, Days: 18}, 30, "", "2.3/day",
 			"|copies|69|days|18/30\n|orders|31"},
-		{"zero", Sales{LastSale: time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)}, 30, "", "", "0/day",
+		{"zero", Sales{LastSale: time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)}, 30, "", "0/day",
 			"no sale in 30 days\n|last sale|Sep 2"},
-		{"zero with no sale in the year", Sales{}, 30, "", "", "0/day", "no sale in 30 days"},
-		{"a sale last year", Sales{LastSale: time.Date(2025, 11, 20, 0, 0, 0, 0, time.UTC)}, 30, "", "", "0/day",
+		{"zero with no sale in the year", Sales{}, 30, "", "0/day", "no sale in 30 days"},
+		{"a sale last year", Sales{LastSale: time.Date(2025, 11, 20, 0, 0, 0, 0, time.UTC)}, 30, "", "0/day",
 			"no sale in 30 days\n|last sale|Nov 20, 2025"},
-		{"a price and condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 12.34, LastCondition: "LP"}, 30, "", "", "2.3/day",
+		{"a price and condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 12.34, LastCondition: "LP"}, 30, "", "2.3/day",
 			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$12.34 LP · Oct 11"},
-		{"a price with no condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 12.34}, 30, "", "", "2.3/day",
+		{"a price with no condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 12.34}, 30, "", "2.3/day",
 			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$12.34 · Oct 11"},
-		{"a price and an unabbreviated condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 89.99, LastCondition: "Unopened"}, 30, "", "", "2.3/day",
+		{"a price and an unabbreviated condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 89.99, LastCondition: "Unopened"}, 30, "", "2.3/day",
 			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$89.99 Unopened · Oct 11"},
-		{"a price under a dollar", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 0.5}, 30, "", "", "2.3/day",
+		{"a price under a dollar", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 0.5}, 30, "", "2.3/day",
 			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$0.50 · Oct 11"},
-		{"zero with a price", Sales{LastSale: time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC), LastPrice: 12.34, LastCondition: "LP"}, 30, "", "", "0/day",
+		{"zero with a price", Sales{LastSale: time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC), LastPrice: 12.34, LastCondition: "LP"}, 30, "", "0/day",
 			"no sale in 30 days\n|last sale|$12.34 LP · Aug 2"},
-		{"another window", Sales{Copies: 7, Orders: 7, Days: 5, LastSale: last}, 7, "", "", "1.0/day",
+		{"another window", Sales{Copies: 7, Orders: 7, Days: 5, LastSale: last}, 7, "", "1.0/day",
 			"|copies|7|days|5/7\n|orders|7\n\n|last sale|Oct 11"},
 	} {
-		rate, detail := text(tc.v, tc.window, day, tc.pace, tc.trend)
+		rate, detail := text(tc.v, tc.window, day, tc.trend)
 		if rate != tc.rate || detail != tc.detail {
 			t.Errorf("%s: got %q, %q; want %q, %q", tc.desc, rate, detail, tc.rate, tc.detail)
 		}
 	}
 }
 
-// TestViewPace words a graded card's band in its details, ending the orders row.
-func TestViewPace(t *testing.T) {
+// TestPaceNote names the band a graded card's pace was judged in, and
+// leaves the details without it.
+func TestPaceNote(t *testing.T) {
 	last := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
 	s := snapshotOf(map[string]*Sales{
-		"fast":    {Copies: 69, Orders: 31, Days: 18, LastSale: last, Pace: PaceFastest, Band: 1, Outsells: 92},
-		"slowest": {Copies: 1, Orders: 1, Days: 1, LastSale: last, Pace: PaceSlow},
-		"all":     {Copies: 1, Orders: 1, Days: 1, LastSale: last, Pace: PaceSlow},
-		"zero":    {LastSale: last, Pace: PaceSlow},
+		"fastest":  {Copies: 69, Orders: 31, Days: 18, LastSale: last, Pace: PaceFastest, Band: 1},
+		"fast":     {Copies: 9, Pace: PaceFast, Band: 1},
+		"steady":   {Copies: 3, Pace: PaceSteady},
+		"slow":     {Copies: 1, Pace: PaceSlow},
+		"zero":     {LastSale: last, Pace: PaceSlow},
+		"ungraded": {Copies: 1},
+		"no band":  {Copies: 1, Pace: PaceSlow, Band: 2},
 	})
-	s.Bands = []Band{{0, 30}, {30, 0}}
+	s.Bands = []Band{{0, 30}, {30, 100}}
 	for card, want := range map[string]string{
-		"fast":    "|copies|69|days|18/30\n|orders|31|vs. $30+|top 8%\n\n|last sale|Oct 11",
-		"slowest": "|copies|1|days|1/30\n|orders|1|vs. under $30|slowest\n\n|last sale|Oct 11",
-		"zero":    "no sale in 30 days\n|last sale|Oct 11",
+		"fastest":  "Among the fastest $30–100 cards",
+		"fast":     "Fast for a $30–100 card",
+		"steady":   "Steady for a card under $30",
+		"slow":     "Slow for a card under $30",
+		"zero":     "",
+		"ungraded": "",
+		"no band":  "",
+		"missing":  "",
 	} {
-		_, detail, _ := s.View(card)
-		if detail != want {
-			t.Errorf("%s: got %q, want %q", card, detail, want)
+		got := s.PaceNote(card)
+		if got != want {
+			t.Errorf("%s: got %q, want %q", card, got, want)
 		}
-		if s.Pace(card) != s.Cards[card].Pace {
-			t.Errorf("%s: pace %v", card, s.Pace(card))
-		}
+	}
+	s.Bands = []Band{{0, 30}, {30, 0}}
+	got := s.PaceNote("fastest")
+	if got != "Among the fastest $30+ cards" {
+		t.Errorf("open band: got %q", got)
 	}
 	s.Bands = []Band{{}}
-	_, detail, _ := s.View("all")
-	if !strings.Contains(detail, "|vs. all|slowest\n") {
-		t.Errorf("one band: got %q", detail)
+	got = s.PaceNote("slow")
+	if got != "Slow for a card" {
+		t.Errorf("one band: got %q", got)
 	}
-	if s.Pace("missing") != PaceNone || (*Snapshot)(nil).Pace("card") != PaceNone {
-		t.Error("a card with no data has a pace")
+	s.Bands = []Band{{0, 30}, {30, 100}}
+	_, detail, _ := s.View("fastest")
+	if detail != "|copies|69|days|18/30\n|orders|31\n\n|last sale|Oct 11" {
+		t.Errorf("details: got %q", detail)
+	}
+	if s.Pace("fast") != PaceFast || s.Pace("missing") != PaceNone || (*Snapshot)(nil).Pace("card") != PaceNone {
+		t.Error("a card's pace is not the one graded, or a card with no data has one")
+	}
+	if (*Snapshot)(nil).PaceNote("card") != "" {
+		t.Error("nothing loaded: a note")
 	}
 }
 
@@ -579,7 +586,7 @@ func TestViewPace(t *testing.T) {
 func TestView(t *testing.T) {
 	v := Sales{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
 	s := snapshotOf(map[string]*Sales{"card": &v})
-	wantRate, wantDetail := text(v, Window, s.Day, "", "")
+	wantRate, wantDetail := text(v, Window, s.Day, "")
 	rate, detail, _ := s.View("card")
 	if rate != wantRate || detail != wantDetail {
 		t.Errorf("card: got %q, %q; want %q, %q", rate, detail, wantRate, wantDetail)

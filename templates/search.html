@@ -675,7 +675,7 @@
                                             <details class="sales-velocity"{{if $.VelocityOpen}} open{{end}}>
                                                 <summary class="price-row">
                                                     <span class="store-name dim">TCGplayer sales</span>
-                                                    <span class="price"><span class="amt{{with $card.VelocityPace}} velocity-{{.}}{{end}}">{{if $card.VelocityRising}}<span class="velocity-rising" title="Selling at least twice as fast this week">&#8593;</span>{{end}}{{$card.Velocity}}</span></span>
+                                                    <span class="price"><span class="amt{{with $card.VelocityPace}} velocity-{{.}}{{end}}"{{with $card.VelocityNote}} title="{{.}}"{{end}}>{{if $card.VelocityRising}}<span class="velocity-rising" title="Selling at least twice as fast this week">&#8593;</span>{{end}}{{$card.Velocity}}</span></span>
                                                     <i class="sales-velocity-chevron" data-lucide="chevron-down"></i>
                                                 </summary>
                                                 <div class="sales-velocity-detail">{{tip_html $card.VelocityDetail}}</div>

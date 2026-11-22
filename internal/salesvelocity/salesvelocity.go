@@ -42,11 +42,9 @@ type Sales struct {
 	// The median sale price over the window, weighted by orders.
 	Price float64
 
-	// How fast it sells against its price band, Bands[Band], and the percent
-	// of that band's cards it outsells, rounded down.
-	Pace     Pace
-	Band     int8
-	Outsells int8
+	// How fast it sells against its price band, Bands[Band].
+	Pace Pace
+	Band int8
 }
 
 // Pace is how fast a card sells against cards of a like price.
@@ -690,7 +688,7 @@ func grade(cards map[string]*Sales) []Band {
 		n := len(copies)
 		for _, v := range g.cards {
 			slower := sort.SearchInts(copies, int(v.Copies))
-			v.Band, v.Outsells = int8(i), int8(100*slower/n)
+			v.Band = int8(i)
 			// In whole counts, so a share on a cut-off is never a hair under it.
 			switch {
 			case 10*slower >= 9*n:
@@ -740,28 +738,30 @@ func pricedSuffix(priced int, note string) string {
 	return line
 }
 
-// paceCells are the details' cells on how a card sells against its price
-// band, ending the orders row, empty for a card not graded or with no sale in
-// the window.
-func paceCells(v Sales, bands []Band) string {
+// paceNote says how a card sells against its price band, "Slow for a $10–30
+// card", empty for a card not graded or with no sale in the window.
+func paceNote(v Sales, bands []Band) string {
 	if v.Pace == PaceNone || v.Copies == 0 || int(v.Band) >= len(bands) {
 		return ""
 	}
-	peers := "all"
-	label := bands[v.Band].String()
-	if label != "" {
-		peers = strings.TrimPrefix(label, "at ")
+	before, after := "", ""
+	band := bands[v.Band].String()
+	price, priced := strings.CutPrefix(band, "at ")
+	if priced {
+		before = price + " "
+	} else if band != "" {
+		after = " " + band
 	}
-	rank := "slowest"
-	if v.Outsells > 0 {
-		rank = "top " + strconv.Itoa(max(100-int(v.Outsells), 1)) + "%"
+	if v.Pace == PaceFastest {
+		return "Among the fastest " + before + "cards" + after
 	}
-	return "|vs. " + peers + "|" + rank
+	pace := v.Pace.String()
+	return strings.ToUpper(pace[:1]) + pace[1:] + " for a " + before + "card" + after
 }
 
-// trendLine is the details' line on a card rising the times given, empty for
-// one not rising.
-func trendLine(rising float64) string {
+// trendCells are the details' cells on a card rising the times given, ending
+// the orders row, empty for one not rising.
+func trendCells(rising float64) string {
 	if rising == 0 {
 		return ""
 	}
@@ -777,9 +777,9 @@ func Heading() string {
 }
 
 // text is a card's rate and its details (tip_html format) over the window of
-// days to day: the counts two pairs a row, pace ending the second, then after
-// a blank line, which rules them off, the trend and the last sale.
-func text(v Sales, window int, day time.Time, pace, trend string) (rate, detail string) {
+// days to day: the counts two pairs a row, the trend ending the second, then
+// after a blank line, which rules it off, the last sale.
+func text(v Sales, window int, day time.Time, trend string) (rate, detail string) {
 	last := ""
 	if !v.LastSale.IsZero() {
 		last = "|last sale|" + lastSaleText(v, day)
@@ -800,16 +800,10 @@ func text(v Sales, window int, day time.Time, pace, trend string) (rate, detail 
 
 	lines := []string{
 		fmt.Sprintf("|copies|%d|days|%d/%d", v.Copies, v.Days, window),
-		"|orders|" + strconv.Itoa(int(v.Orders)) + pace,
-	}
-	if trend != "" || last != "" {
-		lines = append(lines, "")
-	}
-	if trend != "" {
-		lines = append(lines, trend)
+		"|orders|" + strconv.Itoa(int(v.Orders)) + trend,
 	}
 	if last != "" {
-		lines = append(lines, last)
+		lines = append(lines, "", last)
 	}
 	return rate, strings.Join(lines, "\n")
 }
@@ -825,7 +819,7 @@ func (s *Snapshot) View(cardID string) (rate, detail string, notable bool) {
 	if !found {
 		return "", "", false
 	}
-	rate, detail = text(v, Window, s.Day, paceCells(v, s.Bands), trendLine(s.rising(v)))
+	rate, detail = text(v, Window, s.Day, trendCells(s.rising(v)))
 	return rate, detail, v.PerDay(Window) >= notableFloor
 }
 
@@ -844,6 +838,16 @@ func (s *Snapshot) Rising(cardID string) bool {
 func (s *Snapshot) Pace(cardID string) Pace {
 	v, _ := s.For(cardID)
 	return v.Pace
+}
+
+// PaceNote says what a card's pace was judged against, for a tooltip on its
+// rate, empty where the rate has no band behind it.
+func (s *Snapshot) PaceNote(cardID string) string {
+	v, found := s.For(cardID)
+	if !found {
+		return ""
+	}
+	return paceNote(v, s.Bands)
 }
 
 // Rates is the copies sold a day of each card with data.
