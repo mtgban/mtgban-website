@@ -168,6 +168,10 @@ func decklistCSVFixture(t *testing.T) (*matcher.Backend, *prices) {
 	})
 	b.UUIDs["FIXTUREA-1"].Edition, b.UUIDs["FIXTUREA-1"].Rarity, b.UUIDs["FIXTUREA-1"].Language = "Fixture Edition Alpha", "rare", "English"
 	b.UUIDs["FIXTUREA-2"].Foil = true
+	b.UUIDs["FIXTUREA-box"] = &matcher.CardObject{
+		Card:   matcher.Card{UUID: "FIXTUREA-box", Name: "Fixture Box Alpha", SetCode: "FIXTUREA"},
+		Sealed: true,
+	}
 	inventory := func(entries map[string][]mtgban.InventoryEntry) mtgban.InventoryRecord {
 		out := mtgban.InventoryRecord{}
 		for id, list := range entries {
@@ -187,8 +191,13 @@ func decklistCSVFixture(t *testing.T) (*matcher.Backend, *prices) {
 		}),
 		seller("TCGDirectLow", map[string][]mtgban.InventoryEntry{"FIXTUREA-1": {{Conditions: "NM", Price: 1.4}}}),
 		seller("TCGLow", map[string][]mtgban.InventoryEntry{"FIXTUREA-1": {{Conditions: "NM", Price: 1.1, OriginalID: "9001"}}}),
-		seller("TCGSealed", nil),
-		seller("MKMTrend", map[string][]mtgban.InventoryEntry{"FIXTUREA-1": {{Conditions: "NM", Price: 0.9, OriginalID: "5001"}}}),
+		seller("TCGSealed", map[string][]mtgban.InventoryEntry{
+			"FIXTUREA-box": {{Conditions: "NM", Price: 99.99, InstanceID: "333"}},
+		}),
+		seller("MKMTrend", map[string][]mtgban.InventoryEntry{
+			"FIXTUREA-1":   {{Conditions: "NM", Price: 0.9, OriginalID: "5001"}},
+			"FIXTUREA-box": {{Conditions: "NM", Price: 80, OriginalID: "5003"}},
+		}),
 		seller("MKMLow", map[string][]mtgban.InventoryEntry{"FIXTUREA-2": {{Conditions: "NM", Price: 3.3, OriginalID: "5002"}}}),
 	}, nil)
 	return b, s.prices()
@@ -197,9 +206,9 @@ func decklistCSVFixture(t *testing.T) (*matcher.Backend, *prices) {
 // What each marketplace export writes, unchanged by the flush at its end.
 func TestDecklistCSVBytes(t *testing.T) {
 	b, p := decklistCSVFixture(t)
-	ids := []string{"FIXTUREA-1", "FIXTUREA-2", "nope", "FIXTUREA-1", "FIXTUREA-1"}
-	qtys := []string{"1", "2", "1", "3", "x"}
-	conds := []string{"NM", "SP", "NM", "NM", "SP"}
+	ids := []string{"FIXTUREA-1", "FIXTUREA-2", "nope", "FIXTUREA-1", "FIXTUREA-1", "FIXTUREA-box"}
+	qtys := []string{"1", "2", "1", "3", "x", "1"}
+	conds := []string{"NM", "SP", "NM", "NM", "SP", "NM"}
 	// Captured from the exports before they flushed and checked at their end.
 	for _, c := range []struct {
 		name   string
@@ -209,11 +218,13 @@ func TestDecklistCSVBytes(t *testing.T) {
 		{"tcgplayer", tcgDecklistCSV, "TCGplayer Id,Product Line,Set Name,Product Name,Title,Number,Rarity,Condition,TCG Market Price,TCG Direct Low,TCG Low Price With Shipping,TCG Low Price,Total Quantity,Add to Quantity,My Store Price,TCG Marketplace Price,My Store Reserve Quantity,Photo URL\n" +
 			"111,,,,,,,Near Mint,1.50,1.40,,1.10,,4,,1.50,,\n" +
 			"222,,,,,,,Lightly Played Foil,7.00,0.00,,0.00,,2,,7.00,,\n" +
-			"112,,,,,,,Lightly Played,1.25,0.00,,0.00,,1,,1.25,,\n"},
+			"112,,,,,,,Lightly Played,1.25,0.00,,0.00,,1,,1.25,,\n" +
+			"333,,,,,,,Unopened,99.99,0.00,,0.00,,1,,99.99,,\n"},
 		{"cardmarket", UUID2MKMCSV, "cardmarketId,quantity,name,set,setCode,cn,condition,language,isFoil,isPlayset,isSigned,price,comment,nameDE,nameES,nameFR,nameIT,rarity,listedAt\n" +
 			"5001,4,Fixture Card Alpha,Fixture Edition Alpha,FIXTUREA,1,NM,English,,,,0.90,,,,,,Rare,\n" +
 			"5002,2,\"Fixture, Card \"\"Beta\"\"\",,FIXTUREA,2,EX,,Y,,,3.30,,,,,,,\n" +
-			"5001,1,Fixture Card Alpha,Fixture Edition Alpha,FIXTUREA,1,EX,English,,,,0.90,,,,,,Rare,\n"},
+			"5001,1,Fixture Card Alpha,Fixture Edition Alpha,FIXTUREA,1,EX,English,,,,0.90,,,,,,Rare,\n" +
+			"5003,1,Fixture Box Alpha,,FIXTUREA,,NM,,,,,80.00,,,,,,,\n"},
 	} {
 		var buf bytes.Buffer
 		if err := c.export(b, p, csv.NewWriter(&buf), ids, qtys, conds); err != nil {
