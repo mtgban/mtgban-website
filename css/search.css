@@ -719,6 +719,8 @@ body:has(.search-layout) {
 .sidebar-printings a { color: var(--search-link); text-decoration: none; }
 .sidebar-printings a:hover { text-decoration: underline; }
 .sidebar-printings i[class*="ss-"] { color: var(--normal); margin: 0 1px; }
+/* 5% over keyrune's 2x, as the drawn badges are (genCardPrintings). */
+.sidebar-printings .ss-2x { font-size: 2.1em; }
 /* The keyrune glyphs and the overflow trigger already centre on the same
    line, but a generated set badge is a replaced element and rides the
    baseline, leaving the trigger hanging below it on games with no keyrune
