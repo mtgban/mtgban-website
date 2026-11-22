@@ -305,6 +305,19 @@ an hour of the pull, and otherwise at the day before.
 A pull that stops partway through a day leaves it short but not signed out, which
 neither check catches.
 
+## Recent orders
+
+Each card's newest TCGplayer orders per grade, for the Buyers column's Sales
+mode, load beside the velocity from the newspaper's
+`tcgplayerrecentsalemodel`. The `Recent sales` job runs every three hours
+and reads only the orders stamped since its last load, and the whole year
+once a day. The pull writes them once a day, over a few hours, so most
+runs find nothing new.
+ADR-0009 has the design, and `TestRecentSalesLive` measures the load and its
+heap, the same way the velocity's live test does:
+
+    NEWSPAPER_LIVE=1 NEWSPAPER_LIVE_CONFIG=<absolute path> go test ./internal/salesvelocity -run TestRecentSalesLive -v
+
 ## Why not the most-searched cards first
 
 The ticket suggested filling in the most-searched cards first. One pass

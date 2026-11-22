@@ -43,6 +43,32 @@ func (s *site) loadSalesVelocity() {
 	}
 }
 
+// recentSalesStore holds TCGplayer's recent orders per card. A request reads
+// its snapshot once, like the velocity's.
+var recentSalesStore = &salesvelocity.RecentStore{}
+
+// loadRecentSales reads the orders the newspaper wrote since the last load, or
+// all of them on a new day or datastore.
+func (s *site) loadRecentSales() {
+	game, found := gameMap[Config().Game]
+	if !found || SkipNewspaper || NewNewspaperDB == nil {
+		return
+	}
+	b := s.backend()
+	if len(b.GetUUIDs()) == 0 {
+		// No datastore yet: its load runs this once it is in.
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	result, problem := recentSalesStore.Load(ctx, NewNewspaperDB, b, game, time.Now())
+	if result != "" || problem != "" {
+		backgroundJobs.Report(jobRecentSales, result, problem)
+	}
+}
+
 // checkNewspaperSales reports on the job's row when the newspaper's sales pull
 // looks signed out or stopped, which checkJobHealth then announces.
 func checkNewspaperSales() {
