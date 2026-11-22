@@ -27,9 +27,7 @@ const (
 	// RecentShown is the orders a grade shows before the rest fold away.
 	RecentShown = 5
 	// The orders kept per card and grade, as the newspaper keeps them.
-	recentDepth = 10
-	// Days back an order is kept.
-	recentAge = 365
+	recentDepth = 20
 	// How far before the newest stamp read an incremental load reads again. The
 	// newspaper writes each product in one short transaction stamped at its
 	// start, so rows commit out of stamp order by seconds; repeats are dropped.
@@ -91,15 +89,14 @@ func (s *RecentStore) Publish(snap *RecentSnapshot) {
 	s.current.Store(snap)
 }
 
-// RecentQuery is the orders of one game since an age and stamped after a
-// time, both naive UTC as the newspaper writes them.
+// RecentQuery is the orders of one game stamped after a time, naive UTC as
+// the newspaper writes it.
 const RecentQuery = `
 	SELECT product_id, variant, condition, order_date,
 	       round(purchase_price * 100)::bigint, quantity, custom_listing_id, pulled_at
 	  FROM tcgplayerrecentsalemodel
-	 WHERE order_date >= $1
-	   AND pulled_at > $2
-	   AND product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $3)`
+	 WHERE pulled_at > $1
+	   AND product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $2)`
 
 // recentRow is one row of RecentQuery.
 type recentRow struct {
@@ -129,14 +126,13 @@ func (s *RecentStore) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, 
 	if !full {
 		since = current.Pulled.Add(-recentOverlap)
 	}
-	cutoff := startOfDay(now).AddDate(0, 0, -recentAge)
 
 	var base *RecentSnapshot
 	if !full {
 		base = current
 	}
-	rb := newRecentBuilder(base, cardMatcher(b), uint32(cutoff.Unix()))
-	err := scanRecent(ctx, db, game, cutoff, since, rb)
+	rb := newRecentBuilder(base, cardMatcher(b))
+	err := scanRecent(ctx, db, game, since, rb)
 	if err != nil {
 		note := recentUnavailable(err)
 		if note != "" {
@@ -165,15 +161,15 @@ func (s *RecentStore) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, 
 
 // fullLoad reports whether a load reads every order rather than those
 // written since current: with none loaded, for a new backend, and once a day
-// so orders past the age leave the cards no new order touched.
+// so orders deleted from the table leave the snapshot.
 func fullLoad(current *RecentSnapshot, b *matcher.Backend, now time.Time) bool {
 	return current == nil || current.Backend != weak.Make(b) || !startOfDay(current.Full).Equal(startOfDay(now))
 }
 
-// scanRecent reads game's orders from cutoff on, stamped after since, into
-// rb one row at a time, so a full load never holds them all.
-func scanRecent(ctx context.Context, q salesQuerier, game string, cutoff, since time.Time, rb *recentBuilder) error {
-	rows, err := q.QueryContext(ctx, RecentQuery, naive(cutoff), naive(since), game)
+// scanRecent reads game's orders stamped after since into rb one row at a
+// time, so a full load never holds them all.
+func scanRecent(ctx context.Context, q salesQuerier, game string, since time.Time, rb *recentBuilder) error {
+	rows, err := q.QueryContext(ctx, RecentQuery, naive(since), game)
 	if err != nil {
 		return err
 	}
@@ -234,7 +230,7 @@ func gradeIndex(condition string) int {
 
 // recentStats counts what a load read and could not keep.
 type recentStats struct {
-	rows, unmatched, old int
+	rows, unmatched, undated int
 	// Orders per condition with no grade.
 	dropped map[string]int
 }
@@ -264,15 +260,14 @@ func (st recentStats) report(full bool, cards int) string {
 // an incremental load.
 type recentBuilder struct {
 	match  func(productID int64, variant string) string
-	cutoff uint32
 	added  map[string]*Recent
 	pulled time.Time
 	st     recentStats
 }
 
 // newRecentBuilder starts a load on top of base, nil for a full one.
-func newRecentBuilder(base *RecentSnapshot, match func(productID int64, variant string) string, cutoff uint32) *recentBuilder {
-	rb := &recentBuilder{match: match, cutoff: cutoff, added: map[string]*Recent{}}
+func newRecentBuilder(base *RecentSnapshot, match func(productID int64, variant string) string) *recentBuilder {
+	rb := &recentBuilder{match: match, added: map[string]*Recent{}}
 	if base != nil {
 		rb.pulled = base.Pulled
 	}
@@ -295,8 +290,8 @@ func (rb *recentBuilder) add(row recentRow) {
 		return
 	}
 	order, ok := newOrder(row)
-	if !ok || order.At < rb.cutoff {
-		rb.st.old++
+	if !ok {
+		rb.st.undated++
 		return
 	}
 	cardID := rb.match(row.ProductID, row.Variant)
@@ -311,7 +306,7 @@ func (rb *recentBuilder) add(row recentRow) {
 	}
 	r.Grades[grade] = append(r.Grades[grade], order)
 	if len(r.Grades[grade]) >= 2*recentDepth {
-		r.Grades[grade] = newestOrders(nil, r.Grades[grade], rb.cutoff)
+		r.Grades[grade] = newestOrders(nil, r.Grades[grade])
 	}
 }
 
@@ -329,7 +324,7 @@ func (rb *recentBuilder) snapshot(base *RecentSnapshot) *RecentSnapshot {
 			if old != nil {
 				kept = old.Grades[i]
 			}
-			merged.Grades[i] = newestOrders(kept, r.Grades[i], rb.cutoff)
+			merged.Grades[i] = newestOrders(kept, r.Grades[i])
 		}
 		cards[cardID] = merged
 	}
@@ -369,9 +364,8 @@ func (o byNewest) Less(i, j int) bool {
 }
 
 // newestOrders is kept and added together, each order once by its whole
-// identity, from cutoff on,
-// newest first and at most recentDepth, in a new slice.
-func newestOrders(kept, added []Order, cutoff uint32) []Order {
+// identity, newest first and at most recentDepth, in a new slice.
+func newestOrders(kept, added []Order) []Order {
 	if len(added) == 0 && len(kept) == 0 {
 		return nil
 	}
@@ -381,7 +375,7 @@ func newestOrders(kept, added []Order, cutoff uint32) []Order {
 	sort.Sort(byNewest(all))
 	out := all[:0]
 	for i, o := range all {
-		if o.At < cutoff || (i > 0 && o == all[i-1]) {
+		if i > 0 && o == all[i-1] {
 			continue
 		}
 		out = append(out, o)
