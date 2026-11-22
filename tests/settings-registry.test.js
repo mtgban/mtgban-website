@@ -40,7 +40,7 @@ const lineOf = (src, i) => src.slice(0, i).split('\n').length;
 // Names an identifier holds: var/let/const X = 'a', or X = cond ? 'a' : 'b', in the same file.
 function resolve(src, id) {
     const out = [];
-    const decl = new RegExp('(?:var|let|const)\\s+' + id.replace(/\$/g, '\\$') + '\\s*=\\s*([^;\\n]*)', 'g');
+    const decl = new RegExp('(?:var|let|const)\\s+' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*=\\s*([^;\\n]*)', 'g');
     for (const m of src.matchAll(decl)) {
         const v = m[1].trim();
         const one = v.match(/^(['"])([^'"]*)\1$/);
