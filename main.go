@@ -822,8 +822,9 @@ func main() {
 		s.startScraperLoad(*dumpsDir, stores, datastoreLoaded)
 	}
 
-	// Runtime manifest refreshes funnel through one debounced goroutine, each
-	// under tracked so that one that panics does not end the loop.
+	// Runtime manifest refreshes funnel through one batched goroutine (at most
+	// one refresh per refreshWindow), each under tracked so that one that
+	// panics does not end the loop.
 	s.offline.StartRefresher(func(_ string, fn func()) func() { return tracked(jobOffline, fn) })
 
 	if !DevMode {
