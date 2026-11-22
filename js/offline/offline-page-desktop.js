@@ -140,6 +140,22 @@
         }
     }
 
+    // Where the pointer last moved to, null until it has. A scroll or a key
+    // fires mouseover on whatever row ends up under a still pointer, so a
+    // hover counts only where the pointer has not been: a real one arrives
+    // ahead of the mousemove that brings it.
+    var pointerX = null;
+    var pointerY = null;
+
+    function pointerMoved(e) {
+        pointerX = e.clientX;
+        pointerY = e.clientY;
+    }
+
+    function pointerStill(e) {
+        return pointerX === null || (e.clientX === pointerX && e.clientY === pointerY);
+    }
+
     // The navbar's Search and Sealed links keep the current query.
     function paintNavLinks(q) {
         document.querySelectorAll('.offline-mode-btn').forEach(function (a) {
@@ -164,7 +180,9 @@
             });
 
             // Sidebar image follows the hovered result, like search.html.
+            document.addEventListener('mousemove', pointerMoved, true);
             document.getElementById('offline-results').addEventListener('mouseover', function (e) {
+                if (pointerStill(e)) return;
                 var row = e.target.closest('[data-image-url]');
                 if (row) showRowImage(row);
             });
