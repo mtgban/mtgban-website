@@ -133,6 +133,7 @@ function loadPage(file, { search = '', ids = [], pills = [], navLinks = [], cook
         self,
         document,
         key: (event) => docListeners.keydown(event),
+        move: (x, y) => docListeners.mousemove({ clientX: x, clientY: y }),
         // Lets the page's setup and first query finish: nothing here is timed.
         settle: () => new Promise((resolve) => setImmediate(resolve)),
         load: () => docListeners.DOMContentLoaded(),
@@ -446,7 +447,10 @@ test('desktop starts from the default sort cookie, reading hybrid as alphabetica
 
 test('the sidebar image only takes a URL the renderers could have written', async () => {
     const page = await started('offline-page-desktop.js', { ids: DESKTOP, search: '?sealed=1' });
+    page.move(0, 0);
+    let x = 0;
     const hover = (attrs) => page.els['offline-results'].fire('mouseover', {
+        clientX: ++x, clientY: 0,
         target: { closest: () => makeEl({ 'data-foil': 'true', 'data-set-code': 'NEO', ...attrs }) },
     });
     hover({ 'data-image-url': '/api/offline/images/abc.webp' });
@@ -456,6 +460,28 @@ test('the sidebar image only takes a URL the renderers could have written', asyn
     hover({ 'data-image-url': 'https://elsewhere.example/x.webp' });
     expect(page.log.art.at(-1)).toStartWith('data:image/gif');
     expect(wrapper['data-foil']).toBe('false');
+});
+
+test('the sidebar image follows a hover only where the pointer moved', async () => {
+    const page = await started('offline-page-desktop.js', { ids: DESKTOP });
+    const hover = (url, x, y) => page.els['offline-results'].fire('mouseover', {
+        clientX: x, clientY: y,
+        target: { closest: () => makeEl({ 'data-image-url': url }) },
+    });
+    // Nothing moved since the page loaded.
+    hover('/api/offline/images/a.webp', 5, 5);
+    expect(page.log.art).toEqual([]);
+
+    // A real hover arrives ahead of its mousemove.
+    page.move(5, 5);
+    hover('/api/offline/images/b.webp', 6, 5);
+    page.move(6, 5);
+    expect(page.log.art).toEqual(['/api/offline/images/b.webp']);
+
+    // A scroll under the still pointer, with Firefox's same-place mousemove.
+    page.move(6, 5);
+    hover('/api/offline/images/c.webp', 6, 5);
+    expect(page.log.art).toEqual(['/api/offline/images/b.webp']);
 });
 
 test('mobile mode pills carry the query and mark the mode', async () => {
