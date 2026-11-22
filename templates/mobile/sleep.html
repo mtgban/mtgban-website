@@ -148,14 +148,14 @@
     {{range $i, $letter := .SleepersKeys}}
         {{$bgColor := index $.SleepersColors $i}}
         {{$cardIds := index $.Sleepers $letter}}
-        <div class="m-sleep-tier">
-            <div class="m-sleep-tier-label" style="background-color: {{$bgColor}};">{{$letter}}</div>
+        <div class="m-sleep-tier" style="background-color: {{$bgColor}};">
+            <div class="m-sleep-tier-label">Tier {{$letter}}</div>
             <div class="m-sleep-tier-cards">
                 {{range $cardIds}}
                     {{$card := index $.Metadata .}}
                     <a class="m-sleep-card" href="{{$card.SearchURL}}" data-track="ui.sleepers.card">
                         <div class="foil-wrap" data-foil="{{$card.Foil}}" data-etched="{{$card.Etched}}">
-                            <img class="card-art" loading="lazy" src="{{$card.ImageURL}}" width="110" height="154" alt="{{$card.Name}}" title="{{$card.Name}}" style="border-radius: 8px; display: block;">
+                            <img class="card-art" loading="lazy" src="{{$card.ImageURL}}" width="110" height="154" alt="{{$card.Name}}" title="{{$card.Name}}">
                         </div>
                     </a>
                 {{end}}
