@@ -82,6 +82,8 @@ func tierPages(s *site, entry map[string]map[string]string) []TierPage {
 			flags = searchFlags(flags)
 		case "Global":
 			flags = globalFlags(flags)
+		case "Newspaper":
+			flags = newsFlags(flags)
 		}
 		page := TierPage{Name: nav.Name, Description: nav.Description}
 		for _, flag := range slices.Sorted(maps.Keys(flags)) {
@@ -195,6 +197,17 @@ func globalFlags(flags map[string]string) map[string]string {
 	return out
 }
 
+// newsFlags is a tier's Newspaper flags with NewsLarge always set, so every
+// tier shows the rows its pages show.
+func newsFlags(flags map[string]string) map[string]string {
+	out := maps.Clone(flags)
+	if out == nil {
+		out = map[string]string{}
+	}
+	out["NewsLarge"] = flags["NewsLarge"]
+	return out
+}
+
 // TierPerk is what one of a tier's flags gives: the pill its card shows,
 // if any, and the row and cell it takes when the tiers are compared.
 type TierPerk struct {
@@ -247,7 +260,14 @@ func aclFlagPerk(flag, value string) (TierPerk, bool) {
 			return perk("Data three days behind", "Data delay", "3 days")
 		}
 	case "NewsLarge":
-		return on("Double the rows per page")
+		// Every tier shows its rows per page; only the grant's larger page
+		// gets a pill on the card
+		set, _ := strconv.ParseBool(value)
+		rows := strconv.Itoa(newsRowsPerPage(set))
+		if set {
+			return perk(rows+" entries per page", "Entries per page", rows)
+		}
+		return perk("", "Entries per page", rows)
 	case "SearchDownloadCSV":
 		return on("CSV download of results")
 	case "SearchChartLoopback":
