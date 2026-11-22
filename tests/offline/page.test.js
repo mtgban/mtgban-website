@@ -28,6 +28,8 @@ function makeEl(attrs = {}) {
         querySelector: () => null,
         querySelectorAll: () => [],
         blur: () => { attrs.blurred = true; },
+        focus: () => { attrs.focused = true; },
+        setSelectionRange: (from, to) => { attrs.selection = [from, to]; },
     };
 }
 
@@ -129,6 +131,7 @@ function loadPage(file, { search = '', ids = [], pills = [], navLinks = [], cook
         hold,
         location,
         self,
+        document,
         key: (event) => docListeners.keydown(event),
         // Lets the page's setup and first query finish: nothing here is timed.
         settle: () => new Promise((resolve) => setImmediate(resolve)),
@@ -884,6 +887,32 @@ test('PgDn and PgUp step a result from the one on top, as on the search page', a
 
     expect(await press('a')).toBe(false);
     expect(tracked).toEqual([['ui.search.key', 'result_page_down'], ['ui.search.key', 'result_page_up'], ['ui.search.key', 'result_page_down']]);
+});
+
+test('Tab takes the search box from outside a text field and Escape gives it up, as on the search page', async () => {
+    const page = await started('offline-page-desktop.js', { ids: DESKTOP, search: '?q=sol', queries: { sol: rows(3) } });
+    const box = page.els['nav-searchbox'];
+    box.value = 'sol';
+    const { tracked } = pageKeys(page);
+    const press = (key, target) => {
+        let stopped = false;
+        page.key({ key, target, preventDefault: () => { stopped = true; } });
+        return stopped;
+    };
+
+    expect(press('Tab', { tagName: 'INPUT' })).toBe(false);
+    expect(box.attrs.focused).toBeUndefined();
+    expect(press('Tab', { tagName: 'A' })).toBe(true);
+    expect(box.attrs.focused).toBe(true);
+    expect(box.attrs.selection).toEqual([0, 3]);
+    expect(tracked).toEqual([['ui.search.key', 'tab_to_search']]);
+
+    page.document.activeElement = {};
+    press('Escape', { tagName: 'BODY' });
+    expect(box.attrs.blurred).toBeUndefined();
+    page.document.activeElement = box;
+    expect(press('Escape', box)).toBe(false);
+    expect(box.attrs.blurred).toBe(true);
 });
 
 test('PgDn keeps stepping through results too short to reach the top', async () => {

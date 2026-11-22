@@ -123,6 +123,23 @@
         page.afterTyping(function () { pageStep(down); });
     }
 
+    // Tab outside a text field takes the search box and Escape gives it up,
+    // as search-result-nav.js does on the search page.
+    function boxKey(e) {
+        var box = document.getElementById('nav-searchbox');
+        if (!box) return;
+        if (e.key === 'Tab') {
+            var tag = e.target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            e.preventDefault();
+            if (root.BAN && root.BAN.track) root.BAN.track('ui.search.key', 'tab_to_search');
+            box.focus();
+            box.setSelectionRange(0, box.value.length);
+        } else if (e.key === 'Escape' && document.activeElement === box) {
+            box.blur();
+        }
+    }
+
     // The navbar's Search and Sealed links keep the current query.
     function paintNavLinks(q) {
         document.querySelectorAll('.offline-mode-btn').forEach(function (a) {
@@ -141,7 +158,10 @@
         queryChanged: paintNavLinks,
         move: moveCursor,
         ready: function () {
-            document.addEventListener('keydown', pageKey);
+            document.addEventListener('keydown', function (e) {
+                boxKey(e);
+                pageKey(e);
+            });
 
             // Sidebar image follows the hovered result, like search.html.
             document.getElementById('offline-results').addEventListener('mouseover', function (e) {
