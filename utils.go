@@ -1265,7 +1265,7 @@ func genCardPrintings(b *matcher.Backend, co *matcher.CardObject) string {
 			"Color":   "var(--normal)",
 			"Foil":    false,
 			"Symbol":  set.Symbol,
-			"Size":    32,
+			"Size":    34,
 			"Class":   "",
 		})
 		if err != nil {
