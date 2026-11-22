@@ -10,6 +10,8 @@
     if (sortMode === 'hybrid') sortMode = 'alpha';
     // The result the arrow keys are on, and the first one starts out showing.
     var cursor = 0;
+    // The header stuck on top after the last move, -1 until there is one.
+    var movedTo = -1;
 
     function paintCount(n, shown) {
         document.getElementById('offline-count').textContent =
@@ -69,15 +71,56 @@
         window.scrollBy(0, above - parseFloat(getComputedStyle(headers[i]).top));
     }
 
+    function resultHeaders() {
+        return document.getElementById('offline-results').querySelectorAll('.result-header');
+    }
+
+    // Moves to result i; mark draws the arrow keys' cursor on it.
+    function goTo(headers, i, mark) {
+        headers[cursor].classList.remove('offline-cursor');
+        cursor = i;
+        if (mark) headers[cursor].classList.add('offline-cursor');
+        scrollToHeader(headers, cursor);
+        movedTo = stuckIndex(headers);
+        showRowImage(headers[cursor]);
+    }
+
     function moveCursor(step) {
-        var headers = document.getElementById('offline-results').querySelectorAll('.result-header');
+        var headers = resultHeaders();
         var next = cursor + step;
         if (next < 0 || next >= headers.length) return;
-        headers[cursor].classList.remove('offline-cursor');
-        cursor = next;
-        headers[cursor].classList.add('offline-cursor');
-        scrollToHeader(headers, cursor);
-        showRowImage(headers[cursor]);
+        goTo(headers, next, true);
+    }
+
+    // The last result whose header has reached where it sticks.
+    function stuckIndex(headers) {
+        for (var i = headers.length - 1; i > 0; i--) {
+            var top = parseFloat(getComputedStyle(headers[i]).top);
+            if (headers[i].getBoundingClientRect().top <= top + 2) return i;
+        }
+        return 0;
+    }
+
+    // PgDn and PgUp step a result from the one on top, or from the last one
+    // moved to while nothing has scrolled since, which the results at the
+    // bottom need as their headers never reach the top.
+    function pageStep(down) {
+        var headers = resultHeaders();
+        if (headers.length === 0) return;
+        var at = stuckIndex(headers);
+        if (at === movedTo) at = cursor;
+        goTo(headers, down ? Math.min(at + 1, headers.length - 1) : Math.max(at - 1, 0), false);
+    }
+
+    // From the box too, as search-result-nav.js does on the search page, once
+    // what is being typed has settled, as the arrow keys do.
+    function pageKey(e) {
+        if (e.key !== 'PageDown' && e.key !== 'PageUp') return;
+        if (resultHeaders().length === 0) return;
+        e.preventDefault();
+        var down = e.key === 'PageDown';
+        if (!e.repeat && root.BAN && root.BAN.track) root.BAN.track('ui.search.key', down ? 'result_page_down' : 'result_page_up');
+        page.afterTyping(function () { pageStep(down); });
     }
 
     // The navbar's Search and Sealed links keep the current query.
@@ -98,6 +141,8 @@
         queryChanged: paintNavLinks,
         move: moveCursor,
         ready: function () {
+            document.addEventListener('keydown', pageKey);
+
             // Sidebar image follows the hovered result, like search.html.
             document.getElementById('offline-results').addEventListener('mouseover', function (e) {
                 var row = e.target.closest('[data-image-url]');
@@ -124,6 +169,7 @@
             paintCount(exec.results.length, shown.pageRows);
             paintPills();
             cursor = 0;
+            movedTo = -1;
             var first = el.querySelector('.result-header');
             if (first && !shown.typing) showRowImage(first);
         },

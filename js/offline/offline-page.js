@@ -290,6 +290,13 @@
             runQuery(value, true).catch(showErrorNotice);
         }
 
+        // Runs fn once what is being typed has settled, as a key that moves
+        // through the results needs the whole page under it.
+        function afterTyping(fn) {
+            var ready = typing ? settle(lastQuery.trim(), true) : Promise.resolve();
+            ready.then(fn).catch(showErrorNotice);
+        }
+
         function showErrorNotice(err) {
             shown = null;
             resultsEl().innerHTML =
@@ -338,10 +345,9 @@
                     live: live,
                     onType: typed,
                     onArrow: function (step) {
-                        var ready = typing ? settle(lastQuery.trim(), true) : Promise.resolve();
-                        ready.then(function () {
+                        afterTyping(function () {
                             if (hooks.move) hooks.move(step);
-                        }).catch(showErrorNotice);
+                        });
                     },
                     onSubmit: function (q) {
                         if (live() && hooks.closeKeyboard) box.blur();
@@ -366,6 +372,7 @@
 
         return {
             sealed: function () { return sealedMode; },
+            afterTyping: afterTyping,
             // Draw the last answer again, as a new sort asks, which also ends typing.
             repaint: function () {
                 if (typing) settle(lastQuery.trim()).catch(showErrorNotice);

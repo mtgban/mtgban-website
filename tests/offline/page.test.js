@@ -128,6 +128,8 @@ function loadPage(file, { search = '', ids = [], pills = [], navLinks = [], cook
         log,
         hold,
         location,
+        self,
+        key: (event) => docListeners.keydown(event),
         // Lets the page's setup and first query finish: nothing here is timed.
         settle: () => new Promise((resolve) => setImmediate(resolve)),
         load: () => docListeners.DOMContentLoaded(),
@@ -800,6 +802,8 @@ function headersFor(page, n) {
     const headers = Array.from({ length: n }, (_, i) => {
         const header = makeEl({ 'data-image-url': '/api/offline/images/' + i + '.webp' });
         header.nextElementSibling = { getBoundingClientRect: () => ({ bottom: 500 + i }) };
+        header.top = 200 + 300 * i;
+        header.getBoundingClientRect = () => ({ top: header.top });
         return header;
     });
     const el = page.els['offline-results'];
@@ -836,6 +840,81 @@ test('arrow keys walk the results, with the image following', async () => {
     await page.settle();
     expect(headers[0].classList.names.has('offline-cursor')).toBe(true);
     expect(page.log.scrolls.at(-1)).toEqual(['to', 0]);
+});
+
+function pageKeys(page) {
+    const tracked = [];
+    page.self.BAN = { track: (...a) => tracked.push(a) };
+    const press = async (key, repeat = false) => {
+        let stopped = false;
+        page.key({ key, repeat, preventDefault: () => { stopped = true; } });
+        await page.settle();
+        return stopped;
+    };
+    return { press, tracked };
+}
+
+test('PgDn and PgUp step a result from the one on top, as on the search page', async () => {
+    const page = loadPage('offline-page-desktop.js', { ids: DESKTOP, search: '?q=sol', queries: { sol: rows(3) } });
+    const headers = headersFor(page, 3);
+    page.load();
+    await page.settle();
+    const { press, tracked } = pageKeys(page);
+
+    expect(await press('PageDown')).toBe(true);
+    expect(page.log.scrolls.at(-1)).toEqual(['by', 500 - 77]);
+    expect(page.log.art.at(-1)).toBe('/api/offline/images/1.webp');
+    expect(headers[1].classList.names.has('offline-cursor')).toBe(false);
+
+    // Scrolled by hand until the third result's header sticks.
+    headers[1].top = 77;
+    headers[2].top = 77;
+    await press('PageUp', true);
+    expect(page.log.scrolls.at(-1)).toEqual(['by', 500 - 77]);
+
+    headers[2].top = 400;
+    await press('PageUp');
+    expect(page.log.scrolls.at(-1)).toEqual(['to', 0]);
+
+    headers[1].top = 77;
+    headers[2].top = 77;
+    await press('PageDown');
+    expect(page.log.scrolls.at(-1)).toEqual(['by', 501 - 77]);
+    expect(page.log.art.at(-1)).toBe('/api/offline/images/2.webp');
+
+    expect(await press('a')).toBe(false);
+    expect(tracked).toEqual([['ui.search.key', 'result_page_down'], ['ui.search.key', 'result_page_up'], ['ui.search.key', 'result_page_down']]);
+});
+
+test('PgDn keeps stepping through results too short to reach the top', async () => {
+    const page = loadPage('offline-page-desktop.js', { ids: DESKTOP, search: '?q=sol', queries: { sol: rows(4) } });
+    const headers = headersFor(page, 4);
+    page.load();
+    await page.settle();
+    const { press } = pageKeys(page);
+    // Scrolled to the bottom, where the second result's header is the last to stick.
+    headers[1].top = 77;
+    await press('PageDown');
+    expect(page.log.art.at(-1)).toBe('/api/offline/images/2.webp');
+    await press('PageDown');
+    expect(page.log.art.at(-1)).toBe('/api/offline/images/3.webp');
+    await press('PageUp');
+    expect(page.log.art.at(-1)).toBe('/api/offline/images/2.webp');
+});
+
+test('PgDn settles what is being typed, then steps', async () => {
+    const page = loadPage('offline-page-desktop.js', { ids: DESKTOP, ...LIVE, queries: { sol: rows(150) } });
+    const headers = headersFor(page, 2);
+    page.load();
+    await page.settle();
+    page.type('sol');
+    await page.settle();
+    const { press } = pageKeys(page);
+    await press('PageDown');
+    expect(page.pausePending()).toBe(false);
+    expect(page.els['offline-results'].innerHTML).toBe('drawn 100');
+    expect(page.log.art.at(-1)).toBe('/api/offline/images/1.webp');
+    expect(headers[1].classList.names.has('offline-cursor')).toBe(false);
 });
 
 test('an arrow key settles what is being typed, then moves', async () => {

@@ -137,6 +137,7 @@ func TestSearchUIPages(t *testing.T) {
 		"ui.fav.merge": "search/shared", "ui.fav.shared_open": "search/shared",
 		"ui.recents": "search", "ui.fav.sort": "search", "ui.fav.csv": "search",
 		"ui.fav.chart": "search", "ui.fav.upload": "search", "ui.fav.share": "search",
+		"ui.search.key": "search,sealed,offline",
 	}
 	denoms := map[string]string{
 		"ui.mfilter.apply": "ui.mfilter.open", "ui.mchart.reset_zoom": "ui.mchart.open", "ui.mchart.gesture": "ui.mchart.open",
