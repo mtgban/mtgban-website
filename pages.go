@@ -744,7 +744,7 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 
 	// Add other partials as needed
 	if name == "search.html" {
-		files = append(files, "templates/partials/search-landing.html")
+		files = append(files, "templates/partials/search-landing.html", salesPaneFile)
 	}
 	if name == "search.html" || name == "alerts.html" || name == "upload.html" {
 		files = append(files, "templates/partials/alert-modal.html")
@@ -814,6 +814,12 @@ func buildTemplateCache() (map[string]*template.Template, error) {
 	}
 	cache[setSymbolKey] = t
 
+	t, err = tmplparse.ParseFiles(salesPaneBase, []string{salesPaneFile}, funcMap)
+	if err != nil {
+		return nil, fmt.Errorf("parsing sales pane: %w", err)
+	}
+	cache[salesPaneKey] = t
+
 	return cache, nil
 }
 
@@ -830,6 +836,23 @@ func setSymbolTemplate() (*template.Template, error) {
 	t := TemplateCache[setSymbolKey]
 	if DevMode || t == nil {
 		return tmplparse.ParseFiles(setSymbolBase, []string{setSymbolFile}, funcMap)
+	}
+	return t, nil
+}
+
+const (
+	salesPaneFile = "templates/partials/sales-pane.html"
+	salesPaneBase = "sales-pane.html"
+	// salesPaneKey is the partial's entry in TemplateCache, for the panes
+	// /data/sales/ draws outside the search page.
+	salesPaneKey = "partials/sales-pane.html"
+)
+
+// salesPaneTemplate is the sales-pane partial on its own.
+func salesPaneTemplate() (*template.Template, error) {
+	t := TemplateCache[salesPaneKey]
+	if DevMode || t == nil {
+		return tmplparse.ParseFiles(salesPaneBase, []string{salesPaneFile}, funcMap)
 	}
 	return t, nil
 }

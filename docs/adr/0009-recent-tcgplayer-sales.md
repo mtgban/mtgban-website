@@ -100,21 +100,30 @@ What exists:
    game config's `search_buyers_default` (Pokemon's sets `sales`), and
    everyone else gets `buylist`. Sealed search has no switch. The TCGplayer sales row stays above both modes,
    unchanged. Offline search, which has no orders, shows no switch.
-6. **Only the pane on show is rendered.** The buylist renders as today. The
-   sales pane is rendered only when the mode is Sales. The first switch to
-   Sales fetches every card's pane for the page in one same-origin request,
-   `/data/sales/?ids=…`, behind the same signing as the chart's data and
-   rendered from the snapshot alone. The logged-out prompt is static and
-   needs no fetch. A page in
-   Buylist mode costs nothing more than today.
+6. **The search draws no sales.** The buylist renders as today, and each
+   card gets an empty Sales pane. When Sales is on show, because the page
+   opened in it or on the first switch, the page fetches every card's pane
+   in one same-origin request, `/data/sales/{ids}`, behind the same signing
+   as the chart's data and rendered from the snapshot alone. A reader not
+   logged in gets one log-in prompt in the page, which the script copies
+   into each pane, with no fetch. Neither mode costs a search anything
+   measurable (Consequences).
 7. **Sales shows each condition's 5 newest orders**, under `Condition: NM`
-   headers, newest first: the date, the price per copy and, above one copy,
-   the quantity. A condition with more than 5 folds the rest under
-   "N more". Shipping is not shown. A card with no order on record says
-   so. Sales mode leaves out the buylist's index rows and ignores its
-   condition filters. On phones the Buyers tab shows every condition's
-   group in Sales mode rather than following the condition pills, and the
-   tab appears whenever a card has orders.
+   headers, newest first.
+   - Each header carries the condition's average price per copy over every
+     order kept, weighted by copies.
+   - A row is the source (TCGplayer's logo and name, grey), the date
+     (white, centred: `2026-11-19` on desktop, `Nov 19` on phones, the
+     minute in its tooltip), and the price per copy with the quantity
+     beside it above one copy.
+   - A condition with more than 5 folds the rest under "N more". Shipping
+     is not shown. A card with no order on record says so.
+   - Sales mode leaves out the buylist's index rows and ignores its
+     condition filters.
+   - On phones the switch sits on a row of its own under the panel's
+     "Buyers" band. The Buyers tab shows every condition's group in Sales
+     mode rather than following the condition pills, and the tab appears
+     whenever a card has orders.
 8. **Every logged-in reader sees Sales**, any tier: a reader with a
    verified signature. A logged-out reader gets the switch too, and Sales
    shows a Join / Log in prompt in place of the orders. The velocity row
@@ -136,6 +145,10 @@ What exists:
   crowds out the rest, and the reader asked for each condition's own five.
 - **Render both panes**: rejected. Up to 100 cards × 5 conditions × 10
   orders, paid on every page for a pane most readers never open.
+- **Render the Sales pane in the search when the reader is in Sales**:
+  rejected. With 14 orders on every card it made the search 39% slower
+  and its page 18% larger; the fetch after the page is on show costs the
+  search nothing.
 - **Reload the whole table on the velocity's day**: rejected. The day
   lands when the pull starts, so it would show orders a day old.
 - **Seed from `tcgplayerlastsalemodel`**: rejected. It has no listing id,
@@ -163,10 +176,10 @@ What exists:
   condition within the year. Its key is about as large as its rows. Its
   size is measured after the first nights. The sales run ends by deleting
   rows older than 400 days.
-- **Search time.** In Buylist mode, one snapshot read per request and no
-  rendering. In Sales mode, one lookup per card and the pane. Both are
-  measured with `BenchmarkSearchPage`, on master against the branch with
-  benchstat, before the site PR merges.
+- **Search time.** One snapshot read per request and one lookup per card,
+  in either mode: measured with `BenchmarkSearchPage`, on master against
+  the branch with benchstat. The panes cost their own request, after the
+  page is on show, and show "Loading recent sales…" until it answers.
 - **Free readers see each condition's recent prices and dates,** which
   hand them roughly what the velocity row's details gate. This was chosen:
   Sales is meant to bring readers in.

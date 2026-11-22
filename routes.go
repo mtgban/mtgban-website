@@ -216,5 +216,6 @@ func (s *site) dataRoutes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.Handle("/data/chart/", http.HandlerFunc(s.ChartDataAPI))
 	mux.Handle("/data/prices/", http.HandlerFunc(s.BatchPricesAPI))
+	mux.Handle("/data/sales/", http.HandlerFunc(s.SalesPaneAPI))
 	return mux
 }

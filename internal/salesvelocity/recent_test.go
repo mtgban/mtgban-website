@@ -191,11 +191,16 @@ func TestRecentGroups(t *testing.T) {
 	if len(groups[0].Shown) != RecentShown || len(groups[0].More) != 2 {
 		t.Errorf("NM shown %d, more %d, want %d and 2", len(groups[0].Shown), len(groups[0].More), RecentShown)
 	}
-	if got := groups[0].Shown[0]; got != (Line{Date: "Nov 22", Source: "TCGplayer", Price: "$12.34"}) {
-		t.Errorf("NM first line = %+v", got)
+	want := Line{Date: "2026-11-22", Short: "Nov 22", Time: "2026-11-22 10:00 UTC", Source: "TCGplayer", Price: "12.34"}
+	if got := groups[0].Shown[0]; got != want {
+		t.Errorf("NM first line = %+v, want %+v", got, want)
 	}
-	if got := groups[1].Shown[0]; got != (Line{Date: "Dec 30, 2025", Source: "TCGplayer", Price: "$0.05", Qty: "×3"}) {
-		t.Errorf("HP line = %+v", got)
+	want = Line{Date: "2025-12-30", Short: "Dec 30, 2025", Time: "2025-12-30 00:00 UTC", Source: "TCGplayer", Price: "0.05", Qty: "×3"}
+	if got := groups[1].Shown[0]; got != want {
+		t.Errorf("HP line = %+v, want %+v", got, want)
+	}
+	if groups[0].Avg != "12.34" || groups[1].Avg != "0.05" {
+		t.Errorf("averages = %q, %q", groups[0].Avg, groups[1].Avg)
 	}
 	var none *Recent
 	if none.Groups(recentNow) != nil {
@@ -233,5 +238,15 @@ func TestFullLoad(t *testing.T) {
 		if got := fullLoad(c.current, c.b, c.now); got != c.want {
 			t.Errorf("%s: fullLoad = %v, want %v", c.name, got, c.want)
 		}
+	}
+}
+
+func TestAverageWeighsCopies(t *testing.T) {
+	orders := []Order{{Cents: 1000, Qty: 3}, {Cents: 2000, Qty: 1}}
+	if got := averageText(orders); got != "12.50" {
+		t.Errorf("averageText = %q, want 12.50: three copies at $10, one at $20", got)
+	}
+	if averageText(nil) != "" {
+		t.Error("no orders has an average")
 	}
 }

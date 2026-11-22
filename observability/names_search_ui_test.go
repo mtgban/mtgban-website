@@ -162,7 +162,7 @@ func TestSearchUIPages(t *testing.T) {
 		}
 	}
 	// 56 from this phase and ui.search.key, the palette stage's results page shortcuts.
-	if seen != 57 {
-		t.Errorf("%d names under this phase's prefixes, want 57", seen)
+	if seen != 58 {
+		t.Errorf("%d names under this phase's prefixes, want 58", seen)
 	}
 }

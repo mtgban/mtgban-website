@@ -706,6 +706,13 @@ type SearchVars struct {
 
 	// CanVelocity shows the sales velocity row to the newspaper tiers.
 	CanVelocity bool
+
+	// The Buyers column's mode, "buylist" or "sales", whether the reader is
+	// logged in to see the sales, and the cards with any order on record
+	// (docs/adr/0009).
+	BuyersMode string
+	CanSales   bool
+	HasSales   map[string]bool
 	// VelocityNotice says a velocity filter needs a higher tier, for the phone's
 	// empty page, which quotes the query instead of listing the notices.
 	VelocityNotice string
@@ -914,6 +921,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	applyStoreFactors(result, readStoreFactors(r))
 
 	pageVars.Metadata, pageVars.Printings = searchMetadata(ds, p, config.Sales, shown.keys, preferFlavor)
+	fillRecentSales(&pageVars.SearchVars, recentSalesStore.Snapshot(), r, sig, shown.keys)
 
 	// Optionally sort according to price
 	if !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores" {
