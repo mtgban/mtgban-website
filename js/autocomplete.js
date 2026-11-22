@@ -252,6 +252,9 @@ function __acFetchCardMeta(name, onReady) {
 function autocomplete(form, inp, sealed) {
     var currentFocus;
     var minlen = 3;
+    /* A short prefix matches hundreds of names, and drawing them all on
+     * every keystroke lags on phones; nobody scrolls past the first few. */
+    var maxRows = 50;
     var providerMode = false;
     /* The name list arrives on the first input, not at page load or on
      * focus: it is 700 KB, and the navbar box takes focus on every page.
@@ -483,7 +486,8 @@ function autocomplete(form, inp, sealed) {
 
         /* For each item in the array... */
         var query = __acQuery(val);
-        for (i = 0; i < arr.length; i++) {
+        var shown = 0;
+        for (i = 0; i < arr.length && shown < maxRows; i++) {
             /* Check whether the item is found by what was typed, at its front
              * or past a prefix nobody types */
             var span = __acMatchSpan(arr[i], folded[i], query, squashed[i]);
@@ -527,6 +531,7 @@ function autocomplete(form, inp, sealed) {
                 fakeButton.remove();
             });
             a.appendChild(b);
+            shown++;
         }
 
         /* Only append the dropdown if there are matching items */
