@@ -19,6 +19,7 @@ const (
 	jobCKSignals       = "CK signals"
 	jobTCGListings     = "TCG listings"
 	jobSalesVelocity   = "Sales velocity"
+	jobRecentSales     = "Recent sales"
 	jobNewspaperSales  = "Newspaper sales"
 	jobOffline         = "Offline refresh"
 	jobTCGCSVPrices    = "TCGCSV prices"
@@ -128,6 +129,11 @@ func (s *site) scheduleCrons() *cron.Cron {
 	// Reload TCGplayer's sellers and copies per grade once the newspaper
 	// finishes a scrape; until then that is one MAX(calc_date).
 	addJob("50 * * * *", jobTCGListings, s.loadTCGListings)
+
+	// Load TCGplayer's recent orders as the newspaper's pull writes them. The
+	// pull runs once a day, over a few hours; the other runs find nothing new
+	// and read one indexed range.
+	addJob("40 */3 * * *", jobRecentSales, s.loadRecentSales)
 
 	// Alarm on the newspaper's sales pull signing out or stopping. Every site reads
 	// the same table, so one of them watches it.

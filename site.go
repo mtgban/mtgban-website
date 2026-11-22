@@ -272,6 +272,8 @@ func (s *site) loadDatastore(path string) error {
 	go s.refreshNewspaper()
 	// TCGplayer's listing counts wait for a datastore to match them to.
 	go tracked(jobTCGListings, s.loadTCGListings)()
+	// So do TCGplayer's recent orders.
+	go tracked(jobRecentSales, s.loadRecentSales)()
 	// The landing strip's ranking resolves its tiles against the datastore,
 	// only where the observability database holds the votes.
 	if ObservabilityDB != nil {
