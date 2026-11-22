@@ -1600,12 +1600,8 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	// A new slice: the cached one is shared and never reordered.
 	results = newsFilter(b, report, results, query)
 
-	// Set the page size depending on level
-	pageSize := DefaultPageSize
 	extraSize, _ := strconv.ParseBool(GetParamFromSig(sig, "NewsLarge"))
-	if extraSize {
-		pageSize *= 2
-	}
+	pageSize := newsRowsPerPage(extraSize)
 
 	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
 	if report.Option != "" && countNews(r) {
@@ -1631,4 +1627,13 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 
 	noteNewspaperStaleness(&pageVars)
 	render(w, "news.html", pageVars)
+}
+
+// newsRowsPerPage is how many rows a report page shows, doubled by the
+// NewsLarge grant.
+func newsRowsPerPage(large bool) int {
+	if large {
+		return DefaultPageSize * 2
+	}
+	return DefaultPageSize
 }

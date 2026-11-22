@@ -192,7 +192,8 @@ func TestACLFlagLabels(t *testing.T) {
 		{"NewsEnabled", "1day", "Data one day behind", true},
 		{"NewsEnabled", "3day", "Data three days behind", true},
 		{"NewsEnabled", "7day", "", false},
-		{"NewsLarge", "true", "Double the rows per page", true},
+		{"NewsLarge", "true", "50 entries per page", true},
+		{"NewsLarge", "", "", true},
 		{"SearchDownloadCSV", "true", "CSV download of results", true},
 		{"SearchChartLoopback", "90", "Price charts back 3 months", true},
 		{"SearchChartLoopback", "0", "", false},
@@ -263,6 +264,8 @@ func TestACLFlagRowsAndCells(t *testing.T) {
 		{"ArbitEnabled", "ALL", "Stores", "All"},
 		{"ArbitEnabled", "CK,SCG", "Stores", "2"},
 		{"ArbitDisabledVendors", "CK", "Vendors", "Some excluded"},
+		{"NewsLarge", "true", "Entries per page", "50"},
+		{"NewsLarge", "", "Entries per page", "25"},
 		{"AnySpread", "true", "Lowest spread", "50%"},
 		{"AnySpread", "false", "Lowest spread", "200%"},
 		{"UploadCustomMax", "50", "Custom buylist rules", "10"},
@@ -334,6 +337,14 @@ func TestTierComparisonLinesUpTheCards(t *testing.T) {
 	}
 	if want := []string{"", "", "200%", "200%", "50%"}; !slices.Equal(global.Rows[0].Cells, want) {
 		t.Errorf("spread floor cells %v, want %v", global.Rows[0].Cells, want)
+	}
+	// Every tier with Newspaper shows its entries per page, the grant's more
+	news := map[string][]string{}
+	for _, r := range groups[1].Rows {
+		news[r.Name] = r.Cells
+	}
+	if want := []string{"", "", "25", "25", "50"}; !slices.Equal(news["Entries per page"], want) {
+		t.Errorf("entries per page cells %v, want %v", news["Entries per page"], want)
 	}
 	if tierComparison(nil) != nil {
 		t.Error("no tiers gave groups")
