@@ -18,13 +18,20 @@ func Watermark(secret []byte, email string, p *SetPayload) {
 
 	// One keyed HMAC reused for every mark; Reset restores the keyed state.
 	m := hmac.New(sha256.New, seed)
-	var sum []byte
+	var sum, key []byte
 	mark := func(section, uuid, store, tag string, price float64) float64 {
 		if price < wmMinPrice {
 			return price
 		}
+		key = append(key[:0], section...)
+		key = append(key, '|')
+		key = append(key, uuid...)
+		key = append(key, '|')
+		key = append(key, store...)
+		key = append(key, '|')
+		key = append(key, tag...)
 		m.Reset()
-		m.Write([]byte(section + "|" + uuid + "|" + store + "|" + tag))
+		m.Write(key)
 		sum = m.Sum(sum[:0])
 		h := binary.BigEndian.Uint64(sum[:8])
 		if h%128 != 0 {

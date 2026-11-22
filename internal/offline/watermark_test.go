@@ -1,6 +1,7 @@
 package offline
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"math"
 	"testing"
@@ -108,5 +109,31 @@ func TestWatermarkSkipsCheapAndStaysConsistent(t *testing.T) {
 		if byStore["SCG"].Regular != byStore["SCG"].Conditions["NM"] {
 			t.Fatalf("%s: finish price and NM condition diverged", id)
 		}
+	}
+}
+
+// TestWatermarkedEncodingGolden pins the bytes a watermarked payload encodes
+// to, over several stores per card and both maps, so neither the marks nor
+// the encoder's ordering can drift.
+func TestWatermarkedEncodingGolden(t *testing.T) {
+	p := bigPayload()
+	for i := 0; i < 5000; i += 3 {
+		id := fmt.Sprintf("uuid-%04d", i)
+		p.Retail[id]["SCG"] = &PriceEntry{Regular: 1.10, Foil: 2.50, Cond: "NM", Qty: 2, QtyFoil: 1,
+			Conditions: map[string]float64{"NM": 1.10, "SP": 0.90, "NM_foil": 2.50},
+			Quantities: map[string]int{"NM": 2, "SP": 4, "NM_foil": 1}}
+		p.Buylist[id] = map[string]*PriceEntry{
+			"CK":  {Regular: 0.70, Conditions: map[string]float64{"NM": 0.70, "SP": 0.55}},
+			"ABU": {Regular: 0.65, Qty: 12},
+		}
+	}
+	Watermark([]byte("secret"), "Reader@Example.com", p)
+	data, err := Encode(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = "47dc2505fb8c9438f1512e4ceb635595ec6caba8dff34d317a30ea1699d2ec26"
+	if got := fmt.Sprintf("%x", sha256.Sum256(data)); got != want {
+		t.Errorf("watermarked encoding = %s, want %s", got, want)
 	}
 }
