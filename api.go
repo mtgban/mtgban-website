@@ -339,9 +339,14 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 			}
 		}
 
-		condLong := tcgConditionMap[cond]
-		if co.Foil || co.Etched {
-			condLong += " Foil"
+		var condLong string
+		if co.Sealed {
+			condLong = "Unopened"
+		} else {
+			condLong = tcgConditionMap[cond]
+			if co.Foil || co.Etched {
+				condLong += " Foil"
+			}
 		}
 
 		tcgEntry := tcgProducts[findTCGproductID(b, p, id)]
