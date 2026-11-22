@@ -697,7 +697,7 @@ body:has(.search-layout) {
     color: var(--search-text-dim);
 }
 .setvalue-stashed .sidebar-setvalue-trigger {
-    display: block;
+    display: inline-block;
 }
 .setvalue-stashed .sidebar-setvalue-panel {
     display: none;
@@ -712,8 +712,8 @@ body:has(.search-layout) {
     padding: 10px 12px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.3);
 }
-.setvalue-stashed .sidebar-setvalue:hover .sidebar-setvalue-panel,
-.setvalue-stashed .sidebar-setvalue:focus-within .sidebar-setvalue-panel {
+.setvalue-stashed .sidebar-setvalue-trigger:hover + .sidebar-setvalue-panel,
+.setvalue-stashed .sidebar-setvalue-trigger:focus + .sidebar-setvalue-panel {
     display: block;
 }
 .sidebar-printings a { color: var(--search-link); text-decoration: none; }
