@@ -7,10 +7,11 @@ const source = readFileSync(join(import.meta.dir, '..', 'js', 'search-type-focus
 // Runs the real js/search-type-focus.js with a fake document holding the
 // navbar search box. opts.dialogs lists the page's dialogs, each shown or
 // not; opts.boxHidden hides the box itself, and opts.noCheckVisibility
-// stands for a browser without Element.checkVisibility.
+// stands for a browser without Element.checkVisibility. opts.noInsertText
+// stands for one that refuses the insertText command.
 function load(opts) {
     opts = opts || {};
-    let onKey = null;
+    let onKey = null, onPaste = null;
     const box = {
         tagName: 'INPUT',
         value: 'lightning bolt',
@@ -19,10 +20,19 @@ function load(opts) {
         focus() { this.focused = true; },
         setSelectionRange(a, b) { this.selection = [a, b]; },
         checkVisibility: () => !opts.boxHidden,
+        maxLength: 1000,
+        events: [],
+        dispatchEvent(e) { this.events.push(e.type); },
     };
     const dialogs = (opts.dialogs || []).map(shown => ({ checkVisibility: () => shown }));
     const document = {
-        addEventListener: (ev, fn) => { if (ev === 'keydown') onKey = fn; },
+        addEventListener: (ev, fn) => { if (ev === 'keydown') onKey = fn; if (ev === 'paste') onPaste = fn; },
+        // Types over the box's selection, as the browser does.
+        execCommand: (cmd, ui, text) => {
+            if (opts.noInsertText || cmd !== 'insertText' || !box.focused || !box.selection) return false;
+            box.value = box.value.slice(0, box.selection[0]) + text + box.value.slice(box.selection[1]);
+            return true;
+        },
         querySelectorAll: sel => (sel === '[role="dialog"], dialog[open]' ? dialogs : []),
         getElementById: id => (id === 'nav-searchbox' ? box : null),
     };
@@ -35,7 +45,17 @@ function load(opts) {
         isComposing: false, ctrlKey: false, metaKey: false,
         getModifierState: m => !!(extra && extra.altGraph && m === 'AltGraph'),
     }, extra));
-    return { box, press, tracked };
+    // Answers whether the page took the paste from the browser.
+    const paste = (text, extra) => {
+        let taken = false;
+        if (onPaste) onPaste(Object.assign({
+            target: { tagName: 'BODY' }, defaultPrevented: false,
+            clipboardData: { getData: type => (type === 'text/plain' ? text : '') },
+            preventDefault() { taken = true; },
+        }, extra));
+        return taken;
+    };
+    return { box, press, paste, tracked };
 }
 
 test('a printable key focuses the search box with its query selected', () => {
@@ -106,4 +126,48 @@ test('with a dialog open the key is the dialog\'s and nothing is counted', () =>
     const { press, tracked } = load({ dialogs: [true] });
     press('s');
     expect(tracked).toEqual([]);
+});
+
+test('a paste with no field selected replaces the query, and is counted', () => {
+    const { box, paste, tracked } = load();
+    expect(paste('Force of Will')).toBe(true);
+    expect(box.focused).toBe(true);
+    expect(box.value).toBe('Force of Will');
+    expect(tracked).toEqual([['ui.key', 'paste_to_search']]);
+});
+
+test('a paste is joined into one line and trimmed', () => {
+    const { box, paste } = load();
+    paste('\tForce of Will\r\nAlliances\n');
+    expect(box.value).toBe('Force of Will Alliances');
+});
+
+test('a paste the browser refuses to insert still reaches the box, within its maxlength', () => {
+    const { box, paste } = load({ noInsertText: true });
+    paste('x'.repeat(1200));
+    expect(box.value).toBe('x'.repeat(1000));
+    expect(box.events).toEqual(['input']);
+});
+
+test('a paste with no text, or already taken, is left to the browser', () => {
+    for (const [text, extra] of [['', {}], [' \n', {}], ['x', { defaultPrevented: true }], ['x', { clipboardData: null }]]) {
+        const { box, paste, tracked } = load();
+        expect(paste(text, extra)).toBe(false);
+        expect(box.value).toBe('lightning bolt');
+        expect(tracked).toEqual([]);
+    }
+});
+
+test('a paste into a field, an open dialog or a page with the box hidden is left to the browser', () => {
+    const body = { tagName: 'BODY' };
+    for (const [opts, target] of [
+        [{}, { tagName: 'INPUT' }], [{}, { tagName: 'TEXTAREA' }], [{}, { tagName: 'SELECT' }],
+        [{}, { tagName: 'DIV', isContentEditable: true }],
+        [{ dialogs: [true] }, body], [{ boxHidden: true }, body], [{ noCheckVisibility: true }, body],
+    ]) {
+        const { box, paste, tracked } = load(opts);
+        expect(paste('Force of Will', { target })).toBe(false);
+        expect(box.focused).toBe(false);
+        expect(tracked).toEqual([]);
+    }
 });
