@@ -90,7 +90,7 @@ func TestMobileListsAreTheDesktopTable(t *testing.T) {
 
 // A card with orders on record gets a Sales list after its buyers, or
 // before them where the reader's Buyers column opens on Sales, with the edge
-// button leading to whichever comes first; a sealed product gets none.
+// button leading to whichever comes first; a sealed product as well.
 func TestMobileSalesList(t *testing.T) {
 	for _, c := range []struct {
 		mode   string
@@ -99,7 +99,8 @@ func TestMobileSalesList(t *testing.T) {
 	}{
 		{"buylist", false, []string{`id="sellers-c"`, `id="buyers-c"`, `id="sales-c"`}},
 		{"sales", false, []string{`id="sellers-c"`, `id="sales-c"`, `id="buyers-c"`}},
-		{"sales", true, []string{`id="sellers-c"`, `id="buyers-c"`}},
+		{"buylist", true, []string{`id="sellers-c"`, `id="buyers-c"`, `id="sales-c"`}},
+		{"sales", true, []string{`id="sellers-c"`, `id="sales-c"`, `id="buyers-c"`}},
 	} {
 		vars := sealedPageVars("c")
 		card := vars.Metadata["c"]
@@ -117,14 +118,11 @@ func TestMobileSalesList(t *testing.T) {
 			}
 			at = i
 		}
-		if !c.sealed && !strings.Contains(out, `<div class="sales-pane" data-card="c" data-pending>`) {
-			t.Errorf("mode %s: the Sales list has no pane to fill", c.mode)
-		}
-		if c.sealed && strings.Contains(out, `id="sales-c"`) {
-			t.Error("a sealed product has a Sales list")
+		if !strings.Contains(out, `<div class="sales-pane" data-card="c" data-pending>`) {
+			t.Errorf("mode %s, sealed %v: the Sales list has no pane to fill", c.mode, c.sealed)
 		}
 		first := `data-pane="buyers-c"`
-		if c.mode == "sales" && !c.sealed {
+		if c.mode == "sales" {
 			first = `data-pane="sales-c"`
 		}
 		if !strings.Contains(out, first) {

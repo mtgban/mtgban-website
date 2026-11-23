@@ -36,7 +36,8 @@ What exists:
   touches its database. The velocity loads into an atomic snapshot that a
   search reads once (AGENTS.md invariant 1). It loads the day before the
   newest sale day, because the pull writes the newest day for hours.
-  Sealed products do not match a card, so they have no velocity.
+  Only Magic's sealed products match an id there, so the other games'
+  have no velocity.
 
 ## Decision
 
@@ -88,9 +89,12 @@ What exists:
    - A failed load keeps the last snapshot and is retried three hours later.
    - The grades are the site's: TCGplayer's `Near Mint`, `Lightly Played`,
      `Moderately Played`, `Heavily Played` and `Damaged` become NM, SP, MP,
-     HP and PO, the headers the Buyers column already uses. Any other
-     condition is dropped and counted in the job's report. Sealed is out of
-     scope, as for the velocity.
+     HP and PO, the headers the Buyers column already uses, and a sealed
+     product's `Unopened` is a grade of its own. Any other condition is
+     dropped and counted in the job's report.
+   - A sealed order finds its product by TCGplayer id among the
+     datastore's sealed products, because only Magic's datastore matches a
+     sealed id as a card's. An id two products share answers for neither.
    - Nothing on a request path reads the newspaper.
 5. **The Buyers column switches between Buylist and Sales.** Each card's
    column header holds a two-way switch, and a click sets every card on the
@@ -98,7 +102,8 @@ What exists:
    `sales`), registered in the settings registry. Clicks are tracked as
    `ui.search.buyers_mode`. With no cookie, a logged-in reader gets the
    game config's `search_buyers_default` (Pokemon's sets `sales`), and
-   everyone else gets `buylist`. Sealed search has no switch. The TCGplayer sales row stays above both modes,
+   everyone else gets `buylist`. Sealed search has the same switch and
+   shares the choice. The TCGplayer sales row stays above both modes,
    unchanged. Offline search, which has no orders, shows no switch.
 6. **The search draws no sales.** The buylist renders as today, and each
    card gets an empty Sales pane. When Sales is on show, because the page

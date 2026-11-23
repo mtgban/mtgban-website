@@ -15,21 +15,61 @@ func recentAt(days int, hour int) time.Time {
 	return recentNow.AddDate(0, 0, -days).Truncate(24 * time.Hour).Add(time.Duration(hour) * time.Hour)
 }
 
-func recentMatch(productID int64, variant string) string {
+func recentMatch(row recentRow) string {
 	switch {
-	case productID == 1 && variant == "Normal":
+	case row.ProductID == 1 && row.Variant == "Normal":
 		return "card-a"
-	case productID == 1 && variant == "Foil":
+	case row.ProductID == 1 && row.Variant == "Foil":
 		return "card-a_f"
-	case productID == 2:
+	case row.ProductID == 2:
 		// Two printings of one product resolve to one card.
 		return "card-b"
+	case row.ProductID == 3:
+		return "box"
 	}
 	return ""
 }
 
+func TestRecentMatcherSealed(t *testing.T) {
+	product := func(uuid, name, id string) *matcher.CardObject {
+		return &matcher.CardObject{Sealed: true, Card: matcher.Card{
+			UUID: uuid, Name: name,
+			Identifiers: map[string]string{"tcgplayerProductId": id},
+		}}
+	}
+	b := &matcher.Backend{
+		AllSealedUUIDs: []string{"box", "drop", "drop-foil"},
+		UUIDs: map[string]*matcher.CardObject{
+			"box":       product("box", "Booster Box", "10"),
+			"drop":      product("drop", "Drop", "20"),
+			"drop-foil": product("drop-foil", "Drop Foil", "20"),
+		},
+	}
+	match := recentMatcher(b)
+	cases := []struct {
+		product int64
+		want    string
+	}{
+		{10, "box"},
+		// The listing two products share.
+		{20, ""},
+		{30, ""},
+	}
+	for _, c := range cases {
+		got := match(row(c.product, "Normal", "Unopened", recentNow, 100))
+		if got != c.want {
+			t.Errorf("product %d is %q, want %q", c.product, got, c.want)
+		}
+	}
+	// A graded condition is a card's, whatever product it names.
+	got := match(row(10, "Normal", "Near Mint", recentNow, 100))
+	if got != "" {
+		t.Errorf("a Near Mint order of a sealed product is %q, want none", got)
+	}
+}
+
 // buildRecent runs rows through a builder on top of base, nil for a full load.
-func buildRecent(base *RecentSnapshot, rows []recentRow, match func(productID int64, variant string) string) (*RecentSnapshot, recentStats) {
+func buildRecent(base *RecentSnapshot, rows []recentRow, match func(row recentRow) string) (*RecentSnapshot, recentStats) {
 	rb := newRecentBuilder(base, match)
 	for _, row := range rows {
 		rb.add(row)
@@ -57,7 +97,8 @@ func TestBuildRecentGradesAndCuts(t *testing.T) {
 	rows = append(rows,
 		row(1, "Normal", "Damaged", recentAt(1, 10), 100),
 		row(1, "Foil", "Lightly Played", recentAt(2, 10), 900),
-		row(1, "Normal", "Unopened", recentAt(1, 10), 100),
+		row(1, "Normal", "Graded", recentAt(1, 10), 100),
+		row(3, "Normal", "Unopened", recentAt(1, 10), 12000),
 		row(9, "Normal", "Near Mint", recentAt(1, 10), 100),
 		// Years old, and still the newest Heavily Played.
 		row(1, "Normal", "Heavily Played", recentAt(3*365, 10), 300),
@@ -82,14 +123,22 @@ func TestBuildRecentGradesAndCuts(t *testing.T) {
 	if foil == nil || len(foil.Grades[1]) != 1 {
 		t.Errorf("foil SP orders = %+v, want one", foil)
 	}
-	if st.unmatched != 1 || st.undated != 0 || st.dropped["Unopened"] != 1 {
-		t.Errorf("stats = %+v, want 1 unmatched, 1 Unopened dropped", st)
+	box, _ := snap.For("box")
+	if box == nil || len(box.Grades[5]) != 1 {
+		t.Fatalf("box orders = %+v, want one unopened", box)
+	}
+	groups := box.Groups()
+	if len(groups) != 1 || groups[0].Grade != "Unopened" || groups[0].Avg != "120.00" {
+		t.Errorf("box groups = %+v, want one Unopened averaging 120.00", groups)
+	}
+	if st.unmatched != 1 || st.undated != 0 || st.dropped["Graded"] != 1 {
+		t.Errorf("stats = %+v, want 1 unmatched, 1 Graded dropped", st)
 	}
 	if !snap.Pulled.Equal(recentNow) {
 		t.Errorf("Pulled = %v, want the newest stamp read", snap.Pulled)
 	}
 	report := st.report(true, len(snap.Cards))
-	if !strings.Contains(report, `no grade for "Unopened" 1`) || !strings.Contains(report, "(full)") {
+	if !strings.Contains(report, `no grade for "Graded" 1`) || !strings.Contains(report, "(full)") {
 		t.Errorf("report = %q", report)
 	}
 }

@@ -18,23 +18,22 @@ import (
 func TestBuyersMode(t *testing.T) {
 	cases := []struct {
 		chosen, gameDefault string
-		canSales, sealed    bool
+		canSales            bool
 		want                string
 	}{
-		{"", "", true, false, "buylist"},
-		{"", "sales", true, false, "sales"},
+		{"", "", true, "buylist"},
+		{"", "sales", true, "sales"},
 		// A logged-out reader would see only the prompt.
-		{"", "sales", false, false, "buylist"},
-		{"buylist", "sales", true, false, "buylist"},
-		{"sales", "", true, false, "sales"},
-		{"sales", "", false, false, "sales"},
-		{"bogus", "", true, false, "buylist"},
-		{"sales", "sales", true, true, "buylist"},
+		{"", "sales", false, "buylist"},
+		{"buylist", "sales", true, "buylist"},
+		{"sales", "", true, "sales"},
+		{"sales", "", false, "sales"},
+		{"bogus", "", true, "buylist"},
 	}
 	for _, c := range cases {
-		got := buyersMode(c.chosen, c.gameDefault, c.canSales, c.sealed)
+		got := buyersMode(c.chosen, c.gameDefault, c.canSales)
 		if got != c.want {
-			t.Errorf("buyersMode(%q, %q, %v, %v) = %q, want %q", c.chosen, c.gameDefault, c.canSales, c.sealed, got, c.want)
+			t.Errorf("buyersMode(%q, %q, %v) = %q, want %q", c.chosen, c.gameDefault, c.canSales, got, c.want)
 		}
 	}
 }
@@ -210,6 +209,39 @@ func TestSalesPrinting(t *testing.T) {
 		co.Finish, co.Foil, co.Etched, co.Sealed = c.finish, c.foil, c.etched, c.sealed
 		if got := salesPrinting(co); got != c.want {
 			t.Errorf("salesPrinting(%q, sealed %v) = %q, want %q", c.finish, c.sealed, got, c.want)
+		}
+	}
+}
+
+// A sealed page shows its sales as a card's does: in the Buyers column on
+// desktop, in a list of their own on a phone.
+func TestSealedSearchShowsSales(t *testing.T) {
+	skipWithoutDatastore(t)
+	readyToRender(t)
+	uuids := backend().GetSealedUUIDsInSet("MH2")
+	if len(uuids) == 0 {
+		t.Skip("no MH2 sealed products")
+	}
+	box := uuids[0]
+	saved := recentSalesStore.Snapshot()
+	recentSalesStore.Publish(&salesvelocity.RecentSnapshot{Cards: map[string]*salesvelocity.Recent{box: {}}})
+	t.Cleanup(func() { recentSalesStore.Publish(saved) })
+
+	for agent, want := range map[string][]string{
+		"": {`class="result-col buyers-col" data-buyers-mode="sales"`, `class="sales-pane" data-card="` + box + `" data-pending`},
+		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148": {`data-pane="sales-` + box + `"`, `id="sales-` + box + `" role="region"`, `class="sales-pane" data-card="` + box + `" data-pending`},
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/sealed?q="+url.QueryEscape("id:"+box), nil)
+		r.AddCookie(&http.Cookie{Name: "SearchBuyersMode", Value: "sales"})
+		if agent != "" {
+			r.Header.Set("User-Agent", agent)
+		}
+		rec := httptest.NewRecorder()
+		testSite.Search(rec, r)
+		for _, w := range want {
+			if !strings.Contains(rec.Body.String(), w) {
+				t.Errorf("agent %q: the page lacks %q", agent, w)
+			}
 		}
 	}
 }

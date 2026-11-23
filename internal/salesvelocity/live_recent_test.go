@@ -32,7 +32,7 @@ func TestRecentSalesLive(t *testing.T) {
 	// A full load streams the rows into a new snapshot while the old one
 	// still serves: the second load is that peak.
 	start := time.Now()
-	rb := newRecentBuilder(nil, cardMatcher(b))
+	rb := newRecentBuilder(nil, recentMatcher(b))
 	err := scanRecent(ctx, db, game, time.Time{}, rb)
 	if err != nil {
 		t.Fatal(err)
@@ -41,7 +41,7 @@ func TestRecentSalesLive(t *testing.T) {
 	loadTook := time.Since(start)
 	rb = nil
 	one := heap()
-	again := newRecentBuilder(nil, cardMatcher(b))
+	again := newRecentBuilder(nil, recentMatcher(b))
 	err = scanRecent(ctx, db, game, time.Time{}, again)
 	if err != nil {
 		t.Fatal(err)

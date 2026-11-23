@@ -77,12 +77,8 @@ const (
 )
 
 // buyersMode is the mode the reader chose, else the game's default for a
-// reader logged in to see sales, else the buylist. Sealed search has no
-// sales to show.
-func buyersMode(chosen, gameDefault string, canSales, sealed bool) string {
-	if sealed {
-		return buyersBuylist
-	}
+// reader logged in to see sales, else the buylist.
+func buyersMode(chosen, gameDefault string, canSales bool) string {
 	switch chosen {
 	case buyersBuylist, buyersSales:
 		return chosen
@@ -98,7 +94,7 @@ func buyersMode(chosen, gameDefault string, canSales, sealed bool) string {
 // from /data/sales/ once it is on show in Sales, so no mode costs a search.
 func fillRecentSales(v *SearchVars, recent *salesvelocity.RecentSnapshot, r *http.Request, sig string, keys []string) {
 	v.CanSales = sig != "" || (DevMode && !SigCheck)
-	v.BuyersMode = buyersMode(readCookie(r, "SearchBuyersMode"), Config().SearchBuyersDefault, v.CanSales, v.IsSealed)
+	v.BuyersMode = buyersMode(readCookie(r, "SearchBuyersMode"), Config().SearchBuyersDefault, v.CanSales)
 	v.HasSales = map[string]bool{}
 	for _, cardID := range keys {
 		_, found := recent.For(cardID)

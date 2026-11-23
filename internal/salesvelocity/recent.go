@@ -19,9 +19,13 @@ import (
 	"github.com/mtgban/go-mtgban/matcher"
 )
 
-// Grades are the conditions an order is kept under, as the Buyers column
-// heads its buylist: TCGplayer's Near Mint through Damaged.
-var Grades = [...]string{"NM", "SP", "MP", "HP", "PO"}
+// Grades are the conditions an order is kept under: TCGplayer's Near Mint
+// through Damaged as the Buyers column heads its buylist, then the one a
+// sealed product sells in.
+var Grades = [...]string{"NM", "SP", "MP", "HP", "PO", unopened}
+
+// unopened is the condition of every sealed order, and the grade it is kept under.
+const unopened = "Unopened"
 
 const (
 	// RecentShown is the orders a grade shows before the rest fold away.
@@ -131,7 +135,7 @@ func (s *RecentStore) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, 
 	if !full {
 		base = current
 	}
-	rb := newRecentBuilder(base, cardMatcher(b))
+	rb := newRecentBuilder(base, recentMatcher(b))
 	err := scanRecent(ctx, db, game, since, rb)
 	if err != nil {
 		note := recentUnavailable(err)
@@ -211,7 +215,7 @@ func recentUnavailable(err error) string {
 	return ""
 }
 
-// gradeIndex is condition's index in Grades, -1 for one the column does not head.
+// gradeIndex is condition's index in Grades, -1 for one that is not kept.
 func gradeIndex(condition string) int {
 	switch condition {
 	case "Near Mint":
@@ -224,6 +228,8 @@ func gradeIndex(condition string) int {
 		return 3
 	case "Damaged":
 		return 4
+	case unopened:
+		return 5
 	}
 	return -1
 }
@@ -259,14 +265,34 @@ func (st recentStats) report(full bool, cards int) string {
 // recentBuilder keys rows by card and grade, on top of a base snapshot for
 // an incremental load.
 type recentBuilder struct {
-	match  func(productID int64, variant string) string
+	match  func(row recentRow) string
 	added  map[string]*Recent
 	pulled time.Time
 	st     recentStats
 }
 
+// recentMatcher resolves an order to b's id for what it sold, "" for none: a
+// sealed order's product through the sealed products, since only Magic's
+// datastore matches a sealed id, and any other as the velocity does.
+func recentMatcher(b *matcher.Backend) func(row recentRow) string {
+	card := cardMatcher(b)
+	sealed := b.BuildSealedProductMap("tcgplayerProductId")
+	return func(row recentRow) string {
+		if row.Condition != unopened {
+			return card(row.ProductID, row.Variant)
+		}
+		// Two products under one id cannot be told apart: every sealed
+		// order's variant is Normal, a foil drop's included.
+		uuids := sealed[int(row.ProductID)]
+		if len(uuids) != 1 {
+			return ""
+		}
+		return uuids[0]
+	}
+}
+
 // newRecentBuilder starts a load on top of base, nil for a full one.
-func newRecentBuilder(base *RecentSnapshot, match func(productID int64, variant string) string) *recentBuilder {
+func newRecentBuilder(base *RecentSnapshot, match func(row recentRow) string) *recentBuilder {
 	rb := &recentBuilder{match: match, added: map[string]*Recent{}}
 	if base != nil {
 		rb.pulled = base.Pulled
@@ -294,7 +320,7 @@ func (rb *recentBuilder) add(row recentRow) {
 		rb.st.undated++
 		return
 	}
-	cardID := rb.match(row.ProductID, row.Variant)
+	cardID := rb.match(row)
 	if cardID == "" {
 		rb.st.unmatched++
 		return
