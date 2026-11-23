@@ -26,7 +26,7 @@ func TestGenPageNavMarksTheMobileView(t *testing.T) {
 	}{
 		{"Search", true},
 		{"Error", true},
-		{"Upload", false},
+		{"Upload", true},
 		{"Arbitrage", false},
 		{"Reverse", false},
 		{"Global", false},
@@ -38,7 +38,7 @@ func TestGenPageNavMarksTheMobileView(t *testing.T) {
 		if pageVars.IsMobile != c.mobile {
 			t.Errorf("%q on a phone: IsMobile %v, want %v", c.page, pageVars.IsMobile, c.mobile)
 		}
-		trimmed := !slices.ContainsFunc(pageVars.Nav, func(n NavElem) bool { return n.Name == "Upload" })
+		trimmed := !slices.ContainsFunc(pageVars.Nav, func(n NavElem) bool { return n.Name == "Arbitrage" })
 		if trimmed != c.mobile {
 			t.Errorf("%q on a phone: navbar trimmed %v, want %v", c.page, trimmed, c.mobile)
 		}
@@ -49,17 +49,17 @@ func TestGenPageNavMarksTheMobileView(t *testing.T) {
 		}
 	}
 
-	// A reader without the grant has no Upload entry in their navbar, and
+	// A reader without the grant has no Arbitrage entry in their navbar, and
 	// its BANned notice still keeps the desktop layout.
 	withSigMode(t, true, true)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.AddCookie(&http.Cookie{Name: "MobileView", Value: "true"})
-	pageVars := genPageNav(testSite, req, "Upload", "")
-	if slices.ContainsFunc(pageVars.Nav, func(n NavElem) bool { return n.Name == "Upload" }) {
-		t.Fatal("a reader with no signature has Upload in their navbar")
+	pageVars := genPageNav(testSite, req, "Arbitrage", "")
+	if slices.ContainsFunc(pageVars.Nav, func(n NavElem) bool { return n.Name == "Arbitrage" }) {
+		t.Fatal("a reader with no signature has Arbitrage in their navbar")
 	}
 	if pageVars.IsMobile {
-		t.Error("Upload's BANned notice on a phone is marked mobile")
+		t.Error("Arbitrage's BANned notice on a phone is marked mobile")
 	}
 }
 
@@ -77,8 +77,8 @@ func TestDesktopOnlyMenuNamesTheViewTheToggleLeadsTo(t *testing.T) {
 		{"a phone on auto-detect", "", iPhone, "Switch to Desktop View", "false"},
 		{"a desktop on auto-detect", "", "", "Switch to Mobile View", "true"},
 	} {
-		req := httptest.NewRequest(http.MethodGet, "/upload", nil)
-		toggle := httptest.NewRequest(http.MethodGet, "/toggle-mobile?redirect=%2Fupload", nil)
+		req := httptest.NewRequest(http.MethodGet, "/arbit", nil)
+		toggle := httptest.NewRequest(http.MethodGet, "/toggle-mobile?redirect=%2Farbit", nil)
 		for _, r := range []*http.Request{req, toggle} {
 			if c.cookie != "" {
 				r.AddCookie(&http.Cookie{Name: "MobileView", Value: c.cookie})
@@ -88,8 +88,8 @@ func TestDesktopOnlyMenuNamesTheViewTheToggleLeadsTo(t *testing.T) {
 			}
 		}
 
-		pageVars := genPageNav(testSite, req, "Upload", "")
-		page := renderPage(t, "upload.html", pageVars.IsMobile, pageVars)
+		pageVars := genPageNav(testSite, req, "Arbitrage", "")
+		page := renderPage(t, "arbit.html", pageVars.IsMobile, pageVars)
 		if !strings.Contains(page, c.label) {
 			t.Errorf("%s: the menu does not say %q", c.reader, c.label)
 		}
@@ -195,23 +195,56 @@ func TestSearchListsTheStoresOnlyForAPhone(t *testing.T) {
 	}
 }
 
-// A phone's menu lists the Screener and the TCG Syp List: both render in the
-// mobile layout (the Syp list as phone cards), and neither is desktop only.
-func TestPhoneMenuListsScreenerAndSyp(t *testing.T) {
+// A phone's menu lists the Screener, the TCG Syp List and Upload: each
+// renders in the mobile layout (the Syp list as phone cards), and none is
+// desktop only.
+func TestPhoneMenuListsTheResponsivePages(t *testing.T) {
 	nav := filterNavForMobile([]NavElem{
-		{Name: "Newspaper"}, {Name: "TCG Syp List"}, {Name: "Screener (Beta)"}, {Name: "Upload"},
+		{Name: "Newspaper"}, {Name: "TCG Syp List"}, {Name: "Screener (Beta)"}, {Name: "Upload"}, {Name: "Arbitrage"},
 	})
 	var names []string
 	for _, n := range nav {
 		names = append(names, n.Name)
 	}
-	want := []string{"Newspaper", "TCG Syp List", "Screener (Beta)"}
+	want := []string{"Newspaper", "TCG Syp List", "Screener (Beta)", "Upload"}
 	if !slices.Equal(names, want) {
 		t.Errorf("phone menu %v, want %v", names, want)
 	}
-	for _, name := range []string{"TCG Syp List", "Screener (Beta)"} {
+	for _, name := range []string{"TCG Syp List", "Screener (Beta)", "Upload"} {
 		if desktopOnly(name) {
 			t.Errorf("%s is desktop only, so a phone menu link would leave the mobile view", name)
+		}
+	}
+}
+
+// The mobile base carries no settings modal, and Upload's options live in
+// it: a phone's Upload brings the shell, its scripts and a link of its own,
+// where a desktop's has the base's and the navbar's gear.
+func TestUploadOnAPhoneKeepsItsSettings(t *testing.T) {
+	results := PageVars{UploadVars: UploadVars{UploadEntries: []UploadEntry{{}}}}
+	for _, c := range []struct {
+		name   string
+		mobile bool
+		pv     PageVars
+		links  int
+	}{
+		{"the form on a phone", true, PageVars{}, 1},
+		{"the results on a phone", true, results, 1},
+		{"the form on a desktop", false, PageVars{}, 0},
+		{"the results on a desktop", false, results, 0},
+	} {
+		c.pv.IsMobile = c.mobile
+		c.pv.UserNav = &NavElem{}
+		page := renderPage(t, "upload.html", c.mobile, c.pv)
+		for _, want := range []string{`id="settings-modal"`, `src="/js/settings-loader.js`, `src="/js/utils.js`} {
+			n := strings.Count(page, want)
+			if n != 1 {
+				t.Errorf("%s: %d of %s, want 1", c.name, n, want)
+			}
+		}
+		n := strings.Count(page, `class="upload-share-link upload-settings-link"`)
+		if n != c.links {
+			t.Errorf("%s: %d settings links, want %d", c.name, n, c.links)
 		}
 	}
 }

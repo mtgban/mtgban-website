@@ -754,7 +754,10 @@ and under) starts on it.
 **Phone menus.** A narrow screen keeps an optimizer store's buttons (768px
 and under) and the form's store grid (640px and under) in menus that open
 from the foot of the screen. Each is a popover whose box the CSS lays out in
-the page on a wider screen, or where the browser has no popovers.
+the page on a wider screen, or where the browser has no popovers. Upload has
+no mobile template: the mobile view puts the same page in its own frame,
+with a Settings link of its own and the settings modal, which no other
+mobile page carries.
 
 **TCGplayer export prices.** An uploaded TCGplayer export's price is its
 My Store Price, then TCG Marketplace Price, then TCG Market Price, the

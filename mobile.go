@@ -94,6 +94,7 @@ var mobileEnabledPages = []string{
 	"TCG Syp List",
 	"Screener (Beta)",
 	"Sleepers",
+	"Upload",
 	"Alerts",
 	"Changelog",
 	"Account",
