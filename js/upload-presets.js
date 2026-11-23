@@ -302,6 +302,7 @@
                 });
             });
             persistStores(doc, modeForced ? ['index_stores', 'sealed_index_stores'] : null);
+            if (window.showStoreCount) window.showStoreCount();
         } else {
             storesSkipped = STORE_LISTS.some(function (k) { return Array.isArray(opts[k]) && opts[k].length > 0; });
         }

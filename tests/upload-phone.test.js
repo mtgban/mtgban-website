@@ -28,7 +28,7 @@ const html = read('templates/upload.html');
 // A menu only exists while it is open, so its look must not stop at a width:
 // a turned phone leaves the phone rules with the menu still up.
 test('an open menu is a menu at any width', () => {
-    for (const sel of ['.opt-header-actions']) {
+    for (const sel of ['.opt-header-actions', '.upload-store-area']) {
         const open = css.indexOf(sel + '[popover]:popover-open {');
         expect(open).toBeGreaterThan(-1);
         const before = css.slice(0, open);
@@ -39,7 +39,7 @@ test('an open menu is a menu at any width', () => {
 
 // Off a phone both are plain boxes: the display they carry outranks a closed popover's none.
 test('the menus are laid out in the page on a desktop', () => {
-    for (const sel of ['.opt-header-actions']) {
+    for (const sel of ['.opt-header-actions', '.upload-store-area']) {
         expect(css).toContain(sel + '[popover] { position: static;');
         expect(css).toContain('        ' + sel + '[popover]');
     }
@@ -87,4 +87,23 @@ test('a pick closes the store menu', () => {
 test('share and the backpack menu keep the store menu open', () => {
     expect(menuClick(['opt-btn', 'opt-share-btn'])).toBe(0);
     expect(menuClick(['opt-btn', 'pack-move-btn'], { popovertarget: 'opt-pack-CK' })).toBe(0);
+});
+
+test('the stores button counts the visible grid', () => {
+    const count = { textContent: '' };
+    const grid = (on, all) => ({ querySelectorAll: (q) => ({ length: q.includes(':checked') ? on : all }) });
+    const window = { BAN_UPLOAD_FORM: {} };
+    const changes = [];
+    const change = (e) => changes.forEach((fn) => fn(e));
+    const document = {
+        getElementById: (id) => (id === 'upload-store-count' ? count : null),
+        querySelector: (q) => (q === '.upload-store-grid:not(.upload-store-hidden)' ? grid(3, 26) : null),
+        querySelectorAll: () => [],
+        addEventListener: (type, fn) => { if (type === 'change') changes.push(fn); },
+    };
+    new Function('window', 'document', 'localStorage', 'with (window) {' + read('js/upload-form.js') + '}')(window, document, { getItem: () => null, setItem() {} });
+    change({ target: { closest: () => null } });
+    expect(count.textContent).toBe('');
+    change({ target: { closest: () => ({}) } });
+    expect(count.textContent).toBe('3 of 26');
 });

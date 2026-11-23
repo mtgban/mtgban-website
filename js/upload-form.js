@@ -94,6 +94,21 @@ document.addEventListener('click', function(e) {
     }
 });
 
+// The stores ticked in the visible grid, on the button that opens them on a
+// phone. Every change to the grids reaches the form as a change event, but
+// for an applied preset's, which calls this itself.
+window.showStoreCount = function() {
+    var count = document.getElementById('upload-store-count');
+    var box = document.querySelector('.upload-store-grid:not(.upload-store-hidden)');
+    if (!count || !box) return;
+    var all = box.querySelectorAll('input[type="checkbox"]');
+    var on = box.querySelectorAll('input[type="checkbox"]:checked');
+    count.textContent = on.length + ' of ' + all.length;
+};
+document.addEventListener('change', function(e) {
+    if (e.target.closest && e.target.closest('#upload_form')) showStoreCount();
+});
+
 // Re-ticks a store grid from its persisted cookie after reloadSelect rebuilds
 // it from the page-load snapshot (window.BAN_UPLOAD_FORM), which otherwise
 // shows stale ticks once a preset or a prior mode switch changed the cookie.
