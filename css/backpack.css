@@ -209,7 +209,8 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 .backpack-tab,
 .backpack-tab-del,
 .backpack-tab-add,
-.backpack-tab-field {
+.backpack-tab-field,
+.backpack-paid-field {
     flex: none;
     border: 1px solid var(--border-moderate);
     background: var(--surface-2);
@@ -247,6 +248,8 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 .backpack-tab.drop-after { box-shadow: 3px 0 0 var(--dodgerblue); }
 
 .backpack-tab-field { width: 10em; }
+/* a width in % lets the row's column shrink under it on a phone */
+.backpack-paid-field { width: 100%; max-width: 7em; box-sizing: border-box; }
 
 .backpack-sort {
     flex: none;
@@ -274,7 +277,8 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 
 .backpack-sort-note { font-size: 0.85em; opacity: 0.75; }
 
-.backpack-row-price { font-size: 0.85em; font-variant-numeric: tabular-nums; }
+.backpack-row-price,
+.backpack-row-paid { font-size: 0.85em; font-variant-numeric: tabular-nums; }
 
 .backpack-row-price.none { opacity: 0.6; }
 
@@ -447,7 +451,8 @@ body.mobile.light-theme .backpack-panel .m-drawer-handle span { background: rgba
 /* iOS zooms into a field under 16px */
 body.mobile .backpack-cond,
 body.mobile .backpack-sort-by,
-body.mobile .backpack-tab-field { font-size: 16px; }
+body.mobile .backpack-tab-field,
+body.mobile .backpack-paid-field { font-size: 16px; }
 
 /* the one footer row fits a phone with tighter gaps and icons */
 body.mobile .backpack-actions,
@@ -457,7 +462,8 @@ body.mobile .backpack-sort-dir { min-width: 2rem; padding: 0.3em; }
 
 /* iOS zooms the page into a focused field under 16px. */
 @media (pointer: coarse) {
-    .backpack-tab-field {
+    .backpack-tab-field,
+    .backpack-paid-field {
         font-size: 16px;
     }
 }

@@ -625,8 +625,11 @@ override; phone UA detection via `mileusna/useragent`).
   and `MaxSearchTotalResults` (10k max, search.go).
 - **Backpack**: `js/backpack.js` collects cards with a count and a
   condition each across searches, synced as the `backpack` user-state
-  section, and posts them to Upload as `hashes`, `hashesQtys` and
-  `hashesCond` from a navbar side panel. The base templates load it, so
+  section, and posts them to Upload as `hashes`, `hashesQtys`,
+  `hashesCond` and `hashesPrice` from a navbar side panel. `paid`, what
+  each copy cost where known, is the price it posts: adding Upload rows
+  takes their loaded price (a file's market price aside), the panel's
+  dropdown sets it, and copies joining an entry average into it. The base templates load it, so
   the button and panel are on every page with a navbar, all but
   `/offline`. The service worker precaches that page without cookies, so
   sync never starts on it: an edit would stay on that device, and the

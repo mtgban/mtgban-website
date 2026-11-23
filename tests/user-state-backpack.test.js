@@ -74,8 +74,8 @@ test('a newer add beats an older removal', async () => {
 });
 
 test('the pushed entries carry only the synced fields', async () => {
-    const { pushed } = await reconcileBackpack([entry('a', 1, 10, { cond: 'SP', pack: 2, sellPrice: 5, query: 'x' })], []);
-    expect(Object.keys(pushed[0]).sort()).toEqual(['cond', 'pack', 'cw', 'edition', 'finishClass', 'finishTag', 'id', 'img', 'm', 'name', 'number', 'qty', 'set', 't'].sort());
+    const { pushed } = await reconcileBackpack([entry('a', 1, 10, { cond: 'SP', pack: 2, paid: 4.5, sellPrice: 5, query: 'x' })], []);
+    expect(Object.keys(pushed[0]).sort()).toEqual(['cond', 'pack', 'cw', 'edition', 'finishClass', 'finishTag', 'id', 'img', 'm', 'name', 'number', 'paid', 'qty', 'set', 't'].sort());
     expect(pushed[0].sellPrice).toBeUndefined();
 });
 
