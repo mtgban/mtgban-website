@@ -205,6 +205,13 @@
     color: var(--search-text-dim);
     white-space: nowrap;
 }
+.sales-src[href] {
+    color: var(--search-link);
+    text-decoration: none;
+}
+.sales-src[href]:hover {
+    text-decoration: underline;
+}
 .sales-src-icon {
     flex: none;
     border-radius: 3px;

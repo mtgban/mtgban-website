@@ -39,6 +39,7 @@ func TestSearchUINames(t *testing.T) {
 		{"ui.row.store", "buyer", "CK", "buyer", "CK", true},
 		{"ui.row.store", "seller", "Bob's Cards & Games", "seller", "other", true},
 		{"ui.row.store", "seller", "other", "seller", "other", true},
+		{"ui.row.store", "sales", "CK", "sales", "CK", true},
 		{"ui.row.store", "seller", "", "seller", "other", true},
 		{"ui.row.store", "sidebar", "CK", "", "", false},
 		{"ui.row.locked", "", "velocity_upsell", "", "velocity_upsell", true},
