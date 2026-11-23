@@ -488,6 +488,7 @@ html:has(.m-landing) {
         min-height: 0;
         border-radius: var(--card-radius, var(--radius-lg));
         scroll-snap-align: center;
+        scroll-snap-stop: always;
     }
 
     /* The card's lists: each a full column, its heading fixed on top and
@@ -501,6 +502,7 @@ html:has(.m-landing) {
         min-height: 0;
         overflow: hidden;
         scroll-snap-align: start;
+        scroll-snap-stop: always;
     }
 
     .m-layout-cards .m-tab-panel > .result-col {
@@ -601,6 +603,7 @@ html:has(.m-landing) {
         justify-self: center;
         margin: 0.25em 0 0.5em;
         scroll-snap-align: center;
+        scroll-snap-stop: always;
     }
 
     /* The backpack's minus hangs over it, across the picture's foot, so
