@@ -256,11 +256,8 @@ func TestSearchFactsReadTypedTokensOnly(t *testing.T) {
 
 func TestSearchViewFacts(t *testing.T) {
 	run := searchRun{Page: "sealed", Views: map[string]string{
-		"SearchDefaultTab":      "buyers",
-		"SearchDefaultView":     "<b>",
 		"SearchListingPriority": "market",
-		"SearchSealedContents":  "",
-		"MobileSearchLayout":    "NM", // another cookie's value
+		"SearchSealedContents":  "NM", // another cookie's value
 	}}
 	var got []string
 	for _, f := range searchFacts(run) {
@@ -268,7 +265,7 @@ func TestSearchViewFacts(t *testing.T) {
 			got = append(got, f.scope+"="+f.value)
 		}
 	}
-	want := []string{"SearchDefaultTab=buyers", "SearchListingPriority=market"}
+	want := []string{"SearchListingPriority=market"}
 	if !slices.Equal(got, want) {
 		t.Errorf("search.view = %v, want %v", got, want)
 	}
@@ -283,7 +280,7 @@ func TestSearchFactsPassTheRegistry(t *testing.T) {
 		Page: "sets", Scope: "ignored", Sort: "velocity", SortFrom: "cookie", Reverse: true,
 		PageIndex: 2, PageSize: 25, Source: "banbot", Chart: "modal", Factors: true, Custom: true,
 		Misc:       []string{"noSussy", "hidePrelPack", "hidePromos", "preferFlavor", "hideBLconds", "skipEmpty", "noUpsell"},
-		Views:      map[string]string{"SearchDefaultTab": "sellers", "SearchDefaultView": "INDEX", "SearchListingPriority": "stores", "SearchSealedContents": "variable", "MobileSearchLayout": "compact"},
+		Views:      map[string]string{"SearchListingPriority": "stores", "SearchSealedContents": "variable"},
 		PromoTypes: []string{"fixturea"},
 		Packs:      map[string]map[string]bool{"my list": {}},
 	}
@@ -557,7 +554,7 @@ func TestSearchPageNameAndChartKind(t *testing.T) {
 func TestReadSearchRun(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/sealed?q=x&p=3&ps=25&reverse=true&sort=retail&utm_source=banbot", nil)
 	for name, value := range map[string]string{
-		"SearchDefaultTab": "buyers", "SearchListingPriority": "market",
+		"SearchSealedContents": "decklist", "SearchListingPriority": "market",
 		"SearchMiscOpts": "noSussy,hidePromos,", storeFactorsCookie: "CK:10:85",
 	} {
 		r.AddCookie(&http.Cookie{Name: name, Value: value})
@@ -572,7 +569,7 @@ func TestReadSearchRun(t *testing.T) {
 	if !run.Factors || run.Custom {
 		t.Errorf("factors %v custom %v, want true false", run.Factors, run.Custom)
 	}
-	if run.Views["SearchDefaultTab"] != "buyers" {
+	if run.Views["SearchSealedContents"] != "decklist" {
 		t.Errorf("views = %v", run.Views)
 	}
 	if _, found := run.Views["SearchListingPriority"]; found {

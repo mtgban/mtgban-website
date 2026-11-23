@@ -24,7 +24,7 @@
 // mobile/sleep.html, upload.html's per-row thumbnail and thumbHtml()'s
 // generated markup (js/utils.js). A new page showing a card's own art opts
 // in by adding .card-art to it - nothing else has to change here.
-var CARD_ART_SELECTOR = '#cardImage, #cardImageModalImg, #m-drawer-img, .hoverImage, .m-card-img-landscape, .landing-popular-img, .card-art';
+var CARD_ART_SELECTOR = '#cardImage, #cardImageModalImg, .hoverImage, .m-card-img-landscape, .landing-popular-img, .card-art';
 var CARD_ART_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 window.cardArtPlaceholder = CARD_ART_PLACEHOLDER;
 

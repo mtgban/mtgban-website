@@ -11,7 +11,7 @@ test('the landing-empty rules live in main.css alone', () => {
         expect(search).not.toContain(sel);
     }
     expect(search).not.toMatch(/landing-empty-/);
-    // search.css alone defines --search-link, so the moved rules carry a fallback.
+    // search-rows.css alone defines --search-link, so the moved rules carry a fallback.
     expect(main).not.toMatch(/var\(--search-link\)/);
     expect(main).toContain('var(--search-link, var(--ainfo))');
 });

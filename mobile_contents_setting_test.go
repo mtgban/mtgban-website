@@ -11,7 +11,7 @@ import (
 func TestMobileSettingsOfferSealedContents(t *testing.T) {
 	// The drawer's markup sits in the results block, its cookie wiring in the
 	// page around it, so each is read from where it lives.
-	drawer := renderMobileSearch(t, sealedPageVars("expanded", "abc"))
+	drawer := renderMobileSearch(t, sealedPageVars("abc"))
 	for _, want := range []string{
 		`id="m-set-sealed-contents"`,
 		`data-val="contents"`,

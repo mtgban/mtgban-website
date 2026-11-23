@@ -35,9 +35,6 @@ func TestRestrictedStoreRendersItalic(t *testing.T) {
 		out := renderPage(t, "search.html", mobile, v)
 
 		class := `class="store-name store-restricted"`
-		if mobile {
-			class = `class="m-vendor-name m-vendor-restricted"`
-		}
 		if n := strings.Count(out, class); n != 2 {
 			t.Errorf("mobile=%v: %d names carry %s, want 2 (seller and buyer)", mobile, n, class)
 		}

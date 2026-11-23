@@ -50,9 +50,6 @@ var (
 var trackValueAllowlist = []string{
 	// ui.row.store: a row's scraper shorthand set server side, never reader text; the registry types it a store, so Check folds an unloaded one to other.
 	`templates/partials/search-columns.html: ui.row.store: data-track-value="{{or .Shorthand "other"}}" data-track-s`,
-	`templates/mobile/search.html: ui.row.store: data-track-value="{{or $entry.Shorthand "other"}}" data-t`,
-	// ui.row.condition: $conditions ranges over AllConditions (search.go), the registry's enum exactly; Check refuses any other.
-	`templates/mobile/search.html: ui.row.condition: data-track-value="{{$conditions}}">{{$conditions}}</butto`,
 	// ui.settings.tab: . ranges over settingsTabs, keys of settingsTabNames, each a registered value (TestEverySettingsTabIsACountedValue).
 	`templates/settings/body.html: ui.settings.tab: data-track-value="{{.}}">`,
 	// ui.optimizer.send: the optimizer section's store shorthand, a key of .Optimized set server side, never reader text; the registry types the scope a store, so Check folds an unloaded one to other.

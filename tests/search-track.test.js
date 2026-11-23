@@ -56,10 +56,7 @@ const { SearchTrack } = load({});
 test.each([
     ['a closed sales row', summaryIn({ classes: ['price-row', 'sales-velocity'], open: false }), false, 'velocity'],
     ['an open sales row', summaryIn({ classes: ['sales-velocity'], open: true }), false, ''],
-    ['the mobile sales row, which is also an offer row', summaryIn({ classes: ['m-vendor-row', 'sales-velocity'], open: false }), false, 'velocity'],
-    ['a closed offer row', summaryIn({ classes: ['m-vendor-row'], open: false }), false, 'detail'],
-    ['an open offer row', summaryIn({ classes: ['m-vendor-row'], open: true }), false, ''],
-    ['the store link inside an offer row', linkIn(summaryIn({ classes: ['m-vendor-row'], open: false })), false, ''],
+    ['the store link inside a sales row', linkIn(summaryIn({ classes: ['sales-velocity'], open: false })), false, ''],
     ['a summary of some other details', summaryIn({ classes: ['faq'], open: false }), false, ''],
     ['an add link on the chart page', anchor('chart-add-link'), false, 'roster_add'],
     ['a remove link on the chart page', anchor('chart-remove-link'), false, 'roster_remove'],
@@ -77,10 +74,10 @@ test('the listener is capture phase and makes one call for a click', () => {
     expect(listeners[0].type).toBe('click');
     expect(listeners[0].capture).toBe(true);
     listeners[0].fn({ target: summaryIn({ classes: ['price-row', 'sales-velocity'], open: false }) });
-    listeners[0].fn({ target: summaryIn({ classes: ['m-vendor-row'], open: false }) });
+    listeners[0].fn({ target: summaryIn({ classes: ['faq'], open: false }) });
     listeners[0].fn({ target: anchor('chart-remove-link') });
-    listeners[0].fn({ target: summaryIn({ classes: ['m-vendor-row'], open: true }) });
-    expect(calls).toEqual([['ui.row.velocity', 'open'], ['ui.row.detail', 'open'], ['ui.chart.roster', 'remove', 'page']]);
+    listeners[0].fn({ target: summaryIn({ classes: ['sales-velocity'], open: true }) });
+    expect(calls).toEqual([['ui.row.velocity', 'open'], ['ui.chart.roster', 'remove', 'page']]);
 });
 
 test('inside the chart modal a roster link is left to search-modal.js', () => {

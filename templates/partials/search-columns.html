@@ -1,6 +1,7 @@
-{{/* A result's Sellers and Buyers columns, the desktop search's table,
-     styled by css/search-rows.css. Called with dict "Page" $ "Card" $card
-     "CardID" $cardId. */}}
+{{/* A result's Sellers and Buyers columns: the desktop search's table and
+     the lists of a phone's Cards (docs/adr/0010-mobile-card-view.md), styled
+     by css/search-rows.css. Called with dict "Page" $ "Card" $card "CardID"
+     $cardId. */}}
 
 {{define "result-sellers"}}{{$page := .Page}}{{$card := .Card}}{{$cardId := .CardID}}
 <div class="result-col">
@@ -153,7 +154,8 @@
 
 {{define "result-buyers"}}{{$page := .Page}}{{$card := .Card}}{{$cardId := .CardID}}
 {{/* Switch puts the Buylist/Sales switch on a card that is not sealed
-     (docs/adr/0009-recent-tcgplayer-sales.md) */}}
+     (docs/adr/0009-recent-tcgplayer-sales.md); the phone shows the sales
+     in a pane of their own instead */}}
 {{$salesSwitch := and .Switch (not $card.Sealed)}}
 <div class="result-col{{if $salesSwitch}} buyers-col{{end}}"{{if $salesSwitch}} data-buyers-mode="{{$page.BuyersMode}}"{{end}}>
     <div class="result-col-header">Buyers{{if $salesSwitch}}{{template "buyers-switch" $page.BuyersMode}}{{end}}</div>

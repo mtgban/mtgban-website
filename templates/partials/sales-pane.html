@@ -18,17 +18,3 @@
 <div class="no-offers"><i>No sales on record</i></div>
 {{end}}
 {{end}}
-
-{{define "m-sales-row"}}<div class="m-vendor-row m-vendor-flat sales-row">{{template "sales-source" .Source}}<span class="sales-date" title="{{.Time}}">{{.Short}}</span><span class="m-vendor-right"><span class="m-vendor-price">$ {{.Price}}</span><span class="sales-qty">{{.Qty}}</span></span></div>{{end}}
-
-{{define "m-sales-pane"}}
-{{range .}}
-<div class="m-sales-group">
-<div class="m-sales-head"><span>{{.Grade}}</span><span class="sales-avg">avg <b>$ {{.Avg}}</b></span></div>
-{{range .Shown}}{{template "m-sales-row" .}}{{end}}
-{{with .More}}<details class="sales-more"><summary><span class="sales-more-open">{{len .}} more</span><span class="sales-more-close">Fewer</span></summary>{{range .}}{{template "m-sales-row" .}}{{end}}</details>{{end}}
-</div>
-{{else}}
-<div class="m-vendor-row m-sales-none">No sales on record</div>
-{{end}}
-{{end}}

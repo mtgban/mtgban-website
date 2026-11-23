@@ -16,10 +16,7 @@
         SearchSealedContents: 'contents',
         UploadSorting: '',
         UploadPriceSource: '',
-        UploadTiebreak: '',
-        SearchDefaultTab: 'sellers',
-        SearchDefaultView: 'NM',
-        MobileSearchLayout: 'expanded'
+        UploadTiebreak: ''
     };
     // Each packed cookie's flags, closed; a token outside is never sent.
     var KNOWN_FLAGS = {
@@ -35,10 +32,7 @@
         SearchSealedContents: ['contents', 'decklist', 'variable'],
         UploadSorting: ['setchrono', 'setalpha', 'alphabetical', 'highprice', 'highspread', 'profitability', 'storeorder'],
         UploadPriceSource: ['credit', 'marketCredit'],
-        UploadTiebreak: ['credit', 'marketCredit', 'consolidate', 'custom'],
-        SearchDefaultTab: ['sellers', 'buyers'],
-        SearchDefaultView: ['NM', 'SP', 'MP', 'HP', 'PO', 'INDEX'],
-        MobileSearchLayout: ['expanded', 'compact']
+        UploadTiebreak: ['credit', 'marketCredit', 'consolidate', 'custom']
     };
     // The other settings a save can change, closed; each is only set or cleared.
     var OTHERS = [
@@ -54,7 +48,7 @@
 
     // The cookies the mobile drawer's save writes.
     var DRAWER = [
-        'MobileSearchLayout', 'SearchDefaultTab', 'SearchDefaultView', 'SearchListingPriority',
+        'SearchListingPriority',
         'SearchSealedContents', 'SearchSellersPriority', 'SearchVendorsPriority', 'SearchMiscOpts',
         'SearchSellersList', 'SearchVendorsList', 'SearchStoreFactors'
     ];

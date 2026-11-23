@@ -112,8 +112,8 @@ func TestSalesPaneAPI(t *testing.T) {
 	}
 
 	phone := get("/data/sales/sold", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148")
-	if !strings.Contains(phone["sold"], "m-sales-group") || !strings.Contains(phone["sold"], "Nov 19") {
-		t.Errorf("phone pane = %s", phone["sold"])
+	if phone["sold"] != panes["sold"] {
+		t.Errorf("phone pane differs from the desktop's:\n%s", phone["sold"])
 	}
 
 	many := make([]string, salesPaneMaxIDs+5)

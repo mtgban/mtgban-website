@@ -674,7 +674,7 @@ func TestSearchColorsSalesVelocity(t *testing.T) {
 		pages := velocityPages(t, velocityPageVars(true, true))
 		for name, want := range map[string]string{
 			"desktop": `<span class="amt velocity-` + pace.String() + `">2.3/day</span>`,
-			"mobile":  `<span class="m-vendor-price velocity-` + pace.String() + `">2.3/day</span>`,
+			"mobile":  `<span class="amt velocity-` + pace.String() + `">2.3/day</span>`,
 		} {
 			if !strings.Contains(pages[name], want) {
 				t.Errorf("%s: want %q, rendered:\n%s", name, want, pages[name])

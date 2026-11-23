@@ -92,10 +92,10 @@ func TestSettingsCounts(t *testing.T) {
 			byPath[s.Path]++
 		}
 	}
-	if byClass["preference"] != 93 || byClass["transient"] != 17 || byClass["admin"] != 1 {
-		t.Errorf("classes = %v, want 93 preference, 17 transient, 1 admin", byClass)
+	if byClass["preference"] != 90 || byClass["transient"] != 17 || byClass["admin"] != 1 {
+		t.Errorf("classes = %v, want 90 preference, 17 transient, 1 admin", byClass)
 	}
-	want := map[string]int{"root": 62, "upload": 23, "arbit": 1, "reverse": 1, "global": 1, "sleepers": 3, "newspaper": 2}
+	want := map[string]int{"root": 59, "upload": 23, "arbit": 1, "reverse": 1, "global": 1, "sleepers": 3, "newspaper": 2}
 	if !maps.Equal(byPath, want) {
 		t.Errorf("preference entries by path = %v, want %v", byPath, want)
 	}
@@ -129,7 +129,6 @@ func TestSettingEntries(t *testing.T) {
 		{"UploadMargin", "cookie", "upload", "number", "10", "preference", ""},
 		{"chartDateRange", "both", "root", "number", "180", "preference", "SearchChartRange"},
 		{"chartMultiDateRange", "both", "root", "number", "0", "preference", "SearchChartMultiRange"},
-		{"MobileSearchLayout", "both", "root", "enum", "expanded", "preference", "mtgban_search_layout"},
 		{"ArbitFilters", "both", "root", "query", "", "preference", "mtgban_arbit_filters"},
 		{"uploadMode", "both", "upload", "flag", "off", "preference", ""},
 		{"gdocURL", "cookie", "upload", "blob", "", "transient", ""},
@@ -161,13 +160,13 @@ func TestSettingEntries(t *testing.T) {
 	}
 }
 
-// The 56 settings the modal and the mobile drawer can change (the scopes
+// The 53 settings the modal and the mobile drawer can change (the scopes
 // of ui.settings.change) are preference entries under exactly these names.
 func TestSettingsCoverTheModal(t *testing.T) {
 	names := []string{
 		"SearchSellersList", "SearchVendorsList", "SearchDefaultSort", "SearchListingPriority",
 		"SearchSellersPriority", "SearchVendorsPriority", "SearchBuylistSecondary", "SearchSealedContents",
-		"SearchStoreFactors", "SearchDefaultTab", "SearchDefaultView", "MobileSearchLayout",
+		"SearchStoreFactors",
 		"UploadCustomOpts.enabled",
 		"UploadPercSpread", "UploadPercSpreadMax", "UploadMinVal", "UploadMaxVal", "UploadMargin",
 		"UploadCustomPercMax", "UploadMultiplier", "UploadMaxQty", "UploadSorting", "UploadPriceSource", "UploadTiebreak", "UploadTiebreakOrder",
@@ -182,8 +181,8 @@ func TestSettingsCoverTheModal(t *testing.T) {
 	for _, f := range []string{"lowval", "highval", "lowvalabs", "highvalabs", "minmargin", "unpack", "nocond", "noprice", "customperc", "noresults"} {
 		names = append(names, "UploadOptimizerOpts."+f)
 	}
-	if len(names) != 56 {
-		t.Fatalf("%d names, want 56", len(names))
+	if len(names) != 53 {
+		t.Fatalf("%d names, want 53", len(names))
 	}
 	for _, n := range names {
 		if !IsSetting(n) {
@@ -256,8 +255,8 @@ func TestSettingsJSONServesPreferencesOnly(t *testing.T) {
 	if err := json.Unmarshal(SettingsJSON(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Settings) != 93 {
-		t.Fatalf("served %d entries, want 93", len(got.Settings))
+	if len(got.Settings) != 90 {
+		t.Fatalf("served %d entries, want 90", len(got.Settings))
 	}
 	raw := string(SettingsJSON())
 	for _, leak := range []string{"uploadTab", "adminFixMode", "mtgban_metrics_snap", "mtgban_metrics_queue", "mtgban_search_layout", "upload.value_set", "\"class\"", "\"area\""} {

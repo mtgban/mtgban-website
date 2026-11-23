@@ -201,10 +201,11 @@ func TestSearchShowsTCGListings(t *testing.T) {
 		},
 		Metadata: map[string]GenericCard{cardID: {Name: "Some Card", Edition: "Some Set"}},
 	}
-	// Desktop hovers the table; mobile, which cannot, keeps the sentences.
+	// The phone draws the desktop table, the table in the tip included.
+	want := `<span class="tcg-listings" title="` + plain + `" data-tip="` + title + `">51/83</span>`
 	for name, tc := range map[string]struct{ page, want string }{
-		"desktop": {renderDesktopSearch(t, pageVars), `<span class="tcg-listings" title="` + plain + `" data-tip="` + title + `">51/83</span>`},
-		"mobile":  {renderMobileSearch(t, pageVars), `<span class="tcg-listings" title="` + plain + `">51/83</span>`},
+		"desktop": {renderDesktopSearch(t, pageVars), want},
+		"mobile":  {renderMobileSearch(t, pageVars), want},
 	} {
 		page := tc.page
 		if strings.Count(page, tc.want) != 1 {

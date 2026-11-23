@@ -651,9 +651,6 @@ type SearchVars struct {
 	DidYouMean         []string
 	AltSearches        []suggest.AltSearch
 	CanDownloadCSV     bool
-	DefaultTab         string
-	DefaultView        mtgban.Condition
-	MobileSearchLayout string
 	VelocityOpen       bool
 	OfflineModeAllowed bool
 	MaxLookbackDays    int
@@ -1125,9 +1122,6 @@ func fillSearchPrefs(pageVars *SearchVars, r *http.Request) {
 	// chart drawer, whose range select locks what the tier does not reach.
 	pageVars.MaxLookbackDays = chartLookback(sig).Days()
 
-	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
-	pageVars.DefaultView = mtgban.Condition(readCookie(r, "SearchDefaultView"))
-	pageVars.MobileSearchLayout = readCookie(r, "MobileSearchLayout")
 	pageVars.VelocityOpen = readCookie(r, "SearchVelocityOpen") == "open"
 
 	// The Alphabetical button asks for the sort grouped by set where that is

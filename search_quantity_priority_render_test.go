@@ -43,9 +43,6 @@ func TestQuantityPriorityRendersAsCountNotPrice(t *testing.T) {
 		// The slot itself: a bare "12" is on every page already, in the
 		// favicon link's sizes="120x120".
 		want := `<span class="cur">#</span><span class="amt">12</span>`
-		if mobile {
-			want = `<span class="m-vendor-price"># 12</span>`
-		}
 		if !strings.Contains(out, want) {
 			t.Errorf("mobile=%v: the price slot does not read %s", mobile, want)
 		}

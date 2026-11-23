@@ -27,7 +27,7 @@ func TestCookiePath(t *testing.T) {
 		{"BAN_SIG", "/auth", "/"},
 		{"MTGBAN", "/auth", "/"},
 		{"BAN_SESSION", "/auth", "/"},
-		{"MobileSearchLayout", "/sealed", "/"},
+		{"SearchListingPriority", "/sealed", "/"},
 		{"Unknown", "/", "/"},
 	}
 

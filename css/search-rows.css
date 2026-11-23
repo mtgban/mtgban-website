@@ -1,7 +1,7 @@
 /* The price table a search result shows its sellers and buyers in: the
-   desktop search, the shared favorites and the offline page
-   (templates/partials/search-columns.html). Loaded before search.css,
-   whose narrower layouts override it. */
+   desktop search, the shared favorites, the offline page and the phone's
+   Cards lists (templates/partials/search-columns.html). Loaded before
+   search.css, whose narrower layouts override it. */
 
 .light-theme {
     --search-row-even: #f5f5f8;
@@ -510,7 +510,9 @@ html.admin-fix-mode .raw-record { display: inline-block; }
    ratio/credit and quantity so the name keeps its room. The ratio/credit
    stay available in the row's hover tooltip. The lower bound shares the
    exact 560px edge with the single-column rule above (strict vs. non-strict
-   `<`) so there's no sub-pixel gap where the fields flash back in. */
+   `<`) so there's no sub-pixel gap where the fields flash back in. A list
+   at phone width keeps them, stacked under the price (below): a touch
+   screen has no hover to show the tooltip. */
 @container search-results (560px < width <= 720px) {
     .price-right.has-buylist-extra { grid-template-columns: 7em; }
     .price-right.has-buylist-extra .buylist-extra,
@@ -564,10 +566,11 @@ html.admin-fix-mode .raw-record { display: inline-block; }
 
 /* The tight two-column band again, for every row of both columns: a row's
    price cell stacks what follows the price (an index's second price, a
-   store's quantity or listings) under it, so the price columns close up to
-   one and the store names keep their room. After the subgrid rules, which it overrides, as it does the
+   store's quantity or listings, a buyer's ratio and credit at phone width)
+   under it, so the price columns close up to one and the store names keep
+   their room. After the subgrid rules, which it overrides, as it does the
    buyers' 7em track above. */
-@container search-results (560px < width <= 720px) {
+@container search-results (560px < width <= 720px) or (width <= 480px) {
     .rows-main {
         grid-template-columns: 1fr auto;
     }
@@ -580,6 +583,7 @@ html.admin-fix-mode .raw-record { display: inline-block; }
         line-height: 1.1;
     }
     .rows-main .price-right > .secondary,
+    .rows-main .price-right > .buylist-extra,
     .rows-main .price-right > .qty {
         font-size: 0.8em;
         opacity: 0.7;
@@ -607,4 +611,13 @@ html.admin-fix-mode .raw-record { display: inline-block; }
     /* Only under the EV header: without it the columns are not simulations. */
     .rows-index:has(.index-label) .index-cols > .price:nth-child(2)::before { content: "Sim"; }
     .rows-index:has(.index-label) .index-cols > .price:nth-child(3)::before { content: "±"; }
+}
+
+/* At phone width a buyer's price cell stacks three lines (price, ratio or
+   credit, quantity), more than the fixed row holds, so the row grows. */
+@container search-results (width <= 480px) {
+    .rows-main > .price-row {
+        height: auto;
+        min-height: var(--price-row-h, 42px);
+    }
 }

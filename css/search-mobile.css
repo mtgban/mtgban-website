@@ -35,6 +35,235 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     border-bottom-color: rgba(0, 0, 0, 0.06);
 }
 
+/* The search landing in portrait: the recent searches and favorites above,
+   the search bar at the bottom within reach of a thumb, neither moving the
+   page */
+@media (orientation: portrait) {
+    html:has(.m-landing),
+    html:has(.m-landing) body {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+    }
+
+    .m-page.m-landing:has(.m-search-bar-sticky),
+    body.has-scope .m-page.m-landing:has(.m-search-bar-sticky) {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 48px);
+        height: calc(100dvh - 48px);
+        padding: 0;
+    }
+
+    .m-landing .m-search-bar-sticky {
+        position: relative;
+        top: auto;
+        flex: none;
+        order: 1;
+        border-top: 1px solid var(--border);
+        border-bottom: 0;
+        padding-bottom: var(--m-safe-bottom, env(safe-area-inset-bottom));
+    }
+
+    /* With the bar at the foot, the suggestions open upwards across the
+       bar's width, up to the navbar (js/autocomplete.js sets the height),
+       and the box joins them on its top edge */
+    .m-landing .m-search-wrap,
+    .m-layout-cards .m-search-wrap {
+        position: relative;
+    }
+
+    .m-landing .m-search-wrap form,
+    .m-layout-cards .m-search-wrap form {
+        position: static;
+    }
+
+    .m-landing .m-search-wrap .autocomplete-items,
+    .m-layout-cards .m-search-wrap .autocomplete-items {
+        top: auto;
+        bottom: 100%;
+        left: -0.5em;
+        right: -0.5em;
+        box-sizing: border-box;
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+    }
+
+    /* The pinned-filter row floats above the search bar at the foot, a
+       drawer of its own, rather than lengthening the bar under its box */
+    body.has-scope {
+        --m-scope-h: 46px;
+    }
+
+    body.has-scope .m-landing .m-scope-row,
+    body.has-scope .m-layout-cards .m-scope-row {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 100%;
+        height: var(--m-scope-h);
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0 12px;
+        border-top: 1px solid var(--border);
+        border-radius: 16px 16px 0 0;
+        background: var(--background);
+        box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    /* GO and CLEAR the filter box's height, not the 44px main.css gives
+       every phone button */
+    body.has-scope .m-scope-row button {
+        min-height: 0;
+    }
+
+    body.has-scope .m-landing .m-landing-lists {
+        padding-bottom: var(--m-scope-h);
+    }
+
+    .m-landing .m-scope-row .autocomplete-items,
+    .m-layout-cards .m-scope-row .autocomplete-items {
+        top: auto;
+        bottom: 100%;
+    }
+
+    /* No focus ring on the boxes at the foot: the open list marks them */
+    .m-landing .m-search-input:focus,
+    .m-layout-cards .m-search-input:focus,
+    .m-landing .m-scope-box:focus,
+    .m-layout-cards .m-scope-box:focus {
+        outline: none;
+    }
+
+    .m-landing .m-scope-row .autocomplete:has(.autocomplete-items) input,
+    .m-layout-cards .m-scope-row .autocomplete:has(.autocomplete-items) input {
+        border-radius: 0 0 var(--radius-sm, 8px) var(--radius-sm, 8px);
+    }
+
+    /* While the list is open the box takes its colours, drops its top edge,
+       and its top corners curve out into the list's lower edge, drawn by
+       the bar's two pseudo-elements (--box-l and --box-r from
+       js/search-cards.js) */
+    .m-landing .m-search-wrap,
+    .m-layout-cards .m-search-wrap {
+        --fan: 6px;
+        --fan-line: var(--border-moderate);
+        --fan-bg: rgb(20, 24, 30);
+    }
+
+    .light-theme .m-landing .m-search-wrap,
+    .light-theme .m-layout-cards .m-search-wrap {
+        --fan-bg: rgb(255, 255, 255);
+    }
+
+    .m-landing .m-search-wrap .autocomplete:has(.autocomplete-items) input,
+    .m-layout-cards .m-search-wrap .autocomplete:has(.autocomplete-items) input {
+        border-radius: 0 0 8px 8px;
+        border-color: var(--fan-line);
+        border-top-color: transparent;
+        background: var(--fan-bg);
+    }
+
+    .m-landing .m-search-wrap .autocomplete-items,
+    .m-layout-cards .m-search-wrap .autocomplete-items {
+        border-bottom: 0;
+    }
+
+    .m-landing .m-search-wrap:has(.autocomplete-items)::before,
+    .m-landing .m-search-wrap:has(.autocomplete-items)::after,
+    .m-layout-cards .m-search-wrap:has(.autocomplete-items)::before,
+    .m-layout-cards .m-search-wrap:has(.autocomplete-items)::after {
+        content: "";
+        position: absolute;
+        top: -1px;
+        height: var(--fan);
+        z-index: 111;
+        pointer-events: none;
+        background-repeat: no-repeat;
+    }
+
+    .m-landing .m-search-wrap:has(.autocomplete-items)::before,
+    .m-layout-cards .m-search-wrap:has(.autocomplete-items)::before {
+        left: -0.5em;
+        width: calc(var(--box-l, 0px) + 0.5em + 1px);
+        background-image:
+            radial-gradient(circle at 1px 100%, transparent calc(var(--fan) - 1px), var(--fan-line) calc(var(--fan) - 1px), var(--fan-line) var(--fan), var(--fan-bg) var(--fan)),
+            linear-gradient(var(--fan-line), var(--fan-line));
+        background-size: calc(var(--fan) + 1px) 100%, calc(100% - var(--fan) - 1px) 1px;
+        background-position: right top, left top;
+    }
+
+    .m-landing .m-search-wrap:has(.autocomplete-items)::after,
+    .m-layout-cards .m-search-wrap:has(.autocomplete-items)::after {
+        right: -0.5em;
+        width: calc(var(--box-r, 0px) + 0.5em + 1px);
+        background-image:
+            radial-gradient(circle at calc(100% - 1px) 100%, transparent calc(var(--fan) - 1px), var(--fan-line) calc(var(--fan) - 1px), var(--fan-line) var(--fan), var(--fan-bg) var(--fan)),
+            linear-gradient(var(--fan-line), var(--fan-line));
+        background-size: calc(var(--fan) + 1px) 100%, calc(100% - var(--fan) - 1px) 1px;
+        background-position: left top, right top;
+    }
+
+    .m-landing .m-landing-lists {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 0 0.5em 0.5em;
+        container-type: size;
+    }
+
+    /* As many recent searches as the screen holds, whole rows only: the pane
+       is a grid of fixed rows no taller than the lists, and the rows past
+       the last that fits go to rows of no height, clipped */
+    .m-landing #m-recent-searches {
+        display: grid;
+        grid-template-rows: 3.25em repeat(auto-fit, 3.25em);
+        grid-auto-rows: 0;
+        max-height: calc(100cqh - 0.75em);
+    }
+
+    .m-landing #m-recent-searches .landing-pane-body {
+        display: contents;
+    }
+
+    .m-landing #m-recent-searches .landing-item {
+        min-height: 0;
+        overflow: hidden;
+    }
+}
+
+/* The recent searches are the desktop's pane (search-landing.css), as
+   tall as its rows, and absent with none */
+.m-landing #m-recent-searches {
+    min-height: 0;
+    margin-top: 0.75em;
+}
+
+.m-landing #m-recent-searches:empty {
+    display: none;
+}
+
+/* No hover on a phone to reveal a row's pin and delete, so they always
+   show, a thumb's size, with the query kept clear of them */
+.m-landing #m-recent-searches .landing-item-actions,
+.m-landing #m-recent-searches .landing-item-pin,
+.m-landing #m-recent-searches .landing-item-delete {
+    opacity: 1;
+}
+
+.m-landing #m-recent-searches .landing-item-pin,
+.m-landing #m-recent-searches .landing-item-delete {
+    padding: 0.55em;
+}
+
+.m-landing #m-recent-searches .landing-item-pin.pinned {
+    color: var(--accent, #5b8def);
+}
+
+.m-landing #m-recent-searches .landing-item-info {
+    margin-right: calc(70px + 0.7em);
+}
+
 .m-search-wrap {
     display: flex;
     align-items: center;
@@ -106,6 +335,21 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 }
 
 .light-theme .m-search-btn {
+    border-color: rgba(0, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.04);
+}
+
+/* In the search bar the pinned filters match the buttons beside them, so
+   the box sits centred between the two sides */
+.m-search-wrap .m-pin-btn {
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.light-theme .m-search-wrap .m-pin-btn {
     border-color: rgba(0, 0, 0, 0.2);
     background: rgba(0, 0, 0, 0.04);
 }
@@ -304,6 +548,19 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     overflow: hidden;
     overflow: clip visible;
     text-overflow: ellipsis;
+}
+
+/* The set and number, then the finish and treatment badges; the set gives
+   way to the badges */
+.m-card-setline {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    min-width: 0;
+}
+
+.m-card-setline > .m-badge {
+    flex: none;
 }
 
 .m-card-badges {
@@ -558,12 +815,10 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 }
 
 /* Alternating row tint for scan-ability */
-.m-vendor-row:nth-child(even) summary,
 .m-vendor-row.m-vendor-flat:nth-child(even) {
     background: rgba(255, 255, 255, 0.02);
 }
 
-.light-theme .m-vendor-row:nth-child(even) summary,
 .light-theme .m-vendor-row.m-vendor-flat:nth-child(even) {
     background: rgba(0, 0, 0, 0.015);
 }
@@ -572,207 +827,6 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     border-bottom: none;
 }
 
-/* TCGplayer copies sold a day, newspaper tiers (salesvelocity.go). A stat rather
-   than an offer; it grows left of the price column, keeping the prices' edge. */
-.sales-velocity .m-vendor-name {
-    color: var(--greytext);
-}
-.sales-velocity .m-vendor-price {
-    justify-self: end;
-    font-weight: 400;
-}
-.sales-velocity .m-vendor-price.velocity-fastest {
-    font-weight: 700;
-}
-.sales-velocity .m-detail-note .tip-table {
-    width: 100%;
-}
-.sales-velocity .m-detail-note .tip-table td {
-    white-space: nowrap;
-}
-.sales-velocity .m-detail-note .tip-table td:not(.tip-label) {
-    color: var(--normaltext);
-}
-.sales-velocity .m-detail-note .tip-table td:nth-child(2):not(:last-child) {
-    width: 100%;
-}
-.sales-velocity .m-detail-note .tip-table td:nth-child(4),
-.sales-velocity .m-detail-note .tip-table:not(:first-child) td:last-child {
-    text-align: right;
-}
-.sales-velocity .m-detail-note .tip-table td + .tip-label {
-    padding-left: 0.75rem;
-}
-.sales-velocity .m-detail-note .tip-table:not(:first-child) {
-    margin-top: 0.3rem;
-    padding-top: 0.3rem;
-    border-top: 1px solid var(--border-subtle);
-}
-.m-vendor-row.sales-velocity-upsell {
-    display: block;
-    padding: 0.3rem 0.75rem;
-    font-size: 0.7rem;
-    font-style: italic;
-    text-align: center;
-    text-decoration: none;
-    color: var(--greytext);
-}
-
-/* The Buyers panel's Buylist and Sales modes (templates/partials/sales-pane.html).
-   In Sales every grade shows, whatever the condition pills say. */
-.m-buyers-bar {
-    display: flex;
-    justify-content: flex-end;
-    padding: 0.35rem 0.75rem;
-    border-bottom: 1px solid var(--border-subtle);
-}
-.m-buyers-bar .buyers-switch {
-    display: inline-flex;
-    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.14));
-    border-radius: 8px;
-    overflow: hidden;
-}
-.m-buyers-bar .buyers-switch-btn {
-    padding: 0.3rem 0.9rem;
-    border: 0;
-    background: none;
-    font: inherit;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--greytext);
-}
-.m-buyers-bar .buyers-switch-btn.on {
-    background: var(--border-subtle, rgba(255, 255, 255, 0.12));
-    color: var(--normaltext);
-}
-.buyers-panel[data-buyers-mode="sales"] > .m-cond-group,
-.buyers-panel[data-buyers-mode="sales"] > .m-buylist-none,
-.buyers-panel[data-buyers-mode="buylist"] > .m-sales-pane {
-    display: none !important;
-}
-.m-sales-head {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.2em 0.75em;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    color: var(--greytext);
-    background: rgba(255, 255, 255, 0.04);
-    border-bottom: 1px solid var(--border);
-}
-.m-sales-head .sales-avg {
-    letter-spacing: 0;
-    font-variant-numeric: tabular-nums;
-}
-.m-sales-head .sales-avg b {
-    color: var(--normaltext);
-    font-weight: 600;
-}
-.m-sales-pane .sales-src {
-    flex: 1 1 0;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    color: var(--greytext);
-    font-size: 0.9rem;
-    white-space: nowrap;
-}
-.m-sales-pane .sales-src-icon {
-    flex: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
-}
-.m-sales-pane .sales-date {
-    flex: none;
-    font-size: 0.9rem;
-    font-variant-numeric: tabular-nums;
-}
-.m-sales-pane .m-vendor-right {
-    flex: 1 1 0;
-    display: flex;
-    align-items: baseline;
-    justify-content: flex-end;
-    gap: 0.4rem;
-}
-.m-sales-pane .sales-qty {
-    min-width: 1.8em;
-    font-size: 0.85rem;
-    color: var(--greytext);
-}
-.m-sales-pane .sales-more > summary {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.8rem;
-    color: var(--greytext);
-    list-style: none;
-}
-.m-sales-pane .sales-more > summary::-webkit-details-marker {
-    display: none;
-}
-.m-sales-pane .sales-more[open] > summary .sales-more-open,
-.m-sales-pane .sales-more:not([open]) > summary .sales-more-close {
-    display: none;
-}
-.m-sales-pane[data-pending]::before {
-    content: "Loading recent sales…";
-    display: block;
-    padding: 0.6rem 0.75rem;
-    font-size: 0.8rem;
-    font-style: italic;
-    color: var(--greytext);
-}
-.m-sales-none {
-    padding: 0.6rem 0.75rem;
-    color: var(--greytext);
-    font-size: 0.85rem;
-}
-
-/* Names a sealed product's offers where they follow its reference rows, on an
-   expanded card: with no condition bands there, the simulated values would run
-   straight into the rows that are actual offers. */
-.m-panel-header {
-    padding: 0.6em 0.75em 0.35em;
-    border-top: 1px solid var(--border);
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--greytext);
-}
-
-.m-vendor-row summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 1rem 0 0.75rem;
-    margin: 0;
-    min-height: 44px;
-    cursor: pointer;
-    list-style: none;
-    gap: 0.5rem;
-    box-sizing: border-box;
-    transition: background-color 0.1s ease;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.m-vendor-row summary::-webkit-details-marker {
-    display: none;
-}
-
-.m-vendor-row summary::marker {
-    display: none;
-    content: "";
-}
-
-.m-vendor-row summary:active {
-    background-color: rgba(255, 255, 255, 0.04);
-}
-
-.light-theme .m-vendor-row summary:active {
-    background-color: rgba(0, 0, 0, 0.03);
-}
 
 .m-vendor-name {
     flex: 1;
@@ -786,49 +840,26 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 
 /* Only the store's name gives way to the ellipsis; the badges after it
    (Best, hotlist, Card Kingdom's wait) stay whole */
-.m-vendor-name:has(> .m-vendor-link, > .m-vendor-label) {
+.m-vendor-name:has(> .m-vendor-label) {
     display: flex;
     align-items: baseline;
     column-gap: 0.25em;
 }
-.m-vendor-name > .m-vendor-link,
 .m-vendor-name > .m-vendor-label {
     min-width: 0;
     overflow: hidden;
     overflow: clip visible;
     text-overflow: ellipsis;
 }
-.m-vendor-name > :not(.m-vendor-link, .m-vendor-label) {
+.m-vendor-name > :not(.m-vendor-label) {
     flex: none;
 }
 
-/* On the narrowest phones a Card Kingdom state pill and Best leave the
-   name two letters; the row's own highlight already says Best. Hidden from
-   sight only, so a screen reader still reads it. */
-@media (max-width: 374px) {
-    .m-vendor-name:has(> .bl-pill) > .m-best-badge {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        margin: 0;
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
-    }
-}
 
 .m-vendor-name.dim {
     opacity: 0.5;
 }
 
-/* A store the default search blocklist hides: only this reader's tier sees
-   it. The badges beside the name stay upright. */
-.m-vendor-name.m-vendor-restricted {
-    font-style: italic;
-}
-.m-vendor-restricted > :not(.m-vendor-link, .m-vendor-label) {
-    font-style: normal;
-}
 
 .m-vendor-right {
     display: grid;
@@ -846,25 +877,6 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     font-variant-numeric: tabular-nums;
 }
 
-/* An index's second price (CM Trend, TCG Market) under its first, in the
-   same column, so the name keeps its room */
-.m-vendor-secondary {
-    display: block;
-    margin-top: 2px;
-    font-size: 0.7rem;
-    font-weight: 500;
-    color: var(--greytext);
-}
-
-/* Buylist offer at or above Card Kingdom's P90 (mirrors desktop .price-best) */
-.m-vendor-price.m-price-best {
-    color: var(--asuccess);
-}
-
-/* Card Kingdom is likely to pay more soon (buylist_state, buylist_wait) */
-.m-vendor-price.m-price-wait {
-    color: var(--awarning);
-}
 
 .m-vendor-name .ck-wait {
     color: var(--awarning);
@@ -876,19 +888,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     color: var(--greytext);
     text-align: right;
 }
-/* TCGplayer's sellers/copies (tcglistings.go) need more than a quantity.
-   A flat row has no chevron, so the count takes that track too; under a
-   chevron (a store adjustment) every row of the card makes the room, so
-   the prices stay in one column. */
-.m-vendor-flat .m-vendor-qty:has(.tcg-listings) {
-    grid-column: span 2;
-}
-.m-card:has(summary .tcg-listings) {
-    --m-vendor-qty-width: 4.5em;
-}
 
 /* Best price highlight */
-.m-best-price summary,
 .m-best-price.m-vendor-flat {
     background: color-mix(in srgb, var(--dodgerblue) 8%, transparent);
     border-left: 3px solid var(--dodgerblue);
@@ -903,99 +904,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     margin-left: 0.3em;
 }
 
-/* Expanded detail — must match summary width */
-.m-vendor-detail {
-    background: color-mix(in srgb, var(--text) 3%, var(--background));
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    box-sizing: border-box;
-}
 
-
-
-/* Detail rows share the exact same layout rules as summary */
-.m-vendor-row .m-detail-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 1rem 0 0.75rem;
-    min-height: 32px;
-    list-style: none;
-    box-sizing: border-box;
-    gap: 0.5rem;
-}
-
-.m-detail-row .m-vendor-name {
-    color: var(--greytext);
-    font-weight: 500;
-}
-
-.m-detail-row .m-vendor-price {
-    color: var(--greytext);
-}
-
-/* A number a store adjustment rewrote; the details show the quoted one */
-.m-price-adjusted {
-    text-decoration: underline dotted;
-    text-decoration-thickness: 0.06em;
-    text-underline-offset: 0.2em;
-}
-
-/* Card Kingdom's stock facts and the odds behind its signal */
-.m-vendor-row .m-detail-note {
-    padding: 0.25rem 1rem 0.5rem 0.75rem;
-    font-size: 0.7rem;
-    line-height: 1.35;
-    color: var(--greytext);
-    white-space: pre-line;
-}
-.m-vendor-row .m-detail-note .tip-table {
-    margin-top: 0.15rem;
-    border-collapse: collapse;
-    font-variant-numeric: tabular-nums;
-}
-.m-vendor-row .m-detail-note .tip-table tr {
-    background: none;
-}
-.m-vendor-row .m-detail-note .tip-table th,
-.m-vendor-row .m-detail-note .tip-table td {
-    padding: 0;
-    font-weight: 400;
-    text-align: left;
-}
-.m-vendor-row .m-detail-note .tip-table .tip-label {
-    padding-right: 0.75rem;
-}
-.m-vendor-row .m-detail-note .tip-table .tip-num {
-    padding-left: 0.75rem;
-    text-align: right;
-}
-
-/* Locked vendor */
-.m-vendor-locked {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 0.75em;
-    min-height: 48px;
-}
-
-.m-locked-cta {
-    display: flex;
-    align-items: center;
-    gap: 0.4em;
-}
-.m-locked-btn {
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.3em 0.75em;
-    border-radius: 4px;
-    background: var(--dodgerblue-fill);
-    color: white;
-    text-decoration: none;
-    white-space: nowrap;
-}
 /* Log in reads as the secondary action next to the solid Join button. */
 .m-locked-btn-login {
     background: transparent;
@@ -1004,13 +913,25 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     padding: calc(0.3em - 1px) calc(0.75em - 1px);
 }
 
-/* Pagination */
+/* Pagination: the page count stays centred on the first and last page */
 .m-pagination {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: center;
     gap: 0.5em;
     padding: 1em 0;
+}
+
+.m-pg-back,
+.m-pg-fwd,
+.m-pg-at {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.m-pg-back {
+    justify-content: flex-end;
 }
 
 .m-search-notices {
@@ -1045,7 +966,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     font-size: 0.85rem;
 }
 
-/* Card image bottom drawer */
+/* Bottom drawer overlay */
 .m-drawer-overlay {
     display: none;
     position: fixed;
@@ -1056,27 +977,6 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 
 .m-drawer-overlay.open {
     display: block;
-}
-
-.m-drawer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 500;
-    background: rgba(20, 20, 35, 0.92);
-    backdrop-filter: blur(20px) saturate(1.5);
-    -webkit-backdrop-filter: blur(20px) saturate(1.5);
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 20px 20px 0 0;
-    transform: translateY(100%);
-    transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
-    padding: 0.5em 1em 1.5em;
-    max-height: 70vh;
-}
-
-.m-drawer.open {
-    transform: translateY(0);
 }
 
 .m-drawer-handle {
@@ -1099,36 +999,10 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     box-shadow: 0 0 8px rgba(0, 0, 0, 0.05);
 }
 
-.light-theme .m-drawer,
 .light-theme .m-chart-drawer,
 .light-theme .m-filter-sheet {
     background: rgba(255, 255, 255, 0.92);
     border-top-color: rgba(0, 0, 0, 0.06);
-}
-
-.m-drawer-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5em;
-}
-
-.m-drawer-img {
-    max-width: 250px;
-    width: 100%;
-    height: auto;
-    border-radius: 12px;
-}
-
-.m-drawer-name {
-    font-weight: 600;
-    font-size: 0.9rem;
-    text-align: center;
-}
-
-/* Make card header indicate it's tappable */
-.m-card-header {
-    cursor: pointer;
 }
 
 /* Filter overlay sheet */
@@ -1319,105 +1193,6 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 
 .light-theme .m-sealed-cat-link:active {
     background: rgba(0, 0, 0, 0.05);
-}
-
-/* Recent Searches */
-#m-recent-searches {
-    margin-top: 0.75em;
-}
-
-.m-recent-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 0.25em 0.4em;
-}
-
-.m-recent-title {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--greytext);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.m-recent-clear {
-    font-size: 0.7rem;
-    color: var(--greytext);
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0.3em 0.5em;
-    min-height: auto !important;
-}
-
-.m-recent-clear:active {
-    color: var(--red);
-}
-
-.m-recent-list {
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    max-height: 232px; /* ~5 items at 44px + borders */
-    overflow-y: auto;
-}
-
-.light-theme .m-recent-list {
-    border-color: rgba(0, 0, 0, 0.1);
-}
-
-.m-recent-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5em;
-    padding: 0.5em 0.75em;
-    text-decoration: none;
-    color: var(--text);
-    font-size: 0.85rem;
-    min-height: 44px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.light-theme .m-recent-item {
-    border-bottom-color: rgba(0, 0, 0, 0.05);
-}
-
-.m-recent-item:last-child {
-    border-bottom: none;
-}
-
-.m-recent-item:active {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.light-theme .m-recent-item:active {
-    background: rgba(0, 0, 0, 0.03);
-}
-
-.m-recent-icon {
-    flex-shrink: 0;
-    font-size: 0.9rem;
-    opacity: 0.5;
-}
-
-.m-recent-query {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    overflow: clip visible;
-    text-overflow: ellipsis;
-}
-
-/* The pinned bar the search ran under, muted from the query's own colour. */
-.m-recent-scope {
-    opacity: 0.6;
-}
-
-.m-recent-arrow {
-    flex-shrink: 0;
-    font-size: 1.1rem;
-    color: var(--greytext);
 }
 
 /* Favorites */
@@ -2644,10 +2419,6 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
         padding: 0.25em 0.75em;
     }
 
-    .m-vendor-row summary {
-        min-height: 38px;
-        padding: 0 0.75rem 0 0.5rem;
-    }
 
     .m-vendor-name {
         font-size: 0.8rem;
@@ -2657,7 +2428,6 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
         font-size: 0.8rem;
     }
 
-    .m-best-price summary,
     .m-best-price.m-vendor-flat {
         padding-left: calc(0.5rem - 3px);
     }
@@ -2700,8 +2470,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
         grid-template-columns: 1fr 1fr;
     }
 
-    /* Image drawer: hide in landscape since card images are already visible inline */
-    .m-drawer,
+    /* No drawer overlays in landscape */
     .m-drawer-overlay {
         display: none !important;
     }
@@ -2867,29 +2636,6 @@ body.m-setpicker-lock {
     gap: 0.5rem;
 }
 
-/* === Vendor name as inline link inside <summary> or flat row === */
-.m-vendor-row .m-vendor-link {
-    color: inherit;
-    text-decoration: none;
-}
-.m-vendor-row .m-vendor-link:hover,
-.m-vendor-row .m-vendor-link:focus {
-    text-decoration: underline;
-}
-
-/* === Chevron, only visible inside <details> === */
-.m-vendor-chevron {
-    width: 14px;
-    height: 14px;
-    margin-left: 0.4em;
-    opacity: 0.5;
-    transition: transform 150ms ease;
-    flex-shrink: 0;
-}
-
-.m-vendor-row[open] .m-vendor-chevron {
-    transform: rotate(180deg);
-}
 
 .m-fav-pin {
     flex: 0 0 auto;
@@ -2970,105 +2716,4 @@ body.m-setpicker-lock {
 .m-toggle-busy {
     opacity: 0.5;
     pointer-events: none;
-}
-
-/* === Expanded layout: all conditions and both panels visible === */
-
-/* Panel labels replace the hidden tabs */
-.m-layout-expanded .m-tab-panel::before {
-    content: "Sellers";
-    display: block;
-    padding: 0.4em 0.75em;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--greytext);
-    border-bottom: 1px solid var(--border);
-    text-align: center;
-    background: rgba(30, 144, 255, 0.05);
-}
-
-.m-layout-expanded .m-tab-panel[id^="buyers"]::before {
-    content: "Buyers";
-}
-
-/* Condition band on every group */
-.m-layout-expanded .m-cond-group::before {
-    content: attr(data-cond);
-    display: block;
-    padding: 0.2em 0.75em;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--greytext);
-    background: rgba(255, 255, 255, 0.04);
-    border-bottom: 1px solid var(--border);
-}
-
-.light-theme .m-layout-expanded .m-cond-group::before {
-    background: rgba(0, 0, 0, 0.03);
-}
-
-.m-layout-expanded .m-cond-group[data-cond="INDEX"]::before {
-    content: "Index";
-}
-
-/* Sealed products have no real conditions to label */
-.m-layout-expanded .m-sealed .m-cond-group::before {
-    display: none;
-}
-
-/* No per-group fade: everything is visible at once */
-.m-layout-expanded .m-cond-group.active {
-    animation: none;
-}
-
-/* Tighter rows: no longer the primary tap-to-reveal surface */
-.m-layout-expanded .m-vendor-row summary,
-.m-layout-expanded .m-vendor-row.m-vendor-flat {
-    min-height: 36px;
-}
-
-.m-layout-expanded .m-vendor-row .m-detail-row {
-    min-height: 28px;
-}
-
-.m-layout-expanded .m-vendor-locked {
-    min-height: 40px;
-}
-
-/* Long pages: skip layout/paint of off-screen cards */
-.m-layout-expanded .m-card {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 900px;
-}
-
-/* Containment makes the card the fixed actions menu's containing block and
-   clips it; the card holding an open menu is on screen anyway */
-.m-layout-expanded .m-card:has(.m-actions-menu.open) {
-    content-visibility: visible;
-}
-
-/* Buyers-first stacking, portrait only; landscape grid handles side by side */
-@media (orientation: portrait) {
-    .m-layout-expanded .m-card.m-buyers-first {
-        display: flex;
-        flex-direction: column;
-    }
-    .m-layout-expanded .m-card.m-buyers-first > .m-card-header {
-        order: -3;
-    }
-    .m-layout-expanded .m-card.m-buyers-first > .m-tab-panel[id^="buyers"] {
-        order: -1;
-    }
-}
-
-/* Keep the card name visible while scrolling a long expanded card */
-@media (orientation: portrait) {
-    .m-layout-expanded .m-card-header {
-        position: sticky;
-        top: 100px; /* fixed nav 48px + fixed search bar ~52px */
-        z-index: 3;
-        background: var(--background);
-    }
 }
