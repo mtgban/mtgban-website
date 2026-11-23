@@ -993,6 +993,8 @@ body.settings-open {
     .settings-rail-gap { display: none; }
     .settings-modal-header { flex-wrap: wrap; gap: 0.5em; }
     .settings-search { margin-left: 0; flex-basis: 100%; }
+    /* Cut at the row's end, a threshold's field is out of reach */
+    .settings-toggles-grid .settings-toggle > span:last-child { white-space: normal; line-height: 1.5; }
 }
 
 /* iOS zooms the page into a focused field under 16px. */
