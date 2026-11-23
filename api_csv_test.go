@@ -93,7 +93,7 @@ func TestCSVCondQtyIndexing(t *testing.T) {
 	// Inject empty TCG sellers so the inventory lookups in UUID2TCGCSV succeed
 	// (prices come out 0, which is fine — we only assert condition/quantity).
 	var sellers []mtgban.Seller
-	for _, sh := range []string{"TCGPlayer", "TCGDirectLow", "TCGLow", "TCGSealed"} {
+	for _, sh := range []string{"TCGPlayer", "TCGTrends", "TCGDirect", "TCGItemLow", "TCGSealed"} {
 		sellers = append(sellers, mtgban.NewSellerFromInventory(
 			mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: sh}))
 	}
@@ -189,6 +189,14 @@ func decklistCSVFixture(t *testing.T) (*matcher.Backend, *prices) {
 			"FIXTUREA-1": {{Conditions: "NM", Price: 1.5, InstanceID: "111"}, {Conditions: "SP", Price: 1.25, InstanceID: "112"}},
 			"FIXTUREA-2": {{Conditions: "SP", Price: 7, InstanceID: "222"}},
 		}),
+		seller("TCGTrends", map[string][]mtgban.InventoryEntry{
+			"FIXTUREA-1": {{Conditions: "NM", Price: 1.6}, {Conditions: "SP", Price: 1.3}},
+		}),
+		seller("TCGDirect", map[string][]mtgban.InventoryEntry{"FIXTUREA-1": {{Conditions: "NM", Price: 1.45}}}),
+		seller("TCGItemLow", map[string][]mtgban.InventoryEntry{
+			"FIXTUREA-1": {{Conditions: "NM", Price: 0.75}, {Conditions: "SP", Price: 0.5}},
+			"FIXTUREA-2": {{Conditions: "SP", Price: 6}},
+		}),
 		seller("TCGDirectLow", map[string][]mtgban.InventoryEntry{"FIXTUREA-1": {{Conditions: "NM", Price: 1.4}}}),
 		seller("TCGLow", map[string][]mtgban.InventoryEntry{"FIXTUREA-1": {{Conditions: "NM", Price: 1.1, OriginalID: "9001"}}}),
 		seller("TCGSealed", map[string][]mtgban.InventoryEntry{
@@ -216,10 +224,10 @@ func TestDecklistCSVBytes(t *testing.T) {
 		want   string
 	}{
 		{"tcgplayer", tcgDecklistCSV, "TCGplayer Id,Product Line,Set Name,Product Name,Title,Number,Rarity,Condition,TCG Market Price,TCG Direct Low,TCG Low Price With Shipping,TCG Low Price,Total Quantity,Add to Quantity,My Store Price,TCG Marketplace Price,My Store Reserve Quantity,Photo URL\n" +
-			"111,,,,,,,Near Mint,1.50,1.40,,1.10,,4,,1.50,,\n" +
-			"222,,,,,,,Lightly Played Foil,7.00,0.00,,0.00,,2,,7.00,,\n" +
-			"112,,,,,,,Lightly Played,1.25,0.00,,0.00,,1,,1.25,,\n" +
-			"333,,,,,,,Unopened,99.99,0.00,,0.00,,1,,99.99,,\n"},
+			"111,,,,,,,Near Mint,1.60,1.45,1.50,0.75,,4,,1.60,,\n" +
+			"222,,,,,,,Lightly Played Foil,0.00,0.00,7.00,6.00,,2,,7.00,,\n" +
+			"112,,,,,,,Lightly Played,1.30,0.00,1.25,0.50,,1,,1.30,,\n" +
+			"333,,,,,,,Unopened,0.00,0.00,99.99,0.00,,1,,99.99,,\n"},
 		{"cardmarket", UUID2MKMCSV, "cardmarketId,quantity,name,set,setCode,cn,condition,language,isFoil,isPlayset,isSigned,price,comment,nameDE,nameES,nameFR,nameIT,rarity,listedAt\n" +
 			"5001,4,Fixture Card Alpha,Fixture Edition Alpha,FIXTUREA,1,NM,English,,,,0.90,,,,,,Rare,\n" +
 			"5002,2,\"Fixture, Card \"\"Beta\"\"\",,FIXTUREA,2,EX,,Y,,,3.30,,,,,,,\n" +
@@ -275,7 +283,7 @@ func TestTCGCSVWritesTheLoadedPrice(t *testing.T) {
 	if len(records) != 4 {
 		t.Fatalf("got %d records, want a header and 3 rows", len(records))
 	}
-	for i, want := range [][2]string{{"2.50", "2.50"}, {"", "1.25"}, {"4.00", "4.00"}} {
+	for i, want := range [][2]string{{"2.50", "2.50"}, {"", "1.30"}, {"4.00", "4.00"}} {
 		row := records[i+1]
 		if row[14] != want[0] || row[15] != want[1] {
 			t.Errorf("%s: My Store Price %q, TCG Marketplace Price %q, want %q", row[7], row[14], row[15], want)
@@ -303,7 +311,7 @@ func TestTCGCSVRoundTripsItsPrice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i, want := range []float64{2.5, 1.25, 4} {
+	for i, want := range []float64{2.5, 1.3, 4} {
 		entry, err := parser.ParseRow(indexMap, records[i+1])
 		if err != nil {
 			t.Fatal(err)
@@ -335,7 +343,7 @@ func TestTCGCSVLeavesOutTheFilesMarketPrice(t *testing.T) {
 	if len(records) != 3 {
 		t.Fatalf("got %d records, want a header and 2 rows", len(records))
 	}
-	for i, want := range [][2]string{{"", "1.50"}, {"9.99", "9.99"}} {
+	for i, want := range [][2]string{{"", "1.60"}, {"9.99", "9.99"}} {
 		row := records[i+1]
 		if row[14] != want[0] || row[15] != want[1] {
 			t.Errorf("%s: My Store Price %q, TCG Marketplace Price %q, want %q", row[7], row[14], row[15], want)
