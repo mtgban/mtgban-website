@@ -3,8 +3,8 @@
 // rewrites their data-cond/data-qtys/data-price, and the offers catch up
 // when the reader reloads. An Optimizer row edits the Results rows of its
 // card and grade, and a card can take one more line in a grade it lacks.
-// A list sent from the backpack takes each condition and copies edit back
-// to it; the backpack keeps no price.
+// A list sent from the backpack takes each condition, copies and price
+// edit back to it.
 (function() {
     var CONDS = ['NM', 'SP', 'MP', 'HP', 'PO'];
     var QTYS = 20;
@@ -281,6 +281,7 @@
     // setPrice gives every row the price, which the offers are judged
     // against when the page reloads.
     function setPrice(rows, p) {
+        var pack = window.Backpack && window.Backpack.sentPack ? window.Backpack.sentPack() : 0;
         rows.forEach(function(tr) {
             remember(tr);
             tr.dataset.price = String(p);
@@ -291,12 +292,16 @@
             }
             mark(tr);
             optRows(tr.dataset.hash, tr.dataset.grade || '').forEach(function(opt) {
+                // What adding the row to the backpack and sharing it carry
+                opt.dataset.sharePrice = String(p);
                 var ob = opt.querySelector('.ures-edit-btn[data-edit="price"]');
                 if (!ob) return;
                 ob.textContent = p.toFixed(2);
                 ob.classList.add('edited');
             });
+            if (pack && window.ListStorage) window.Backpack.setPaid(window.ListStorage.backpackKey({id: tr.dataset.hash, cond: tr.dataset.cond || '', pack: pack}), p);
         });
+        if (pack && window.renderBackpack) window.renderBackpack();
     }
 
     function pick(value) {

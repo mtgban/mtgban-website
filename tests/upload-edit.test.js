@@ -135,6 +135,7 @@ function load({ results, opt = [], optB = [], sentPack = 0, packHas = [] }) {
             sentPack: () => sentPack,
             setCond: (k, c) => calls.pack.push(['cond', k, c]),
             setQty: (k, q) => calls.pack.push(['qty', k, q]),
+            setPaid: (k, v) => calls.pack.push(['paid', k, v]),
             // The backpack refuses a grade it already holds
             addCond: (k, c) => { calls.pack.push(['add', k, c]); return !packHas.includes(c); },
         },
@@ -333,7 +334,8 @@ test('a price set on an optimizer row prices each list line of its card', () => 
     expect(btn(opt, 'price').textContent).toBe('3.26');
     expect(shown()).toBe('2 updated');
     expect(calls.track).toEqual(['ui.optimizer:edit_price']);
-    // The backpack keeps no price
+    expect(opt.dataset.sharePrice).toBe('3.26');
+    // Not from the backpack, so nothing is taken back there
     expect(calls.pack).toEqual([]);
 
     // Back to what one line came with clears only that line
@@ -348,6 +350,16 @@ test('a price set on an optimizer row prices each list line of its card', () => 
     menu().querySelector('.ures-edit-input').value = '';
     menu().querySelector('.ures-edit-set').click();
     expect(ring.dataset.price).toBe('1.5');
+});
+
+test('a price set on a list sent from the backpack goes back to it', () => {
+    const bolt = resultRow('Bolt', 'a', 'SP', 1, { price: '2' });
+    const { calls, menu } = load({ results: [bolt], opt: [], sentPack: 2 });
+    btn(bolt, 'price').click();
+    menu().querySelector('.ures-edit-input').value = '3.5';
+    menu().querySelector('.ures-edit-set').click();
+    expect(calls.pack).toEqual([['paid', '2/a|SP', 3.5]]);
+    expect(calls.rendered).toBe(1);
 });
 
 test('a grade can be taken back to none, as a list line without one', () => {
