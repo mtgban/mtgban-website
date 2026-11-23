@@ -304,8 +304,10 @@ type OptimizedUploadEntry struct {
 	Price float64
 
 	// The price and condition the row was loaded with, whatever the settings
-	// compare and grade it against: what a share of the section sends
+	// compare and grade it against: what a share of the section sends, and
+	// the backpack takes as paid
 	LoadedPrice     float64
+	LoadedIsMarket  bool
 	LoadedCondition mtgban.Condition
 
 	// Key of the source of alternative (comparison) pricing
@@ -1421,6 +1423,7 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 				Condition:       row.conds,
 				Price:           comparePrice,
 				LoadedPrice:     row.OriginalPrice,
+				LoadedIsMarket:  row.PriceIsMarket,
 				LoadedCondition: cmp.Or(row.OriginalCondition, row.IgnoredCondition),
 				CompareSource:   st.altPriceSource,
 				Moved:           moved,

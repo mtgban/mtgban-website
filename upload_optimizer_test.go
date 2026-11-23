@@ -303,7 +303,7 @@ func TestOptimizerKeepsWhatTheRowLoaded(t *testing.T) {
 		optimizedQtys:    map[string]int{},
 	}
 	row := uploadRow{
-		UploadEntry: &UploadEntry{CardID: "card", OriginalPrice: 3.5, IgnoredCondition: mtgban.SP},
+		UploadEntry: &UploadEntry{CardID: "card", OriginalPrice: 3.5, PriceIsMarket: true, IgnoredCondition: mtgban.SP},
 		priceKey:    "card",
 		qty:         1,
 	}
@@ -320,8 +320,8 @@ func TestOptimizerKeepsWhatTheRowLoaded(t *testing.T) {
 	if got[0].Price != 9 || got[0].Condition != "" {
 		t.Errorf("compared against %v in %q, want the index's 9 and no grade", got[0].Price, got[0].Condition)
 	}
-	if got[0].LoadedPrice != 3.5 || got[0].LoadedCondition != mtgban.SP {
-		t.Errorf("loaded %v in %q, want 3.5 in SP", got[0].LoadedPrice, got[0].LoadedCondition)
+	if got[0].LoadedPrice != 3.5 || !got[0].LoadedIsMarket || got[0].LoadedCondition != mtgban.SP {
+		t.Errorf("loaded %v (market %v) in %q, want the market's 3.5 in SP", got[0].LoadedPrice, got[0].LoadedIsMarket, got[0].LoadedCondition)
 	}
 }
 
@@ -342,6 +342,20 @@ func TestOptimizerShareButton(t *testing.T) {
 		if !strings.Contains(out, `data-share-price="3.5" data-share-cond="SP"`) {
 			t.Errorf("CanShare %v: the row carries no loaded price and grade", canShare)
 		}
+	}
+}
+
+// TestOptimizerMarksMarketPrice marks a row's loaded price that is the
+// file's market price, as a result row's is.
+func TestOptimizerMarksMarketPrice(t *testing.T) {
+	out := renderUpload(t, PageVars{UploadVars: UploadVars{
+		Optimized:           map[string][]OptimizedUploadEntry{"CK": {{CardID: "a", Quantity: 2, LoadedPrice: 3.5, LoadedIsMarket: true}}},
+		OptimizedKeys:       []string{"CK"},
+		OptimizedTotals:     map[string]float64{"CK": 1},
+		OptimizedQuantities: map[string]int{"CK": 2},
+	}})
+	if !strings.Contains(out, `data-share-price="3.5m"`) {
+		t.Error("the row does not mark its loaded price as the market's")
 	}
 }
 
