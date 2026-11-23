@@ -449,7 +449,7 @@
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
-                                            <span class="m-vendor-price{{if $entry.OrigPrice}} m-price-adjusted{{end}}">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                            <span class="m-vendor-price{{if $entry.OrigPrice}} m-price-adjusted{{end}}">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}{{if $entry.Secondary}}<span class="m-vendor-secondary"{{with $entry.SecondaryTip}} title="{{.}}"{{end}}>$ {{printf "%.2f" $entry.Secondary}}</span>{{end}}</span>
                                             <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{else if $entry.Listings}}<span class="tcg-listings" title="{{plain_tip $entry.ListingsTitle}}">{{$entry.Listings}}</span>{{end}}</span>
                                             <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
                                         </span>
@@ -476,7 +476,7 @@
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
-                                        <span class="m-vendor-price{{if $entry.OrigPrice}} m-price-adjusted{{end}}">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-price{{if $entry.OrigPrice}} m-price-adjusted{{end}}">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}{{if $entry.Secondary}}<span class="m-vendor-secondary"{{with $entry.SecondaryTip}} title="{{.}}"{{end}}>$ {{printf "%.2f" $entry.Secondary}}</span>{{end}}</span>
                                         <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{else if $entry.Listings}}<span class="tcg-listings" title="{{plain_tip $entry.ListingsTitle}}">{{$entry.Listings}}</span>{{end}}</span>
                                     </span>
                                 </div>

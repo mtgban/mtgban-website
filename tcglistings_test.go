@@ -179,8 +179,9 @@ func TestSearchSellersCarryTCGListings(t *testing.T) {
 	}
 }
 
-// TestSearchShowsTCGListings renders the counts in the TCGplayer row's
-// quantity cell, desktop and mobile, and leaves a store's own quantity alone.
+// TestSearchShowsTCGListings renders the counts on the TCGplayer row, beside
+// the store's name on desktop and in the quantity cell on mobile, and leaves
+// a store's own quantity alone.
 func TestSearchShowsTCGListings(t *testing.T) {
 	const cardID = "tcg-listings-card"
 	const title = "|# Condition | Sellers | Copies\n| **Near Mint** | **51** | **83**\n60 listings across conditions · Sep 28"
@@ -192,7 +193,7 @@ func TestSearchShowsTCGListings(t *testing.T) {
 			FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{cardID: {
 				"NM": {
 					{ScraperName: "TCGplayer", Shorthand: tcgListingsStore, Price: 7.5, NoQuantity: true, URL: "https://example.test",
-						Listings: "51/83", ListingsTitle: title},
+						Listings: "51/83", ListingsTitle: title, Secondary: 6, SecondaryTip: "Without shipping"},
 					{ScraperName: "Other Store", Shorthand: "OS", Price: 8, Quantity: 3, URL: "https://example.test"},
 				},
 			}},
@@ -211,6 +212,9 @@ func TestSearchShowsTCGListings(t *testing.T) {
 		}
 		if strings.Count(page, `class="tcg-listings"`) != 1 {
 			t.Errorf("%s: counts on more than the TCGplayer row", name)
+		}
+		if strings.Count(page, `title="Without shipping"`) != 1 || !strings.Contains(page, "6.00") {
+			t.Errorf("%s: want the item price once on the TCGplayer row, rendered:\n%s", name, page)
 		}
 	}
 }

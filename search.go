@@ -91,6 +91,8 @@ type SearchEntry struct {
 	Country string
 
 	Secondary float64
+	// SecondaryTip says what Secondary is, where the row does not say it.
+	SecondaryTip string
 
 	ExtraValues map[string]float64
 
@@ -2288,6 +2290,10 @@ func searchSellers(p *prices, cardIDs []string, config SearchConfig) (foundSelle
 	// the same rows once more
 	cardIDs = dedupeKeys(cardIDs)
 
+	// The TCGplayer rows carry their item price beside the delivered one;
+	// the store it comes from has no rows of its own (api_only_stores)
+	itemLow, _ := p.sellerInventory(tcgItemLowStore)
+
 	// Search sellers
 	for _, seller := range p.sellers {
 		if shouldSkipStoreNG(seller, config.StoreFilters) {
@@ -2345,6 +2351,10 @@ func searchSellers(p *prices, cardIDs []string, config SearchConfig) (foundSelle
 				}
 				if info.Shorthand == tcgListingsStore {
 					res.Listings, res.ListingsTitle = tcgListingsFor(cardID, conditions)
+					res.Secondary = tcgItemLowFor(itemLow[cardID], entry.InstanceID)
+					if res.Secondary > 0 {
+						res.SecondaryTip = "Without shipping"
+					}
 				}
 
 				// Touchdown
@@ -2354,6 +2364,24 @@ func searchSellers(p *prices, cardIDs []string, config SearchConfig) (foundSelle
 	}
 
 	return
+}
+
+// tcgItemLowStore is TCGplayer's lowest listing per sku without its
+// shipping, which go-mtgban's tcg_market publishes beside TCGPlayer.
+const tcgItemLowStore = "TCGItemLow"
+
+// tcgItemLowFor is the item price of a TCGplayer sku's lowest listing, or 0:
+// the entry of the same sku, which both stores name in InstanceID.
+func tcgItemLowFor(entries []mtgban.InventoryEntry, sku string) float64 {
+	if sku == "" {
+		return 0
+	}
+	for _, entry := range entries {
+		if entry.InstanceID == sku {
+			return entry.Price
+		}
+	}
+	return 0
 }
 
 func searchVendors(p *prices, cardIDs []string, config SearchConfig) (foundVendors map[string]map[mtgban.Condition][]SearchEntry) {

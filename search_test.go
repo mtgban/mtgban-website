@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -369,6 +370,44 @@ func TestRefererSourceKeepsTheSiteQueryOut(t *testing.T) {
 	} {
 		if got := refererSource(tc.referer); got != tc.want {
 			t.Errorf("refererSource(%q) = %q, want %q", tc.referer, got, tc.want)
+		}
+	}
+}
+
+// TestSearchSellersCarryTCGItemLow pairs each TCGplayer row with the item
+// price of the same sku, and puts it on no other store's row.
+func TestSearchSellersCarryTCGItemLow(t *testing.T) {
+	now := time.Now()
+	listing := mtgban.InventoryRecord{"card": {
+		{Conditions: "NM", Price: 7.5, Quantity: 1, InstanceID: "100"},
+		{Conditions: "SP", Price: 6.5, Quantity: 1, InstanceID: "101"},
+	}}
+	itemLow := mtgban.InventoryRecord{"card": {
+		{Conditions: "NM", Price: 6, Quantity: 1, InstanceID: "100"},
+		{Conditions: "SP", Price: 5, Quantity: 1, InstanceID: "999"},
+	}}
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(listing, mtgban.ScraperInfo{Name: "TCGplayer", Shorthand: tcgListingsStore, NoQuantityInventory: true, InventoryTimestamp: &now}),
+		mtgban.NewSellerFromInventory(itemLow, mtgban.ScraperInfo{Name: "TCGplayer Item Low", Shorthand: tcgItemLowStore, NoQuantityInventory: true, InventoryTimestamp: &now}),
+		mtgban.NewSellerFromInventory(listing, mtgban.ScraperInfo{Name: "Other Store", Shorthand: "OS", InventoryTimestamp: &now}),
+	}
+	withPrices(t, sellers, currentPrices().vendors)
+
+	config := SearchConfig{StoreFilters: []FilterStoreElem{{Name: "seller", Values: fixupStoreCodeNG(currentPrices(), tcgItemLowStore), Negate: true, OnlyForSeller: true}}}
+	found := searchSellers(currentPrices(), []string{"card"}, config)
+	for grade, want := range map[mtgban.Condition]float64{"NM": 6, "SP": 0} {
+		entries := found["card"][grade]
+		if len(entries) != 2 {
+			t.Fatalf("%s: got %d entries, want 2: %+v", grade, len(entries), entries)
+		}
+		for _, entry := range entries {
+			got := entry.Secondary
+			if entry.Shorthand == tcgListingsStore && got != want {
+				t.Errorf("%s: TCGplayer item price %v, want %v", grade, got, want)
+			}
+			if entry.Shorthand != tcgListingsStore && got != 0 {
+				t.Errorf("%s: %s carries item price %v", grade, entry.Shorthand, got)
+			}
 		}
 	}
 }

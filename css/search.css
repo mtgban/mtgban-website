@@ -1796,9 +1796,14 @@ html.admin-fix-mode .raw-record { display: inline-block; }
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
-/* TCGplayer's sellers/copies for the grade (tcglistings.go) */
-.price-row .qty .tcg-listings {
+/* TCGplayer's sellers/copies for the grade (tcglistings.go), beside the
+   store's name: the row's second price slot holds its item price. */
+.price-row .store-cell .tcg-listings {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
     font-size: var(--text-sm);
+    color: var(--search-text-dim);
+    font-variant-numeric: tabular-nums;
     cursor: help;
 }
 
