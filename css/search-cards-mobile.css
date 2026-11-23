@@ -653,10 +653,10 @@ html:has(.m-landing) {
         justify-self: center;
     }
 
-    /* After the last card, where there are any: the pager and the search's
-       notices, in a small drawer over the foot of the card, above the search
-       bar. A swipe up on the last card raises it and a swipe down lowers it
-       (js/search-cards.js); nothing scrolls meanwhile. */
+    /* After the last card: where the results end, the pager and the search's
+       notices, whichever there are, in a small drawer over the foot of the
+       card, above the search bar. A swipe up on the last card raises it and a
+       swipe down lowers it (js/search-cards.js); nothing scrolls meanwhile. */
     .m-layout-cards .m-results-end {
         position: absolute;
         left: 0;
@@ -699,6 +699,10 @@ html:has(.m-landing) {
         margin-left: -18px;
         border-radius: 2px;
         background: var(--border);
+    }
+
+    .m-layout-cards .m-results-end .m-end-line {
+        padding: 0.35em 0;
     }
 
     .m-layout-cards .m-results-end .m-pagination {

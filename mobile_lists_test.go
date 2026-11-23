@@ -157,3 +157,37 @@ func TestMobileSealedLandingBarAtFoot(t *testing.T) {
 		t.Error("the editions come before the bar's markup; the landing's CSS orders the bar last")
 	}
 }
+
+// The drawer under the last card says where the results end: on an only
+// page, with the count, and on the last of several, beside the pager.
+func TestMobileEndDrawer(t *testing.T) {
+	const line = `<p class="m-end-line">End of results`
+	for _, c := range []struct {
+		at    Pagination
+		end   string
+		pager bool
+	}{
+		{Pagination{}, line + ` &middot; 2 shown</p>`, false},
+		{Pagination{CurrentIndex: 1, TotalIndex: 3, NextIndex: 2}, "", true},
+		{Pagination{CurrentIndex: 3, TotalIndex: 3, PrevIndex: 2}, line + `</p>`, true},
+	} {
+		vars := sealedPageVars("a", "b")
+		vars.Pagination = c.at
+		out := renderMobileSearch(t, vars)
+		if !strings.Contains(out, `<div class="m-results-end">`) {
+			t.Errorf("page %d of %d has no drawer", c.at.CurrentIndex, c.at.TotalIndex)
+		}
+		if c.end == "" && strings.Contains(out, line) {
+			t.Errorf("page %d of %d says the results end", c.at.CurrentIndex, c.at.TotalIndex)
+		}
+		if !strings.Contains(out, c.end) {
+			t.Errorf("page %d of %d lacks %s", c.at.CurrentIndex, c.at.TotalIndex, c.end)
+		}
+		if got := strings.Contains(out, `<div class="m-pagination">`); got != c.pager {
+			t.Errorf("page %d of %d: pager %v, want %v", c.at.CurrentIndex, c.at.TotalIndex, got, c.pager)
+		}
+	}
+	if out := renderMobileSearch(t, PageVars{}); strings.Contains(out, "m-results-end") {
+		t.Error("a search with no results has the drawer")
+	}
+}

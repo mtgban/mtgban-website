@@ -431,7 +431,7 @@
     {{end}}
 
     </div>
-    {{if and .AllKeys (or .CurrentIndex .Notices)}}<div class="m-results-end">{{template "m-search-end" .}}</div>{{end}}
+    {{if .AllKeys}}<div class="m-results-end">{{template "m-search-end" .}}</div>{{end}}
     </div>
     {{/* Before first paint: each card opens on its picture, not its buyers */}}
     <script>document.querySelectorAll('.m-results > .m-card').forEach(function(c){if(c.querySelector(':scope > [id^="sellers"]'))c.scrollLeft=c.clientWidth;});</script>
@@ -722,8 +722,14 @@
 </div>
 {{end}}
 
-{{/* The pager and the search's notices, after the last card */}}
+{{/* The end of the results, the pager and the search's notices, after the
+     last card */}}
 {{define "m-search-end"}}
+    {{/* A page with no pager is zero of zero */}}
+    {{if eq .CurrentIndex .TotalIndex}}
+    <p class="m-end-line">End of results{{if not .CurrentIndex}} &middot; {{len .AllKeys}} shown{{end}}</p>
+    {{end}}
+
     {{/* Pagination */}}
     {{if .CurrentIndex}}
     <div class="m-pagination">
