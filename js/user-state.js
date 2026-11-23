@@ -757,12 +757,13 @@
     function localBackpack() { try { return JSON.parse(readLocal(BACKPACK_KEY, '[]')); } catch (e) { return []; } }
     function localRecents() { try { return JSON.parse(readLocal(RECENTS_KEY, '[]')); } catch (e) { return []; } }
 
-    // The backpack syncs identity and the count; prices stay on the page.
+    // The backpack syncs identity, the count and the price paid; market
+    // prices stay on the page.
     // A removed entry keeps only what names it and orders it in a merge.
     function trimBackpack(e) {
         if (e.del) return ListStorage.backpackGone(e);
         return {
-            id: e.id, cond: e.cond, pack: e.pack, qty: e.qty, t: e.t, m: e.m, del: e.del,
+            id: e.id, cond: e.cond, pack: e.pack, qty: e.qty, paid: e.paid, t: e.t, m: e.m, del: e.del,
             name: e.name, edition: e.edition, set: e.set, number: e.number,
             finishTag: e.finishTag, finishClass: e.finishClass, img: e.img, cw: e.cw
         };

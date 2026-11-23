@@ -21,19 +21,33 @@
     var MAX = window.BAN_BACKPACK_MAX > 0 ? window.BAN_BACKPACK_MAX : 100;
     var TABS = window.BAN_BACKPACK_TABS > 0 ? window.BAN_BACKPACK_TABS : 1;
     var MAX_QTY = 999;
+    // The most Upload's own price menu takes.
+    var MAX_PAID = 1000000;
 
     var CONDS = ListStorage.backpackConds;
 
     // read drops entries without a string id, holds each qty to 1..999 and
     // gives each a grade, NM when it has none, and a backpack, 1 when it
-    // has none.
+    // has none. paid, what each copy cost, is there only once known.
     function read() {
         return ListStorage.read(KEY).filter(function (e) { return e && typeof e.id === "string" && e.id !== ""; }).map(function (e) {
             e.qty = Math.max(1, Math.min(MAX_QTY, parseInt(e.qty, 10) || 1));
             e.cond = ListStorage.backpackCond(e);
             e.pack = ListStorage.backpackPack(e);
+            e.paid = paidOf(e.paid);
             return e;
         });
+    }
+    // paidOf is v as a price paid, in cents, undefined when it is none.
+    function paidOf(v) {
+        var n = Math.round(Number(v) * 100) / 100;
+        return n > 0 && n <= MAX_PAID ? n : undefined;
+    }
+    // blend averages into e's price paid that of n copies about to join it;
+    // copies with no price take the others'.
+    function blend(e, n, paid) {
+        if (!paid) return;
+        e.paid = e.paid ? paidOf((e.paid * e.qty + paid * n) / (e.qty + n)) : paid;
     }
     // An entry is one card in one grade in one backpack; key names it.
     var key = ListStorage.backpackKey;
@@ -358,6 +372,22 @@
 
     function remove(k) { setQty(k, 0); }
 
+    // setPaid sets what each copy of the entry k names cost; blank or zero
+    // takes the price away, and one it cannot use leaves it. It says whether
+    // the price changed.
+    function setPaid(k, v) {
+        var list = read();
+        var i = find(list, k);
+        var paid = paidOf(v);
+        if (i < 0 || list[i].del || list[i].paid === paid) return false;
+        if (!paid && Math.round(Number(v) * 100) !== 0) return false;
+        remember(list, [k]);
+        list[i].paid = paid;
+        list[i].m = now();
+        save(list);
+        return true;
+    }
+
     // setCond moves the entry k names to grade cond, keeping its copies and
     // its place; when the card already holds that grade the copies join it.
     function setCond(k, cond) { relocate(k, cond, 0); }
@@ -389,6 +419,7 @@
         var t = now();
         remember(list, [k, to]);
         if (j >= 0 && !list[j].del) {
+            blend(list[j], e.qty, e.paid);
             list[j].qty += e.qty;
             list[j].m = t;
         } else {
@@ -475,6 +506,7 @@
         plan.forEach(function (x) {
             var j = find(list, x.to);
             if (j >= 0 && !list[j].del) {
+                blend(list[j], x.n, x.e.paid);
                 list[j].qty += x.n;
                 list[j].m = t;
             } else {
@@ -522,7 +554,7 @@
     }
 
     // sendForm builds the Upload POST the search sidebar and favorites use,
-    // with a quantity and a grade beside each card.
+    // with a quantity, a grade and any price paid beside each card.
     function sendForm(mode) {
         var entries = ordered();
         var form = document.createElement("form");
@@ -542,6 +574,9 @@
             var c = document.createElement("input");
             c.type = "hidden"; c.name = "hashesCond"; c.value = e.cond;
             form.appendChild(c);
+            var p = document.createElement("input");
+            p.type = "hidden"; p.name = "hashesPrice"; p.value = e.paid ? String(e.paid) : "";
+            form.appendChild(p);
         });
         return form;
     }
@@ -820,8 +855,9 @@
     // ---- the Upload results and optimizer ----
 
     // rowCard reads an Upload row, an optimizer store's or a result's, into
-    // the card, grade and copies it lists: no grade where the upload ignored
-    // grades, as the page shows it.
+    // the card, grade, copies and loaded price it lists: no grade where the
+    // upload ignored grades, as the page shows it. A market price, marked
+    // with an "m", is not one that was paid.
     function rowCard(tr) {
         var attr = function (n) { return tr.getAttribute(n) || ""; };
         if (tr.getAttribute("data-opt-id") !== null) {
@@ -829,13 +865,15 @@
             return {
                 id: attr("data-opt-id"), cond: attr("data-opt-cond"), qty: edited ? editedShare(tr, listedCopies(attr("data-opt-id"), attr("data-opt-cond"))) : parseInt(attr("data-load-qty"), 10) || 1,
                 name: attr("data-load-name"), edition: attr("data-opt-edition"), set: attr("data-load-set"), number: attr("data-load-number"),
-                finishTag: attr("data-opt-finish-tag"), finishClass: attr("data-opt-finish-class"), img: attr("data-opt-img"), cw: attr("data-opt-cw") === "true"
+                finishTag: attr("data-opt-finish-tag"), finishClass: attr("data-opt-finish-class"), img: attr("data-opt-img"), cw: attr("data-opt-cw") === "true",
+                paid: paidOf(attr("data-share-price"))
             };
         }
         return {
             id: attr("data-hash"), cond: attr("data-grade"), qty: parseInt(attr("data-qtys"), 10) || 1,
             name: attr("data-card-name"), edition: attr("data-edition"), set: attr("data-set-code"), number: attr("data-number"),
-            finishTag: attr("data-finish-tag"), finishClass: attr("data-finish-class"), img: attr("data-image-url"), cw: attr("data-has-warning") === "true"
+            finishTag: attr("data-finish-tag"), finishClass: attr("data-finish-class"), img: attr("data-image-url"), cw: attr("data-has-warning") === "true",
+            paid: paidOf(attr("data-price"))
         };
     }
 
@@ -959,9 +997,9 @@
     }
 
     // put adds rows to backpack p as one undo step, each row's copies in
-    // its grade, NM for a row without one, held to 999 a card and new cards
-    // only while there is room. It says how many copies went in and how
-    // many did not fit.
+    // its grade at its price, NM for a row without one, held to 999 a card
+    // and new cards only while there is room. It says how many copies went
+    // in and how many did not fit.
     function put(rows, p) {
         var list = read();
         var t = now();
@@ -970,6 +1008,7 @@
             var c = rowCard(tr);
             var k = key({ id: c.id, cond: c.cond, pack: p });
             if (!(k in want)) { want[k] = 0; cards[k] = c; order.push(k); }
+            else { blend(cards[k], c.qty, c.paid); cards[k].qty += c.qty; }
             want[k] += c.qty;
         });
         var room = Math.min(MAX - inPack(p).length, MAX * TABS - live().length);
@@ -987,19 +1026,19 @@
         remember(list, plan.map(function (x) { return x.k; }));
         // Unshifted last row first, so the new cards keep the section's order
         plan.reverse().forEach(function (x) {
-            var i = find(list, x.k);
+            var i = find(list, x.k), c = cards[x.k];
             if (i >= 0 && !list[i].del) {
+                blend(list[i], x.n, c.paid);
                 list[i].qty += x.n;
                 list[i].m = t;
                 return;
             }
             if (i >= 0) list.splice(i, 1);
-            var c = cards[x.k];
             list.unshift({
                 id: c.id, name: c.name, edition: c.edition, set: c.set,
                 number: c.number, finishTag: c.finishTag, finishClass: c.finishClass,
                 img: c.img, cw: c.cw, cond: ListStorage.backpackCond({ cond: c.cond }),
-                pack: p, qty: x.n, t: t, m: t
+                pack: p, qty: x.n, paid: c.paid, t: t, m: t
             });
         });
         save(list);
@@ -1447,8 +1486,8 @@
 
     // condSelect moves the entry to a grade, or adds the card in one more,
     // never offering the grades its other entries hold, or moves it to one
-    // of the other backpacks.
-    function condSelect(e, held, others) {
+    // of the other backpacks, or opens the field for its price paid.
+    function condSelect(e, held, others, editPaid) {
         var sel = text("select", "backpack-cond");
         sel.setAttribute("aria-label", "Condition");
         CONDS.forEach(function (c) {
@@ -1467,10 +1506,15 @@
             others.forEach(function (t) { to.appendChild(option("@" + t.pack, t.name, "Move every copy to " + t.name)); });
             sel.appendChild(to);
         }
+        var cost = text("optgroup");
+        cost.setAttribute("label", "Price paid");
+        cost.appendChild(option("$", e.paid ? "$ " + e.paid.toFixed(2) : "Set price", "What each copy cost"));
+        sel.appendChild(cost);
         sel.value = e.cond;
         sel.addEventListener("change", function () {
             var v = sel.value;
             sel.value = e.cond;
+            if (v === "$") { editPaid(); return; }
             if (v.charAt(0) === "@") {
                 moveCard(key(e), parseInt(v.slice(1), 10));
                 focusTab(active());
@@ -1509,6 +1553,50 @@
         return text("div", "backpack-row-price", "NM $ " + got.v.toFixed(2) + (got.store ? " · " + got.store : ""));
     }
 
+    // paidLine is what each copy of the row's card cost, or null.
+    function paidLine(e) {
+        if (!e.paid) return null;
+        var line = text("div", "backpack-row-paid", "Paid $ " + e.paid.toFixed(2));
+        line.setAttribute("title", "Each copy");
+        return line;
+    }
+
+    // askPaid swaps the row's price paid for a field: Enter or leaving it
+    // saves, blank taking the price away, and Escape keeps the price. Then
+    // done, told whether a key ended it, redraws the row.
+    function askPaid(e, body, done) {
+        var was = body.querySelector(".backpack-row-paid");
+        var field = document.createElement("input");
+        field.type = "number";
+        field.setAttribute("class", "backpack-paid-field");
+        field.setAttribute("aria-label", "Price paid for each copy");
+        field.setAttribute("placeholder", "0.00");
+        field.setAttribute("min", "0");
+        field.setAttribute("max", String(MAX_PAID));
+        field.setAttribute("step", "0.01");
+        field.value = e.paid ? e.paid.toFixed(2) : "";
+        var over = false;
+        var finish = function (save, byKey) {
+            if (over) return;
+            over = true;
+            // A number field reads as blank while it holds no number
+            if (field.validity && field.validity.badInput) save = false;
+            if (save && setPaid(key(e), field.value) && window.BAN && window.BAN.track) window.BAN.track("ui.backpack.card", "paid");
+            done(byKey);
+        };
+        field.addEventListener("keydown", function (ev) {
+            if (ev.key !== "Enter" && ev.key !== "Escape") return;
+            ev.preventDefault();
+            // Escape here keeps the price, not closes the panel
+            ev.stopPropagation();
+            finish(ev.key === "Enter", true);
+        });
+        field.addEventListener("blur", function () { finish(true, false); });
+        if (was) was.replaceWith(field); else body.appendChild(field);
+        field.focus();
+        if (field.select) field.select();
+    }
+
     function row(e, held, others, price) {
         var r = text("div", "backpack-row");
         r.setAttribute("data-card-id", e.id);
@@ -1543,6 +1631,8 @@
         body.append(name, where);
         if (e.finishTag) body.appendChild(text("span", "backpack-row-finish " + (e.finishClass || ""), e.finishTag));
         if (price) body.appendChild(price);
+        var paid = paidLine(e);
+        if (paid) body.appendChild(paid);
 
         // The minus takes the last copy with the card; Undo brings it back.
         var ctl = text("div", "backpack-row-ctl");
@@ -1573,7 +1663,18 @@
             render();
             if (focused) focusCtl(key(e), ".backpack-plus");
         });
-        ctl.append(condSelect(e, held, others), minus, qty, plus);
+        var editPaid = function () {
+            askPaid(e, body, function (byKey) {
+                // This row alone: redrawing the list would take the control
+                // a click is leaving the field for
+                var cur = live().filter(function (x) { return key(x) === key(e); })[0];
+                if (!cur || r.parentNode !== listEl) return;
+                r.replaceWith(row(cur, held, others, price));
+                undoBtn.disabled = undoSteps().length === 0;
+                if (byKey) focusCtl(key(e), ".backpack-cond");
+            });
+        };
+        ctl.append(condSelect(e, held, others, editPaid), minus, qty, plus);
 
         r.append(art, body, ctl);
         return r;
@@ -1880,7 +1981,7 @@
         if (panel && panel.classList.contains("open")) close(); else open();
     }
 
-    window.Backpack = { sentPack: function () { return sentPack; }, read: read, add: add, setQty: setQty, remove: remove, setCond: setCond, addCond: addCond, moveTo: moveTo, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, tabs: tabs, addTab: addTab, renameTab: renameTab, deleteTab: deleteTab, open: open, close: close };
+    window.Backpack = { sentPack: function () { return sentPack; }, read: read, add: add, setQty: setQty, remove: remove, setPaid: setPaid, setCond: setCond, addCond: addCond, moveTo: moveTo, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, tabs: tabs, addTab: addTab, renameTab: renameTab, deleteTab: deleteTab, open: open, close: close };
 
     function init() {
         var nav = document.getElementById("nav-backpack");

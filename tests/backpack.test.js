@@ -83,7 +83,7 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
         minus.push(less);
         return btn;
     });
-    // Upload optimizer sections, each an add and a take button and rows of [id, qty, unticked, cond].
+    // Upload optimizer sections, each an add and a take button and rows of [id, qty, unticked, cond, price].
     const optSections = sections.map((rows) => {
         const section = el('div'); section.classes.add('opt-store');
         const add = el('button'); add.classes.add('pack-add-btn'); add.hidden = true;
@@ -91,8 +91,8 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
         const move = el('button'); move.classes.add('pack-move-btn'); move.hidden = true;
         const fold = el('button'); fold.classes.add('section-fold');
         section.append(add, take, move, fold);
-        rows.forEach(([id, qty, unticked, cond = '']) => {
-            const tr = el('tr'); tr.setAttribute('data-opt-id', id); tr.setAttribute('data-opt-cond', cond); tr.setAttribute('data-load-qty', String(qty));
+        rows.forEach(([id, qty, unticked, cond = '', price = '0']) => {
+            const tr = el('tr'); tr.setAttribute('data-opt-id', id); tr.setAttribute('data-opt-cond', cond); tr.setAttribute('data-load-qty', String(qty)); tr.setAttribute('data-share-price', price);
             Object.entries({ 'data-load-name': 'Card ' + id, 'data-load-set': 'S', 'data-load-number': '7', 'data-opt-edition': 'Set', 'data-opt-img': 'img/' + id, 'data-opt-finish-tag': '', 'data-opt-finish-class': '', 'data-opt-cw': 'false' }).forEach(([k, v]) => tr.setAttribute(k, v));
             if (unticked) tr.classes.add('opt-removed');
             section.appendChild(tr);
@@ -101,15 +101,15 @@ function page({ store = [], mobile = false, ban, pending, max, tabs, active, tab
         return { section, add, take, move, fold, rows: section.children.filter((c) => c.tag === 'tr') };
     });
     // The results tab, when given: the toolbar's add and take pair, and its
-    // rows of [id, qty, cond, removed] that exportRows hands out by view.
+    // rows of [id, qty, cond, removed, price] that exportRows hands out by view.
     let res = null;
     if (results) {
         const bar = el('div');
         const add = el('button'); add.classes.add('pack-add-btn'); add.setAttribute('data-pack-rows', 'results'); add.hidden = true;
         const take = el('button'); take.classes.add('pack-take-btn'); take.setAttribute('data-pack-rows', 'results'); take.hidden = true;
         bar.append(add, take); body.appendChild(bar);
-        const rows = results.map(([id, qty, cond = '', removed]) => {
-            const tr = el('tr'); tr.setAttribute('data-hash', id); tr.setAttribute('data-qtys', String(qty)); tr.setAttribute('data-cond', cond || 'SP');
+        const rows = results.map(([id, qty, cond = '', removed, price = '0']) => {
+            const tr = el('tr'); tr.setAttribute('data-hash', id); tr.setAttribute('data-qtys', String(qty)); tr.setAttribute('data-cond', cond || 'SP'); tr.setAttribute('data-price', price);
             if (cond) tr.setAttribute('data-grade', cond);
             Object.entries({ 'data-card-name': 'Card ' + id, 'data-edition': 'Set', 'data-set-code': 'S', 'data-number': '7', 'data-image-url': 'img/' + id, 'data-finish-tag': 'Foil', 'data-finish-class': 'foil', 'data-has-warning': 'false' }).forEach(([k, v]) => tr.setAttribute(k, v));
             if (removed) tr.classes.add('ures-removed-row');
@@ -1131,7 +1131,7 @@ describe('the condition dropdown', () => {
     const selects = (panel) => panel.querySelectorAll('.backpack-cond');
     const pick = (sel, v) => { sel.value = v; (sel.listeners.change || []).forEach((fn) => fn()); };
     const choices = (sel) => sel.children.filter((o) => o.tag === 'option').map((o) => o.value);
-    const adds = (sel) => sel.children.filter((o) => o.tag === 'optgroup').flatMap((g) => g.children.map((o) => [o.value, o.textContent]));
+    const adds = (sel) => sel.children.filter((o) => o.tag === 'optgroup' && o.getAttribute('label') !== 'Price paid').flatMap((g) => g.children.map((o) => [o.value, o.textContent]));
 
     test('offers every grade, NM picked, and to add the card in the others', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
@@ -1255,6 +1255,110 @@ describe('the condition dropdown', () => {
         sel.focus();
         expect(p.key('Tab')).toBe(false);
         expect(p.key('Tab', true)).toBe(false);
+    });
+});
+
+describe('the price paid', () => {
+    const open = (p) => { p.nav.click(); return ids['backpack-panel']; };
+    const pick = (sel, v) => { sel.value = v; (sel.listeners.change || []).forEach((fn) => fn()); };
+    const press = (n, key) => { const ev = { key, stopped: false, preventDefault() {}, stopPropagation() { this.stopped = true; } }; n.listeners.keydown.forEach((fn) => fn(ev)); return ev; };
+    const leave = (n) => n.listeners.blur.forEach((fn) => fn());
+    const paid = (p) => p.stored().filter((e) => !e.del).map((e) => [e.id, e.cond, e.qty, e.paid]).sort();
+    const entry = (id, extra) => Object.assign({ id, name: id, cond: 'NM', pack: 1, qty: 1, t: 1, m: 1 }, extra);
+    // edit picks the first row's price from its dropdown and types v.
+    const edit = (panel, v) => { pick(panel.querySelector('.backpack-cond'), '$'); const f = panel.querySelector('.backpack-paid-field'); f.value = v; return f; };
+
+    test('the dropdown sets it on that entry, redrawing the row and keeping focus there', () => {
+        const p = page({ store: [entry('uuid-1', { t: 5 }), entry('uuid-2')] });
+        const panel = open(p);
+        const other = panel.querySelectorAll('.backpack-row')[1];
+        expect(panel.querySelector('.backpack-row-paid')).toBe(null);
+        const field = edit(panel, '4.256');
+        expect(p.document.activeElement).toBe(field);
+        press(field, 'Enter');
+        expect(paid(p)).toEqual([['uuid-1', 'NM', 1, 4.26], ['uuid-2', 'NM', 1, undefined]]);
+        expect(p.stored()[0].m).toBeGreaterThan(1);
+        expect(panel.querySelector('.backpack-row-paid').textContent).toBe('Paid $ 4.26');
+        expect(panel.querySelector('.backpack-cond').value).toBe('NM');
+        expect(p.document.activeElement).toBe(panel.querySelector('.backpack-cond'));
+        expect(panel.querySelectorAll('.backpack-row')[1]).toBe(other);
+        expect(p.tracked).toContainEqual(['ui.backpack.card', 'paid']);
+        // The dropdown names the price, and the field starts from it
+        const opt = panel.querySelector('.backpack-cond').children.filter((o) => o.tag === 'optgroup').pop().children[0];
+        expect([opt.value, opt.textContent]).toEqual(['$', '$ 4.26']);
+        pick(panel.querySelector('.backpack-cond'), '$');
+        expect(panel.querySelector('.backpack-paid-field').value).toBe('4.26');
+        expect(panel.querySelector('.backpack-row-paid')).toBe(null);
+    });
+
+    test('Escape keeps it, leaving the field saves it, a blank one takes it away and Undo brings it back', () => {
+        const p = page({ store: [entry('uuid-1', { paid: 3 })] });
+        const panel = open(p);
+        expect(press(edit(panel, '9'), 'Escape').stopped).toBe(true);
+        expect(paid(p)[0][3]).toBe(3);
+        expect(ids['backpack-undo'].disabled).toBe(true);
+        leave(edit(panel, '5'));
+        expect(paid(p)[0][3]).toBe(5);
+        expect(ids['backpack-undo'].disabled).toBe(false);
+        leave(edit(panel, ''));
+        expect(paid(p)[0][3]).toBe(undefined);
+        expect(panel.querySelector('.backpack-row-paid')).toBe(null);
+        ids['backpack-undo'].click();
+        expect(paid(p)[0][3]).toBe(5);
+        expect(panel.querySelector('.backpack-row-paid').textContent).toBe('Paid $ 5.00');
+    });
+
+    test('a stored or typed price that is none counts as none', () => {
+        const store = ['x', -2, 0, null, 1e9, '3.5m'].map((v, i) => entry('uuid-' + i, { paid: v }));
+        expect(page({ store }).window.Backpack.read().map((e) => e.paid)).toEqual([undefined, undefined, undefined, undefined, undefined, undefined]);
+        const p = page({ store: [entry('uuid-1', { paid: 3 })] });
+        expect(p.window.Backpack.setPaid('uuid-1', '3')).toBe(false);
+        for (const v of ['-1', '1500000', 'x']) expect(p.window.Backpack.setPaid('uuid-1', v)).toBe(false);
+        expect(paid(p)[0][3]).toBe(3);
+        expect(p.sm.mtgban_backpack_undo).toBe(undefined);
+        const field = edit(open(p), '');
+        field.validity = { badInput: true };
+        press(field, 'Enter');
+        expect(paid(p)[0][3]).toBe(3);
+        expect(p.window.Backpack.setPaid('uuid-1', 0)).toBe(true);
+        expect(paid(p)[0][3]).toBe(undefined);
+    });
+
+    test('a change of copies, grade or backpack keeps it, and copies joining an entry average in', () => {
+        const p = page({ store: [entry('uuid-1', { qty: 3, paid: 2 }), entry('uuid-1', { cond: 'SP', paid: 6 }), entry('uuid-1', { pack: 2 })], tabs: 2 });
+        p.window.Backpack.setQty('uuid-1', 2);
+        p.window.Backpack.setCond('uuid-1', 'HP');
+        expect(paid(p)).toEqual([['uuid-1', 'HP', 2, 2], ['uuid-1', 'NM', 1, undefined], ['uuid-1', 'SP', 1, 6]]);
+        p.window.Backpack.setCond('uuid-1|HP', 'SP');
+        expect(paid(p)).toEqual([['uuid-1', 'NM', 1, undefined], ['uuid-1', 'SP', 3, 3.33]]);
+        // Copies without a price take the others'
+        p.window.Backpack.setCond('uuid-1|SP', 'NM');
+        p.window.Backpack.moveTo('uuid-1', 2);
+        expect(paid(p)).toEqual([['uuid-1', 'NM', 4, 3.33]]);
+    });
+
+    test('adding Upload rows takes their loaded price, a market price aside', () => {
+        const p = page({ results: [['uuid-1', 1, 'NM', false, '4'], ['uuid-1', 3, 'NM', false, '8'], ['uuid-2', 1, 'NM', false, '7m'], ['uuid-3', 1, 'SP', false, '0']] });
+        p.window.addRowsToBackpack(p.res.add);
+        expect(paid(p)).toEqual([['uuid-1', 'NM', 4, 7], ['uuid-2', 'NM', 1, undefined], ['uuid-3', 'SP', 1, undefined]]);
+    });
+
+    test('adding an Optimizer section averages into what the backpack holds', () => {
+        const p = page({ store: [entry('uuid-1', { paid: 1 }), entry('uuid-2', { paid: 5 })], sections: [[['uuid-1', 1, false, 'NM', '3'], ['uuid-2', 2, false, 'NM', '2m'], ['uuid-3', 1, false, 'HP', '0.5']]] });
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(paid(p)).toEqual([['uuid-1', 'NM', 2, 2], ['uuid-2', 'NM', 3, 5], ['uuid-3', 'HP', 1, 0.5]]);
+    });
+
+    test('an Optimizer section moved to another backpack carries it there', () => {
+        const p = page({ store: [entry('uuid-1', { qty: 3, paid: 4 }), entry('uuid-1', { pack: 2, paid: 1 })], tabs: 2, sections: [[['uuid-1', 2, false, 'NM']]] });
+        p.window.moveRowsToPack(p.optSections[0].move, 2);
+        expect(paid(p)).toEqual([['uuid-1', 'NM', 1, 4], ['uuid-1', 'NM', 3, 3]]);
+    });
+
+    test('a send posts it beside each card', () => {
+        const p = page({ store: [entry('uuid-1', { t: 3, paid: 4.5 }), entry('uuid-2', { t: 2 }), entry('uuid-3', { paid: 10 })] });
+        const form = p.window.Backpack.sendForm('buylist');
+        expect(form.children.filter((i) => i.name === 'hashesPrice').map((i) => i.value)).toEqual(['4.5', '', '10']);
     });
 });
 
@@ -1597,7 +1701,7 @@ describe('sending', () => {
         const form = submitted[0];
         expect(form.getAttribute('action')).toBe('/upload?from=backpack');
         const inputs = form.children.map((i) => [i.name, i.value]);
-        expect(inputs).toEqual([['mode', 'false'], ['hashes', 'uuid-2'], ['hashesQtys', '1'], ['hashesCond', 'NM'], ['hashes', 'uuid-1'], ['hashesQtys', '2'], ['hashesCond', 'NM']]);
+        expect(inputs).toEqual([['mode', 'false'], ['hashes', 'uuid-2'], ['hashesQtys', '1'], ['hashesCond', 'NM'], ['hashesPrice', ''], ['hashes', 'uuid-1'], ['hashesQtys', '2'], ['hashesCond', 'NM'], ['hashesPrice', '']]);
         expect(p.stored().filter((e) => !e.del).length).toBe(2);
     });
 
@@ -1610,7 +1714,7 @@ describe('sending', () => {
         ids['backpack-send'].click();
         expect(liveAtSubmit).toBe(2);
         expect(submitted[0].children[0].value).toBe('true');
-        expect(submitted[0].children.length).toBe(7);
+        expect(submitted[0].children.length).toBe(9);
         expect(p.stored().filter((e) => !e.del).length).toBe(2);
         expect(p.pendingIds()).toEqual(['uuid-2', 'uuid-1']);
     });
