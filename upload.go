@@ -35,6 +35,7 @@ import (
 	"github.com/mtgban/mtgban-website/cardconduit"
 	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/cubecobra"
+	"github.com/mtgban/mtgban-website/internal/bulkrates"
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
@@ -866,7 +867,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.Metadata.fillSales(salesVelocityStore.Snapshot())
 	pageVars.SortKeys = uploadSortKeys(b, uploadedData)
 
-	rows := priceUploadRows(b, blMode, st, prices, indexes, uploadedData)
+	rows := priceUploadRows(b, blMode, st, prices, indexes, ds.bulk, uploadedData)
 	pageVars.TotalEntries = rows.totalEntries
 	pageVars.TotalQuantity = rows.totalQuantity
 	pageVars.SinglesQuantity = rows.singlesQuantity
@@ -878,7 +879,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fillUploadResults(&pageVars.UploadVars, b, p, ds.editions.ReprintParents, st, ids, prices, rows, uploadedData)
-	if len(pageVars.NotBought) > 0 {
+	// Not bought rows and bulk ones may offer the alert link
+	if len(pageVars.NotBought) > 0 || slices.ContainsFunc(pageVars.FilteredOut, func(e LeftoverEntry) bool { return e.Bulk.Link != "" }) {
 		pageVars.AlertChannelList = readerAlertChannels(s, r)
 		pageVars.CanAlerts = pageVars.AlertChannelList != ""
 	}
@@ -1143,8 +1145,10 @@ type optimizedKey struct {
 }
 
 // priceUploadRows prices each matched row at the stores and indexes fetched,
-// adds up the totals, and picks the best stores for the optimizer.
-func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices uploadPrices, indexes uploadIndexes, uploadedData []UploadEntry) uploadRows {
+// adds up the totals, and picks the best stores for the optimizer. On a
+// buylist, a row the bulk shelf pays more for than any store goes to
+// Filtered out at the bulk rate.
+func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices uploadPrices, indexes uploadIndexes, bulk *bulkrates.Rates, uploadedData []UploadEntry) uploadRows {
 	rows := uploadRows{
 		resultPrices:     map[string]map[string]float64{},
 		totalEntries:     map[string]float64{},
@@ -1208,14 +1212,25 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 			bestStores = nil
 		}
 
+		// The bulk shelf takes the row from the stores when it pays more
+		tier, bulkTakes := bulkOffer(bulk, blMode, st, row, rows.resultPrices[row.priceKey], bestStores, movedOut || offers[moved] > 0)
+		if bulkTakes {
+			bestStores = nil
+		}
+
 		listed := rows.optimizeRow(row, offers, bestStores, st, indexes)
 		if blMode && !listed {
 			e := LeftoverEntry{CardID: row.CardID, Condition: row.conds, Quantity: row.qty, Loaded: rowComparePrice(row, st, indexes), CompareSource: st.altPriceSource, Moved: movedOut, Notes: row.Notes}
-			if len(bestStores) == 0 {
+			if len(bestStores) == 0 && !bulkTakes {
 				rows.notBought.add(row, e)
 			} else {
-				e.Store = bestStores[0]
-				e.Price = rows.resultPrices[row.priceKey][e.Store]
+				if bulkTakes {
+					e.Bulk = tier
+					e.Price = tier.Each()
+				} else {
+					e.Store = bestStores[0]
+					e.Price = rows.resultPrices[row.priceKey][e.Store]
+				}
 				if e.Loaded != 0 {
 					e.Spread = e.Price / e.Loaded * 100
 				}
@@ -1226,6 +1241,35 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 	}
 
 	return rows
+}
+
+// bulkOffer is the bulk shelf's tier for a buylist row, in the reader's
+// price source, when it pays more a copy than the best store on the page,
+// at prices, unless the reader placed the row; a store keeps a tie.
+func bulkOffer(bulk *bulkrates.Rates, blMode bool, st uploadSettings, row uploadRow, prices map[string]float64, bestStores []string, placed bool) (bulkrates.Tier, bool) {
+	if !blMode || placed || row.co == nil {
+		return bulkrates.Tier{}, false
+	}
+	tier, takes := bulk.Offer(row.co)
+	tier = tier.Times(bulkRate(st))
+	// A rate the price source zeroes, as a store with no market credit, pays
+	// nothing
+	if !takes || tier.Each() == 0 || (len(bestStores) > 0 && prices[bestStores[0]] >= tier.Each()) {
+		return bulkrates.Tier{}, false
+	}
+	return tier, true
+}
+
+// bulkRate is what the reader's price source makes of a dollar of the bulk
+// shelf's cash, as tallyOffers does of a store's.
+func bulkRate(st uploadSettings) float64 {
+	switch st.priceSource {
+	case "credit":
+		return bulkrates.CreditRate
+	case "marketCredit":
+		return bulkrates.CreditRate * Config().BuylistMarketCredit[bulkrates.Store]
+	}
+	return 1
 }
 
 // pricedRow is a matched row and its offers, by store.
@@ -1281,6 +1325,9 @@ type LeftoverEntry struct {
 	MoveTo string
 	// Moved is whether the reader moved the row to Not bought
 	Moved bool
+	// Bulk is the bulk shelf's row that takes it, when it pays more than
+	// every store
+	Bulk bulkrates.Tier
 	// Notes is the row's, for the link back to its offer
 	Notes string
 }
@@ -1565,6 +1612,8 @@ func (rows *uploadRows) tallyMissing(row uploadRow, prices uploadPrices, indexes
 // under, its quantity after the multiplier and cap, and whether it counts.
 type uploadRow struct {
 	*UploadEntry
+	// co is the row's card, nil when the datastore lacks it
+	co       *matcher.CardObject
 	isSealed bool
 	conds    mtgban.Condition
 	priceKey string
@@ -1577,6 +1626,9 @@ func newUploadRow(b *matcher.Backend, st uploadSettings, entry *UploadEntry) upl
 	// The sealed id list was built from this same lookup, so ask the
 	// datastore directly instead of scanning the list per row.
 	co, err := b.GetUUID(entry.CardID)
+	if err != nil {
+		co = nil
+	}
 
 	conds := entry.OriginalCondition
 	if st.skipConds {
@@ -1585,6 +1637,7 @@ func newUploadRow(b *matcher.Backend, st uploadSettings, entry *UploadEntry) upl
 
 	return uploadRow{
 		UploadEntry: entry,
+		co:          co,
 		isSealed:    err == nil && co.Sealed,
 		conds:       conds,
 		priceKey:    entry.CardID + string(conds),

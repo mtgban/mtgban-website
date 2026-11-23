@@ -1261,10 +1261,12 @@
         api('GET', '/api/alerts/').then(function (list) { markBells(list || []); }).catch(function () {});
     }
 
-    // Upload's bells sit in Not bought, under every store's rows, so their
-    // alerts are read when that section first comes into view.
+    // Upload's bells sit in Filtered out's bulk rows and in Not bought, under
+    // every store's rows, so their alerts are read when the first section
+    // holding one comes into view.
     function markBellsOnSight() {
-        var section = document.getElementById('opt-not-bought');
+        var section = document.getElementById('opt-filtered-out');
+        if (!section || !section.querySelector('.alert-link')) section = document.getElementById('opt-not-bought');
         if (!section || !window.IntersectionObserver) { markExistingBells(); return; }
         var seen = new window.IntersectionObserver(function (entries) {
             if (!entries.some(function (e) { return e.isIntersecting; })) return;

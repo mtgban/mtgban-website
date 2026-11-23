@@ -1,6 +1,8 @@
 package main
 
 import (
+	"math"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/matcher"
@@ -124,5 +126,153 @@ func TestBulkOffersGames(t *testing.T) {
 			t.Parallel()
 			checkBulkOffers(t, gameDatastore(t, game).backend, cases)
 		})
+	}
+}
+
+// A row goes to Filtered out at its bulk rate, in any condition, when no
+// store buys it or the bulk shelf pays more a copy than the best one; a
+// store keeps a tie and a row the reader placed, and one the datastore
+// lacks, or any with no bulk shelf, goes where it went before.
+func TestUploadBulkRows(t *testing.T) {
+	skipWithoutDatastore(t)
+	const (
+		vigil   = "0003caab-9ff5-5d1a-bc06-976dd0457f19" // common, 0.01
+		goblin  = "0001e0d0-2dcd-5640-aadc-a84765cf5fc9" // rare, 0.10
+		legion  = "0004822c-c181-5564-808d-a6cc48359a1a" // mythic, 0.25
+		inferno = "0404d63b-eeee-5e67-aa59-ac82514b7cf4" // mythic, 0.25
+	)
+	entries := []UploadEntry{
+		{CardID: "card", OriginalPrice: 10},
+		{CardID: vigil, OriginalCondition: "HP", OriginalPrice: 0.05},
+		{CardID: vigil + "_f", OriginalPrice: 0.10},
+		{CardID: "nothing", OriginalPrice: 1},
+		{CardID: goblin, OriginalPrice: 0.50},
+		{CardID: legion, OriginalPrice: 0.50},
+		{CardID: inferno, OriginalPrice: 0.50},
+	}
+	prices := uploadPrices{
+		results: map[string]map[string]*BanPrice{
+			"card":  {"CK": {Regular: 5}},
+			goblin:  {"CK": {Regular: 0.02}},
+			legion:  {"CK": {Regular: 0.25}},
+			inferno: {"CK": {Regular: 0.05}},
+		},
+		enabledStores: []string{"CK"},
+	}
+	st := uploadSettings{percMargin: 1, multiplier: 1, moves: map[string]string{vigil + "_f": notBoughtMove, inferno: "CK"}}
+
+	rows := priceUploadRows(backend(), true, st, prices, uploadIndexes{}, bulkrates.New(backend()), entries)
+	for card, want := range map[string]string{"card": "CK", legion: "CK", inferno: "CK moved", goblin: ""} {
+		got := strings.Join(sectionOf(rows, card), ",")
+		if got != want {
+			t.Errorf("%s at %q, want %q", card, got, want)
+		}
+	}
+	bulkRows := map[string]LeftoverEntry{}
+	for _, e := range rows.filteredOut.rows {
+		bulkRows[e.CardID] = e
+	}
+	hp := bulkRows[vigil]
+	if len(bulkRows) != 2 || hp.Condition != "HP" || hp.Store != "" ||
+		hp.Bulk.Name != "1000 Bulk Commons/Uncommons" || hp.Price != 0.01 || hp.Spread != 20 {
+		t.Errorf("filtered out %+v, want the HP Vigil at the bulk rate, 20%% of its 0.05, and Goblin King", rows.filteredOut.rows)
+	}
+	rare := bulkRows[goblin]
+	if rare.Store != "" || rare.Bulk.Name != "Bulk Rare" || rare.Price != 0.10 {
+		t.Errorf("Goblin King %+v, want Bulk Rare at 0.10 over CK's 0.02", rare)
+	}
+	var notBought []string
+	for _, e := range rows.notBought.rows {
+		notBought = append(notBought, e.CardID)
+	}
+	if strings.Join(notBought, ",") != vigil+"_f,nothing" {
+		t.Errorf("not bought %q, want the moved foil Vigil and the unknown id", notBought)
+	}
+
+	none := priceUploadRows(backend(), true, st, prices, uploadIndexes{}, nil, entries)
+	got := strings.Join(sectionOf(none, goblin), ",")
+	if len(none.filteredOut.rows) != 0 || len(none.notBought.rows) != 3 || got != "CK" {
+		t.Errorf("no bulk: Goblin King at %q, filtered out %+v, not bought %+v", got, none.filteredOut.rows, none.notBought.rows)
+	}
+}
+
+// Priced in credit, the bulk shelf's offer is its credit, so a store whose
+// credit beats it keeps a rare the shelf would take for cash; in market
+// credit, a shelf with no market credit pays nothing, so a common no store
+// buys stays in Not bought.
+func TestUploadBulkCredit(t *testing.T) {
+	skipWithoutDatastore(t)
+	withConfigCopy(t)
+	const (
+		goblin = "0001e0d0-2dcd-5640-aadc-a84765cf5fc9" // rare, 0.10, 0.125 in credit
+		vigil  = "0003caab-9ff5-5d1a-bc06-976dd0457f19" // common, no store
+	)
+	entries := []UploadEntry{{CardID: goblin, OriginalPrice: 0.50}, {CardID: vigil, OriginalPrice: 0.05}}
+	for _, tc := range []struct {
+		source string
+		credit float64
+		market map[string]float64
+		store  string
+		bulk   float64
+	}{
+		{"", 1.5, nil, "", 0.10},                                                        // cash: CK's 0.09 loses
+		{"credit", 1.5, nil, "CK", 0},                                                   // CK's 0.135 in credit wins
+		{"credit", 1.2, nil, "", 0.10 * 1.25},                                           // CK's 0.108 loses to 0.125
+		{"marketCredit", 1.2, map[string]float64{"CK": 1, "CSI": 0.8}, "CK", 0},         // 0.108 beats 0.10
+		{"marketCredit", 1.2, map[string]float64{"CK": 0.8, "CSI": 1}, "", 0.10 * 1.25}, // 0.0864 loses
+		{"marketCredit", 1.2, map[string]float64{"CK": 1}, "CK", 0},                     // the shelf pays nothing
+	} {
+		Config().BuylistMarketCredit = tc.market
+		prices := uploadPrices{
+			results:       map[string]map[string]*BanPrice{goblin: {"CK": {Regular: 0.09}}},
+			credits:       map[string]float64{"CK": tc.credit},
+			enabledStores: []string{"CK"},
+		}
+		st := uploadSettings{percMargin: 1, multiplier: 1, priceSource: tc.source}
+		rows := priceUploadRows(backend(), true, st, prices, uploadIndexes{}, bulkrates.New(backend()), entries)
+		got := strings.Join(sectionOf(rows, goblin), ",")
+		var bulk float64
+		for _, e := range rows.filteredOut.rows {
+			if e.CardID == goblin {
+				bulk = e.Price
+			}
+		}
+		if got != tc.store || math.Abs(bulk-tc.bulk) > 1e-9 {
+			t.Errorf("%q at %v credit, %v: at %q, bulk %v; want %q, %v", tc.source, tc.credit, tc.market, got, bulk, tc.store, tc.bulk)
+		}
+		var vigilNotBought bool
+		for _, e := range rows.notBought.rows {
+			vigilNotBought = vigilNotBought || e.CardID == vigil
+		}
+		if vigilNotBought != (tc.source == "marketCredit" && tc.market["CSI"] == 0) {
+			t.Errorf("%q, %v: Vigil in Not bought %v", tc.source, tc.market, vigilNotBought)
+		}
+	}
+}
+
+// A bulk row names the shelf for its store, links its offer to it, shows a
+// boxed rate as the box's price, sorts by the price a card, can be moved to
+// Not bought, and keeps the alert bell a Not bought row has.
+func TestUploadBulkRender(t *testing.T) {
+	lot := bulkrates.Tier{Name: "1000 Bulk Commons/Uncommons", Price: 3, Lot: 1000, Link: "https://example.com/bulk"}
+	out := renderUpload(t, PageVars{CanAlerts: true, UploadVars: UploadVars{
+		IsBuylist:     true,
+		ScraperKeys:   []string{"CK"},
+		UploadEntries: []UploadEntry{{CardID: "a"}},
+		FilteredOut:   []LeftoverEntry{{CardID: "a", Quantity: 1, Bulk: lot, Price: lot.Each()}},
+	}})
+	section := leftoverRows(out, "opt-filtered-out")
+	for _, want := range []string{
+		`<span title="1000 Bulk Commons/Uncommons">CSI Bulk</span>`,
+		`data-sort="0.0030"><span class="offer">$ <a href="https://example.com/bulk" target="_blank" rel="noopener" title="1000 Bulk Commons/Uncommons">3.00 / 1000</a>`,
+		`class="opt-move-btn"`,
+		`class="opt-move-btn opt-alert-btn alert-link" data-card-id="a" data-side="buylist"`,
+	} {
+		if !strings.Contains(section, want) {
+			t.Errorf("no %s in %s", want, section)
+		}
+	}
+	if strings.Contains(section, "/go/b/") {
+		t.Errorf("a bulk row links through a store: %s", section)
 	}
 }

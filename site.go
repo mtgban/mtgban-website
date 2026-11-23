@@ -16,6 +16,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/alerts"
+	"github.com/mtgban/mtgban-website/internal/bulkrates"
 	"github.com/mtgban/mtgban-website/internal/dsreload"
 	"github.com/mtgban/mtgban-website/internal/offline"
 	"github.com/mtgban/mtgban-website/internal/offlineapi"
@@ -241,6 +242,7 @@ func (s *site) newDatastore(b *matcher.Backend, loadedAt time.Time) *datastore {
 		palette:  s.palette.NewSnapshot(b),
 		finishes: v2FinishList(b),
 		odds:     newProductOdds(b, sources),
+		bulk:     bulkrates.New(b),
 		loadedAt: loadedAt,
 	}
 }
