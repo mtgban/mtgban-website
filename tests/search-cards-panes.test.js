@@ -28,3 +28,12 @@ test('in Sales mode the sales come before the buyers', () => {
 test('a card with no sellers starts at its picture', () => {
     expect(panes(card(false, ['buyers']))).toEqual(['picture', 'buyers']);
 });
+
+test('a list keeps its overscroll up and down only', () => {
+    // Kept sideways too, Chrome on Android drops the swipe that would leave a
+    // list long enough to scroll.
+    const css = readFileSync(join(import.meta.dir, '..', 'css', 'search-cards-mobile.css'), 'utf8');
+    const rule = css.match(/\.m-tab-panel > \.result-col \{([^}]*)\}/)[1];
+    expect(rule).toContain('overscroll-behavior-y: contain;');
+    expect(rule).not.toMatch(/overscroll-behavior(-x)?:/);
+});

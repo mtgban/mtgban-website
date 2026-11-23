@@ -89,8 +89,10 @@ What the phone page already has, and this decision builds on:
    vertical scroller, `scroll-snap-type: y mandatory` with
    `scroll-snap-stop: always`; each card is a horizontal scroller,
    `scroll-snap-type: x mandatory` over its panes, sellers | picture |
-   buyers | sales. Lists and the results area contain their overscroll, which
-   also keeps Android's pull-to-refresh off the deck. The search does not
+   buyers | sales. The results area contains its overscroll, which also keeps
+   Android's pull-to-refresh off the deck; a list contains its own up and down
+   only, since Chrome would otherwise drop the sideways swipe out of a list
+   that scrolls. The search does not
    zoom: `touch-action: pan-x pan-y` stops it on Android, and iOS, which
    pinch-zooms regardless, has its gesture events cancelled. Script does
    only what CSS cannot: put each card on its picture, inline right after the

@@ -491,8 +491,9 @@ html:has(.m-landing) {
     }
 
     /* The card's lists: each a full column, its heading fixed on top and
-       its table scrolling under it, the overscroll kept from the slide and
-       the results */
+       its table scrolling under it, the overscroll kept from the results.
+       Up and down only: kept sideways too, Chrome would drop the swipe that
+       leaves the list. */
     .m-layout-cards .m-card > .m-tab-panel {
         display: flex;
         flex-direction: column;
@@ -506,7 +507,7 @@ html:has(.m-landing) {
         flex: 1;
         min-height: 0;
         overflow-y: auto;
-        overscroll-behavior: contain;
+        overscroll-behavior-y: contain;
     }
 
     .m-layout-cards .m-card > .m-tab-panel[id^="sellers"] {
