@@ -744,7 +744,7 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 
 	// Add other partials as needed
 	if name == "search.html" {
-		files = append(files, "templates/partials/search-landing.html", salesPaneFile)
+		files = append(files, "templates/partials/search-landing.html", "templates/partials/search-columns.html", salesPaneFile)
 	}
 	if name == "search.html" || name == "alerts.html" || name == "upload.html" {
 		files = append(files, "templates/partials/alert-modal.html")

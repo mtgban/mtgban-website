@@ -17,7 +17,7 @@ const MaxErrorLine = 1_000_000
 // scripts are the basenames of every file under js/; a drift test in the root package keeps them in step.
 var scripts = []string{
 	"admin-metrics.js", "admin-people.js", "alerts.js", "api-plans.js", "arbit-filters.js", "arbit-presets.js",
-	"arbit-rows.js", "autocomplete.js", "backpack.js", "ban-to-cart.js", "card-art-fallback.js", "card-row.js",
+	"arbit-rows.js", "autocomplete.js", "backpack.js", "ban-to-cart.js", "buylist-extra.js", "card-art-fallback.js", "card-row.js",
 	"cart-prompt.js", "chart-range.js", "chart.umd.min.js", "chartopts.js", "command-palette.js", "confirm-dialog.js", "cookies.js",
 	"copy2clip.js", "custom-rules.js", "edition-combobox.js", "editions-picker.js", "favorites-shared.js", "favorites.js",
 	"fetchnames.js", "fflate.min.js", "filtering.js", "followmouse.js", "guide-data.js", "guide.js", "icons.js",

@@ -1,0 +1,580 @@
+/* The search landing's panes, recent searches and favorites: the desktop
+   landing and the phone's recent searches both draw them. */
+
+/* === Search landing panes === */
+
+.search-landing {
+    max-width: var(--page-max-width);
+    margin: 0.5rem auto 0 auto;
+}
+
+.search-landing-grid {
+    display: grid;
+    grid-template-columns: minmax(240px, 320px) 1fr;
+    gap: 1rem;
+    align-items: stretch;
+}
+
+@media (max-width: 540px) {
+    .search-landing-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.landing-pane {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    border-radius: 0.5em;
+    overflow: hidden;
+    min-height: 50vh;
+    container-type: inline-size;
+}
+
+.landing-pane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6em 0.85em;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    font-weight: 600;
+    color: var(--normal);
+}
+
+.landing-pane-title {
+    font-size: 1.05em;
+}
+
+.landing-pane-actions {
+    display: flex;
+    gap: 0.5em;
+}
+
+/* Export toolbar: download/import sit flush together as one unit, the
+   two uploader buttons (retail/buylist) flush as another, with the
+   standard 0.5em gap separating the two groups. */
+.landing-pane-export {
+    display: flex;
+    gap: 0.5em;
+}
+.landing-pane-export-pair {
+    display: flex;
+    gap: 0;
+}
+
+/* Share panel under the favorites header: the link, copy, stop. */
+.fav-share-panel { display: flex; gap: 0.5em; align-items: center; padding: 0.5em 1em; flex-wrap: wrap; }
+.fav-share-link { flex: 1 1 14em; min-width: 0; font-size: 0.85em; padding: 0.35em 0.5em; }
+
+.landing-pane-btn {
+    background: transparent;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+    color: var(--normal);
+    padding: 0.25em 0.6em;
+    border-radius: 0.25em;
+    cursor: pointer;
+    font-size: 0.85em;
+}
+
+.landing-pane-btn:hover {
+    background: var(--surface-3);
+}
+
+.landing-pane-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.3em;
+    line-height: 1;
+}
+.landing-pane-btn-icon i,
+.landing-pane-btn-icon svg {
+    width: 16px;
+    height: 16px;
+}
+/* Send-to-uploader: green = retail, orange = buylist (matches the
+   search sidebar's Retail/Buylist colour coding). */
+.landing-pane-btn-retail { color: var(--asuccess); }
+.landing-pane-btn-buylist { color: var(--awarning); }
+.landing-pane-btn-retail:hover,
+.landing-pane-btn-buylist:hover { background: var(--surface-3); }
+
+.landing-pane-body {
+    flex: 1 1 auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.landing-pane-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75em;
+    padding: 0.5em;
+    border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+}
+
+/* Shared favorites page: one pane, centred, read-only rows. */
+.landing-pane-shared { max-width: 52em; margin: 0 auto; }
+.landing-pane-merge { padding: 0.35em 0.9em; }
+.landing-shared-note { margin: 0.75em 1em; font-size: 0.85em; opacity: 0.75; }
+
+.landing-page-btn {
+    background: transparent;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+    color: var(--normal);
+    padding: 0.15em 0.6em;
+    border-radius: 0.25em;
+    cursor: pointer;
+}
+
+.landing-page-btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.landing-page-label {
+    font-size: 0.9em;
+    color: var(--normaltext);
+}
+
+.landing-empty {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--greytext);
+    font-style: italic;
+    padding: 2em 1em;
+}
+
+/* Recents pane: scrolls instead of paginating on desktop */
+.landing-pane-recent .landing-pane-body {
+    /* ~8 rows tall before the body starts to scroll */
+    max-height: 41em;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-4, #323840) transparent;
+}
+.landing-pane-recent .landing-pane-body::-webkit-scrollbar {
+    width: 4px;
+}
+.landing-pane-recent .landing-pane-body::-webkit-scrollbar-thumb {
+    background: var(--surface-4, #323840);
+    border-radius: 2px;
+}
+
+/* Recents pane */
+.landing-pane-recent .landing-item {
+    gap: 0.6em;
+    padding: 0.7em 0.7em;
+    position: relative;
+    box-sizing: border-box;
+    min-height: 3em;
+}
+/* Art background */
+.landing-pane-recent .landing-item.has-background {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    padding: 0.7em 0.7em;
+    overflow: hidden;
+    border-bottom: none;
+}
+.landing-pane-recent .landing-item.has-image {
+    background-position: top center;
+}
+.landing-pane-recent .landing-item.has-background::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+.dark-theme .landing-pane-recent .landing-item.has-background::before {
+    background: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 80%, transparent 100%);
+}
+.light-theme .landing-pane-recent .landing-item.has-background::before {
+    background: linear-gradient(to right, rgba(255,255,255,0.93) 0%, rgba(255,255,255,0.75) 60%, rgba(255,255,255,0.4) 85%, transparent 100%);
+}
+.landing-pane-recent .landing-item.has-background > .landing-item-info,
+.landing-pane-recent .landing-item.has-background > .landing-item-thumb {
+    position: relative;
+    z-index: 1;
+}
+.dark-theme .landing-pane-recent .landing-item.has-background .landing-item-info {
+    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+.dark-theme .landing-pane-recent .landing-item.has-background .landing-item-query {
+    color: #fff;
+}
+.light-theme .landing-pane-recent .landing-item.has-background .landing-item-info {
+    text-shadow: 0 1px 3px rgba(255,255,255,0.4);
+}
+.light-theme .landing-pane-recent .landing-item.has-background .landing-item-query {
+    color: #111;
+}
+/* Pin/delete buttons */
+.landing-pane-recent .landing-item-actions {
+    position: absolute;
+    right: 0.7em;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1;
+    display: flex;
+    border-radius: 4px;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 120ms;
+}
+.landing-pane-recent .landing-item:hover .landing-item-actions {
+    opacity: 1;
+}
+.landing-pane-recent .landing-item-actions {
+    background: var(--surface-2);
+}
+.landing-pane-recent .landing-item-info {
+    flex: 1;
+    min-width: 0;
+    transition: margin-right 0ms 50ms;
+}
+.landing-pane-recent .landing-item:hover .landing-item-info {
+    margin-right: 3.6em;
+    transition: margin-right 0ms;
+}
+/* Fallback thumbnail (no crop) */
+.landing-pane-recent .landing-item-thumb {
+    width: 4em;
+    height: 1.5em;
+    border-radius: 3px;
+}
+.landing-pane-recent .landing-item-thumb i.ss {
+    font-size: 1.5em;
+}
+/* Alternating/hover/pinned for entries without art */
+.landing-pane-recent .landing-item:nth-child(even):not(.has-background) {
+    background-color: var(--row-odd);
+}
+.landing-pane-recent .landing-item:not(.has-background):hover {
+    background-color: var(--row-hover);
+}
+.landing-pane-recent .landing-item:has(.landing-item-pin.pinned):not(.has-background) {
+    background-color: var(--surface-3);
+}
+/* Line between the pinned searches and the rest */
+.landing-pane-recent .landing-item.landing-item-last-pinned {
+    border-bottom: 1px solid var(--greytext);
+}
+
+/* Favorites pane: 2-column grid of card-style tiles */
+.landing-pane-favorites .landing-pane-body {
+    overflow: visible;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 0.4em;
+    padding: 0.5em;
+    align-content: start;
+}
+
+.landing-pane-favorites .landing-item-fav {
+    position: relative;
+    align-items: flex-start;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    border-radius: 0.5em;
+    background: var(--surface-2);
+    padding: 0.6em;
+    transition: border-color 150ms;
+}
+.landing-pane-favorites .landing-item-fav:hover {
+    border-color: var(--accent-border, rgba(91,141,239,0.25));
+}
+.landing-item-fav.fav-dragging {
+    opacity: 0.4;
+}
+.landing-item-fav.fav-drag-over {
+    border-color: var(--ainfo);
+    border-style: dashed;
+}
+
+.landing-pane-favorites .landing-item-fav .landing-item-thumb {
+    width: 5.6em;
+    height: 7.84em;
+    background: transparent;
+    border-radius: 0.35em;
+}
+
+.landing-pane-favorites .landing-item-fav .landing-item-line1 {
+    width: 100%;
+    align-items: center;
+    padding-bottom: 0.45em;
+    margin-bottom: 0.5em;
+    background: linear-gradient(90deg, transparent, var(--border-subtle, rgba(255,255,255,0.12)) 20%, var(--border-subtle, rgba(255,255,255,0.12)) 80%, transparent) bottom / 100% 1px no-repeat;
+}
+
+.landing-pane-favorites .landing-item-fav .landing-item-set {
+    color: var(--search-link);
+    font-weight: 600;
+    font-size: 0.85em;
+}
+
+.landing-pane-favorites .landing-item-fav .landing-item-prices {
+    grid-template-columns: 1fr max-content;
+    row-gap: 0.5em;
+}
+
+/* Pin/delete live in a bounded actions box at the tile's top-right (same
+ * pattern as the recents pane) so long names/badges never show through. */
+.landing-pane-favorites .landing-item-fav .landing-item-actions {
+    position: absolute;
+    top: 0.35em;
+    right: 0.35em;
+    z-index: 1;
+    display: flex;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--surface-2);
+    opacity: 0;
+    transition: opacity 120ms;
+}
+.landing-pane-favorites .landing-item-fav:hover .landing-item-actions {
+    opacity: 1;
+}
+
+.landing-item {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    padding: 0.85em 1em;
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
+    color: var(--normal);
+    text-decoration: none;
+}
+
+.landing-item:hover {
+    background: var(--surface-2);
+}
+
+.landing-item:last-child {
+    border-bottom: none;
+}
+
+.landing-item-thumb {
+    flex: 0 0 auto;
+    width: 3.5em;
+    height: 4.9em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-2);
+    border-radius: 0.25em;
+    overflow: hidden;
+}
+
+.landing-item-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.landing-item-thumb .foil-wrap {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.landing-item-thumb:has(.ss) {
+    background: transparent;
+}
+
+.landing-item-thumb i.ss {
+    font-size: 2.5em;
+    color: var(--normal);
+}
+
+.landing-item-thumb-placeholder {
+    font-size: 1.5em;
+    opacity: 0.6;
+    color: var(--normaltext);
+}
+
+.landing-item-info {
+    flex: 1 1 auto;
+    overflow: hidden;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35em;
+}
+
+.landing-item-line1 {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4em;
+    flex-wrap: wrap;
+    margin-bottom: 0.1em;
+}
+
+.landing-item-name {
+    font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    overflow: clip visible;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.landing-item-set {
+    font-size: 0.8em;
+    color: var(--greytext);
+}
+
+.landing-item-prices {
+    display: grid;
+    grid-template-columns: var(--landing-price-label-w, 14em) max-content;
+    column-gap: 1em;
+    row-gap: 0.15em;
+    align-items: baseline;
+    font-size: 0.88em;
+}
+
+.landing-item-price-label {
+    min-width: 0;
+    overflow: hidden;
+    overflow: clip visible;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.landing-item-price-value {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+
+.landing-item-price-label.sell,
+.landing-item-price-value.sell { color: var(--asuccess); }
+
+.landing-item-price-label.buy,
+.landing-item-price-value.buy { color: var(--awarning); }
+
+.landing-item-query {
+    font-size: 0.95em;
+    min-width: 0;
+    overflow: hidden;
+    overflow: clip visible;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    color: var(--normal);
+}
+
+/* The pinned bar the search ran under, muted from the query's own colour. */
+.landing-item-scope {
+    opacity: 0.6;
+}
+
+.landing-item-arrow {
+    display: none;
+}
+
+.landing-item-delete {
+    display: inline-flex;
+    background: transparent;
+    border: none;
+    color: var(--greytext);
+    cursor: pointer;
+    padding: 0.3em;
+    border-radius: 0.25em;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 120ms, color 120ms;
+}
+
+.landing-item:hover .landing-item-delete {
+    opacity: 1;
+}
+
+
+.landing-item-delete:hover {
+    color: var(--adanger);
+    background: var(--surface-2);
+}
+
+.landing-syntax-link {
+    margin-top: 1em;
+    text-align: center;
+    color: var(--greytext);
+    font-size: 0.9em;
+}
+
+.landing-syntax-link a {
+    color: var(--anormal);
+}
+
+/* === Pin button on landing items === */
+.landing-item-pin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    padding: 0.3em;
+    background: transparent;
+    border: 0;
+    color: var(--greytext, #888);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 120ms, color 120ms;
+}
+.landing-item:hover .landing-item-pin { opacity: 1; }
+.landing-item-pin:hover,
+.landing-item:hover .landing-item-pin.pinned { color: var(--accent, #5b8def); }
+
+/* Pinned row: tinted background instead of always-visible icon */
+.landing-item:has(.landing-item-pin.pinned) {
+    background-color: var(--surface-2);
+}
+.landing-pane-favorites .landing-item-fav:has(.landing-item-pin.pinned) {
+    background: var(--surface-3);
+}
+
+/* === Favorites sort pills (inline in pane header next to action buttons) === */
+.landing-pane-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    padding-right: 0.55em;
+    margin-right: 0.25em;
+    border-right: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+}
+.fav-sort-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15em;
+    padding: 0.3em;
+    background: transparent;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+    border-radius: 0.25em;
+    color: var(--normal);
+    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+}
+.fav-sort-pill:hover { color: var(--text, currentColor); background: var(--surface-3); }
+.fav-sort-pill.active {
+    color: var(--accent, #5b8def);
+    border-color: var(--accent-border, rgba(91,141,239,0.35));
+}
+.fav-sort-pill i,
+.fav-sort-pill svg,
+.fav-sort-pill i[data-lucide] { width: 16px; height: 16px; flex: 0 0 auto; }
+.fav-sort-pill .fav-sort-dir.asc,
+.fav-sort-pill .fav-sort-dir.desc { color: var(--ainfo, #5b8def); }

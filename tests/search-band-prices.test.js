@@ -5,7 +5,7 @@ import { read } from './metrics-helpers.js';
 // 1250-1366px laptops with the sidebar) the price columns close up to one, so
 // store names are not cut: what follows a price stacks under it, none hidden.
 function bandBlock() {
-    const css = read('css/search.css');
+    const css = read('css/search-rows.css');
     const subgrid = css.indexOf('@supports (grid-template-columns: subgrid)');
     const start = css.indexOf('@container search-results (560px < width <= 720px) {\n    .rows-main {');
     expect(subgrid).toBeGreaterThan(-1);

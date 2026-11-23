@@ -49,7 +49,7 @@
             '</div>';
     }
 
-    // Visible secondary cell text, mirroring renderCell (search.html:1316-1338).
+    // Visible secondary cell text, mirroring renderCell (js/buylist-extra.js).
     // Credit modes have no offline data so they render blank like empty online cells.
     function buylistExtraText(ctx, ratio, isNM) {
         var mode = ctx.buylistSecondary || '';
