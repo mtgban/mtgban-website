@@ -215,6 +215,17 @@ function moveOptRow(row, store) {
     if (window.reprocessUploadResults) reprocessUploadResults();
 }
 
+// A pick in a store's phone menu closes it, so what the pick opens or says
+// is not behind it. Share says its piece on its own button, and the backpack
+// menu opens over this one, its picks closing both. Captured, as
+// upload-edit.js stops the clicks on an edited page.
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest && e.target.closest('.opt-header-actions .opt-btn, .opt-header-actions .opt-move-menu button');
+    if (!btn || btn.hasAttribute('popovertarget') || btn.classList.contains('opt-share-btn')) return;
+    var menu = btn.closest('.opt-header-actions');
+    if (menu.matches('[popover]') && menu.matches(':popover-open')) menu.hidePopover();
+}, true);
+
 document.addEventListener('click', function(e) {
     var pick = e.target.closest && e.target.closest('.opt-move-menu button');
     if (pick) {
