@@ -584,7 +584,7 @@
                 {{range $storeKeys}}
                     {{$price := (index $scraperEntries .)}}
                     {{/* The legend's green: a buylist offer above the price the list came with. */}}
-                    <td class="ures-price {{if and $root.IsBuylist (ne $loadedPrice 0.0) (gt $price $loadedPrice)}}best{{end}}{{if eq . $top}} pc-key{{end}}" data-label="{{index $root.StoreNames .}}" data-sort="{{if ne $price 0.0}}{{printf "%.2f" $price}}{{end}}">
+                    <td class="ures-price {{if and $root.IsBuylist (ne $loadedPrice 0.0) (gt $price $loadedPrice)}}best{{end}}{{if eq . $top}} pc-key{{end}}{{if eq $price 0.0}} none{{end}}" data-label="{{index $root.StoreNames .}}" data-sort="{{if ne $price 0.0}}{{printf "%.2f" $price}}{{end}}">
                         {{if ne $price 0.0}}
                             <a href="https://mtgban.com/go/{{if $root.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}" target="_blank">$ {{printf "%.2f" $price}}</a>
                         {{else}}
@@ -616,7 +616,7 @@
             <td></td>
             <td style="text-align:center;font-family:var(--font-mono);font-weight:700" data-label="Qty">{{.Quantity}}</td>
             {{range $storeKeys}}
-                <td class="ures-price" style="font-weight:700" data-label="{{index $root.StoreNames .}}">
+                <td class="ures-price{{if not (index $totals .)}} none{{end}}" style="font-weight:700" data-label="{{index $root.StoreNames .}}">
                     $ {{printf "%.2f" (index $totals .)}}
                     {{$missing := (index $missingCounts .)}}
                     {{if ne $missing 0}}
@@ -649,7 +649,7 @@
         <span class="val">{{.Quantity}}</span>
     </div>
     {{range .StoreKeys}}
-        <div class="res-summary-stat">
+        <div class="res-summary-stat{{if not (index $root.TotalEntries .)}} none{{end}}">
             <span class="label"{{with index $.Root.CustomTips .}} title="{{.}}"{{end}}>{{index $.Root.StoreNames .}}</span>
             <span class="val">$ {{printf "%.2f" (index $root.TotalEntries .)}}</span>
             {{$missing := (index $root.MissingCounts .)}}
@@ -687,7 +687,7 @@
         <span class="val">{{$s.Quantity}}</span>
     </div>
     {{range .StoreKeys}}
-        <div class="res-summary-stat">
+        <div class="res-summary-stat{{if not (index $s.Totals .)}} none{{end}}">
             <span class="label"{{with index $.Root.CustomTips .}} title="{{.}}"{{end}}>{{index $.Root.StoreNames .}}</span>
             <span class="val">$ {{printf "%.2f" (index $s.Totals .)}}</span>
             {{$gone := (index $s.Missing .)}}

@@ -131,3 +131,62 @@ func TestUploadPhoneCardBestStore(t *testing.T) {
 		}
 	}
 }
+
+// A store with no price for the card is marked, for a phone to leave out,
+// and a priced one is not; so are a store's totals.
+func TestUploadResultsMarkUnpricedStores(t *testing.T) {
+	marked := regexp.MustCompile(`class="ures-price[^"]* none" data-label="[^"]*" data-sort=""`)
+	priced := regexp.MustCompile(`class="ures-price[^"]* none" data-label="[^"]*" data-sort="[^"]+"`)
+	for _, tc := range []struct {
+		name   string
+		prices map[string]float64
+		want   int
+	}{
+		{"both priced", map[string]float64{"LOW": 8, "HIGH": 12}, 0},
+		{"one unpriced", map[string]float64{"HIGH": 12}, 1},
+		{"none priced", map[string]float64{}, 2},
+	} {
+		out := resultsTable(t, true, 0, tc.prices)
+		n := len(marked.FindAllString(out, -1))
+		if n != tc.want {
+			t.Errorf("%s: %d cells marked, want %d", tc.name, n, tc.want)
+		}
+		if priced.MatchString(out) {
+			t.Errorf("%s: a priced cell is marked", tc.name)
+		}
+		// resultsTable passes no totals, so the row's two are both zero
+		n = strings.Count(out, `class="ures-price none" style=`)
+		if n != 2 {
+			t.Errorf("%s: %d of the totals row's cells marked, want 2", tc.name, n)
+		}
+	}
+
+	tmpl, err := template.New("upload.html").Funcs(funcMap).ParseFiles("templates/upload.html")
+	if err != nil {
+		t.Fatalf("parsing upload.html: %v", err)
+	}
+	totals := map[string]float64{"HIGH": 12}
+	for strip, data := range map[string]map[string]any{
+		"ures-cat-strip": {
+			"CountLabel": "Cards",
+			"Quantity":   1,
+			"StoreKeys":  []string{"LOW", "HIGH"},
+			"Root":       PageVars{UploadVars: UploadVars{TotalEntries: totals}},
+		},
+		"ures-unpacked-strip": {
+			"Section":   UnpackedSection{Quantity: 1, Totals: totals},
+			"StoreKeys": []string{"LOW", "HIGH"},
+			"Root":      PageVars{},
+		},
+	} {
+		var b bytes.Buffer
+		err = tmpl.ExecuteTemplate(&b, strip, data)
+		if err != nil {
+			t.Fatalf("rendering %s: %v", strip, err)
+		}
+		n := strings.Count(b.String(), `class="res-summary-stat none"`)
+		if n != 1 {
+			t.Errorf("%s: %d totals marked, want 1", strip, n)
+		}
+	}
+}
