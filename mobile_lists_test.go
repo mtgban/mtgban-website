@@ -15,14 +15,20 @@ import (
 // around it is chrome this has nothing to say about.
 func renderMobileSearch(t *testing.T, pageVars PageVars) string {
 	t.Helper()
+	return renderMobileBlock(t, "m-search-results", pageVars)
+}
+
+// renderMobileBlock renders one named block of the mobile search page.
+func renderMobileBlock(t *testing.T, block string, pageVars PageVars) string {
+	t.Helper()
 	baseName, files := renderTemplateFiles("search.html", true)
 	tmpl, err := tmplparse.ParseFiles(baseName, files, funcMap)
 	if err != nil {
 		t.Fatalf("parsing mobile search.html: %v", err)
 	}
 	var b bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&b, "m-search-results", pageVars); err != nil {
-		t.Fatalf("rendering m-search-results: %v", err)
+	if err := tmpl.ExecuteTemplate(&b, block, pageVars); err != nil {
+		t.Fatalf("rendering %s: %v", block, err)
 	}
 	return b.String()
 }
@@ -124,5 +130,30 @@ func TestMobileSalesList(t *testing.T) {
 		if !strings.Contains(out, first) {
 			t.Errorf("mode %s, sealed %v: no edge button with %s", c.mode, c.sealed, first)
 		}
+	}
+}
+
+// The sealed landing has the search landing's shape: the editions scroll in
+// the lists area above the search bar at the foot, the category button
+// left of the box and search right of it, so the box sits centred.
+func TestMobileSealedLandingBarAtFoot(t *testing.T) {
+	vars := PageVars{SearchVars: SearchVars{
+		EditionSort: []string{"Booster Boxes"},
+		EditionList: map[string][]EditionEntry{"Booster Boxes": {{Name: "Foundations", Code: "FDN"}}},
+	}}
+	html := renderMobileBlock(t, "m-sealed-landing", vars)
+	for _, want := range []string{`<div class="m-page m-landing">`, `<div class="m-landing-lists">`, `id="m-sealed-booster-boxes"`, `/js/search-cards.js`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("the sealed landing lacks %s", want)
+		}
+	}
+	category := strings.Index(html, `title="Jump to category"`)
+	box := strings.Index(html, `id="searchbox"`)
+	search := strings.Index(html, `title="Search"`)
+	if category < 0 || box < 0 || search < 0 || category > box || box > search {
+		t.Errorf("the bar reads category %d, box %d, search %d; want them in that order", category, box, search)
+	}
+	if bar, lists := strings.Index(html, `m-search-bar-sticky`), strings.Index(html, `m-landing-lists`); lists < bar {
+		t.Error("the editions come before the bar's markup; the landing's CSS orders the bar last")
 	}
 }
