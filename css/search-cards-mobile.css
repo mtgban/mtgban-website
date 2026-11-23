@@ -642,11 +642,15 @@ html:has(.m-landing) {
         font-variant-numeric: tabular-nums;
     }
 
-    /* A card with no offers says so where the edge bar would be */
+    /* A card with no offers says so where the sellers' edge button would
+       be, clear of the star, backpack and chart in the middle */
     .m-layout-cards .m-card > .no-offers {
         grid-column: var(--pic);
         grid-row: 3;
-        justify-self: center;
+        justify-self: start;
+        align-self: center;
+        margin: 0.25em 0.5em 0.5em;
+        padding: 0 0.6em;
     }
 
     /* After the last card, where there are any: the pager and the search's

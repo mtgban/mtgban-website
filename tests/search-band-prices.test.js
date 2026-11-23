@@ -72,3 +72,9 @@ test('a phone\'s sealed index row centres its name beside the stacked prices', (
     expect(cards).toMatch(/\.m-tab-panel \.rows-index \.index-cols > \.price:nth-child\(2\) \{\n\s+grid-column: 2;\n\s+grid-row: 2;/);
     expect(cards).toMatch(/\.m-tab-panel \.rows-index \.index-cols > \.price:nth-child\(3\) \{\n\s+grid-column: 2;\n\s+grid-row: 3;/);
 });
+
+// The star, backpack and chart sit centred in the same cell.
+test('a phone card\'s "No offers" keeps to the left edge, clear of its icons', () => {
+    const cards = read('css/search-cards-mobile.css');
+    expect(cards).toMatch(/\.m-layout-cards \.m-card > \.no-offers \{[^}]*justify-self: start;/);
+});
