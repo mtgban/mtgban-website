@@ -751,10 +751,10 @@ remembers the toolbar's choice in localStorage (`mtgban_upload_view`); a
 store's own button lasts for the page. With no choice kept, a phone (560px
 and under) starts on it.
 
-**Phone menus.** A narrow screen (768px and under) keeps an optimizer
-store's buttons in a menu that opens from the foot of the screen, a popover
-whose box the CSS lays out in the page on a wider screen, or where the
-browser has no popovers.
+**Phone menus.** A narrow screen keeps an optimizer store's buttons (768px
+and under) and the form's store grid (640px and under) in menus that open
+from the foot of the screen. Each is a popover whose box the CSS lays out in
+the page on a wider screen, or where the browser has no popovers.
 
 **TCGplayer export prices.** An uploaded TCGplayer export's price is its
 My Store Price, then TCG Marketplace Price, then TCG Market Price, the

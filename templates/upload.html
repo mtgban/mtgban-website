@@ -206,6 +206,8 @@
                             {{if not .CanBuylist}}
                                 <span class="upload-mode-hint">Buylist access requires Legacy tier</span>
                             {{end}}
+                            {{/* A phone keeps the stores in a menu this opens */}}
+                            <button type="button" class="upload-store-open" popovertarget="upload-stores" data-track="ui.upload.stores" data-track-value="open">{{template "upload-icon" "menu"}}<span>Stores <span id="upload-store-count"></span></span></button>
                             {{if .CanChangeStores}}
                             <div class="upload-store-bulk">
                                 <button type="button" class="upload-store-bulk-btn" onclick="window.setVisibleStores && setVisibleStores(true)" data-track="ui.upload.stores" data-track-value="select_all">Select all</button>
@@ -214,7 +216,8 @@
                             </div>
                             {{end}}
                         </div>
-                        <div class="upload-store-area">
+                        <div class="upload-store-area" id="upload-stores" popover>
+                            <div class="upload-store-head">Stores <button type="button" class="upload-store-bulk-btn" popovertarget="upload-stores" popovertargetaction="hide">Done</button></div>
                             <div class="upload-store-grid" id="singlesBox"></div>
                             <div class="upload-store-grid upload-store-hidden" id="sealedBox"></div>
                         </div>
@@ -377,39 +380,39 @@
             <div class="upload-help-panel">
                 <h2>Reference</h2>
 
-                <div class="upload-help-card">
-                    <h3>Supported Formats</h3>
+                <details class="upload-help-card" open>
+                    <summary data-track="ui.upload.help"><h3>Supported Formats</h3></summary>
                     <p><strong>CSV</strong> or <strong>spreadsheet</strong> files (.csv/.xls/.xlsx), <strong>Google Sheets</strong>, <strong>TCG</strong> and other tracker URLs, or plaintext decklists.</p>
                     <p>Popular exports like TCG, Deckbox, BinderPOS, and Cardsphere are auto-detected. Plain card name lists also work - the most recent printing will be used.</p>
                     <div class="upload-help-note">Excel sheets should contain <code>mtgban</code> in the sheet name. Google Sheets must be publicly accessible. The saved URL will persist as a preference.</div>
-                </div>
+                </details>
 
-                <div class="upload-help-card">
-                    <h3>Data Requirements</h3>
+                <details class="upload-help-card" open>
+                    <summary data-track="ui.upload.help"><h3>Data Requirements</h3></summary>
                     <p>Data in any format with a comma or tab separated header. Needs sensible column names like <em>card name</em> and <em>edition</em> at minimum.</p>
                     <p>Card recognition follows <strong>Scryfall</strong> notation. If a card has multiple printings (same name, different art), include the collector number or variant.</p>
                     <div class="upload-help-note">Max 5MB, up to 350 entries (1000 for Optimizer). Rows with qty 0 are skipped. Identical entries with same condition are merged.</div>
-                </div>
+                </details>
 
-                <div class="upload-help-card">
-                    <h3>Reading Results</h3>
+                <details class="upload-help-card" open>
+                    <summary data-track="ui.upload.help"><h3>Reading Results</h3></summary>
                     <p>Each card shows prices from all selected stores. A per-store <strong>total</strong> row appears at the bottom with quantity-adjusted sums.</p>
                     <p>Below totals: count of cards not found per store, plus an estimated missing value via TCG Low.</p>
                     <p>The <strong>Index Overview</strong> shows popular aggregate prices. These describe the printing, not your copy: TCG Low and TCG Market carry a single price whatever condition you loaded. TCG Direct is the exception and is condition-adjusted, falling back to TCG Direct Low.</p>
                     <div class="upload-help-note">If price or quantity data exists in your upload, it displays above results. Condition data adjusts store prices and can determine foiling status.</div>
-                </div>
+                </details>
 
-                <div class="upload-help-card">
-                    <h3>Optimizer</h3>
+                <details class="upload-help-card" open>
+                    <summary data-track="ui.upload.help"><h3>Optimizer</h3></summary>
                     <p>Groups results by <strong>store</strong> and <strong>edition</strong> with a theoretical maximum split per store. Similar offers within the margin threshold are all listed.</p>
                     <p>Each store section shows its offer next to loaded/TCG Low price. The percentage indicates offer strength. Use <strong>Load at</strong> buttons to push directly to partner storefronts.</p>
                     <div class="upload-help-note">The qty multiplier applies only to optimizer operations - loaded data stays untouched. You can download per-store CSVs, remove cards from TCGplayer inventory, or share a link to one store's ticked cards.</div>
-                </div>
+                </details>
 
                 <hr class="upload-help-divider">
 
-                <div class="upload-help-card">
-                    <h3>Result Legend</h3>
+                <details class="upload-help-card" open>
+                    <summary data-track="ui.upload.help"><h3>Result Legend</h3></summary>
                     <div class="upload-legend-list">
                         <div class="upload-legend-row">
                             <span class="upload-legend-swatch" style="background:var(--aliasing);"></span>
@@ -429,23 +432,29 @@
                             <span class="upload-legend-sym">&#9888;&#65039;</span> Offer above custom spread threshold
                         </div>
                     </div>
-                </div>
+                </details>
 
                 <hr class="upload-help-divider">
 
-                <div class="upload-help-card">
-                    <h3>Privacy &amp; Access</h3>
+                <details class="upload-help-card" open>
+                    <summary data-track="ui.upload.help"><h3>Privacy &amp; Access</h3></summary>
                     <p>Nothing you upload is stored on the website unless you click Share: a shared list is kept for seven days, and anyone with the link who can use this page can open it. Your exports are private to you only.</p>
                     <p>Some features may be available at certain tiers only. At <i>Modern</i> you can customize the list of Retail stores. At <i>Legacy</i>, you get access to <strong>Buylist</strong> prices, CSV downloads, and exports. At <i>Vintage</i> you have no download limits and can import custom searches.</p>
-                </div>
+                </details>
 
-                <div class="upload-help-card">
-                    <h3>Need Help?</h3>
+                <details class="upload-help-card" open>
+                    <summary data-track="ui.upload.help"><h3>Need Help?</h3></summary>
                     <p>If anything doesn't work, post your file in the <strong>#feedback</strong> channel on the BAN Discord with a URL or screenshot.</p>
-                </div>
+                </details>
             </div>
 
         </div><!-- /.upload-layout -->
+        <script>
+        // A phone starts the Reference folded: open, it is three screens long
+        if (window.matchMedia('(max-width: 640px)').matches) {
+            document.querySelectorAll('details.upload-help-card').forEach(function(d) { d.open = false; });
+        }
+        </script>
 
         <script type="text/javascript">
             // What the upload form script is handed by the page: the store
@@ -1185,6 +1194,7 @@
                         {{$qty := index $.OptimizedQuantities $scraperKey}}
                         <span class="opt-count">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
                         <span class="opt-total">$ {{printf "%.2f" $total}}</span>
+                        <button type="button" class="opt-menu-btn" popovertarget="opt-acts-{{$scraperKey}}" title="Actions for {{$storeLabel}}" aria-label="Actions for {{$storeLabel}}" data-track="ui.optimizer" data-track-value="store_menu">{{template "upload-icon" "menu"}}</button>
                         <button type="button" class="opt-view-btn" aria-pressed="false" title="Show these cards instead of the rows" aria-label="Show these cards instead of the rows" data-track="ui.optimizer" data-track-value="store_view">{{template "upload-icon" "layout-grid"}}</button>
                         <button type="button" class="section-fold" aria-expanded="true" title="Hide these cards" data-track="ui.optimizer" data-track-value="fold"><i data-lucide="chevron-up"></i></button>
                     </div>
@@ -1194,7 +1204,6 @@
                             <th role="columnheader">Set</th>
                             <th data-sort-method="none">INFO</th>
                             <th class="c" role="columnheader" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Offer</th>
-                        <button type="button" class="opt-menu-btn" popovertarget="opt-acts-{{$scraperKey}}" title="Actions for {{$storeLabel}}" aria-label="Actions for {{$storeLabel}}" data-track="ui.optimizer" data-track-value="store_menu">{{template "upload-icon" "menu"}}</button>
                             <th class="c" role="columnheader" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Loaded</th>
                             <th role="columnheader" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Spread</th>
                             <th class="c" data-sort-method="none"><input type="checkbox" checked autocomplete="off" title="Toggle all" onchange="window.toggleAllOptRows && toggleAllOptRows(this)"></th>

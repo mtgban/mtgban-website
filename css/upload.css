@@ -223,6 +223,9 @@
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
 }
+/* A popover for the phone menu's sake, laid out as a plain box until then */
+.upload-store-area[popover] { position: static; width: auto; height: auto; margin: 0; padding: 0; border: 0; overflow: visible; background: none; color: inherit; }
+.upload-store-open, .upload-store-head { display: none; }
 .upload-store-grid {
     grid-row: 1;
     grid-column: 1;
@@ -323,6 +326,10 @@
 .upload-store-only:hover {
     color: var(--normal);
     background: var(--surface-3);
+}
+/* No row hover without a pointer */
+@media (hover: none) {
+    .upload-store-only { opacity: 1; }
 }
 /* No store customization (sub-Modern tier): checkboxes are disabled, so
    the "only" shortcut would be a no-op — hide it. */
@@ -683,6 +690,8 @@
     margin-bottom: 12px;
 }
 
+.upload-help-card summary { display: block; cursor: pointer; }
+.upload-help-card summary::-webkit-details-marker { display: none; }
 .upload-help-card h3 {
     font-size: var(--text-2xl);
     font-weight: 600;
@@ -808,9 +817,34 @@
         padding: 24px 16px 40px;
     }
 
-    .upload-source-options {
-        grid-template-columns: 1fr;
-    }
+    /* Closer in, so step 3 is not four screens down */
+    .upload-card { padding: 16px; margin-bottom: 12px; }
+    .upload-card-header { margin-bottom: 12px; }
+    .upload-preset-select { flex: 1; min-width: 0; max-width: none; }
+    /* Under 16px iOS zooms the page on focus */
+    .upload-preset-select, .upload-preset-name,
+    .upload-source-area input[type="text"], .upload-source-area textarea { font-size: 16px; }
+    .upload-tab { flex: 1; }
+    .upload-index-grid { gap: 8px; }
+    .upload-index-item { padding: 8px 12px; }
+
+    .upload-source-options { gap: 8px; margin-bottom: 12px; }
+    .upload-source-btn { gap: 4px; padding: 10px 4px; font-size: var(--text-sm); }
+    .upload-source-icon { font-size: var(--text-4xl); }
+
+    .upload-actions { display: grid; grid-template-columns: 1fr 1fr; }
+    .upload-actions .upload-btn { justify-content: center; min-height: 44px; padding: 10px 8px; text-align: center; }
+    .upload-actions .upload-btn-primary, #preset-save-toggle, .upload-preset-save:not([hidden]) { grid-column: 1 / -1; }
+    .upload-preset-save { margin-left: 0; gap: 12px; }
+    .upload-preset-name { flex: 1; min-width: 0; max-width: none; }
+
+    /* The Reference, one fold to a subject */
+    .upload-help-card { padding: 0 16px; margin-bottom: 8px; }
+    .upload-help-card summary h3 { margin: 0; min-height: 44px; font-size: var(--text-lg); justify-content: space-between; }
+    .upload-help-card summary h3::after { content: "+"; color: var(--text-dim); }
+    .upload-help-card[open] { padding-bottom: 14px; }
+    .upload-help-card[open] summary h3::after { content: "\2212"; }
+    .upload-help-divider { display: none; }
 
     .upload-opt-wide {
         grid-column: span 1;
@@ -832,6 +866,34 @@
     .upload-store-grid {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     }
+
+    /* The stores in a menu from the foot of the screen, as the optimizer's
+       stores keep their buttons: a list of 26 in a box showed six */
+    @supports selector(:popover-open) {
+        .upload-mode-stores-row { align-items: stretch; }
+        .upload-mode-col { flex-flow: row wrap; align-items: center; gap: 12px; padding-bottom: 0; border-bottom: 0; }
+        .upload-mode-toggle { flex: 0 0 100%; box-sizing: border-box; }
+        .upload-mode-toggle label { flex: 1; text-align: center; }
+        .upload-mode-hint { flex-basis: 100%; }
+        .upload-store-bulk { margin: 0; gap: 8px; }
+        .upload-store-bulk .upload-store-bulk-btn { padding: 0 6px; font-size: var(--text-md); }
+        .upload-store-open { flex: 1; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border-moderate); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--normal); font: inherit; font-size: var(--text-md); font-weight: 600; cursor: pointer; }
+        .upload-store-open svg { width: 18px; height: 18px; }
+        #upload-store-count { color: var(--activetext); font-weight: 400; }
+
+        .upload-store-area[popover] { display: none; }
+    }
+}
+/* Open, it is the menu at any width: a turned phone is wider than the rules above */
+@supports selector(:popover-open) {
+    .upload-store-area[popover]:popover-open { position: fixed; inset: auto 0 0; display: block; width: auto; max-height: 80vh; padding: 0 16px calc(16px + env(safe-area-inset-bottom)); box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; border-top: 1px solid var(--border-moderate); border-radius: 20px 20px 0 0; background: var(--surface-1); color: var(--normal); }
+    .upload-store-area::backdrop { background: rgba(0, 0, 0, 0.5); }
+    .upload-store-area:popover-open .upload-store-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 8px 0; background: var(--surface-1); font-size: var(--text-lg); font-weight: 700; }
+    .upload-store-head .upload-store-bulk-btn { padding: 0 12px; font-size: var(--text-md); font-weight: 600; }
+    .upload-store-area:popover-open .upload-store-grid { grid-template-columns: 1fr; max-height: none; overflow: visible; }
+    .upload-store-area:popover-open .upload-store-grid.upload-store-hidden { display: none !important; }
+    .upload-store-area:popover-open .upload-store-item { min-height: 44px; box-sizing: border-box; }
+    .upload-store-area:popover-open .upload-store-only { padding: 6px 10px; }
 }
 
 /* -- Results page width --
@@ -1450,6 +1512,9 @@
 .opt-section-nav span { opacity: 0.25; }
 .opt-section-nav a:hover { border-color: var(--accent-border); color: var(--ainfo); }
 .opt-header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; flex: 1; }
+/* A popover for the phone menu's sake, laid out as a plain box until then */
+.opt-header-actions[popover] { position: static; width: auto; height: auto; margin: 0; padding: 0; border: 0; overflow: visible; background: none; color: inherit; }
+.opt-menu-btn, .opt-btn-label { display: none; }
 .opt-store-header .opt-total { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-lg); font-weight: 600; color: var(--asuccess); }
 .opt-store-header .opt-count { font-size: var(--text-sm); color: var(--text-dim); padding: 2px 8px; background: var(--surface-3); border-radius: 10px; }
 .opt-btn {
@@ -1512,9 +1577,6 @@ body:has(.opt-move-menu:popover-open) .hoverWrap { display: none !important; }
 .opt-move-title { padding: 4px 10px 6px; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
 .opt-move-menu button { display: flex; width: 100%; border: none; background: none; cursor: pointer; text-align: left; justify-content: space-between; gap: 16px; padding: 6px 10px; border-radius: var(--radius-sm); color: var(--normal); font-size: var(--text-sm); text-decoration: none; }
 .opt-move-menu button:hover, .opt-move-menu button:focus-visible { background: var(--row-hover); }
-/* A popover for the phone menu's sake, laid out as a plain box until then */
-.opt-header-actions[popover] { position: static; width: auto; height: auto; margin: 0; padding: 0; border: 0; overflow: visible; background: none; color: inherit; }
-.opt-menu-btn, .opt-btn-label { display: none; }
 .opt-move-menu button span { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--asuccess); }
 /* A row the reader moved, and the one a move lands back on */
 .opt-moved > td { background: var(--accent-muted); }
@@ -1845,6 +1907,34 @@ body:not(:has(#panel-optimizer.active)) :is(.res-sort-btn, .res-sort-sep) { disp
     .ures-reload-bar { left: 16px; right: 16px; }
 }
 
+/* A store's buttons in a menu, which its header's menu button opens from the
+   foot of the screen: beside the name they ran to four or five lines */
+@media (max-width: 768px) {
+    @supports selector(:popover-open) {
+        .opt-store-header { display: grid; grid-template-columns: minmax(0, max-content) max-content 1fr repeat(3, auto); gap: 2px 0; padding-right: 8px; }
+        .opt-store-header h3 { grid-area: 1 / 1 / auto / 4; overflow: hidden; overflow: clip visible; text-overflow: ellipsis; align-self: end; }
+        .opt-store-header .opt-count { grid-area: 2 / 1; align-self: start; margin-right: 8px; overflow: hidden; overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .opt-store-header .opt-total { grid-area: 2 / 2; align-self: start; white-space: nowrap; }
+        .opt-view-btn, .opt-menu-btn, .opt-store-header .section-fold { grid-row: 1 / 3; min-width: 40px; align-items: center; justify-content: center; }
+        .opt-view-btn { grid-column: 4; }
+        .opt-menu-btn { grid-column: 5; display: flex; padding: 2px; border: none; border-radius: 6px; background: transparent; color: var(--normal); cursor: pointer; }
+        .opt-menu-btn svg { width: 20px; height: 20px; }
+        .opt-store-header .section-fold { grid-column: 6; }
+
+        .opt-header-actions[popover], .opt-header-actions:empty { display: none; }
+    }
+}
+/* Open, it is the menu at any width: a turned phone is wider than the rules above */
+@supports selector(:popover-open) {
+    .opt-header-actions[popover]:popover-open { position: fixed; inset: auto 0 0; display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; width: auto; max-height: 80vh; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); box-sizing: border-box; overflow-y: auto; border-top: 1px solid var(--border-moderate); border-radius: 20px 20px 0 0; background: var(--surface-1); color: var(--normal); }
+    .opt-header-actions:popover-open::before { content: attr(data-store-name); padding-bottom: 4px; font-size: var(--text-lg); font-weight: 700; }
+    .opt-header-actions::backdrop { background: rgba(0, 0, 0, 0.5); }
+    .opt-header-actions:popover-open .opt-btn:not([hidden]) { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; box-sizing: border-box; text-align: center; }
+    .opt-header-actions:popover-open .opt-btn-label { display: inline; }
+    .opt-header-actions:popover-open .cart-load:not([hidden]) { display: flex; }
+    .opt-header-actions:popover-open .cart-load .load { flex: 1; }
+}
+
 @media (max-width: 640px) {
     .res-header { flex-direction: column; }
     /* Its padding and border inside the 100%, or it runs 10px past the page */
@@ -1907,34 +1997,6 @@ tr.opt-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
     font-size: var(--text-xs);
     font-weight: 600;
     text-transform: uppercase;
-/* A store's buttons in a menu, which its header's menu button opens from the
-   foot of the screen: beside the name they ran to four or five lines */
-@media (max-width: 768px) {
-    @supports selector(:popover-open) {
-        .opt-store-header { display: grid; grid-template-columns: minmax(0, max-content) max-content 1fr repeat(3, auto); gap: 2px 0; padding-right: 8px; }
-        .opt-store-header h3 { grid-area: 1 / 1 / auto / 4; overflow: hidden; overflow: clip visible; text-overflow: ellipsis; align-self: end; }
-        .opt-store-header .opt-count { grid-area: 2 / 1; align-self: start; margin-right: 8px; overflow: hidden; overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-        .opt-store-header .opt-total { grid-area: 2 / 2; align-self: start; white-space: nowrap; }
-        .opt-view-btn, .opt-menu-btn, .opt-store-header .section-fold { grid-row: 1 / 3; min-width: 40px; align-items: center; justify-content: center; }
-        .opt-view-btn { grid-column: 4; }
-        .opt-menu-btn { grid-column: 5; display: flex; padding: 2px; border: none; border-radius: 6px; background: transparent; color: var(--normal); cursor: pointer; }
-        .opt-menu-btn svg { width: 20px; height: 20px; }
-        .opt-store-header .section-fold { grid-column: 6; }
-
-        .opt-header-actions[popover], .opt-header-actions:empty { display: none; }
-    }
-}
-/* Open, it is the menu at any width: a turned phone is wider than the rules above */
-@supports selector(:popover-open) {
-    .opt-header-actions[popover]:popover-open { position: fixed; inset: auto 0 0; display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; width: auto; max-height: 80vh; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); box-sizing: border-box; overflow-y: auto; border-top: 1px solid var(--border-moderate); border-radius: 20px 20px 0 0; background: var(--surface-1); color: var(--normal); }
-    .opt-header-actions:popover-open::before { content: attr(data-store-name); padding-bottom: 4px; font-size: var(--text-lg); font-weight: 700; }
-    .opt-header-actions::backdrop { background: rgba(0, 0, 0, 0.5); }
-    .opt-header-actions:popover-open .opt-btn:not([hidden]) { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; box-sizing: border-box; text-align: center; }
-    .opt-header-actions:popover-open .opt-btn-label { display: inline; }
-    .opt-header-actions:popover-open .cart-load:not([hidden]) { display: flex; }
-    .opt-header-actions:popover-open .cart-load .load { flex: 1; }
-}
-
     letter-spacing: 0.04em;
     color: var(--text-dim);
 }
