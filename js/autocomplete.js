@@ -650,8 +650,10 @@ function autocomplete(form, inp, sealed) {
     }
 
     /* Execute a function (make the suggestions disaeppear)
-     * when someone clicks in the document */
+     * when someone clicks in the document, outside this box while its own
+     * list is open: another box on the page must not close this one's. */
     document.addEventListener("click", function(e) {
+        if (e.target === inp || !inp.parentNode.querySelector('.ac-dropdown')) return;
         closeAllLists(e.target);
     });
 
