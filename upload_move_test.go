@@ -24,7 +24,7 @@ func moveRows(t *testing.T, entries []UploadEntry, st uploadSettings) uploadRows
 	}
 	st.percMargin = 1
 	st.multiplier = 1
-	return priceUploadRows(backend(), true, st, prices, uploadIndexes{}, entries)
+	return priceUploadRows(backend(), true, st, prices, uploadIndexes{}, nil, entries)
 }
 
 // sectionOf lists the stores each card is filed under, and whether it was
@@ -227,7 +227,7 @@ func TestOptimizerMovesToNotBought(t *testing.T) {
 		results:       map[string]map[string]*BanPrice{"card": {"CK": {Regular: 5}}},
 		enabledStores: []string{"CK"},
 	}
-	retail := priceUploadRows(backend(), false, uploadSettings{moves: st.moves, percMargin: 1, multiplier: 1}, prices, uploadIndexes{}, entries[:1])
+	retail := priceUploadRows(backend(), false, uploadSettings{moves: st.moves, percMargin: 1, multiplier: 1}, prices, uploadIndexes{}, nil, entries[:1])
 	if got := sectionOf(retail, "card"); strings.Join(got, ",") != "CK" {
 		t.Errorf("retail: card at %q, want CK", got)
 	}
@@ -282,7 +282,7 @@ func TestNotBoughtMoveTipsNoTie(t *testing.T) {
 		{map[string]string{"moved": notBoughtMove}, "SCG"},
 	} {
 		st := uploadSettings{moves: tc.moves, percMargin: 1, multiplier: 1, tiebreak: uploadtie.Consolidate}
-		rows := priceUploadRows(backend(), true, st, prices, uploadIndexes{}, entries)
+		rows := priceUploadRows(backend(), true, st, prices, uploadIndexes{}, nil, entries)
 		if got := sectionOf(rows, "tied"); strings.Join(got, ",") != tc.want {
 			t.Errorf("moves %v: tied at %q, want %s", tc.moves, got, tc.want)
 		}

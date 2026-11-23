@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/bulkrates"
 	"github.com/mtgban/mtgban-website/internal/uploadsort"
 	"github.com/mtgban/mtgban-website/internal/uploadtie"
 )
@@ -680,13 +681,19 @@ func TestUploadRowsCarryTheirSortKeys(t *testing.T) {
 
 // TestOptimizerListsLeftovers lists, after the stores' sections, a buylist
 // row whose offers the minimum value drops under Filtered out with its best
-// offer and the stores it can be moved to, and one no store buys under Not
-// bought, and neither at retail.
+// offer and the stores it can be moved to, and one neither a store nor the
+// bulk shelf buys under Not bought, and neither at retail.
 func TestOptimizerListsLeftovers(t *testing.T) {
 	cards := closeVendors(t)
+	bulk := bulkrates.New(backend())
 	var extra string
 	for _, id := range backend().GetUUIDs() {
-		if !slices.Contains(cards, id) {
+		co, err := backend().GetUUID(id)
+		if err != nil || slices.Contains(cards, id) {
+			continue
+		}
+		_, bulkTakes := bulk.Offer(co)
+		if !bulkTakes {
 			extra = id
 			break
 		}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/banprice"
+	"github.com/mtgban/mtgban-website/internal/bulkrates"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 )
@@ -16,8 +17,8 @@ import (
 // pre-stores (site.go), the value served before the first load completes:
 // numbers (exact-number searches scan instead, and a number searched alone
 // is no collector number), sources (contents: searches scan instead), names
-// (SuggestAPI answers 204), palette (lists served no-store) and odds (no
-// labels) all wait for an actual load.
+// (SuggestAPI answers 204), palette (lists served no-store), odds (no
+// labels) and bulk (no bulk offers) all wait for an actual load.
 type datastore struct {
 	backend  *matcher.Backend
 	numbers  *numbersSnapshot
@@ -27,5 +28,6 @@ type datastore struct {
 	palette  *palette.Snapshot
 	finishes []banprice.Finish
 	odds     *productOdds
+	bulk     *bulkrates.Rates
 	loadedAt time.Time
 }

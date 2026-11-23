@@ -13,12 +13,13 @@ function bell(card, side) {
 }
 
 // Loads js/alerts.js on a page with only these bells; section is what
-// #opt-not-bought answers, and observers collects each IntersectionObserver.
-function load(bells, { section = null, observers } = {}) {
+// #opt-not-bought answers, filtered what #opt-filtered-out does, and
+// observers collects each IntersectionObserver.
+function load(bells, { section = null, filtered = null, observers } = {}) {
     const listeners = {};
     const document = {
         addEventListener: (type, fn) => { listeners[type] = fn; },
-        getElementById: id => (id === 'opt-not-bought' ? section : null),
+        getElementById: id => ({ 'opt-not-bought': section, 'opt-filtered-out': filtered })[id] || null,
         querySelector: sel => (sel === BELLS ? bells[0] || null : null),
         querySelectorAll: sel => (sel === BELLS ? bells : []),
     };
@@ -69,6 +70,17 @@ test("Upload reads the alerts when Not bought comes into view, once", async () =
     observers[0].fn([{ isIntersecting: true }]);
     expect(a.calls.map(c => c.path)).toEqual(['/api/alerts/']);
     expect(observers[0].connected).toBe(false);
+});
+
+test("Upload watches Filtered out instead when its bulk rows carry bells", () => {
+    const section = {};
+    const bulk = { querySelector: sel => (sel === '.alert-link' ? {} : null) };
+    const plain = { querySelector: () => null };
+    for (const [filtered, want] of [[bulk, bulk], [plain, section]]) {
+        const observers = [];
+        load([bell('card-a', 'buylist')], { section, filtered, observers }).ready();
+        expect(observers[0].observed).toEqual([want]);
+    }
 });
 
 test('a page without Not bought, or a browser without the observer, reads them at load', () => {

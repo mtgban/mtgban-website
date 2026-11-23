@@ -439,7 +439,7 @@ type PageVars struct {
 
 	// CanAlerts says the reader's ACL grants the Alerts page, an
 	// allowance and a delivery channel, so Search's results and Upload's
-	// Not bought rows may offer the alert link.
+	// Not bought and bulk rows may offer the alert link.
 	CanAlerts bool
 	// AlertChannelList is the delivery channels the alert modal offers,
 	// read off #alert-modal's data-alert-channels by js/alerts.js.
