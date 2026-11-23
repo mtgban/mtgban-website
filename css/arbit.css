@@ -791,8 +791,10 @@ button.arb-filter-reset:disabled {
 }
 
 /* ── Row removal ── */
-tr.arb-removed td { opacity: 0.45; }
-tr.arb-removed td:last-child { opacity: 1; }
+tr.arb-removed td,
+tr.load-full td { opacity: 0.45; }
+tr.arb-removed td:last-child,
+tr.load-full td:last-child { opacity: 1; }
 tr.arb-removed .card-name-line a { text-decoration: line-through; }
 tr.arb-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
 .arb-row-check { cursor: pointer; }
