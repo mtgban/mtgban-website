@@ -748,7 +748,8 @@ the package orders; the other tables keep the submitted order.
 **Card view.** `js/upload-view.js` shows an optimizer store's rows as a
 grid of card images, for one store or all of them from the toolbar, and
 remembers the toolbar's choice in localStorage (`mtgban_upload_view`); a
-store's own button lasts for the page.
+store's own button lasts for the page. With no choice kept, a phone (560px
+and under) starts on it.
 
 **TCGplayer export prices.** An uploaded TCGplayer export's price is its
 My Store Price, then TCG Marketplace Price, then TCG Market Price, the
