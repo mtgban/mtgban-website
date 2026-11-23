@@ -649,7 +649,10 @@ override; phone UA detection via `mileusna/useragent`).
   condition, best first.
 - **Results**: `map[cardUUID]map[condition][]SearchEntry`; INDEX
   pseudo-conditions merge TCG Low/Market and MKM Low/Trend pairs into
-  single rows with a `Secondary` price. Without a signature, non-affiliate
+  single rows with a `Secondary` price. A TCGplayer row's `Secondary` is
+  the same sku's price in `TCGItemLow` (the lowest listing's item price,
+  without shipping), paired by `InstanceID`, and its sellers and copies
+  sit beside the store's name instead. Without a signature, non-affiliate
   entries are `Locked` (link disabled), or left out under
   `search_hide_non_affiliates`, against `Affiliates().List` /
   `Affiliates().BuylistList` (common.go) — there is no longer a
@@ -996,7 +999,8 @@ from every reader, a key signed into the site included: the search page,
 its export, every surface reading the search block lists, Arbitrage,
 Reverse and Global as a source or a table whatever `ArbitEnabled` grants,
 their settings grids, the search and upload store lists, the palette's,
-and the guide's store reference.
+and the guide's store reference. `TCGItemLow` alone reaches the search page,
+as the second price on the TCGplayer row, never as a row of its own.
 
 `/api/v2/newspaper/` (`NewspaperAPI`, `api_news.go`) serves the live
 edition of the newspaper's reports: `newspaper/reports.json` lists the

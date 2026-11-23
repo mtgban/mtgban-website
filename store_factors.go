@@ -127,8 +127,8 @@ func (e *SearchEntry) adjustable() bool {
 	return e.IsOffer() && !e.Locked && e.Shorthand != "CUSTOM" && e.Price > 0
 }
 
-// discount takes pct percent off a seller's price; its credit equivalent
-// keeps the store's ratio.
+// discount takes pct percent off a seller's price, and off its item price
+// where it has one; its credit equivalent keeps the store's ratio.
 func (e *SearchEntry) discount(pct int) {
 	if pct <= 0 || !e.adjustable() {
 		return
@@ -141,6 +141,10 @@ func (e *SearchEntry) discount(pct int) {
 	}
 	if e.Credit > 0 {
 		e.Credit = round2(e.Credit * float64(100-pct) / 100)
+	}
+	// A seller row's Secondary is the same store's item price
+	if e.Secondary > 0 {
+		e.Secondary = max(round2(e.Secondary*float64(100-pct)/100), 0.01)
 	}
 }
 

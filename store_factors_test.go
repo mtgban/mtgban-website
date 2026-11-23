@@ -155,6 +155,16 @@ func TestDiscountWithoutCredit(t *testing.T) {
 	}
 }
 
+// TestDiscountScalesTheItemPrice keeps a TCGplayer row's item price under
+// the same discount as its delivered price.
+func TestDiscountScalesTheItemPrice(t *testing.T) {
+	e := SearchEntry{Shorthand: "TCGPlayer", Price: 10, Secondary: 8.5, SecondaryTip: "Without shipping"}
+	e.discount(10)
+	if e.Price != 9 || e.Secondary != 7.65 {
+		t.Errorf("got price %v, item price %v; want 9, 7.65", e.Price, e.Secondary)
+	}
+}
+
 func TestScaleCreditFloor(t *testing.T) {
 	for _, tc := range []struct {
 		credit, market         float64

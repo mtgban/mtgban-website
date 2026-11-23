@@ -616,6 +616,9 @@
                                                         {{else}}
                                                             <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or .Shorthand "other"}}" data-track-scope="seller">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                         {{end}}
+                                                        {{if .Listings}}
+                                                            <span class="tcg-listings" title="{{plain_tip .ListingsTitle}}" data-tip="{{.ListingsTitle}}">{{.Listings}}</span>
+                                                        {{end}}
                                                         {{if $.CanFixSearch}}
                                                             <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=retail&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}" data-track="ui.row.admin_fix" data-track-value="retail">FIX</a>
                                                         {{end}}
@@ -647,15 +650,13 @@
                                                             {{end}}
                                                         </span>
                                                         {{if .Secondary}}
-                                                            <span class="secondary"><span class="cur">$</span><span class="amt">{{printf "%.2f" .Secondary}}</span></span>
+                                                            <span class="secondary"{{with .SecondaryTip}} title="{{.}}"{{end}}><span class="cur">$</span><span class="amt">{{printf "%.2f" .Secondary}}</span></span>
                                                         {{else}}
                                                             <span class="qty">
                                                                 {{if and .BundleIcon .Price}}
                                                                     <img style="padding-top:4px;" src="{{.BundleIcon}}">
                                                                 {{else if not .NoQuantity}}
                                                                     {{.Quantity}}
-                                                                {{else if .Listings}}
-                                                                    <span class="tcg-listings" title="{{plain_tip .ListingsTitle}}" data-tip="{{.ListingsTitle}}">{{.Listings}}</span>
                                                                 {{end}}
                                                             </span>
                                                         {{end}}
