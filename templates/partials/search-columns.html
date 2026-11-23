@@ -153,12 +153,11 @@
 {{end}}
 
 {{define "result-buyers"}}{{$page := .Page}}{{$card := .Card}}{{$cardId := .CardID}}
-{{/* Switch puts the Buylist/Sales switch on a card that is not sealed
+{{/* Switch puts the Buylist/Sales switch on the column
      (docs/adr/0009-recent-tcgplayer-sales.md); the phone shows the sales
      in a pane of their own instead */}}
-{{$salesSwitch := and .Switch (not $card.Sealed)}}
-<div class="result-col{{if $salesSwitch}} buyers-col{{end}}"{{if $salesSwitch}} data-buyers-mode="{{$page.BuyersMode}}"{{end}}>
-    <div class="result-col-header">Buyers{{if $salesSwitch}}{{template "buyers-switch" $page.BuyersMode}}{{end}}</div>
+<div class="result-col{{if .Switch}} buyers-col{{end}}"{{if .Switch}} data-buyers-mode="{{$page.BuyersMode}}"{{end}}>
+    <div class="result-col-header">Buyers{{if .Switch}}{{template "buyers-switch" $page.BuyersMode}}{{end}}</div>
     {{if $card.Velocity}}
         {{if $page.CanVelocity}}
             <details class="sales-velocity"{{if $page.VelocityOpen}} open{{end}}>
@@ -243,7 +242,7 @@
         {{end}}
     {{end}}
     </div>
-    {{if $salesSwitch}}
+    {{if .Switch}}
     <div class="sales-pane" data-card="{{$cardId}}" data-pending></div>
     {{end}}
 </div>

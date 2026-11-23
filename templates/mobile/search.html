@@ -347,7 +347,7 @@
             {{/* The recent sales, for a card with orders on record: a list after
                  the buyers, or before them where the reader's Buyers column
                  opens on Sales (docs/adr/0009-recent-tcgplayer-sales.md) */}}
-            {{$hasSales := and (not $card.Sealed) (index $.HasSales $cardId)}}
+            {{$hasSales := index $.HasSales $cardId}}
             {{$salesFirst := and $hasSales (or (eq $.BuyersMode "sales") (not (or $hasBuyers $salesRow)))}}
             {{$sellerConds := (index $.FoundSellers $cardId)}}
             {{$vendorConds := (index $.FoundVendors $cardId)}}
