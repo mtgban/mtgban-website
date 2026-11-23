@@ -247,6 +247,21 @@
 .sales-more:not([open]) > summary .sales-more-close {
     display: none;
 }
+/* The fold's rows carry on the shading of the row above it. */
+:where(.sales-pane > .price-row:nth-child(even of .price-row)) + .sales-more > .price-row:where(:nth-child(even of .price-row)),
+:where(.sales-pane > .price-row:nth-child(odd of .price-row)) + .sales-more > .price-row:where(:nth-child(odd of .price-row)) {
+    background: var(--search-surface-1);
+}
+@media (pointer: coarse) {
+    /* As tall as a row, for a finger. */
+    .sales-more > summary {
+        display: flex;
+        align-items: center;
+        min-height: var(--price-row-h, 42px);
+        padding-block: 0;
+        box-sizing: border-box;
+    }
+}
 
 /* ── Price row ── */
 /* The row is a (sub)grid: column 1 holds the store name. store-cell wraps the

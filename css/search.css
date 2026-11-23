@@ -1827,6 +1827,7 @@ body.modal-embed .cp-overlay {
     .result-header-cover { margin-left: -16px; margin-right: -16px; }
     .result-header { padding: 8px 10px; gap: 6px; }
     .price-row { --price-row-h: 34px; padding: 0 10px; }
+    .sales-more > summary { --price-row-h: 34px; }
 }
 
 /* When the results area itself gets narrow — typically while the sidebar is
@@ -1967,6 +1968,7 @@ body.modal-embed .cp-overlay {
 @media (max-width: 640px) {
     /* Price rows: tighter layout */
     .price-row { --price-row-h: 36px; padding: 0 8px; gap: 4px; font-size: var(--text-md); }
+    .sales-more > summary { --price-row-h: 36px; }
     .price-row .store-name { font-size: var(--text-md); }
     .price-row .price { font-size: var(--text-md); }
     .price-row .qty { font-size: var(--text-sm); }
