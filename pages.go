@@ -244,7 +244,6 @@ func init() {
 			Page:        "upload.html",
 			SettingsTab: "upload",
 			CanPOST:     true,
-			DesktopOnly: true,
 		},
 		"Global": {
 			Name:        "Global",
@@ -721,13 +720,14 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	// Same reasoning for the description meta tag: every base needs it.
 	files = append(files, "templates/partials/meta-description.html")
 
-	// Every desktop page carries the settings modal's shell; its body is
-	// fetched from /api/settings/modal on open
-	if !isMobile {
+	// Every desktop page carries the settings modal's shell, and the mobile
+	// Upload, whose options live there; its body is fetched from
+	// /api/settings/modal on open
+	if !isMobile || name == "upload.html" {
 		files = append(files, "templates/partials/settings-modal.html")
-		if name == "admin.html" {
-			files = append(files, "templates/partials/admin-usage.html", "templates/partials/admin-searches.html", "templates/partials/admin-alerts.html")
-		}
+	}
+	if !isMobile && name == "admin.html" {
+		files = append(files, "templates/partials/admin-usage.html", "templates/partials/admin-searches.html", "templates/partials/admin-alerts.html")
 	}
 	// The metrics section's partials, desktop and mobile alike
 	if name == "admin.html" {
