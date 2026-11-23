@@ -253,10 +253,11 @@
         place();
     }
 
-    // The pager's drawer: the last card cannot scroll on, so a swipe up on it
-    // raises the drawer, and a swipe down anywhere lowers it again. While it
-    // is up the script owns every swipe, since nothing under it scrolls: a
-    // sideways one folds the drawer and moves the card one list over.
+    // The end drawer, the pager or where the results end: the last card
+    // cannot scroll on, so a swipe up on it raises the drawer, and a swipe
+    // down anywhere lowers it again. While it is up the script owns every
+    // swipe, since nothing under it scrolls: a sideways one folds the drawer
+    // and moves the card one list over.
     var drawer = page.querySelector('.m-results-end');
     var SWIPE = 40;
     var startX = null, startY = null;

@@ -81,10 +81,10 @@ What the phone page already has, and this decision builds on:
    allow and centred on the deck, jumps
    straight to the card at the point tapped or dragged to, without the
    scroll in between, naming its set and number ("TRC #499") while
-   dragging. Under the last card, where there is a pager or a notice,
-   they rise in a drawer over the card's foot with one more swipe, the
-   card staying where it is; a swipe down lowers it. There is no empty
-   slide.
+   dragging. Under the last card one more swipe raises a drawer over the
+   card's foot, the card staying where it is: "End of results" on the
+   last page, then the pager and the notices, where there are any; a swipe
+   down lowers it. There is no empty slide.
 4. **Native scroll snapping, one gesture in code.** The results area is a
    vertical scroller, `scroll-snap-type: y mandatory` with
    `scroll-snap-stop: always`; each card is a horizontal scroller,
