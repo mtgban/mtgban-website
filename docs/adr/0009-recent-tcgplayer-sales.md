@@ -112,7 +112,8 @@ What exists:
    headers, newest first.
    - Each header carries the condition's average price per copy over every
      order kept, weighted by copies.
-   - A row is the source (TCGplayer's logo and name, grey), the date
+   - A row is the source (TCGplayer's logo and name, linked to the card's
+     product page in that condition and printing), the date
      (white, centred: `2026-11-19`, the minute in its tooltip), and the
      price per copy with the quantity
      beside it above one copy.

@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/mtgban"
+
 	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
 
@@ -107,6 +110,10 @@ func TestSalesPaneAPI(t *testing.T) {
 			t.Errorf("sold pane lacks %q:\n%s", want, panes["sold"])
 		}
 	}
+	// The fixture's card is in no datastore, so its name links nowhere.
+	if strings.Contains(panes["sold"], "href") {
+		t.Errorf("a card with no product has a link:\n%s", panes["sold"])
+	}
 	if !strings.Contains(panes["unsold"], "No sales on record") {
 		t.Errorf("unsold pane = %q", panes["unsold"])
 	}
@@ -122,5 +129,87 @@ func TestSalesPaneAPI(t *testing.T) {
 	}
 	if got := len(get("/data/sales/"+strings.Join(many, ","), "")); got != salesPaneMaxIDs {
 		t.Errorf("drew %d panes, want at most %d", got, salesPaneMaxIDs)
+	}
+}
+
+// TestSalesPaneLinks checks a group's link reaches each of its rows, the
+// folded ones included.
+func TestSalesPaneLinks(t *testing.T) {
+	tmpl, err := salesPaneTemplate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := salesvelocity.Line{Date: "2026-11-19", Source: "TCGplayer", Price: "1.00"}
+	groups := []salesvelocity.Group{{
+		Grade: "SP", Link: "https://example.com/p?a=1&b=2",
+		Shown: []salesvelocity.Line{line, line}, More: []salesvelocity.Line{line},
+	}}
+	var buf strings.Builder
+	err = tmpl.ExecuteTemplate(&buf, "sales-pane", groups)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		`<a class="sales-src" href="https://example.com/p?a=1&amp;b=2"`,
+		`data-track="ui.row.store" data-track-value="TCGPlayer" data-track-scope="sales"`,
+	} {
+		if got := strings.Count(out, want); got != 3 {
+			t.Errorf("%d rows have %q, want all 3:\n%s", got, want, out)
+		}
+	}
+}
+
+// TestSalesLink covers the printing, condition and language a sales row's
+// link asks TCGplayer for.
+func TestSalesLink(t *testing.T) {
+	skipWithoutDatastore(t)
+	b := testSite.backend()
+	// Lightning Bolt (M10), whose two finishes share one product.
+	const bolt = "78380203-7623-50bc-ab48-577cd655ee9a"
+	for id, want := range map[string]url.Values{
+		bolt:        {"Printing": {"Normal"}, "Condition": {"Lightly Played"}, "Language": {"English"}, "direct": {"false"}},
+		bolt + "_f": {"Printing": {"Foil"}, "Condition": {"Lightly Played"}, "Language": {"English"}, "direct": {"false"}},
+	} {
+		link := salesLink(b, testSite.prices(), id, mtgban.SP)
+		u, err := url.Parse(link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if inner := u.Query().Get("u"); inner != "" {
+			u, err = url.Parse(inner)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		if u.Path != "/product/32656" {
+			t.Errorf("%s: path %q, want the product's page", id, u.Path)
+		}
+		if got := u.Query().Encode(); got != want.Encode() {
+			t.Errorf("%s: asks for %q, want %q", id, got, want.Encode())
+		}
+	}
+	if link := salesLink(b, testSite.prices(), "unknown", mtgban.NM); link != "" {
+		t.Errorf("an unknown card links to %q", link)
+	}
+}
+
+func TestSalesPrinting(t *testing.T) {
+	cases := []struct {
+		finish               string
+		foil, etched, sealed bool
+		want                 string
+	}{
+		{"nonfoil", false, false, false, "Normal"},
+		{"reverseholofoil", true, false, false, "Reverse Holofoil"},
+		{"etched", false, true, false, "Foil"},
+		{"nonfoil", false, false, true, ""},
+	}
+	for _, c := range cases {
+		co := &matcher.CardObject{}
+		co.Finish, co.Foil, co.Etched, co.Sealed = c.finish, c.foil, c.etched, c.sealed
+		if got := salesPrinting(co); got != c.want {
+			t.Errorf("salesPrinting(%q, sealed %v) = %q, want %q", c.finish, c.sealed, got, c.want)
+		}
 	}
 }

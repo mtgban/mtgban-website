@@ -401,11 +401,13 @@ type Line struct {
 const recentSource = "TCGplayer"
 
 // Group is one grade's orders: the average price per copy over all of
-// them, the newest RecentShown, then the rest.
+// them, the newest RecentShown, then the rest. Link is where the store sells
+// the card in this grade, filled by the caller, "" for a name with no link.
 type Group struct {
 	Grade       string
 	Avg         string
 	Shown, More []Line
+	Link        string
 }
 
 // Groups is r's orders per grade in Grades' order; none for a grade with no
