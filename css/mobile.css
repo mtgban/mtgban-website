@@ -189,8 +189,14 @@
 
 .m-menu-ext {
     display: flex;
+    align-items: center;
     gap: 1em;
     padding: 0.5em;
+}
+
+/* The theme toggle at the end of the Patreon line */
+.m-menu-ext .ban-theme-toggle {
+    margin-left: auto;
 }
 
 .m-menu-ext img {
