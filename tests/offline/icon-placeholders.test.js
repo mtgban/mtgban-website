@@ -30,6 +30,7 @@ const BASES = {
         '.cp-chip-icon', '.cp-chip-delete',
     ],
     'css/mobile.css': ['.m-pin-btn'],
+    'css/search-landing.css': ['.fav-sort-pill'],
     'css/search-mobile.css': [
         '.m-search-btn', '.m-sort-pill', '.m-fav-btn', '.m-chart-btn',
         '.m-actions-btn', '.m-actions-item', '.m-setpicker-close',

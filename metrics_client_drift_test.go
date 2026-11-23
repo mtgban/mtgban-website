@@ -49,7 +49,7 @@ var (
 // Each entry needs a comment saying why its value is bounded and never reader text.
 var trackValueAllowlist = []string{
 	// ui.row.store: a row's scraper shorthand set server side, never reader text; the registry types it a store, so Check folds an unloaded one to other.
-	`templates/search.html: ui.row.store: data-track-value="{{or .Shorthand "other"}}" data-track-s`,
+	`templates/partials/search-columns.html: ui.row.store: data-track-value="{{or .Shorthand "other"}}" data-track-s`,
 	`templates/mobile/search.html: ui.row.store: data-track-value="{{or $entry.Shorthand "other"}}" data-t`,
 	// ui.row.condition: $conditions ranges over AllConditions (search.go), the registry's enum exactly; Check refuses any other.
 	`templates/mobile/search.html: ui.row.condition: data-track-value="{{$conditions}}">{{$conditions}}</butto`,
@@ -431,11 +431,11 @@ func TestTrackValuesAreLiterals(t *testing.T) {
 // An allowlist entry covers its own name only, not the same text under another.
 func TestTrackValueAllowlistIsKeyedOnTheName(t *testing.T) {
 	const use = ` data-track-value="{{or .Shorthand "other"}}" data-track-scope="seller">`
-	if _, problems := scanFixture("templates/search.html", `<a data-track="ui.row.store"`+use); len(problems) != 0 {
+	if _, problems := scanFixture("templates/partials/search-columns.html", `<a data-track="ui.row.store"`+use); len(problems) != 0 {
 		t.Errorf("the allowlisted mark is flagged: %q", problems)
 	}
-	_, problems := scanFixture("templates/search.html", `<a data-track="ui.result.image"`+use)
-	if !hasProblem(problems, "templates/search.html", "data-track-value", "text a reader typed") {
+	_, problems := scanFixture("templates/partials/search-columns.html", `<a data-track="ui.result.image"`+use)
+	if !hasProblem(problems, "templates/partials/search-columns.html", "data-track-value", "text a reader typed") {
 		t.Errorf("the allowlisted text under another name is not flagged: %q", problems)
 	}
 }

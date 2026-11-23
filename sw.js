@@ -44,6 +44,7 @@ var SHELL_URLS = [
     '/js/tooltips.js?hash=' + BUILD,
     '/js/search-type-focus.js?hash=' + BUILD,
     '/js/icons.js?hash=' + BUILD,
+    '/css/search-rows.css?hash=' + BUILD,
     '/css/search.css?hash=' + BUILD,
     '/css/offline.css?hash=' + BUILD,
     '/js/offline/offline-db.js?hash=' + BUILD,

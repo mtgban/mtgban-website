@@ -287,7 +287,7 @@ test('every icon placeholder is sized with the icon that replaces it', () => {
     // Each rule that sizes one of these icons has to size its placeholder in
     // the same breath - that is the only way the two cannot disagree - so
     // this asserts the pairing rather than any particular number.
-    for (const base of ['.search-sort-pill', '.search-sort-settings', '.fav-sort-pill',
+    for (const base of ['.search-sort-pill', '.search-sort-settings',
                         '.result-quick-icons .fav-btn', '.result-quick-icons .qi-view-image',
                         '.qi-actions']) {
         const esc = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
