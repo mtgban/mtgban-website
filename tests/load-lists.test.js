@@ -14,8 +14,8 @@ const ROWS = [
 // mark a row as the page's own checkbox handler does, then fire the change
 // event that follows; show puts the rows in the order given, by
 // data-load-idx, as a sort does, then fires the rowsmoved event that follows.
-function loadPage({lists = [], forms = []}) {
-    const trs = ROWS.map((r, idx) => {
+function loadPage({lists = [], forms = [], cards = ROWS}) {
+    const trs = cards.map((r, idx) => {
         const tr = {
             removed: false,
             dataset: {
@@ -26,13 +26,22 @@ function loadPage({lists = [], forms = []}) {
                 loadTcgid: r.tcgid,
                 loadSet: r.set,
                 loadNumber: r.number,
+                arbId: r.card,
+                loadOffer: r.offer,
             },
         };
-        tr.classList = {contains: (name) => name === 'opt-removed' && tr.removed};
+        if (r.limit) {
+            tr.dataset.loadLimit = r.limit;
+        }
+        tr.classList = {
+            contains: (name) => name === 'opt-removed' && tr.removed,
+            toggle: (name, on) => { tr[name] = on; },
+        };
         return tr;
     });
     let shown = [...trs];
     const section = {
+        querySelector: (selector) => lists.find((l) => selector === '[data-load-list="' + l.dataset.loadList + '"]') || null,
         querySelectorAll: (selector) => ({
             'tr[data-load-idx]': shown,
             '[data-load-list]': lists,
@@ -43,6 +52,7 @@ function loadPage({lists = [], forms = []}) {
 
     const handlers = {};
     const document = {
+        querySelectorAll: (selector) => (selector === '.opt-store' ? [section] : []),
         addEventListener: (type, handler) => { handlers[type] = handler; },
     };
     const wire = new Function('document', source + '\nreturn wireLoadLists;')(document);
@@ -53,6 +63,7 @@ function loadPage({lists = [], forms = []}) {
         handlers.change({target: checkbox});
     };
     return {
+        full: () => trs.map((tr) => !!tr['load-full']),
         untick: (idx) => toggle(idx, true),
         tick: (idx) => toggle(idx, false),
         show: (order) => {
@@ -237,6 +248,73 @@ describe('load lists', () => {
         return {form, children, sent: () => children.filter((c) => c.name && !c.disabled).map((c) => c.value),
             order: () => children.map((c) => c.link || c.value)};
     }
+
+    // One card in three conditions against a limit of 3, then one with none
+    const GRADED = [
+        {card: 'mountain', offer: 'SKU-1', limit: '3', qty: '1', ckid: '21', name: 'Mountain'},
+        {card: 'mountain', offer: 'SKU-1', limit: '3', qty: '3', ckid: '21', name: 'Mountain'},
+        {card: 'mountain', offer: 'SKU-1', limit: '3', qty: '2', ckid: '21', name: 'Mountain'},
+        {card: 'island', offer: 'SKU-2', qty: '4', ckid: '22', name: 'Island'},
+    ];
+
+    test("a buylist's limit holds across conditions as the page loads", () => {
+        const ck = listInput('ckbuylist', 'server');
+        const href = 'https://abugames.com/cartview/shop#ban=301:1,302:3,303:2,304:4&v=abc&side=retail';
+        const link = cartButton(href, '301,302,303,304');
+        const page = loadPage({lists: [ck, link], cards: GRADED});
+        expect(JSON.parse(ck.value)).toEqual({contents: [{id: 21, qty: 3}, {id: 22, qty: 4}, {}]});
+        expect(link.href).toBe('https://abugames.com/cartview/shop#ban=301:1,302:2,304:4&v=abc&side=retail');
+        expect(page.full()).toEqual([false, false, true, false]);
+    });
+
+    test('unticking a condition gives its copies to the next, in the order shown', () => {
+        const href = 'https://abugames.com/cartview/shop#ban=301:1,302:3,303:2,304:4&v=abc&side=retail';
+        const link = cartButton(href, '301,302,303,304');
+        const page = loadPage({lists: [link], cards: GRADED});
+        page.untick(1);
+        expect(link.href).toBe('https://abugames.com/cartview/shop#ban=301:1,303:2,304:4&v=abc&side=retail');
+        expect(page.full()).toEqual([false, false, false, false]);
+        page.tick(1);
+        page.show([2, 1, 0, 3]);
+        expect(link.href).toBe('https://abugames.com/cartview/shop#ban=303:2,302:1,304:4&v=abc&side=retail');
+        expect(page.full()).toEqual([true, false, false, false]);
+    });
+
+    test('a cart link asking its own quantities is held to the limit too', () => {
+        const href = 'https://www.cardtrader.com/cart/edit#ban=a:3,b:3,c:3,d:999&v=abc&side=retail';
+        const link = cartButton(href, 'a,b,c,d', '3,3,3,999');
+        const page = loadPage({lists: [link], cards: GRADED});
+        expect(link.href).toBe('https://www.cardtrader.com/cart/edit#ban=a:3,d:999&v=abc&side=retail');
+        expect(page.full()).toEqual([false, true, true, false]);
+    });
+
+    test('a separate offer for a condition keeps its own limit', () => {
+        const href = 'https://abugames.com/cartview/shop#ban=301:1,302:3,303:2,304:4&v=abc&side=retail';
+        const link = cartButton(href, '301,302,303,304');
+        loadPage({lists: [link], cards: GRADED.map((r, i) => ({...r, offer: 'SKU-' + i}))});
+        expect(link.href).toBe(href);
+    });
+
+    test('offers with no id share a limit only where they state the same one', () => {
+        const href = 'https://abugames.com/cartview/shop#ban=301:8,302:4,303:4&v=abc&side=retail';
+        const link = cartButton(href, '301,302,303');
+        const row = (limit) => ({card: 'mountain', offer: '', limit, qty: limit, name: 'Mountain'});
+        const page = loadPage({lists: [link], cards: [row('8'), row('4'), row('4')]});
+        expect(link.href).toBe('https://abugames.com/cartview/shop#ban=301:8,302:4&v=abc&side=retail');
+        expect(page.full()).toEqual([false, false, true]);
+    });
+
+    test("Card Kingdom's buylist names a product once, its rows added up", () => {
+        const ck = listInput('ckbuylist', 'server');
+        loadPage({lists: [ck], cards: GRADED.map((r) => ({...r, limit: undefined}))});
+        expect(JSON.parse(ck.value)).toEqual({contents: [{id: 21, qty: 6}, {id: 22, qty: 4}, {}]});
+    });
+
+    test('a hashes form sends the copies the limit leaves a row', () => {
+        const f = hashesForm();
+        loadPage({forms: [f.form], cards: GRADED.slice(0, 3).map((r) => ({...r, qty: '2'}))});
+        expect(f.sent()).toEqual(['SCGRetail', 'false', 'card-a/NM', '2', 'NM', 'card-a/SP', '1', 'SP']);
+    });
 
     test('a hashes form disables only the unticked row, even for a repeated card', () => {
         const f = hashesForm();

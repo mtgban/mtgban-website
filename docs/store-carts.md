@@ -643,6 +643,20 @@ GET  /api/cart                  {"lineitems": [{"product_id": 10190, "style": "E
 | a cart add | 0.4 to 2.5 s |
 | two cards in one cart add body | 422 |
 
+## Card Kingdom: the buylist import
+
+`sellcart/partner_import` takes `{"contents": [{"id": ..., "qty": ...}, ...]}`,
+each id the printing's product id, the same for every condition: Card Kingdom
+grades what arrives.
+
+- A product named twice keeps one line, the first, and drops the others. An
+  arbitrage list loaded in November 2026 asked 20 and 8 copies of one card
+  (limit 100) and got 20, 4 and 1 of another (limit 25) and got 4, and 1 and
+  3 of a third (limit 3) and got 1. `js/load-lists.js` adds a product's rows
+  up.
+- The limit (`qty_buying`) is the product's, not a condition's. go-mtgban
+  repeats it on each grade, under one `InstanceID`.
+
 ## SCG: the CSV import
 
 SCG's sell site, `https://sellyourcards.starcitygames.com`, adds one card
@@ -692,7 +706,14 @@ alone. A Mana Pool row's quantity is 0, so in practice that is one copy a
 row, the one the spread priced. TCGplayer's every-seller button asks the
 same: its loader stays at or under BAN's price, but each seller ships its
 own package, whose shipping a spread worked out on one copy does not
-cover. The global page compares two
+cover. An offer's limit holds for a card in
+every condition together, where the conditions share an `InstanceID` and
+state the same limit:
+`js/load-lists.js` (`cappedRows`) fills it from the ticked rows in the order
+they stand, in every list the section sends, and dims a row any of them left out,
+as a `data-load-qtys` cart does sooner, its first condition asking for the
+whole limit.
+The global page compares two
 stores' listings and sells nowhere, so a section gets only "Load at", for
 the store whose copies its rows are: the page's own store, or on sealed
 the section's, as `scraperCompare` picks its seller.
