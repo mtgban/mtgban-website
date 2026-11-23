@@ -38,6 +38,27 @@ html:has(.m-landing) {
     padding-bottom: 4px;
 }
 
+/* A sealed index's EV, Sim median and spread stack in the price column,
+   the store's name centred beside them, where the narrow desktop band
+   puts the median under the name. Only at phone width: a wider pane keeps
+   the index's three columns under their labels. */
+@container search-results (width <= 480px) {
+    .m-layout-cards .m-tab-panel .rows-index .price-row > .store-name {
+        grid-row: 1 / span 3;
+        align-self: center;
+    }
+
+    .m-layout-cards .m-tab-panel .rows-index .index-cols > .price:nth-child(2) {
+        grid-column: 2;
+        grid-row: 2;
+    }
+
+    .m-layout-cards .m-tab-panel .rows-index .index-cols > .price:nth-child(3) {
+        grid-column: 2;
+        grid-row: 3;
+    }
+}
+
 /* The edge buttons, the tools between them, the list headings and the
    scrubber exist for portrait Cards alone; landscape keeps the tools in the
    ⋮ menu */

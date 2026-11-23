@@ -58,3 +58,17 @@ test('a phone\'s list stacks a buyer\'s credit under the price, in a row that gr
     const cards = read('css/search-cards-mobile.css');
     expect(cards).toMatch(/\.m-layout-cards \.m-tab-panel \.price-row \{\n\s+height: auto;\n\s+min-height: var\(--price-row-h, 42px\);/);
 });
+
+// A sealed index's EV row on a phone stacks EV, Sim median and spread in the
+// price column, with the store's name centred beside them.
+test('a phone\'s sealed index row centres its name beside the stacked prices', () => {
+    const all = read('css/search-cards-mobile.css');
+    // Inside the phone-width query: a wider pane keeps the index's subgrid.
+    const start = all.indexOf('@container search-results (width <= 480px) {\n    .m-layout-cards .m-tab-panel .rows-index');
+    expect(start).toBeGreaterThan(-1);
+    const cards = all.slice(start, all.indexOf('\n}\n', start));
+    expect(all.match(/\.rows-index \.index-cols > \.price:nth-child/g)).toHaveLength(2);
+    expect(cards).toMatch(/\.m-tab-panel \.rows-index \.price-row > \.store-name \{\n\s+grid-row: 1 \/ span 3;\n\s+align-self: center;/);
+    expect(cards).toMatch(/\.m-tab-panel \.rows-index \.index-cols > \.price:nth-child\(2\) \{\n\s+grid-column: 2;\n\s+grid-row: 2;/);
+    expect(cards).toMatch(/\.m-tab-panel \.rows-index \.index-cols > \.price:nth-child\(3\) \{\n\s+grid-column: 2;\n\s+grid-row: 3;/);
+});
