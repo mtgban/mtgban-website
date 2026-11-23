@@ -747,8 +747,14 @@ store's own button lasts for the page.
 **TCGplayer export prices.** An uploaded TCGplayer export's price is its
 My Store Price, then TCG Marketplace Price, then TCG Market Price, the
 first that is not blank or zero (`internal/docparse`). The TCGplayer CSV
-download writes a row's loaded price to both seller columns, and the
-market price to TCG Marketplace Price alone where none was loaded.
+download fills its four TCG price columns for the row's sku in its
+condition, as TCGplayer's own export does: TCG Market Price from
+`TCGTrends`, TCG Direct Low from `TCGDirect`, TCG Low Price With Shipping
+from `TCGPlayer` (`TCGSealed` for sealed product), and TCG Low Price from
+`TCGItemLow`. It writes a row's loaded price to both seller columns, and
+the market price to TCG Marketplace Price alone where none was loaded (the
+lowest listing with shipping where there is no market price, as for sealed
+product).
 
 ### 5.3 Arbitrage (`arbit.go`) and Sleepers (`sleep.go`)
 

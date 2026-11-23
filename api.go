@@ -291,16 +291,21 @@ func mergeCSVRows(ids, qtys, conds []string, prices []float64) []csvRow {
 // TCGplayer's own catalog, so they always pass TCGplayer's name-match check
 // (our names don't always match theirs exactly, see commit 1e39d5d). Cards
 // missing from the catalog keep these columns blank - TCGplayer skips the
-// check when they're empty. A loaded price goes in My Store Price and TCG
-// Marketplace Price; where none was loaded, TCG Marketplace Price is
-// TCGplayer's market price and My Store Price stays blank.
+// check when they're empty. The four TCG price columns are the row's sku in
+// its condition, as TCGplayer's own export fills them: its market price
+// (TCGTrends), Direct low (TCGDirect), lowest listing with shipping
+// (TCGPlayer, or TCGSealed) and without it (TCGItemLow). A loaded price goes
+// in My Store Price and TCG Marketplace Price; where none was loaded, TCG
+// Marketplace Price is the market price, or the lowest listing with shipping
+// where there is none, as for sealed product, and My Store Price stays blank.
 func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds []string, loaded []float64) error {
-	market, err := p.sellerInventory("TCGPlayer")
+	listing, err := p.sellerInventory("TCGPlayer")
 	if err != nil {
 		return err
 	}
-	direct, _ := p.sellerInventory("TCGDirectLow")
-	low, _ := p.sellerInventory("TCGLow")
+	market, _ := p.sellerInventory("TCGTrends")
+	direct, _ := p.sellerInventory("TCGDirect")
+	itemLow, _ := p.sellerInventory("TCGItemLow")
 	sealed, _ := p.sellerInventory("TCGSealed")
 
 	// TCGplayer's own identifiers, from the catalog dump
@@ -313,7 +318,8 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 
 	for _, row := range mergeCSVRows(ids, qtys, conds, loaded) {
 		id, cond := row.id, row.cond
-		var prices [3]float64
+		// The four TCG price columns, in the header's order
+		var prices [4]float64
 
 		co, err := b.GetUUID(id)
 		if err != nil {
@@ -324,12 +330,12 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 		if co.Sealed {
 			tcgSkuID = findInstanceID(p, "TCGSealed", id, cond)
 			for _, entry := range sealed[id] {
-				prices[0] = entry.Price
+				prices[2] = entry.Price
 				break
 			}
 		} else {
 			tcgSkuID = findInstanceID(p, "TCGPlayer", id, cond)
-			for j, inv := range []mtgban.InventoryRecord{market, direct, low} {
+			for j, inv := range []mtgban.InventoryRecord{market, direct, listing, itemLow} {
 				for _, entry := range inv[id] {
 					if entry.Conditions == cond {
 						prices[j] = entry.Price
@@ -360,16 +366,15 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 		record = append(record, tcgEntry.Number)
 		record = append(record, tcgEntry.Rarity)
 		record = append(record, condLong)
-		record = append(record, fmt.Sprintf("%0.2f", prices[0]))
-		record = append(record, fmt.Sprintf("%0.2f", prices[1]))
-		record = append(record, "")
-		record = append(record, fmt.Sprintf("%0.2f", prices[2]))
+		for _, price := range prices {
+			record = append(record, fmt.Sprintf("%0.2f", price))
+		}
 		record = append(record, "")
 		var storePrice string
 		if row.price > 0 {
 			storePrice = fmt.Sprintf("%0.2f", row.price)
 		}
-		marketplacePrice := cmp.Or(row.price, prices[0])
+		marketplacePrice := cmp.Or(row.price, prices[0], prices[2])
 		record = append(record, fmt.Sprint(row.qty))
 		// My Store Price and its reserve are a Pro seller's own site: only
 		// a loaded price goes there, and a blank leaves it as it is
