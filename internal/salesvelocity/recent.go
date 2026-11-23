@@ -389,12 +389,12 @@ func newestOrders(kept, added []Order) []Order {
 	return out[:len(out):len(out)]
 }
 
-// Line is one order as the Sales pane prints it: the date in full for
-// desktop, short for phones, and to the minute for its tooltip.
+// Line is one order as the Sales pane prints it: the date, and to the minute
+// for its tooltip.
 type Line struct {
-	Date, Short, Time string
-	Source            string
-	Price, Qty        string
+	Date, Time string
+	Source     string
+	Price, Qty string
 }
 
 // recentSource is where every order here was sold.
@@ -408,9 +408,9 @@ type Group struct {
 	Shown, More []Line
 }
 
-// Groups is r's orders per grade in Grades' order, the dates with their year
-// only when it is not today's; none for a grade with no order.
-func (r *Recent) Groups(today time.Time) []Group {
+// Groups is r's orders per grade in Grades' order; none for a grade with no
+// order.
+func (r *Recent) Groups() []Group {
 	if r == nil {
 		return nil
 	}
@@ -421,7 +421,7 @@ func (r *Recent) Groups(today time.Time) []Group {
 		}
 		g := Group{Grade: Grades[i], Avg: averageText(orders)}
 		for j, o := range orders {
-			line := orderLine(o, today)
+			line := orderLine(o)
 			if j < RecentShown {
 				g.Shown = append(g.Shown, line)
 			} else {
@@ -434,16 +434,11 @@ func (r *Recent) Groups(today time.Time) []Group {
 }
 
 // orderLine is o's date, where it sold, its price per copy and, above one
-// copy, the copies; the short date has its year only when it is not today's.
-func orderLine(o Order, today time.Time) Line {
+// copy, the copies.
+func orderLine(o Order) Line {
 	at := time.Unix(int64(o.At), 0).UTC()
-	short := at.Format("Jan 2")
-	if at.Year() != today.UTC().Year() {
-		short = at.Format("Jan 2, 2006")
-	}
 	line := Line{
 		Date:   at.Format(time.DateOnly),
-		Short:  short,
 		Time:   at.Format("2006-01-02 15:04 UTC"),
 		Source: recentSource,
 		Price:  centsText(uint64(o.Cents)),

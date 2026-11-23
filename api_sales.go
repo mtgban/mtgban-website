@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // salesPaneMaxIDs is the most cards one /data/sales/ request draws: a
@@ -15,7 +14,7 @@ const salesPaneMaxIDs = 100
 // SalesPaneAPI draws the Buyers column's Sales pane for each card id in the
 // path, comma-separated, from the recent orders in memory: the page's
 // first switch to Sales fetches them in one request. The answer maps each id
-// to its pane's markup, the phone's for a phone.
+// to its pane's markup, the same table on a phone's Cards as on desktop.
 func (s *site) SalesPaneAPI(w http.ResponseWriter, r *http.Request) {
 	if verifiedSignature(r) == "" && !(DevMode && !SigCheck) {
 		errorResponse(w, http.StatusUnauthorized, "log in to see recent sales")
@@ -32,13 +31,7 @@ func (s *site) SalesPaneAPI(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, http.StatusInternalServerError, "cannot draw the sales")
 		return
 	}
-	name := "sales-pane"
-	if isMobileRequest(r) {
-		name = "m-sales-pane"
-	}
-
 	recent := recentSalesStore.Snapshot()
-	now := time.Now()
 	panes := map[string]string{}
 	for _, cardID := range strings.Split(idsParam, ",") {
 		cardID = strings.TrimSpace(cardID)
@@ -51,7 +44,7 @@ func (s *site) SalesPaneAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		orders, _ := recent.For(cardID)
 		var buf bytes.Buffer
-		err := t.ExecuteTemplate(&buf, name, orders.Groups(now))
+		err := t.ExecuteTemplate(&buf, "sales-pane", orders.Groups())
 		if err != nil {
 			errorResponse(w, http.StatusInternalServerError, "cannot draw the sales")
 			return

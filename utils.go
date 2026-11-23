@@ -56,7 +56,7 @@ func cookiePath(r *http.Request, cookieName string) string {
 	// route. A root cookie is also one SettingsValues never hands back to a script,
 	// which is what keeps these HttpOnly cookies out of it. The custom
 	// buylist is set up on /upload and priced into /search.
-	if cookieName == signatureCookie || cookieName == legacySignatureCookie || cookieName == sessionCookie || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "MobileSearch") || strings.HasPrefix(cookieName, "UploadCustom") {
+	if cookieName == signatureCookie || cookieName == legacySignatureCookie || cookieName == sessionCookie || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "UploadCustom") {
 		return "/"
 	}
 	if r == nil || r.URL == nil {

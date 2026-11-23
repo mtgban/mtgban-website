@@ -146,7 +146,7 @@ func TestBuylistPriceThatLooksOffIsNotBest(t *testing.T) {
 	}
 
 	pv.IsMobile = true
-	if n := strings.Count(renderPage(t, "search.html", true, pv), "m-price-best"); n != 1 {
+	if n := strings.Count(renderPage(t, "search.html", true, pv), "price-best"); n != 1 {
 		t.Errorf("mobile: %d offers green, want only the one that looks fine", n)
 	}
 }
@@ -209,8 +209,8 @@ Store price $ 10.00, your 20% discount applied"`) {
 	}
 }
 
-// Mobile shows the adjusted number where the Best re-pick reads it, and
-// the quoted number in the details.
+// The phone's table marks an adjusted number as desktop does, the quoted one
+// in its title.
 func TestAdjustedPricesOnMobile(t *testing.T) {
 	var none []mtgban.Seller
 	withPrices(t, none, currentPrices().vendors)
@@ -237,19 +237,13 @@ func TestAdjustedPricesOnMobile(t *testing.T) {
 		Metadata: map[string]GenericCard{id: {Name: "A Card", SetCode: "TST"}},
 	})
 
-	if !strings.Contains(out, `<span class="m-vendor-price m-price-adjusted">$ 9.00</span>`) {
-		t.Error("the discounted seller's summary price is not the adjusted, marked one")
+	if !strings.Contains(out, `class="price price-adjusted" title="Store price $ 10.00, your 10% discount applied"`) {
+		t.Error("the discounted seller's price is not the adjusted one with the store price in its title")
 	}
-	if !strings.Contains(out, "Store price") || !strings.Contains(out, `$ 10.00`) {
-		t.Error("the details do not show the store's own price")
+	if strings.Count(out, "price-adjusted") != 1 {
+		t.Errorf("price-adjusted appears %d times, want 1 (the unadjusted TCG row is not marked)", strings.Count(out, "price-adjusted"))
 	}
-	if !strings.Contains(out, "Credit at face") || !strings.Contains(out, `$ 6.50`) {
-		t.Error("the details do not show the credit at face")
-	}
-	if !strings.Contains(out, `$ 3.25`) {
-		t.Error("the details do not show the adjusted credit")
-	}
-	if strings.Contains(out, `m-price-adjusted">$ 9.50`) {
-		t.Error("the unadjusted TCG row is marked")
+	if !strings.Contains(out, "Credit: $ 3.25\nCredit at face: $ 6.50") || !strings.Contains(out, `class="buylist-extra adjusted"`) {
+		t.Error("the buylist row does not show the adjusted credit with its face value")
 	}
 }

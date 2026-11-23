@@ -38,7 +38,17 @@
                 io.unobserve(e.target);
                 paintCard(e.target);
             });
-        }, { rootMargin: window.innerHeight + 'px 0px' });
+        }, near());
         cards.forEach(function (c) { io.observe(c); });
     });
+
+    // A card is near within a screen of the viewport, or under portrait Cards
+    // within a slide of the results area it scrolls in.
+    function near() {
+        var deck = document.querySelector('.m-layout-cards .m-results');
+        if (deck && window.matchMedia('(orientation: portrait)').matches) {
+            return { root: deck, rootMargin: deck.clientHeight + 'px 0px' };
+        }
+        return { rootMargin: window.innerHeight + 'px 0px' };
+    }
 })();

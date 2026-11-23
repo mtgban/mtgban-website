@@ -113,17 +113,16 @@ What exists:
    - Each header carries the condition's average price per copy over every
      order kept, weighted by copies.
    - A row is the source (TCGplayer's logo and name, grey), the date
-     (white, centred: `2026-11-19` on desktop, `Nov 19` on phones, the
-     minute in its tooltip), and the price per copy with the quantity
+     (white, centred: `2026-11-19`, the minute in its tooltip), and the
+     price per copy with the quantity
      beside it above one copy.
    - A condition with more than 5 folds the rest under "N more". Shipping
      is not shown. A card with no order on record says so.
    - Sales mode leaves out the buylist's index rows and ignores its
      condition filters.
-   - On phones the switch sits on a row of its own under the panel's
-     "Buyers" band. The Buyers tab shows every condition's group in Sales
-     mode rather than following the condition pills, and the tab appears
-     whenever a card has orders.
+   - Phones have no switch: a card with orders has a Sales list of its
+     own, the same table, after its buyers or before them where the
+     reader's mode is Sales (ADR-0010).
 8. **Every logged-in reader sees Sales**, any tier: a reader with a
    verified signature. A logged-out reader gets the switch too, and Sales
    shows a Join / Log in prompt in place of the orders. The velocity row

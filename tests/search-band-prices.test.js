@@ -2,12 +2,13 @@ import { test, expect } from 'bun:test';
 import { read } from './metrics-helpers.js';
 
 // In the tight two-column band (a 560-720px results area: iPads in landscape,
-// 1250-1366px laptops with the sidebar) the price columns close up to one, so
-// store names are not cut: what follows a price stacks under it, none hidden.
+// 1250-1366px laptops with the sidebar) and in a list at phone width the price
+// columns close up to one, so store names are not cut: what follows a price
+// stacks under it, none hidden.
 function bandBlock() {
     const css = read('css/search-rows.css');
     const subgrid = css.indexOf('@supports (grid-template-columns: subgrid)');
-    const start = css.indexOf('@container search-results (560px < width <= 720px) {\n    .rows-main {');
+    const start = css.indexOf('@container search-results (560px < width <= 720px) or (width <= 480px) {\n    .rows-main {');
     expect(subgrid).toBeGreaterThan(-1);
     // After the subgrid rules, which it overrides at the same specificity.
     expect(start).toBeGreaterThan(subgrid);
@@ -34,4 +35,26 @@ test('the band puts a sealed index\'s Sim median under its name and spread under
     // Labelled only under the EV header: a section without one is not simulated.
     expect(block).toMatch(/\.rows-index:has\(\.index-label\) \.index-cols > \.price:nth-child\(2\)::before \{ content: "Sim"; \}/);
     expect(block).toMatch(/\.rows-index:has\(\.index-label\) \.index-cols > \.price:nth-child\(3\)::before \{ content: "±"; \}/);
+});
+
+test('a phone\'s list pane is a results area, so it folds at phone width', () => {
+    const css = read('css/search-cards-mobile.css');
+    expect(css).toMatch(/\.m-layout-cards \.m-tab-panel \{\n\s+container: search-results \/ inline-size;/);
+});
+
+// A buyer's ratio, credit, quantity and CK pause sit in .buylist-extra and
+// .qty. Desktop's band hides them behind the row's hover tooltip; a phone
+// has no hover, so its list keeps them, stacked under the price.
+test('only desktop\'s band hides a buyer\'s ratio, credit and quantity', () => {
+    const css = read('css/search-rows.css');
+    const hides = [...css.matchAll(/@container search-results ([^{]+)\{\n\s+\.price-right\.has-buylist-extra \{[^}]*\}\n\s+\.price-right\.has-buylist-extra \.buylist-extra,\n\s+\.price-right\.has-buylist-extra \.qty \{ display: none; \}/g)];
+    expect(hides.map(m => m[1].trim())).toEqual(['(560px < width <= 720px)']);
+});
+
+test('a phone\'s list stacks a buyer\'s credit under the price, in a row that grows', () => {
+    expect(bandBlock()).toMatch(/\.rows-main \.price-right > \.buylist-extra,/);
+    // Any results area that narrow, desktop's too, lets the row grow.
+    expect(read('css/search-rows.css')).toMatch(/@container search-results \(width <= 480px\) \{\n\s+\.rows-main > \.price-row \{\n\s+height: auto;\n\s+min-height: var\(--price-row-h, 42px\);/);
+    const cards = read('css/search-cards-mobile.css');
+    expect(cards).toMatch(/\.m-layout-cards \.m-tab-panel \.price-row \{\n\s+height: auto;\n\s+min-height: var\(--price-row-h, 42px\);/);
 });

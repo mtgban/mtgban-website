@@ -202,12 +202,13 @@ test('the desktop list marks each entry and its buttons', () => {
     expect(trackProblems(html)).toEqual([]);
 });
 
-test('the mobile list has entries only', () => {
-    const {html} = runListPage({stored: twoRecents, mode: 'mobile'});
-    expect(html.split('data-track="ui.recents" data-track-value="open"').length - 1).toBe(2);
-    expect(html).not.toContain('data-track-value="pin"');
-    expect(html).not.toContain('data-track-value="unpin"');
-    expect(html).not.toContain('data-track-value="delete"');
+// The phone draws every entry; its CSS shows as many as the screen holds.
+test('the mobile list is the desktop list', () => {
+    const seven = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((q, i) => ({q, t: 7 - i, m: 7 - i}));
+    const {html} = runListPage({stored: seven, mode: 'mobile'});
+    expect(html.split('data-track="ui.recents" data-track-value="open"').length - 1).toBe(7);
+    expect(html.split('data-track-value="pin"').length - 1).toBe(7);
+    expect(html).toContain('class="landing-pane-header"');
     expect(trackProblems(html)).toEqual([]);
 });
 

@@ -51,40 +51,37 @@ func renderDesktopSearch(t *testing.T, pageVars PageVars) string {
 }
 
 // Only CK's NM offer follows CK's signal; another store at CK's P90 stays
-// green, and CK's SP offer is never colored.
+// green, and CK's SP offer is never colored. The phone draws the same table.
 func TestSearchBuylistFollowsCKSignal(t *testing.T) {
 	for _, tc := range []struct {
 		state              string
 		best, wait, marker int
-		mBest, mWait       int
 	}{
-		{state: "sell", best: 2, mBest: 2},
-		{state: "wait", best: 1, wait: 1, marker: 1, mBest: 1, mWait: 1},
-		{state: "", best: 1, mBest: 1},
+		{state: "sell", best: 2},
+		{state: "wait", best: 1, wait: 1, marker: 1},
+		{state: "", best: 1},
 	} {
-		desktop := renderDesktopSearch(t, ckSignalPageVars(tc.state))
-		mobile := renderMobileSearch(t, ckSignalPageVars(tc.state))
-		for _, check := range []struct {
-			page, class string
-			want        int
-		}{
-			{desktop, " price-best", tc.best},
-			{desktop, " price-wait", tc.wait},
-			{desktop, `class="ck-wait"`, tc.marker},
-			{mobile, " m-price-best", tc.mBest},
-			{mobile, " m-price-wait", tc.mWait},
-			{mobile, `class="ck-wait"`, tc.marker},
-			{mobile, `class="m-detail-note"`, 1},
-			{desktop, `class="bl-pill bl-pill-high"`, 1},
-			{mobile, `class="bl-pill bl-pill-high"`, 1},
+		for name, page := range map[string]string{
+			"desktop": renderDesktopSearch(t, ckSignalPageVars(tc.state)),
+			"mobile":  renderMobileSearch(t, ckSignalPageVars(tc.state)),
 		} {
-			got := strings.Count(check.page, check.class)
-			if got != check.want {
-				t.Errorf("signal %q: %q appears %d times, want %d", tc.state, check.class, got, check.want)
+			for _, check := range []struct {
+				class string
+				want  int
+			}{
+				{" price-best", tc.best},
+				{" price-wait", tc.wait},
+				{`class="ck-wait"`, tc.marker},
+				{`class="bl-pill bl-pill-high"`, 1},
+			} {
+				got := strings.Count(page, check.class)
+				if got != check.want {
+					t.Errorf("%s, signal %q: %q appears %d times, want %d", name, tc.state, check.class, got, check.want)
+				}
 			}
-		}
-		if !strings.Contains(desktop, "CK stock 0 · out 9 days") {
-			t.Errorf("signal %q: desktop tooltip lacks CK's facts", tc.state)
+			if !strings.Contains(page, "CK stock 0 · out 9 days") {
+				t.Errorf("%s, signal %q: tooltip lacks CK's facts", name, tc.state)
+			}
 		}
 	}
 }

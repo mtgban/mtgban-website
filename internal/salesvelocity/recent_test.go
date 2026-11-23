@@ -184,18 +184,18 @@ func TestRecentGroups(t *testing.T) {
 	}
 	r.Grades[3] = []Order{{At: uint32(time.Date(2025, 12, 30, 0, 0, 0, 0, time.UTC).Unix()), Cents: 5, Qty: 3}}
 
-	groups := r.Groups(recentNow)
+	groups := r.Groups()
 	if len(groups) != 2 || groups[0].Grade != "NM" || groups[1].Grade != "HP" {
 		t.Fatalf("groups = %+v, want NM then HP", groups)
 	}
 	if len(groups[0].Shown) != RecentShown || len(groups[0].More) != 2 {
 		t.Errorf("NM shown %d, more %d, want %d and 2", len(groups[0].Shown), len(groups[0].More), RecentShown)
 	}
-	want := Line{Date: "2026-11-22", Short: "Nov 22", Time: "2026-11-22 10:00 UTC", Source: "TCGplayer", Price: "12.34"}
+	want := Line{Date: "2026-11-22", Time: "2026-11-22 10:00 UTC", Source: "TCGplayer", Price: "12.34"}
 	if got := groups[0].Shown[0]; got != want {
 		t.Errorf("NM first line = %+v, want %+v", got, want)
 	}
-	want = Line{Date: "2025-12-30", Short: "Dec 30, 2025", Time: "2025-12-30 00:00 UTC", Source: "TCGplayer", Price: "0.05", Qty: "×3"}
+	want = Line{Date: "2025-12-30", Time: "2025-12-30 00:00 UTC", Source: "TCGplayer", Price: "0.05", Qty: "×3"}
 	if got := groups[1].Shown[0]; got != want {
 		t.Errorf("HP line = %+v, want %+v", got, want)
 	}
@@ -203,7 +203,7 @@ func TestRecentGroups(t *testing.T) {
 		t.Errorf("averages = %q, %q", groups[0].Avg, groups[1].Avg)
 	}
 	var none *Recent
-	if none.Groups(recentNow) != nil {
+	if none.Groups() != nil {
 		t.Error("a card with no orders has groups")
 	}
 }

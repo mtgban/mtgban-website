@@ -509,7 +509,7 @@ func TestSearchSpellsTheCustomBuylistRule(t *testing.T) {
 		name, mobile, want string
 	}{
 		{"desktop", "", `title="` + rule + `">Custom Buylist`},
-		{"phone", "true", `<div class="m-detail-note">` + rule + `</div>`},
+		{"phone", "true", `title="` + rule + `">Custom Buylist`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(co.Name), nil)

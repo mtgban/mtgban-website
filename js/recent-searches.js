@@ -158,69 +158,53 @@
         }
 
         var html = '';
-        if (mode === 'mobile') {
-            html += '<div class="m-recent-header">';
-            html += '<span class="m-recent-title">Recent Searches</span>';
-            html += '<button class="m-recent-clear" onclick="window.clearRecentSearches(this)">Clear</button>';
-            html += '</div>';
-            html += '<div class="m-recent-list">';
-            searches.forEach(function(s) {
-                html += '<a class="m-recent-item" href="' + escapeAttr(entryHref(s)) + '" data-track="ui.recents" data-track-value="open">';
-                html += '<span class="m-recent-icon">&#128269;</span>';
-                html += '<span class="m-recent-query">' + escapeHtml(displayQuery(s)) + scopeHtml(s, 'm-recent-scope') + '</span>';
-                html += '<span class="m-recent-arrow">&rsaquo;</span>';
-                html += '</a>';
-            });
-            html += '</div>';
-        } else {
-            html += '<div class="landing-pane-header">';
-            html += '<span class="landing-pane-title">Recent Searches</span>';
-            html += '<span class="landing-pane-actions">';
-            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.clearRecentSearches(this)" title="Clear recent searches" aria-label="Clear recent searches"><i data-lucide="trash-2"></i></button>';
-            html += '</span>';
-            html += '</div>';
-            html += '<div class="landing-pane-body">';
-            searches.forEach(function(s, i) {
-                // Prefer the art crop, but keep older/crop-less entries from
-                // falling back to the oversized thumbnail row. The first
-                // result image is still useful background art for searches
-                // whose result has no crop URL (for example a product query).
-                var cropSrc = httpURL(s.crop || '');
-                var imageSrc = httpURL(s.img || '');
-                // Content-warning images stay in the gated thumbnail path
-                // unless a real crop is available, as with existing crops.
-                var backgroundSrc = cropSrc || (!s.cw ? imageSrc : '');
-                var backgroundClass = backgroundSrc ? ' has-background' + (cropSrc ? '' : ' has-image') : '';
-                var token = parseSetToken(s.q);
-                var next = searches[i + 1];
-                var lastPinned = s.pinned && next && !next.pinned ? ' landing-item-last-pinned' : '';
-                html += '<a class="landing-item landing-item-recent' + backgroundClass + lastPinned + '"' + (backgroundSrc ? ' style="background-image:url(&quot;' + escapeAttr(backgroundSrc) + '&quot;)"' : '') + ' href="' + escapeAttr(entryHref(s)) + '" data-track="ui.recents" data-track-value="open">';
-                if (!backgroundSrc) {
-                    html += '<div class="landing-item-thumb">';
-                    if (token.keyrune) {
-                        html += '<i class="ss ' + escapeAttr(token.keyrune) + ' ss-fw"></i>';
-                    } else if (imageSrc) {
-                        html += thumbHtml(imageSrc, s.foil, s.cw);
-                    } else {
-                        html += '<span class="landing-item-thumb-placeholder"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>';
-                    }
-                    html += '</div>';
+        html += '<div class="landing-pane-header">';
+        html += '<span class="landing-pane-title">Recent Searches</span>';
+        html += '<span class="landing-pane-actions">';
+        html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.clearRecentSearches(this)" title="Clear recent searches" aria-label="Clear recent searches"><i data-lucide="trash-2"></i></button>';
+        html += '</span>';
+        html += '</div>';
+        html += '<div class="landing-pane-body">';
+        searches.forEach(function(s, i) {
+            // Prefer the art crop, but keep older/crop-less entries from
+            // falling back to the oversized thumbnail row. The first
+            // result image is still useful background art for searches
+            // whose result has no crop URL (for example a product query).
+            var cropSrc = httpURL(s.crop || '');
+            var imageSrc = httpURL(s.img || '');
+            // Content-warning images stay in the gated thumbnail path
+            // unless a real crop is available, as with existing crops.
+            var backgroundSrc = cropSrc || (!s.cw ? imageSrc : '');
+            var backgroundClass = backgroundSrc ? ' has-background' + (cropSrc ? '' : ' has-image') : '';
+            var token = parseSetToken(s.q);
+            var next = searches[i + 1];
+            var lastPinned = s.pinned && next && !next.pinned ? ' landing-item-last-pinned' : '';
+            html += '<a class="landing-item landing-item-recent' + backgroundClass + lastPinned + '"' + (backgroundSrc ? ' style="background-image:url(&quot;' + escapeAttr(backgroundSrc) + '&quot;)"' : '') + ' href="' + escapeAttr(entryHref(s)) + '" data-track="ui.recents" data-track-value="open">';
+            if (!backgroundSrc) {
+                html += '<div class="landing-item-thumb">';
+                if (token.keyrune) {
+                    html += '<i class="ss ' + escapeAttr(token.keyrune) + ' ss-fw"></i>';
+                } else if (imageSrc) {
+                    html += thumbHtml(imageSrc, s.foil, s.cw);
+                } else {
+                    html += '<span class="landing-item-thumb-placeholder"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>';
                 }
-                html += '<div class="landing-item-info">';
-                html += '<span class="landing-item-query">' + escapeHtml(displayQuery(s)) + scopeHtml(s, 'landing-item-scope') + '</span>';
                 html += '</div>';
-                html += '<div class="landing-item-actions">';
-                html += '<button class="landing-item-pin' + (s.pinned ? ' pinned' : '') + '" data-q="' + escapeAttr(s.q) + '" onclick="window.toggleRecentPin(this.dataset.q, event)" title="' + (s.pinned ? 'Unpin' : 'Pin to top') + '"' + (s.pinned ? ' data-track="ui.recents" data-track-value="unpin"' : ' data-track="ui.recents" data-track-value="pin"') + '>';
-                html += '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="' + (s.pinned ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
-                html += '</button>';
-                html += '<button class="landing-item-delete" data-q="' + escapeAttr(s.q) + '" onclick="window.deleteRecentSearch(this.dataset.q, event)" title="Remove from recent searches" data-track="ui.recents" data-track-value="delete">';
-                html += '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
-                html += '</button>';
-                html += '</div>';
-                html += '</a>';
-            });
+            }
+            html += '<div class="landing-item-info">';
+            html += '<span class="landing-item-query">' + escapeHtml(displayQuery(s)) + scopeHtml(s, 'landing-item-scope') + '</span>';
             html += '</div>';
-        }
+            html += '<div class="landing-item-actions">';
+            html += '<button class="landing-item-pin' + (s.pinned ? ' pinned' : '') + '" data-q="' + escapeAttr(s.q) + '" onclick="window.toggleRecentPin(this.dataset.q, event)" title="' + (s.pinned ? 'Unpin' : 'Pin to top') + '"' + (s.pinned ? ' data-track="ui.recents" data-track-value="unpin"' : ' data-track="ui.recents" data-track-value="pin"') + '>';
+            html += '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="' + (s.pinned ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
+            html += '</button>';
+            html += '<button class="landing-item-delete" data-q="' + escapeAttr(s.q) + '" onclick="window.deleteRecentSearch(this.dataset.q, event)" title="Remove from recent searches" data-track="ui.recents" data-track-value="delete">';
+            html += '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+            html += '</button>';
+            html += '</div>';
+            html += '</a>';
+        });
+        html += '</div>';
         container.innerHTML = html;
         var newBody = container.querySelector('.landing-pane-body');
         if (newBody && savedScroll) newBody.scrollTop = savedScroll;

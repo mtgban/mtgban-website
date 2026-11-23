@@ -44,8 +44,8 @@ test('the desktop image drops its mark on the click that reveals the warning', (
     expect(plain.getAttribute('data-track')).toBe('ui.result.image');
 });
 
-test('the mobile landscape and drawer images drop their mark on the reveal', () => {
-    for (const needle of ['class="m-card-img-landscape', 'id="m-drawer-img"']) {
+test('the mobile card image drops its mark on the reveal', () => {
+    for (const needle of ['class="m-card-img-landscape']) {
         const run = onclickOf('templates/mobile/search.html', needle);
         const img = el({ 'data-track': 'ui.result.image', 'data-track-value': 'reveal_warning' }, ['content-warning']);
         run.call(img, {});

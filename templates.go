@@ -542,6 +542,8 @@ var funcMap = template.FuncMap{
 		}
 		return template.HTML(fmt.Sprintf(`<span class="bl-prices">%s</span>`, prices))
 	},
+	// edge_offer is the price a Cards slide shows at its edge (search_cards.go).
+	"edge_offer": edgeOffer,
 	// grade spells a grade for indexing the condition-keyed maps, which
 	// take a typed key where a template literal is a plain string.
 	"grade": func(s string) mtgban.Condition {

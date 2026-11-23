@@ -1,7 +1,10 @@
 {{define "extra-css"}}
     {{if .CanAlerts}}<link rel="stylesheet" type="text/css" href="/css/settings-modal.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/alerts.css?hash={{.Hash}}">{{end}}
+    <link rel="stylesheet" type="text/css" href="/css/search-rows.css?hash={{.Hash}}">
+    {{if not .SearchRan}}<link rel="stylesheet" type="text/css" href="/css/search-landing.css?hash={{.Hash}}">{{end}}
     <link rel="stylesheet" type="text/css" href="/css/search-mobile.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/search-cards-mobile.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
 {{end}}
 
@@ -57,16 +60,17 @@
 {{end}}
 
 {{define "m-search-bar"}}
-<div class="m-page">
+<div class="m-page m-landing">
+    <div class="m-search-bar-sticky">
     <div class="m-search-wrap">
+        {{if .CanScope}}
+        <button class="m-pin-btn{{if .SearchScope}} is-active{{end}}" id="nav-pin-btn" type="button" title="{{if .SearchScope}}Pinned: {{.SearchScope}}{{else}}Pinned filters{{end}}"><i data-lucide="filter"></i></button>
+        {{end}}
         <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform" data-track="ui.searchbar.submit" data-track-value="landing">
             <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search for a card or product..." value="{{if not .IsMultiChart}}{{.SearchQuery}}{{end}}" maxlength="1000" autofocus autocapitalize="none" autocorrect="off" spellcheck="false" data-autocomplete="{{if .IsSealed}}true{{else}}false{{end}}">
             {{if .CanScope}}<input id="nav-scopefield" type="hidden" name="scope" value="{{.SearchScope}}"{{if not .SearchScope}} disabled{{end}}>{{end}}
         </form>
         <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
-        {{if .CanScope}}
-        <button class="m-pin-btn{{if .SearchScope}} is-active{{end}}" id="nav-pin-btn" type="button" title="{{if .SearchScope}}Pinned: {{.SearchScope}}{{else}}Pinned filters{{end}}"><i data-lucide="filter"></i></button>
-        {{end}}
     </div>
     {{/* Same bar as the desktop navbar's, on the page rather than in fixed
          chrome: a pinned filter has to stay visible here too, or a search
@@ -83,15 +87,17 @@
     </div>
     <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}" defer></script>
     {{end}}
+    </div>
+    <script type="text/javascript" src="/js/search-cards.js?hash={{.Hash}}" defer></script>
 
     {{/* Toast notification */}}
     <div class="m-toast" id="m-fav-toast"></div>
 
-    {{/* Recent searches - from localStorage */}}
-    <div id="m-recent-searches"></div>
-
-    {{/* Favorites - from localStorage */}}
-    <div id="m-favorites"></div>
+    {{/* Recent searches and favorites, from localStorage, above the bar */}}
+    <div class="m-landing-lists">
+        <div class="landing-pane landing-pane-recent" id="m-recent-searches"></div>
+        <div id="m-favorites"></div>
+    </div>
 </div>
 {{end}}
 
@@ -147,21 +153,20 @@
 {{end}}
 
 {{define "m-search-results"}}
-{{$expanded := ne .MobileSearchLayout "compact"}}
-{{$defaultBuyers := or (eq .DefaultTab "buyers") (eq .SearchSort "buylist")}}
-<div class="m-page{{if $expanded}} m-layout-expanded{{end}}">
+{{/* One card a slide, with every list in full (docs/adr/0010-mobile-card-view.md) */}}
+<div class="m-page m-layout-cards">
     {{/* Sticky search bar */}}
     <div class="m-search-bar-sticky">
         <div class="m-search-wrap">
+            <button class="m-search-btn m-filter-btn" type="button" title="Filters" onclick="document.getElementById('m-filter-overlay').classList.add('open'); document.getElementById('m-filter-sheet').classList.add('open');" data-track="ui.mfilter.open"><i data-lucide="sliders-horizontal"></i></button>
+            {{if .CanScope}}
+            <button class="m-pin-btn{{if .SearchScope}} is-active{{end}}" id="nav-pin-btn" type="button" title="{{if .SearchScope}}Pinned: {{.SearchScope}}{{else}}Pinned filters{{end}}"><i data-lucide="filter"></i></button>
+            {{end}}
             <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform" data-track="ui.searchbar.submit" data-track-value="results">
                 <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search..." value="{{if not .IsMultiChart}}{{.SearchQuery}}{{end}}" maxlength="1000" autocapitalize="none" autocorrect="off" spellcheck="false" data-autocomplete="{{if .IsSealed}}true{{else}}false{{end}}">
                 {{if .CanScope}}<input id="nav-scopefield" type="hidden" name="scope" value="{{.SearchScope}}"{{if not .SearchScope}} disabled{{end}}>{{end}}
             </form>
             <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
-            {{if .CanScope}}
-            <button class="m-pin-btn{{if .SearchScope}} is-active{{end}}" id="nav-pin-btn" type="button" title="{{if .SearchScope}}Pinned: {{.SearchScope}}{{else}}Pinned filters{{end}}"><i data-lucide="filter"></i></button>
-            {{end}}
-            <button class="m-search-btn m-filter-btn" type="button" title="Filters" onclick="document.getElementById('m-filter-overlay').classList.add('open'); document.getElementById('m-filter-sheet').classList.add('open');" data-track="ui.mfilter.open"><i data-lucide="sliders-horizontal"></i></button>
             <button class="m-search-btn m-settings-btn" type="button" title="Settings" onclick="window.openSettings && openSettings()" data-track="ui.settings.open" data-track-value="gear"><i data-lucide="settings"></i></button>
         </div>
         {{if .CanScope}}
@@ -184,8 +189,7 @@
     {{/* Result count + sort pills */}}
     {{if .TotalUnique}}
     <div class="m-result-meta">
-        <span>{{.TotalUnique}} result{{if ne .TotalUnique 1}}s{{end}} found</span>
-        {{if gt .TotalUnique (len .AllKeys)}}<span class="m-meta-sub">({{len .AllKeys}} shown)</span>{{end}}
+        <span class="m-meta-count">{{.TotalUnique}} result{{if ne .TotalUnique 1}}s{{end}}{{if gt .TotalUnique (len .AllKeys)}} <span class="m-meta-sub">({{len .AllKeys}} shown)</span>{{end}}</span>
         {{if not .NoSort}}
         <div class="m-sort-pills">
             {{$isChronoSorted := or (eq .SearchSort "chrono") (not .SearchSort)}}
@@ -220,10 +224,13 @@
     </div>
     {{end}}
 
-    {{/* Results */}}
+    {{/* Results, and beside them the scrubber that jumps to any card */}}
+    <div class="m-deck">
+    {{if gt (len .AllKeys) 1}}<div class="m-scrub" aria-hidden="true"><span class="m-scrub-thumb"></span></div>{{end}}
+    <div class="m-results">
     {{range $i, $cardId := .AllKeys}}
         {{$card := (index $.Metadata $cardId)}}
-        <div class="m-card{{if $card.Sealed}} m-sealed{{end}}{{if and $expanded $defaultBuyers}} m-buyers-first{{end}}"{{if $card.RarityColor}} style="--rarity-color: {{$card.RarityColor}}"{{end}}>
+        <div class="m-card{{if $card.Sealed}} m-sealed{{end}}"{{if $card.RarityColor}} style="--rarity-color: {{$card.RarityColor}}"{{end}}>
             {{/* Card header - tap to show image drawer */}}
             <div class="m-card-header"
                  data-card-id="{{$cardId}}"
@@ -237,25 +244,27 @@
                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{index $card.PromoLabels $t}}{{end}}"
                  data-has-warning="{{$card.HasContentWarning}}"
                  data-crop-url="{{$card.CropURL}}"
-                 data-setcode="{{$card.SetCode}}"
-                 onclick="window.showCardDrawer && showCardDrawer({{$card.FullImageURL}}, '{{$card.Name}}', {{$card.HasContentWarning}})" data-track="ui.result.image" data-track-value="drawer_open">
+                 data-setcode="{{$card.SetCode}}">
                 <div class="m-card-icon">
                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 20 "Class" ""}}
                 </div>
                 <div class="m-card-info">
-                    <span class="m-card-name" lang="{{$card.LangTag}}">{{strip_edition $card.Name $card.Edition $card.Sealed}}</span>
-                    {{if ne $card.FlavorName ""}}<span class="m-card-flavor">"{{$card.FlavorName}}"</span>{{end}}
-                    {{if $card.PromoTypes}}<span class="m-card-variant">{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}<a href="?q=is:{{$p}}" onclick="event.stopPropagation()" data-track="ui.result.link" data-track-value="promo_type">{{index $card.PromoLabels $p}}</a>{{end}}</span>{{end}}
-                    <span class="m-card-set">{{$card.SetCode}}{{if $card.Number}} · #{{$card.Number}}{{with $card.SetTotal}}/{{.}}{{end}}{{end}}</span>
+                    {{$name := strip_edition $card.Name $card.Edition $card.Sealed}}
+                    <span class="m-card-title">
+                        <a class="m-card-name{{if gt (len $name) 19}} m-card-name-long{{end}}" href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" data-track="ui.result.link" data-track-value="name">{{$name}}</a>
+                        {{if ne $card.FlavorName ""}}<span class="m-card-flavor">"{{$card.FlavorName}}"</span>{{end}}
+                    </span>
+                    {{/* The finish and treatment badges and the promo types ride
+                         the set line */}}
+                    <span class="m-card-setline">
+                        <span class="m-card-set">{{$card.SetCode}}{{if $card.Number}} · #{{$card.Number}}{{with $card.SetTotal}}/{{.}}{{end}}{{end}}</span>
+                        {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
+                        {{range $card.Treatments}}<a class="m-badge treatment" href="?q=is:{{.}}" onclick="event.stopPropagation()" data-track="ui.result.link" data-track-value="treatment">{{index $card.PromoLabels .}}</a>{{end}}
+                        {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
+                        {{if $card.PromoTypes}}<span class="m-card-variant">{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}<a href="?q=is:{{$p}}" onclick="event.stopPropagation()" data-track="ui.result.link" data-track-value="promo_type">{{index $card.PromoLabels $p}}</a>{{end}}</span>{{end}}
+                    </span>
                 </div>
                 <div class="m-card-badges">
-                    {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
-                    {{range $card.Treatments}}<a class="m-badge treatment" href="?q=is:{{.}}" onclick="event.stopPropagation()" data-track="ui.result.link" data-track-value="treatment">{{index $card.PromoLabels .}}</a>{{end}}
-                    {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
-                    <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.toggleFavorite && toggleFavorite(this);" title="Favorite" data-track="ui.result.icon" data-track-value="star_add" data-track-scope="header"><i data-lucide="star"></i></button>
-                    <button type="button" class="m-pack-btn pack-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.addToBackpack && addToBackpack(this);" title="Add to backpack" data-track="ui.result.icon" data-track-value="pack_add" data-track-scope="header"><i data-lucide="backpack"></i><span class="pack-btn-count" hidden></span></button>
-                    <button type="button" class="m-pack-btn m-pack-minus pack-minus-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.takeFromBackpack && takeFromBackpack(this);" title="Remove from backpack" hidden data-track="ui.result.icon" data-track-value="pack_take" data-track-scope="header"><i data-lucide="circle-minus"></i></button>
-                    {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); window.showChartDrawer && showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history" data-track="ui.result.icon" data-track-value="chart_view" data-track-scope="header"><i data-lucide="chart-line"></i></button>{{end}}
                     <button class="m-actions-btn" onclick="event.stopPropagation(); window.toggleActionsMenu && toggleActionsMenu(this);" title="More actions" data-track="ui.result.icon_menu" data-track-value="open"><i data-lucide="more-vertical"></i></button>
                 </div>
             </div>
@@ -331,318 +340,54 @@
             {{$hasSellers := (index $.FoundSellers $cardId)}}
             {{$hasBuyers := (index $.FoundVendors $cardId)}}
             {{$salesRow := and $card.Velocity (or $.CanVelocity $.ShowUpsell)}}
-            {{/* The Buyers panel's Sales mode, for any card that is not sealed */}}
-            {{$salesSwitch := not $card.Sealed}}
-            {{$hasSales := and $salesSwitch (index $.HasSales $cardId)}}
-            {{/* Open whichever side has offers when the default one has none. */}}
-            {{$buyersTab := or (and $defaultBuyers $hasBuyers) (not $hasSellers)}}
-
-            {{/* Resolve the active condition view for this card: user preference, falling back to NM if unavailable. */}}
+            {{/* The recent sales, for a card with orders on record: a list after
+                 the buyers, or before them where the reader's Buyers column
+                 opens on Sales (docs/adr/0009-recent-tcgplayer-sales.md) */}}
+            {{$hasSales := and (not $card.Sealed) (index $.HasSales $cardId)}}
+            {{$salesFirst := and $hasSales (or (eq $.BuyersMode "sales") (not (or $hasBuyers $salesRow)))}}
             {{$sellerConds := (index $.FoundSellers $cardId)}}
             {{$vendorConds := (index $.FoundVendors $cardId)}}
-            {{$defView := $.DefaultView}}
-            {{if eq $defView ""}}{{$defView = grade "NM"}}{{end}}
-            {{$hasDefault := false}}
-            {{if $sellerConds}}{{if (index $sellerConds $defView)}}{{$hasDefault = true}}{{end}}{{end}}
-            {{if $vendorConds}}{{if (index $vendorConds $defView)}}{{$hasDefault = true}}{{end}}{{end}}
-            {{if not $hasDefault}}{{$defView = grade "NM"}}{{end}}
 
-            {{/* Condition pills - default driven by user preference, hidden for sealed products */}}
-            {{if and (not $card.Sealed) (not $expanded)}}
-            <div class="m-cond-pills" data-card="{{$cardId}}">
-                <span class="m-cond-pills-left">
-                {{range $conditions := $.CondKeys}}
-                    {{if ne $conditions "INDEX"}}
-                        {{$hasCond := false}}
-                        {{if $sellerConds}}{{if (index $sellerConds $conditions)}}{{$hasCond = true}}{{end}}{{end}}
-                        {{if $vendorConds}}{{if (index $vendorConds $conditions)}}{{$hasCond = true}}{{end}}{{end}}
-                        {{if $hasCond}}
-                            <button class="m-cond-pill{{if eq $conditions $defView}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}" data-track="ui.row.condition" data-track-value="{{$conditions}}">{{$conditions}}</button>
-                        {{end}}
-                    {{end}}
-                {{end}}
+            {{/* Cards: the best ask and offer at the picture's edges, each
+                 opening its list; never between the panels, which landscape
+                 pairs as adjacent siblings */}}
+            {{if $hasSellers}}<button type="button" class="m-edge m-edge-sell" data-pane="sellers-{{$cardId}}" aria-label="Sellers" data-track="ui.cards.pane" data-track-value="sellers" data-track-scope="tap"><i data-lucide="chevron-left"></i><span class="m-edge-label">Sellers</span>{{with edge_offer $sellerConds}}<span class="m-edge-price">{{.PriceLabel}}</span>{{end}}</button>{{end}}
+            {{if $salesFirst}}<button type="button" class="m-edge m-edge-buy" data-pane="sales-{{$cardId}}" aria-label="Sales" data-track="ui.cards.pane" data-track-value="sales" data-track-scope="tap"><span class="m-edge-label">Sales</span><i data-lucide="chevron-right"></i></button>
+            {{else if or $hasBuyers $salesRow}}<button type="button" class="m-edge m-edge-buy" data-pane="buyers-{{$cardId}}" aria-label="Buyers" data-track="ui.cards.pane" data-track-value="buyers" data-track-scope="tap"><span class="m-edge-label">Buyers</span>{{with edge_offer $vendorConds}}<span class="m-edge-price">{{.PriceLabel}}</span>{{end}}<i data-lucide="chevron-right"></i></button>{{end}}
+            {{/* Cards: the star, backpack and chart between the edge buttons,
+                 leaving the header to the card's name */}}
+            <div class="m-card-tools">
+                <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.toggleFavorite && toggleFavorite(this);" title="Favorite" data-track="ui.result.icon" data-track-value="star_add" data-track-scope="header"><i data-lucide="star"></i></button>
+                <span class="m-pack-wrap">
+                    <button type="button" class="m-pack-btn pack-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.addToBackpack && addToBackpack(this);" title="Add to backpack" data-track="ui.result.icon" data-track-value="pack_add" data-track-scope="header"><i data-lucide="backpack"></i><span class="pack-btn-count" hidden></span></button>
+                    <button type="button" class="m-pack-btn m-pack-minus pack-minus-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.takeFromBackpack && takeFromBackpack(this);" title="Remove from backpack" hidden data-track="ui.result.icon" data-track-value="pack_take" data-track-scope="header"><i data-lucide="circle-minus"></i></button>
                 </span>
-                {{$hasIndex := false}}
-                {{if $sellerConds}}{{if (index $sellerConds (grade "INDEX"))}}{{$hasIndex = true}}{{end}}{{end}}
-                {{if $vendorConds}}{{if (index $vendorConds (grade "INDEX"))}}{{$hasIndex = true}}{{end}}{{end}}
-                {{if $hasIndex}}
-                <span class="m-cond-pills-right">
-                    <button class="m-cond-pill{{if eq $defView "INDEX"}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}" data-track="ui.row.condition" data-track-value="INDEX">Index</button>
-                </span>
-                {{end}}
+                {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); window.showChartDrawer && showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history" data-track="ui.result.icon" data-track-value="chart_view" data-track-scope="header"><i data-lucide="chart-line"></i></button>{{end}}
             </div>
-            {{end}}
-
-            {{/* Seller/Buyer tab toggle */}}
-            {{if not $expanded}}
-            <div class="m-tabs" data-card="{{$cardId}}">
-                {{if $hasSellers}}<button class="m-tab{{if not $buyersTab}} active{{end}}" data-target="sellers-{{$cardId}}" data-track="ui.row.tab" data-track-value="sellers">Sellers</button>{{end}}
-                {{if or $hasBuyers $salesRow $hasSales}}<button class="m-tab{{if $buyersTab}} active{{end}}" data-target="buyers-{{$cardId}}" data-track="ui.row.tab" data-track-value="buyers">Buyers</button>{{end}}
-            </div>
-            {{end}}
 
             {{/* Inline card image - hidden in portrait, visible in landscape */}}
-            <img class="m-card-img-landscape{{if $card.HasContentWarning}} content-warning{{end}}" src="{{$card.FullImageURL}}" loading="lazy" alt="{{$card.Name}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed');this.removeAttribute('data-track')" data-track="ui.result.image" data-track-value="reveal_warning"{{end}}>
+            <img class="m-card-img-landscape{{if $card.HasContentWarning}} content-warning{{end}}" data-set="{{$card.SetCode}}" data-date="{{$card.Date}}" data-name="{{$card.Name}}"{{if $card.Sealed}} data-sealed{{end}} src="{{$card.FullImageURL}}" loading="{{if lt $i 2}}eager{{else}}lazy{{end}}" alt="{{$card.Name}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed');this.removeAttribute('data-track')" data-track="ui.result.image" data-track-value="reveal_warning"{{end}}>
 
             {{/* Sellers panel */}}
             {{if $hasSellers}}
-            <div class="m-tab-panel{{if or $expanded (not $buyersTab)}} active{{end}}" id="sellers-{{$cardId}}">
-                {{/* The index rows come first and are references: market prices,
-                     and on a sealed product the simulated expected values. What
-                     follows them is offers. A single's condition bands mark where
-                     they begin; a sealed product has none, so name the offers
-                     there, with the word the desktop column header uses - which
-                     is what stops a simulated value reading as a price to pay. */}}
-                {{$headed := false}}
-                {{$refs := false}}
-                {{$condsEntry := (index $.FoundSellers $cardId)}}
-                {{range $conditions := $.CondKeys}}
-                    {{$entries := (index $condsEntry $conditions)}}
-                    {{if $entries}}
-                        {{if eq $conditions "INDEX"}}
-                        {{$refs = true}}
-                        <div class="m-cond-group{{if or $expanded (eq $defView "INDEX")}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}">
-                            {{range $ei, $entry := $entries}}
-                                {{if $entry.Locked}}
-                                <div class="m-vendor-row m-vendor-locked">
-                                    <span class="m-vendor-name dim">{{$entry.ScraperName}}</span>
-                                    <span class="m-locked-cta">
-                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="join">Join</a>
-                                        {{range $ref, $id := $.PatreonIDs}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="login">Log in</a>{{end}}
-                                    </span>
-                                </div>
-                                {{else}}
-                                <div class="m-vendor-row m-vendor-flat">
-                                    <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="seller">{{$entry.ScraperName}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}}</span>{{end}}
-                                    </span>
-                                    <span class="m-vendor-right">
-                                        <span class="m-vendor-price">{{if or $entry.PriceUnit $entry.Price}}{{$entry.PriceLabel}}{{else}}n/a{{end}}{{if and $entry.Secondary (not $entry.IsEV)}}<span class="m-vendor-secondary">$ {{printf "%.2f" $entry.Secondary}}</span>{{end}}</span>
-                                        <span class="m-vendor-qty"></span>
-                                    </span>
-                                </div>
-                                {{end}}
-                            {{end}}
-                        </div>
-                        {{else}}
-                        {{if and $expanded $card.Sealed $refs (not $headed)}}
-                            {{$headed = true}}
-                            <div class="m-panel-header">Sellers</div>
-                        {{end}}
-                        <div class="m-cond-group{{if or $expanded (eq $conditions $defView)}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
-                            {{range $ei, $entry := $entries}}
-                                {{if $entry.Locked}}
-                                <div class="m-vendor-row m-vendor-locked">
-                                    <span class="m-vendor-name dim">{{$entry.ScraperName}} {{$entry.Country}}</span>
-                                    <span class="m-locked-cta">
-                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="join">Join</a>
-                                        {{range $ref, $id := $.PatreonIDs}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="login">Log in</a>{{end}}
-                                    </span>
-                                </div>
-                                {{else}}
-                                {{$hasDetail := or $entry.Credit $entry.OrigPrice}}
-                                {{if $hasDetail}}
-                                <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
-                                    <summary>
-                                        <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                            {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="seller">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}} {{$entry.Country}}</span>{{end}}
-                                            {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
-                                        </span>
-                                        <span class="m-vendor-right">
-                                            <span class="m-vendor-price{{if $entry.OrigPrice}} m-price-adjusted{{end}}">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}{{if $entry.Secondary}}<span class="m-vendor-secondary"{{with $entry.SecondaryTip}} title="{{.}}"{{end}}>$ {{printf "%.2f" $entry.Secondary}}</span>{{end}}</span>
-                                            <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{else if $entry.Listings}}<span class="tcg-listings" title="{{plain_tip $entry.ListingsTitle}}">{{$entry.Listings}}</span>{{end}}</span>
-                                            <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
-                                        </span>
-                                    </summary>
-                                    <div class="m-vendor-detail">
-                                        {{if $entry.Credit}}
-                                        <div class="m-detail-row">
-                                            <span class="m-vendor-name">Credit</span>
-                                            <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.Credit}}</span><span class="m-vendor-qty"></span></span>
-                                        </div>
-                                        {{end}}
-                                        {{if $entry.OrigPrice}}
-                                        <div class="m-detail-row">
-                                            <span class="m-vendor-name">Store price</span>
-                                            <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.OrigPrice}}</span><span class="m-vendor-qty"></span></span>
-                                        </div>
-                                        {{end}}
-                                    </div>
-                                </details>
-                                {{else}}
-                                <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
-                                    <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="seller">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}} {{$entry.Country}}</span>{{end}}
-                                        {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
-                                    </span>
-                                    <span class="m-vendor-right">
-                                        <span class="m-vendor-price{{if $entry.OrigPrice}} m-price-adjusted{{end}}">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}{{if $entry.Secondary}}<span class="m-vendor-secondary"{{with $entry.SecondaryTip}} title="{{.}}"{{end}}>$ {{printf "%.2f" $entry.Secondary}}</span>{{end}}</span>
-                                        <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{else if $entry.Listings}}<span class="tcg-listings" title="{{plain_tip $entry.ListingsTitle}}">{{$entry.Listings}}</span>{{end}}</span>
-                                    </span>
-                                </div>
-                                {{end}}
-                                {{end}}
-                            {{end}}
-                        </div>
-                        {{end}}
-                    {{end}}
-                {{end}}
+            <div class="m-tab-panel active" id="sellers-{{$cardId}}" role="region" aria-label="Sellers">
+                {{template "m-pane-head" "Sellers"}}
+                {{template "result-sellers" dict "Page" $ "Card" $card "CardID" $cardId}}
             </div>
             {{end}}
 
+            {{if $salesFirst}}{{template "m-sales-panel" $cardId}}{{end}}
+
             {{/* Buyers panel */}}
-            {{if or $hasBuyers $salesRow $hasSales}}
-            <div class="m-tab-panel{{if or $expanded $buyersTab}} active{{end}}{{if $salesSwitch}} buyers-panel{{end}}" id="buyers-{{$cardId}}"{{if $salesSwitch}} data-buyers-mode="{{$.BuyersMode}}"{{end}}>
-                {{$headed := false}}
-                {{$refs := $salesRow}}
-                {{if $salesSwitch}}<div class="m-buyers-bar">{{template "buyers-switch" $.BuyersMode}}</div>{{end}}
-                {{if $salesRow}}
-                    {{if $.CanVelocity}}
-                    <details class="m-vendor-row sales-velocity"{{if $.VelocityOpen}} open{{end}}>
-                        <summary>
-                            <span class="m-vendor-name">TCGplayer sales</span>
-                            <span class="m-vendor-right">
-                                <span class="m-vendor-price{{with $card.VelocityPace}} velocity-{{.}}{{end}}"{{with $card.VelocityNote}} title="{{.}}"{{end}}>{{if $card.VelocityRising}}<span class="velocity-rising" title="Selling at least twice as fast this week">&#8593;</span>{{end}}{{$card.Velocity}}</span>
-                                <span class="m-vendor-qty"></span>
-                                <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
-                            </span>
-                        </summary>
-                        <div class="m-vendor-detail"><div class="m-detail-note">{{tip_html $card.VelocityDetail}}</div></div>
-                    </details>
-                    {{else}}
-                    <a class="m-vendor-row sales-velocity-upsell" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener" data-track="ui.row.locked" data-track-value="velocity_upsell">Increase your tier to unlock sales velocity</a>
-                    {{end}}
-                {{end}}
-                {{$condsEntry := (index $.FoundVendors $cardId)}}
-                {{range $conditions := $.CondKeys}}
-                    {{$entries := (index $condsEntry $conditions)}}
-                    {{if $entries}}
-                        {{if eq $conditions "INDEX"}}
-                        {{$refs = true}}
-                        <div class="m-cond-group{{if or $expanded (eq $defView "INDEX")}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}">
-                            {{range $ei, $entry := $entries}}
-                                {{if $entry.Locked}}
-                                <div class="m-vendor-row m-vendor-locked">
-                                    <span class="m-vendor-name dim">{{$entry.ScraperName}}</span>
-                                    <span class="m-locked-cta">
-                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="join">Join</a>
-                                        {{range $ref, $id := $.PatreonIDs}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="login">Log in</a>{{end}}
-                                    </span>
-                                </div>
-                                {{else}}
-                                <div class="m-vendor-row m-vendor-flat">
-                                    <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="buyer">{{$entry.ScraperName}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}}</span>{{end}}
-                                    </span>
-                                    <span class="m-vendor-right">
-                                        <span class="m-vendor-price">{{if or $entry.PriceUnit $entry.Price}}{{$entry.PriceLabel}}{{else}}n/a{{end}}{{if and $entry.Secondary (not $entry.IsEV)}}<span class="m-vendor-secondary">$ {{printf "%.2f" $entry.Secondary}}</span>{{end}}</span>
-                                        <span class="m-vendor-qty"></span>
-                                    </span>
-                                </div>
-                                {{end}}
-                            {{end}}
-                        </div>
-                        {{else}}
-                        {{if and $expanded $card.Sealed $refs (not $headed)}}
-                            {{$headed = true}}
-                            <div class="m-panel-header">Buyers</div>
-                        {{end}}
-                        <div class="m-cond-group{{if or $expanded (eq $conditions $defView)}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
-                            {{range $ei, $entry := $entries}}
-                                {{if $entry.Locked}}
-                                <div class="m-vendor-row m-vendor-locked">
-                                    <span class="m-vendor-name dim">{{$entry.ScraperName}} {{$entry.Country}}</span>
-                                    <span class="m-locked-cta">
-                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="join">Join</a>
-                                        {{range $ref, $id := $.PatreonIDs}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="login">Log in</a>{{end}}
-                                    </span>
-                                </div>
-                                {{else}}
-                                {{$ckNote := and (eq $entry.Shorthand "CK") (eq $conditions "NM") $card.CKFacts}}
-                                {{$pauseNote := and (eq $entry.Shorthand "CKBLLast") (eq $conditions "NM") $card.CKPauseTip}}
-                                {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM")) $ckNote $pauseNote $entry.RuleTip}}
-                                {{$mState := buylist_state $entry.Shorthand $conditions $entry.IsOffer $entry.Price $card.GoodBuylist $card.CKSignal $card.CKPauseWait}}
-                                {{/* A price that looks off is never one to take. */}}
-                                {{if and (eq $entry.Shorthand "TCGDirectNet") (invalid_direct $entry.Price $card.TCGMarketPrice)}}{{$mState = ""}}{{end}}
-                                {{if $hasDetail}}
-                                <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
-                                    <summary>
-                                        <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                            {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="buyer">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}} {{$entry.Country}}</span>{{end}}
-                                            {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseTip}}{{buylist_pause_wait $entry.Shorthand $conditions $card.CKPauseWait}}
-                                            {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
-                                        </span>
-                                        <span class="m-vendor-right">
-                                            <span class="m-vendor-price{{if eq $mState "best"}} m-price-best{{end}}{{if eq $mState "wait"}} m-price-wait{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
-                                            <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
-                                            <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
-                                        </span>
-                                    </summary>
-                                    <div class="m-vendor-detail">
-                                        {{if and $entry.Ratio (eq $conditions "NM")}}
-                                        <div class="m-detail-row">
-                                            <span class="m-vendor-name">Ratio</span>
-                                            <span class="m-vendor-right"><span class="m-vendor-price">{{printf "%.02f%%" $entry.Ratio}}</span><span class="m-vendor-qty"></span></span>
-                                        </div>
-                                        {{end}}
-                                        {{if $entry.Credit}}
-                                        <div class="m-detail-row">
-                                            <span class="m-vendor-name">Credit</span>
-                                            <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.Credit}}</span><span class="m-vendor-qty"></span></span>
-                                        </div>
-                                        {{end}}
-                                        {{if $entry.OrigCredit}}
-                                        <div class="m-detail-row">
-                                            <span class="m-vendor-name">Credit at face</span>
-                                            <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.OrigCredit}}</span><span class="m-vendor-qty"></span></span>
-                                        </div>
-                                        {{end}}
-                                        {{if $entry.MarketCredit}}
-                                        <div class="m-detail-row">
-                                            <span class="m-vendor-name">Mkt Credit</span>
-                                            <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.MarketCredit}}</span><span class="m-vendor-qty"></span></span>
-                                        </div>
-                                        {{end}}
-                                        {{if $ckNote}}
-                                        <div class="m-detail-note">{{tip_html (buylist_title $entry.Shorthand $conditions $mState $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip)}}</div>
-                                        {{end}}
-                                        {{if $pauseNote}}
-                                        <div class="m-detail-note">{{tip_html $card.CKPauseTip}}</div>
-                                        {{end}}
-                                        {{if $entry.RuleTip}}
-                                        <div class="m-detail-note">{{tip_html $entry.RuleTip}}</div>
-                                        {{end}}
-                                    </div>
-                                </details>
-                                {{else}}
-                                <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
-                                    <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
-                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or $entry.Shorthand "other"}}" data-track-scope="buyer">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}<span class="m-vendor-label">{{$entry.ScraperName}} {{$entry.Country}}</span>{{end}}
-                                        {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseTip}}{{buylist_pause_wait $entry.Shorthand $conditions $card.CKPauseWait}}
-                                        {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
-                                    </span>
-                                    <span class="m-vendor-right">
-                                        <span class="m-vendor-price{{if eq $mState "best"}} m-price-best{{end}}{{if eq $mState "wait"}} m-price-wait{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
-                                        <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
-                                    </span>
-                                </div>
-                                {{end}}
-                                {{end}}
-                            {{end}}
-                        </div>
-                        {{end}}
-                    {{end}}
-                {{end}}
-                {{if and $hasSellers (not $hasBuyers)}}
-                <div class="m-vendor-row m-vendor-flat m-buylist-none"><span class="m-vendor-name dim">No offers</span></div>
-                {{end}}
-                {{if $salesSwitch}}
-                <div class="m-sales-pane sales-pane" data-card="{{$cardId}}" data-pending></div>
-                {{end}}
+            {{if or $hasBuyers $salesRow}}
+            <div class="m-tab-panel active" id="buyers-{{$cardId}}" role="region" aria-label="Buyers">
+                {{template "m-pane-head" "Buyers"}}
+                {{template "result-buyers" dict "Page" $ "Card" $card "CardID" $cardId}}
             </div>
             {{end}}
+            {{if and $hasSales (not $salesFirst)}}{{template "m-sales-panel" $cardId}}{{end}}
             {{if not (or $hasSellers $hasBuyers)}}
-            <div class="m-vendor-row m-vendor-flat"><span class="m-vendor-name dim">No offers</span></div>
+            <div class="no-offers"><i>No offers</i></div>
             {{end}}
         </div>
     {{else}}
@@ -681,27 +426,13 @@
         </div>
     {{end}}
 
-    {{/* Pagination */}}
-    {{if .CurrentIndex}}
-    <div class="m-pagination">
-        {{if ne .CurrentIndex 1}}
-            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p=1{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="first">&laquo;</a>
-            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.PrevIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="prev">&lsaquo;</a>
-        {{end}}
-        <span class="m-pg-cur">{{.CurrentIndex}}</span>
-        <span class="m-pg-info">/ {{.TotalIndex}}</span>
-        {{if ne .CurrentIndex .TotalIndex}}
-            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.NextIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="next">&rsaquo;</a>
-            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.TotalIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="last">&raquo;</a>
-        {{end}}
     </div>
-    {{end}}
-
-    {{/* What the search left out or warns about, below the results as on
-         desktop; with no results they read in the empty state above */}}
-    {{if and .AllKeys .Notices}}
-    <p class="m-search-notices">{{range $i, $n := .Notices}}{{if $i}}<br>{{end}}{{$n}}{{end}}</p>
-    {{end}}
+    {{if and .AllKeys (or .CurrentIndex .Notices)}}<div class="m-results-end">{{template "m-search-end" .}}</div>{{end}}
+    </div>
+    {{/* Before first paint: each card opens on its picture, not its buyers */}}
+    <script>document.querySelectorAll('.m-results > .m-card').forEach(function(c){if(c.querySelector(':scope > [id^="sellers"]'))c.scrollLeft=c.clientWidth;});</script>
+    <script type="text/javascript" src="/js/search-cards.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/buylist-extra.js?hash={{.Hash}}" defer></script>
 
     {{/* Filter overlay sheet */}}
     <div class="m-filter-overlay" id="m-filter-overlay" onclick="this.classList.remove('open'); document.getElementById('m-filter-sheet').classList.remove('open');"></div>
@@ -755,37 +486,6 @@
         <div class="m-drawer-handle" onclick="window.closeSettings && closeSettings()"><span></span></div>
         <div class="m-settings-content">
             <h3>Search Settings</h3>
-
-            {{/* Layout */}}
-            <div class="m-settings-section">
-                <div class="m-settings-label">Layout</div>
-                <div class="m-settings-pills" id="m-set-layout">
-                    <button type="button" class="m-settings-pill active" data-val="expanded">Expanded</button>
-                    <button type="button" class="m-settings-pill" data-val="compact">Compact</button>
-                </div>
-            </div>
-
-            {{/* Default Tab */}}
-            <div class="m-settings-section">
-                <div class="m-settings-label">Default Tab</div>
-                <div class="m-settings-pills" id="m-set-default-tab">
-                    <button type="button" class="m-settings-pill active" data-val="sellers">Sellers</button>
-                    <button type="button" class="m-settings-pill" data-val="buyers">Buyers</button>
-                </div>
-            </div>
-
-            {{/* Default View - which condition (or Index) is initially active in result cards */}}
-            <div class="m-settings-section" id="m-set-default-view-section">
-                <div class="m-settings-label">Default View</div>
-                <div class="m-settings-pills" id="m-set-default-view">
-                    <button type="button" class="m-settings-pill active" data-val="NM">NM</button>
-                    <button type="button" class="m-settings-pill" data-val="SP">SP</button>
-                    <button type="button" class="m-settings-pill" data-val="MP">MP</button>
-                    <button type="button" class="m-settings-pill" data-val="HP">HP</button>
-                    <button type="button" class="m-settings-pill" data-val="PO">PO</button>
-                    <button type="button" class="m-settings-pill" data-val="INDEX">Index</button>
-                </div>
-            </div>
 
             {{/* Listing Priority */}}
             <div class="m-settings-section">
@@ -1015,15 +715,52 @@
     </div>
     {{end}}
 
-    {{/* Card image bottom drawer */}}
-    <div class="m-drawer-overlay" id="m-drawer-overlay" onclick="window.hideCardDrawer && hideCardDrawer()"></div>
-    <div class="m-drawer" id="m-drawer">
-        <div class="m-drawer-handle" onclick="window.hideCardDrawer && hideCardDrawer()"><span></span></div>
-        <div class="m-drawer-content">
-            <img class="m-drawer-img" id="m-drawer-img" src="" alt="" onclick="this.classList.add('cw-revealed');this.removeAttribute('data-track')">
-            <span class="m-drawer-name" id="m-drawer-name"></span>
-        </div>
+</div>
+{{end}}
+
+{{/* The pager and the search's notices, after the last card */}}
+{{define "m-search-end"}}
+    {{/* Pagination */}}
+    {{if .CurrentIndex}}
+    <div class="m-pagination">
+        <span class="m-pg-back">
+        {{if ne .CurrentIndex 1}}
+            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p=1{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="first">&laquo;</a>
+            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.PrevIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="prev">&lsaquo;</a>
+        {{end}}
+        </span>
+        <span class="m-pg-at"><span class="m-pg-cur">{{.CurrentIndex}}</span>
+        <span class="m-pg-info">/ {{.TotalIndex}}</span></span>
+        <span class="m-pg-fwd">
+        {{if ne .CurrentIndex .TotalIndex}}
+            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.NextIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="next">&rsaquo;</a>
+            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.TotalIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}" data-track="ui.search.pager" data-track-value="last">&raquo;</a>
+        {{end}}
+        </span>
     </div>
+    {{end}}
+
+    {{/* What the search left out or warns about, below the results as on
+         desktop; with no results they read in the empty state above */}}
+    {{if and .AllKeys .Notices}}
+    <p class="m-search-notices">{{range $i, $n := .Notices}}{{if $i}}<br>{{end}}{{$n}}{{end}}</p>
+    {{end}}
+{{end}}
+
+{{/* A Cards list of a card's recent sales, given its id: search-buyers.js
+     fills every card's the first time one is shown */}}
+{{define "m-sales-panel"}}
+<div class="m-tab-panel active" id="sales-{{.}}" role="region" aria-label="Sales">
+    {{template "m-pane-head" "Sales"}}
+    <div class="result-col"><div class="sales-pane" data-card="{{.}}" data-pending></div></div>
+</div>
+{{end}}
+
+{{/* A Cards list's heading, given "Sellers", "Buyers" or "Sales"; the card's
+     own header stays above it */}}
+{{define "m-pane-head"}}
+<div class="m-pane-head">
+    <span class="m-pane-side">{{.}}</span>
 </div>
 {{end}}
 
@@ -1032,13 +769,14 @@
 <script type="text/javascript" src="/js/search-track.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-velocity.js?hash={{.Hash}}" defer></script>
 {{if not .CanSales}}
-{{/* The Sales pane of a reader not logged in, one copy the switch puts in each card */}}
+{{/* The Sales pane of a reader not logged in, one copy each card's Sales
+     list takes when it is first shown */}}
 <template id="sales-login">
-    <div class="m-vendor-row m-vendor-locked sales-locked">
-        <span class="m-vendor-name dim">Log in to see recent sales</span>
-        <span class="m-locked-cta">
-            <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="sales_join">Join</a>
-            {{range $ref, $id := .PatreonIDs}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="sales_login">Log in</a>{{end}}
+    <div class="price-row sales-locked">
+        <span class="store-name dim">Log in to see recent sales</span>
+        <span class="locked-cta">
+            <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="sales_join">Join</a>
+            {{range $ref, $id := .PatreonIDs}}<a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="sales_login">Log in</a>{{end}}
         </span>
     </div>
 </template>
@@ -1057,21 +795,6 @@ document.querySelectorAll('.m-filter-pills').forEach(function(group) {
         });
     });
 });
-
-// Cross-device: adopt the synced layout pref over a stale local cookie. The
-// page is already rendered from the cookie - which layout it is arrives as
-// markup, not just as css - so adopting one has to be followed by a reload to
-// mean anything. Only when the cookie actually took, so a browser refusing it
-// cannot spin here.
-(function() {
-    var synced = null;
-    try { synced = localStorage.getItem('mtgban_search_layout'); } catch (e) {}
-    if (!synced || synced === (getCookie('MobileSearchLayout') || '')) return;
-    setCookie('MobileSearchLayout', synced, 1000);
-    if (getCookie('MobileSearchLayout') === synced) {
-        window.location.reload();
-    }
-})();
 
 function selectSet(e) {
     var li = e.currentTarget;
@@ -1169,110 +892,6 @@ document.addEventListener('click', function(e) {
 window.addEventListener('scroll', closeActionsMenus, { passive: true });
 window.addEventListener('resize', closeActionsMenus);
 
-// Card image drawer
-function showCardDrawer(imgUrl, name, hasWarning) {
-    var overlay = document.getElementById('m-drawer-overlay');
-    var drawer = document.getElementById('m-drawer');
-    var img = document.getElementById('m-drawer-img');
-    var nameEl = document.getElementById('m-drawer-name');
-    window.setCardArtSource(img, imgUrl);
-    img.alt = name;
-    // Blur content-warning art until tapped, matching desktop. Reset the
-    // revealed state each open so a fresh card starts blurred again.
-    img.classList.toggle('content-warning', !!hasWarning);
-    img.classList.remove('cw-revealed');
-    if (hasWarning) {
-        img.setAttribute('data-track', 'ui.result.image');
-        img.setAttribute('data-track-value', 'reveal_warning');
-    } else {
-        img.removeAttribute('data-track');
-        img.removeAttribute('data-track-value');
-    }
-    nameEl.textContent = name;
-    overlay.classList.add('open');
-    drawer.classList.add('open');
-}
-
-function hideCardDrawer() {
-    document.getElementById('m-drawer-overlay').classList.remove('open');
-    document.getElementById('m-drawer').classList.remove('open');
-}
-
-(function() {
-    // Tab switching: Sellers / Buyers
-    document.querySelectorAll('.m-tab').forEach(function(tab) {
-        tab.addEventListener('click', function() {
-            var card = this.closest('.m-card');
-            card.querySelectorAll('.m-tab').forEach(function(t) { t.classList.remove('active'); });
-            card.querySelectorAll('.m-tab-panel').forEach(function(p) { p.classList.remove('active'); });
-            this.classList.add('active');
-            var target = document.getElementById(this.getAttribute('data-target'));
-            if (target) target.classList.add('active');
-        });
-    });
-
-    // Condition pill switching - all pills (including Index) are mutually exclusive
-    document.querySelectorAll('.m-cond-pill').forEach(function(pill) {
-        pill.addEventListener('click', function() {
-            var cond = this.getAttribute('data-cond');
-            var card = this.closest('.m-card');
-
-            this.closest('.m-cond-pills').querySelectorAll('.m-cond-pill').forEach(function(p) { p.classList.remove('active'); });
-            this.classList.add('active');
-
-            card.querySelectorAll('.m-cond-group').forEach(function(g) {
-                if (g.getAttribute('data-cond') === cond) {
-                    g.classList.add('active');
-                } else {
-                    g.classList.remove('active');
-                }
-            });
-
-            recalcBestBadges(card);
-        });
-    });
-})();
-
-// Recalculate BEST badge per active condition group in each panel
-function recalcBestBadges(card) {
-    card.querySelectorAll('.m-tab-panel').forEach(function(panel) {
-        // Remove all existing best badges and styling
-        panel.querySelectorAll('.m-best-price').forEach(function(r) { r.classList.remove('m-best-price'); });
-        panel.querySelectorAll('.m-best-badge').forEach(function(b) { b.remove(); });
-
-        var isBuyPanel = panel.id && panel.id.indexOf('buyers-') === 0;
-        panel.querySelectorAll('.m-cond-group.active').forEach(function(group) {
-            var bestPrice = isBuyPanel ? -Infinity : Infinity;
-            var bestRow = null;
-            group.querySelectorAll('.m-vendor-row:not(.m-vendor-locked)').forEach(function(row) {
-                var priceEl = row.querySelector('.m-vendor-price');
-                if (!priceEl) return;
-                var price = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
-                if (isNaN(price) || price <= 0) return;
-                if (isBuyPanel ? price > bestPrice : price < bestPrice) {
-                    bestPrice = price;
-                    bestRow = row;
-                }
-            });
-            if (bestRow) {
-                bestRow.classList.add('m-best-price');
-                var nameEl = bestRow.querySelector('.m-vendor-name');
-                if (nameEl && !nameEl.querySelector('.m-best-badge')) {
-                    var badge = document.createElement('span');
-                    badge.className = 'm-best-badge';
-                    badge.textContent = 'Best';
-                    nameEl.appendChild(badge);
-                }
-            }
-        });
-    });
-}
-
-// Run on page load for all cards
-document.querySelectorAll('.m-card').forEach(function(card) {
-    recalcBestBadges(card);
-});
-
 // Settings drawer open/close
 function openSettings() {
     loadSettings();
@@ -1300,17 +919,6 @@ document.querySelectorAll('.m-settings-pills').forEach(function(group) {
     });
 });
 
-// Default View only applies to the compact layout
-function updateDefaultViewVisibility() {
-    var pill = document.querySelector('#m-set-layout .m-settings-pill.active');
-    var section = document.getElementById('m-set-default-view-section');
-    if (!section) return;
-    section.style.display = (pill && pill.getAttribute('data-val') === 'compact') ? '' : 'none';
-}
-document.querySelectorAll('#m-set-layout .m-settings-pill').forEach(function(p) {
-    p.addEventListener('click', updateDefaultViewVisibility);
-});
-
 // Bulk select/clear for store checkboxes
 function mSettingsBulk(containerId, selectAll) {
     var container = document.getElementById(containerId);
@@ -1321,32 +929,6 @@ function mSettingsBulk(containerId, selectAll) {
 
 // Load current cookie values into the settings UI
 function loadSettings() {
-    // Layout
-    var layout = getCookie('MobileSearchLayout') || 'expanded';
-    var layoutGroup = document.getElementById('m-set-layout');
-    layoutGroup.querySelectorAll('.m-settings-pill').forEach(function(p) {
-        p.classList.toggle('active', p.getAttribute('data-val') === layout);
-    });
-    updateDefaultViewVisibility();
-
-    // Default Tab
-    var tab = getCookie('SearchDefaultTab');
-    if (tab) {
-        var group = document.getElementById('m-set-default-tab');
-        group.querySelectorAll('.m-settings-pill').forEach(function(p) {
-            p.classList.toggle('active', p.getAttribute('data-val') === tab);
-        });
-    }
-
-    // Default View
-    var view = getCookie('SearchDefaultView');
-    if (view) {
-        var group = document.getElementById('m-set-default-view');
-        group.querySelectorAll('.m-settings-pill').forEach(function(p) {
-            p.classList.toggle('active', p.getAttribute('data-val') === view);
-        });
-    }
-
     // Listing Priority, absent while the server locks it to store order
     var lp = getCookie('SearchListingPriority');
     var lpGroup = document.getElementById('m-set-listing-priority');
@@ -1394,18 +976,6 @@ function loadSettings() {
 
 // writeDrawer hands set each cookie name and the value the drawer's controls hold for it.
 function writeDrawer(set) {
-    // Layout
-    var layoutPill = document.querySelector('#m-set-layout .m-settings-pill.active');
-    set('MobileSearchLayout', layoutPill ? layoutPill.getAttribute('data-val') : 'expanded');
-
-    // Default Tab
-    var tabPill = document.querySelector('#m-set-default-tab .m-settings-pill.active');
-    set('SearchDefaultTab', tabPill ? tabPill.getAttribute('data-val') : 'sellers');
-
-    // Default View
-    var viewPill = document.querySelector('#m-set-default-view .m-settings-pill.active');
-    set('SearchDefaultView', viewPill ? viewPill.getAttribute('data-val') : 'NM');
-
     // Listing Priority, absent while the server locks it to store order
     if (document.getElementById('m-set-listing-priority')) {
         var lpPill = document.querySelector('#m-set-listing-priority .m-settings-pill.active');
@@ -1480,7 +1050,6 @@ function saveSettings() {
         saved[name] = value;
         setCookie(name, value, 1000);
     });
-    try { localStorage.setItem('mtgban_search_layout', saved.MobileSearchLayout); } catch (e) {}
 
     // Close drawer
     closeSettings();

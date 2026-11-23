@@ -5,15 +5,16 @@ import { join } from 'path';
 const source = readFileSync(join(import.meta.dir, '..', 'js', 'icons.js'), 'utf8');
 
 export function run(opts = {}) {
-    const { cards = [], placeholders = [], activeCards = [] } = opts;
+    const { cards = [], placeholders = [], activeCards = [], deck = null, portrait = true } = opts;
     const calls = [];
     const lucideMock = { createIcons: (o) => calls.push(o === undefined ? 'document' : o.root) };
     const lucide = Object.hasOwn(opts, 'lucide') ? opts.lucide : lucideMock;
-    const window = { lucide, innerHeight: 800 };
+    const window = { lucide, innerHeight: 800, matchMedia: () => ({ matches: portrait }) };
     let readyFn = null;
     const document = {
         addEventListener: (ev, fn) => { if (ev === 'DOMContentLoaded') readyFn = fn; },
         querySelectorAll: (sel) => (sel === '.m-card' ? cards : sel === 'i[data-lucide]' ? placeholders : []),
+        querySelector: (sel) => (sel === '.m-layout-cards .m-results' ? deck : null),
     };
     let observer = null;
     function IntersectionObserver(cb, ioOpts) {
@@ -78,4 +79,15 @@ test('without IntersectionObserver every card is painted at once', () => {
     const { calls, ready } = run({ cards: [card], io: undefined });
     ready();
     expect(calls).toEqual(['document', card]);
+});
+
+test('under portrait Cards a card is near within a slide of the results area', () => {
+    const card = { querySelectorAll: () => [] };
+    const deck = { clientHeight: 600 };
+    const portraitRun = run({ cards: [card], deck });
+    portraitRun.ready();
+    expect(portraitRun.observer().opts).toEqual({ root: deck, rootMargin: '600px 0px' });
+    const landscapeRun = run({ cards: [card], deck, portrait: false });
+    landscapeRun.ready();
+    expect(landscapeRun.observer().opts).toEqual({ rootMargin: '800px 0px' });
 });

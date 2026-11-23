@@ -51,11 +51,8 @@ var searchViewCookies = []struct {
 	name   string
 	values []string
 }{
-	{"SearchDefaultTab", []string{"sellers", "buyers"}},
-	{"SearchDefaultView", []string{"NM", "SP", "MP", "HP", "PO", "INDEX"}},
 	{"SearchListingPriority", []string{"stores", "prices", "credit", "market"}},
 	{"SearchSealedContents", []string{"contents", "decklist", "variable"}},
-	{"MobileSearchLayout", []string{"expanded", "compact"}},
 }
 
 // isCanonical maps each value cardFilterIs has a case for to the name search.is stores.

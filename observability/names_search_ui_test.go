@@ -21,7 +21,6 @@ func TestSearchUINames(t *testing.T) {
 		{"ui.result.icon", "sidebar", "bell", "", "", false},
 		{"ui.result.icon", "", "bell", "", "", false}, // a scoped name always carries a scope
 		{"ui.result.icon_menu", "", "open", "", "open", true},
-		{"ui.result.image", "", "drawer_open", "", "drawer_open", true},
 		{"ui.search.sort", "sort", "retail", "sort", "retail", true},
 		{"ui.search.sort", "reverse", "odds", "reverse", "odds", true},
 		{"ui.search.sort", "sort", "hybrid", "", "", false},
@@ -44,10 +43,6 @@ func TestSearchUINames(t *testing.T) {
 		{"ui.row.store", "sidebar", "CK", "", "", false},
 		{"ui.row.locked", "", "velocity_upsell", "", "velocity_upsell", true},
 		{"ui.row.velocity", "", "open", "", "open", true},
-		{"ui.row.detail", "", "open", "", "open", true},
-		{"ui.row.tab", "", "buyers", "", "buyers", true},
-		{"ui.row.condition", "", "INDEX", "", "INDEX", true},
-		{"ui.row.condition", "", "DMG", "", "", false},
 		{"ui.row.admin_fix", "", "retail", "", "retail", true},
 		{"ui.search.pager", "", "last", "", "last", true},
 		{"ui.search.suggestion", "", "unpin_scope", "", "unpin_scope", true},
@@ -161,8 +156,8 @@ func TestSearchUIPages(t *testing.T) {
 			t.Errorf("%s: denom %q, want %q", n.Name, n.Denom, denoms[n.Name])
 		}
 	}
-	// 56 from this phase and ui.search.key, the palette stage's results page shortcuts.
-	if seen != 58 {
-		t.Errorf("%d names under this phase's prefixes, want 58", seen)
+	// 54 from this phase and ui.search.key, the palette stage's results page shortcuts.
+	if seen != 55 {
+		t.Errorf("%d names under this phase's prefixes, want 55", seen)
 	}
 }

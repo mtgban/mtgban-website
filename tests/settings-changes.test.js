@@ -40,8 +40,8 @@ const cases = [
         { StoreFactors: '{}' }, { StoreFactors: '{"CK":{"d":5}}' },
         [{ name: 'SearchStoreFactors', value: 'set' }]],
     ['the drawer writing a default into an unset cookie is not a change; stores over the price default is',
-        { SearchDefaultTab: null, SearchDefaultView: null, MobileSearchLayout: null, SearchListingPriority: null, SearchSealedContents: null },
-        { SearchDefaultTab: 'sellers', SearchDefaultView: 'NM', MobileSearchLayout: 'expanded', SearchListingPriority: 'stores', SearchSealedContents: 'contents' },
+        { SearchListingPriority: null, SearchSealedContents: null },
+        { SearchListingPriority: 'stores', SearchSealedContents: 'contents' },
         [{ name: 'SearchListingPriority', value: 'stores' }]],
     ['an enum set to its default from unset, or emptied back to it, is not a change',
         { SearchDefaultSort: '', SearchListingPriority: 'prices' }, { SearchDefaultSort: 'chrono', SearchListingPriority: '' },
@@ -56,8 +56,8 @@ const cases = [
         { SearchMiscOpts: 'noSussy,bogus words' }, { SearchMiscOpts: 'noSussy,' },
         []],
     ['an enum value outside its words is sent as set',
-        { SearchDefaultView: 'NM' }, { SearchDefaultView: 'anything else' },
-        [{ name: 'SearchDefaultView', value: 'set' }]],
+        { SearchSealedContents: 'decklist' }, { SearchSealedContents: 'anything else' },
+        [{ name: 'SearchSealedContents', value: 'set' }]],
     ['emptying every store factor is cleared',
         { StoreFactors: '{"CK":{"d":5}}' }, { StoreFactors: '{}' },
         [{ name: 'SearchStoreFactors', value: 'cleared' }]],
@@ -115,7 +115,7 @@ test('hostile cookie names and values send only closed registry words', () => {
         expect(Object.prototype.hasOwnProperty.call(closed, scope)).toBe(true);
         expect(closed[scope]).toContain(value);
     }
-    expect(changes.some((c) => c[2] === 'SearchDefaultView' && c[1] === 'retail')).toBe(false);
+    expect(changes.some((c) => c[2] === 'SearchSealedContents' && c[1] === 'retail')).toBe(false);
     for (const c of calls) expect(['ui.settings.change', 'ui.settings.save']).toContain(c[0]);
 });
 
@@ -145,10 +145,10 @@ test('report does nothing without window.BAN', () => {
 
 test('snapshot reads exactly the drawer cookies', () => {
     const asked = [];
-    const snap = SettingsChanges.snapshot((name) => { asked.push(name); return name === 'SearchDefaultTab' ? 'buyers' : null; });
+    const snap = SettingsChanges.snapshot((name) => { asked.push(name); return name === 'SearchSealedContents' ? 'decklist' : null; });
     expect(Object.keys(snap)).toEqual(SettingsChanges.DRAWER);
     expect(asked).toEqual(SettingsChanges.DRAWER);
-    expect(snap.SearchDefaultTab).toBe('buyers');
+    expect(snap.SearchSealedContents).toBe('decklist');
 });
 
 // runDrawer opens the mobile drawer over a cookie jar with the controls at open, then saves
@@ -205,9 +205,9 @@ test('a drawer applied untouched counts the save and no setting, though it write
 
 test('a drawer save counts the control the reader moved and nothing it writes on its own', () => {
     const { BAN, calls } = fakeBAN();
-    const opened = { 'm-set-listing-priority': 'stores', 'm-set-layout': 'expanded' };
-    runDrawer({ BAN, opened, controls: { 'm-set-listing-priority': 'stores', 'm-set-layout': 'compact' } });
-    expect(calls).toEqual([['ui.settings.change', 'compact', 'MobileSearchLayout'], ['ui.settings.save', 'mobile_drawer', undefined]]);
+    const opened = { 'm-set-listing-priority': 'stores', 'm-set-sealed-contents': 'contents' };
+    runDrawer({ BAN, opened, controls: { 'm-set-listing-priority': 'stores', 'm-set-sealed-contents': 'decklist' } });
+    expect(calls).toEqual([['ui.settings.change', 'decklist', 'SearchSealedContents'], ['ui.settings.save', 'mobile_drawer', undefined]]);
 });
 
 test('a listing priority the reader picked is counted', () => {
@@ -274,7 +274,7 @@ test('the drawer reads the store factors after their save wrote them', () => {
 
 test('a drawer save over unknown cookie text sends no scope or value outside the registry', () => {
     const { BAN, calls } = fakeBAN();
-    runDrawer({ BAN, opened: null, jar: { SearchMiscOpts: 'noSussy,Black Lotus alpha', SearchDefaultView: 'my secret text', SearchDefaultTab: 'https://example.com/' } });
+    runDrawer({ BAN, opened: null, jar: { SearchMiscOpts: 'noSussy,Black Lotus alpha', SearchSealedContents: 'my secret text', SearchListingPriority: 'https://example.com/' } });
     expect(calls.length).toBeGreaterThan(1);
     for (const [name, value, scope] of calls) {
         if (name !== 'ui.settings.change') continue;
@@ -282,12 +282,12 @@ test('a drawer save over unknown cookie text sends no scope or value outside the
         expect(closed[scope]).toContain(value);
     }
     expect(calls).toContainEqual(['ui.settings.change', 'off', 'SearchMiscOpts.noSussy']);
-    expect(calls).toContainEqual(['ui.settings.change', 'NM', 'SearchDefaultView']);
+    expect(calls).toContainEqual(['ui.settings.change', 'contents', 'SearchSealedContents']);
 });
 
 test('the drawer saves with no SettingsChanges loaded, and with no window.BAN', () => {
     const { BAN, calls } = fakeBAN();
-    expect(runDrawer({ BAN, loaded: false }).get('SearchDefaultTab')).toBe('sellers');
+    expect(runDrawer({ BAN, loaded: false }).get('SearchSealedContents')).toBe('contents');
     expect(calls).toEqual([]);
     expect(runDrawer().get('SearchListingPriority')).toBe('stores');
 });

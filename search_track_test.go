@@ -183,10 +183,9 @@ func TestResultHeaderTracks(t *testing.T) {
 	mv.IsMobile = true
 	mobile := renderPage(t, "search.html", true, mv)
 	want = map[string]int{
-		track("ui.result.image", "drawer_open", ""):    1,
 		track("ui.result.link", "treatment", ""):       1,
 		track("ui.result.link", "promo_type", ""):      1,
-		track("ui.result.link", "name", ""):            0,
+		track("ui.result.link", "name", ""):            1,
 		track("ui.result.icon_menu", "open", ""):       1,
 		track("ui.result.image", "reveal_warning", ""): 0, // no warning on this card
 	}
@@ -358,7 +357,6 @@ func rowsPage() PageVars {
 	}
 	v.FoundSellers["card"] = map[mtgban.Condition][]SearchEntry{"NM": rows()}
 	v.FoundVendors["card"] = map[mtgban.Condition][]SearchEntry{"NM": rows()}
-	v.MobileSearchLayout = "compact"
 	return v
 }
 
@@ -434,13 +432,13 @@ func TestRowControlsTrack(t *testing.T) {
 	v = rowsPage()
 	v.IsMobile = true
 	v.CanVelocity = false
-	wantTracks(t, "mobile compact", renderPage(t, "search.html", true, v), map[string]int{
-		track("ui.row.tab", "sellers", ""):            1,
-		track("ui.row.tab", "buyers", ""):             1,
-		track("ui.row.condition", "NM", ""):           1,
-		track("ui.row.condition", "INDEX", ""):        0,
+	wantTracks(t, "mobile", renderPage(t, "search.html", true, v), map[string]int{
+		track("ui.cards.pane", "sellers", "tap"):      1,
+		track("ui.cards.pane", "buyers", "tap"):       1,
 		track("ui.row.locked", "velocity_upsell", ""): 1,
-		`data-track="ui.row.admin_fix"`:               0,
+		// The desktop table's admin links, hidden until fix mode is on
+		track("ui.row.admin_fix", "retail", ""):  3,
+		track("ui.row.admin_fix", "buylist", ""): 3,
 	})
 	// The phone drawer's Join link shows only while the listing priority is locked.
 	wantTracks(t, "mobile drawer unlocked", renderPage(t, "search.html", true, v), map[string]int{
@@ -449,17 +447,6 @@ func TestRowControlsTrack(t *testing.T) {
 	v.ListingLocked = true
 	wantTracks(t, "mobile drawer locked", renderPage(t, "search.html", true, v), map[string]int{
 		track("ui.row.locked", "listing_priority", ""): 1,
-	})
-	v.ListingLocked = false
-	v.FoundSellers["card"]["INDEX"] = []SearchEntry{{ScraperName: "TCG Market", Shorthand: "TCGMarket", Price: 9}}
-	wantTracks(t, "mobile compact with an index", renderPage(t, "search.html", true, v), map[string]int{
-		track("ui.row.condition", "INDEX", ""): 1,
-		track("ui.row.condition", "NM", ""):    1,
-	})
-	v.MobileSearchLayout = "expanded"
-	wantTracks(t, "mobile expanded", renderPage(t, "search.html", true, v), map[string]int{
-		`data-track="ui.row.tab"`:       0,
-		`data-track="ui.row.condition"`: 0,
 	})
 }
 
