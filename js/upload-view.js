@@ -1,6 +1,6 @@
 // The Optimizer's card view: a store's rows drawn as card images. The
 // toolbar's button sets every store and is kept per browser; a store's own
-// button sets that store alone, for this page.
+// button sets that store alone, for this page. A phone starts on it.
 var UPLOAD_VIEW_STORE = 'mtgban_upload_view';
 
 (function () {
@@ -27,7 +27,9 @@ var UPLOAD_VIEW_STORE = 'mtgban_upload_view';
 
     var saved = '';
     try { saved = localStorage.getItem(UPLOAD_VIEW_STORE) || ''; } catch (e) {}
-    stores.forEach(function (store) { show(store, saved === 'cards'); });
+    // With nothing chosen a phone gets cards: a store's table is wider than it
+    var start = saved ? saved === 'cards' : window.matchMedia('(max-width: 560px)').matches;
+    stores.forEach(function (store) { show(store, start); });
     showAll();
 
     if (all) {
