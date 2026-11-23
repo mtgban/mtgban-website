@@ -1264,6 +1264,13 @@
        the desktop table keeps its column */
     .ures-table.phone-cards > tbody > tr > td.ures-price.none,
     .res-summary-stat.none { display: none; }
+    /* The list scrolls with the page, not in a box of its own */
+    .ures-wrap { max-height: none; }
+    /* Short of the 44px main.css gives every button at this width, which
+       spaced the values on a card apart */
+    .ures-table.phone-cards .ures-edit-btn,
+    .ures-table.phone-cards .ures-pick-btn { display: inline-flex; align-items: center; min-height: 32px; vertical-align: middle; }
+    .ures-table.phone-cards .ures-pick-btn { padding: 2px 10px; font-size: var(--text-xs); }
     .ures-table.phone-cards .ures-card-cell { min-width: 0; }
     /* The Card header's width is set inline for the desktop table */
     .ures-table.phone-cards > thead > tr > th { width: auto !important; }
@@ -1845,6 +1852,18 @@ body:not(:has(#panel-optimizer.active)) :is(.res-sort-btn, .res-sort-sep) { disp
     .res-summary { flex-direction: column; align-items: stretch; }
     .res-summary-stat { border-right: none; padding-right: 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; }
     .res-summary-stat:last-child { border-bottom: none; padding-bottom: 0; }
+}
+
+@media (max-width: 560px) {
+    /* The title over its row count and mode, not beside them */
+    .page-standard .page-header { flex-direction: column; gap: 0.25em; }
+    .page-standard .page-header h1 { font-size: var(--text-4xl); }
+    .page-standard .page-header .page-subtitle { white-space: normal; font-size: var(--text-lg); }
+    /* The totals two to a line */
+    .res-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+    .res-summary-stat,
+    .res-summary-stat:last-child { border: 0; padding: 0; }
+    .res-summary-stat .label { text-align: center; }
 }
 
 /* ── Optimizer row removal ── */
