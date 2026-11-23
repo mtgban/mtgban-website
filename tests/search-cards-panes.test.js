@@ -37,3 +37,13 @@ test('a list keeps its overscroll up and down only', () => {
     expect(rule).toContain('overscroll-behavior-y: contain;');
     expect(rule).not.toMatch(/overscroll-behavior(-x)?:/);
 });
+
+test('a flick stops at the next column', () => {
+    // The picture, the tools under it and the lists are what a card snaps to;
+    // one without the stop lets a hard flick pass the picture by.
+    const css = readFileSync(join(import.meta.dir, '..', 'css', 'search-cards-mobile.css'), 'utf8');
+    for (const target of ['.m-card > .m-card-img-landscape', '.m-card > .m-tab-panel', '.m-card-tools']) {
+        const rule = css.slice(css.indexOf('.m-layout-cards ' + target + ' {'));
+        expect(rule.slice(0, rule.indexOf('}'))).toContain('scroll-snap-stop: always;');
+    }
+});
