@@ -240,6 +240,7 @@ function fakeElement(tag) {
 function mountFake() {
     globalThis.document = {createElement: fakeElement};
     globalThis.escapeHtml = (s) => String(s);
+    globalThis.fitSuggestions = () => {};
     const parent = fakeElement('form');
     const input = parent.appendChild(fakeElement('input'));
     const submitted = [];

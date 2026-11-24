@@ -169,6 +169,11 @@
             return row;
         }
 
+        function fit() {
+            if (list) fitSuggestions(input, list);
+        }
+        if (self.visualViewport) self.visualViewport.addEventListener('resize', fit);
+
         // The open list is updated in place, touching only the rows that
         // changed: a new list per keystroke is a new blurred layer and a new
         // scroller for the browser to paint.
@@ -190,6 +195,7 @@
             while (list.children.length > rows.length) list.removeChild(list.children[rows.length]);
             shown.length = rows.length;
             list.scrollTop = 0;
+            fit();
         }
 
         function highlight(next) {
