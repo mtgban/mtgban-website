@@ -139,8 +139,8 @@ html:has(.m-landing) {
     /* The picture beside the lists, its corners rounded as the desktop's:
        a margin round it rather than padding inside it, which the rounding
        would cut through */
-    .m-layout-cards .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-card-img-landscape,
-    .m-layout-cards .m-card:has(.m-tab-panel + .m-tab-panel) > .m-card-img-landscape {
+    .m-layout-cards .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-card-img-landscape,
+    .m-layout-cards .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-card-img-landscape {
         width: calc(175px - 1em);
         margin: 0.5em;
         padding: 0;
