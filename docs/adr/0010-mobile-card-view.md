@@ -181,6 +181,10 @@ What the phone page already has, and this decision builds on:
 - Every phone reader gets the new layout at once, with no way back to the
   list.
 - A page can hold 25 full-size pictures. They load as the reader swipes.
+- A page's lists hold thousands of elements, and laying all of them out cost
+  a swipe its frames in Safari, so each skips its rows until it is near
+  (`content-visibility`). The pane gives it its size, so nothing moves when
+  they come in.
 - Nested snapping (vertical outside, horizontal inside, a scrolling list
   inside that) is the risk, proven in iPhone Safari before it ships, along
   with the ⋮ menu, which is fixed-position

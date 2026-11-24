@@ -564,6 +564,9 @@ html:has(.m-landing) {
         min-height: 0;
         overflow-y: auto;
         overscroll-behavior-y: contain;
+        /* A page's lists run to thousands of rows; only those near the
+           card in view are laid out, or a swipe drops frames */
+        content-visibility: auto;
     }
 
     .m-layout-cards .m-card > .m-tab-panel[id^="sellers"] {
