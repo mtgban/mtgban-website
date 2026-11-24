@@ -356,9 +356,9 @@
             {{/* Cards: the best ask and offer at the picture's edges, each
                  opening its list; never between the panels, which landscape
                  pairs as adjacent siblings */}}
-            {{if $hasSellers}}<button type="button" class="m-edge m-edge-sell" data-pane="sellers-{{$cardId}}" aria-label="Sellers" data-track="ui.cards.pane" data-track-value="sellers" data-track-scope="tap"><i data-lucide="chevron-left"></i><span class="m-edge-label">Sellers</span>{{with edge_offer $sellerConds}}<span class="m-edge-price">{{.PriceLabel}}</span>{{end}}</button>{{end}}
-            {{if $salesFirst}}<button type="button" class="m-edge m-edge-buy" data-pane="sales-{{$cardId}}" aria-label="Sales" data-track="ui.cards.pane" data-track-value="sales" data-track-scope="tap"><span class="m-edge-label">Sales</span><i data-lucide="chevron-right"></i></button>
-            {{else if $buyersList}}<button type="button" class="m-edge m-edge-buy" data-pane="buyers-{{$cardId}}" aria-label="Buyers" data-track="ui.cards.pane" data-track-value="buyers" data-track-scope="tap"><span class="m-edge-label">Buyers</span>{{with edge_offer $vendorConds}}<span class="m-edge-price">{{.PriceLabel}}</span>{{end}}<i data-lucide="chevron-right"></i></button>{{end}}
+            {{if $hasSellers}}{{$ask := edge_offer $sellerConds}}{{template "m-edge-sell" dict "Price" (and $ask $ask.PriceLabel)}}{{end}}
+            {{if $salesFirst}}{{template "m-edge-buy" dict "Pane" "sales" "Title" "Sales" "Price" ""}}
+            {{else if $buyersList}}{{$offer := edge_offer $vendorConds}}{{template "m-edge-buy" dict "Pane" "buyers" "Title" "Buyers" "Price" (and $offer $offer.PriceLabel)}}{{end}}
             {{/* Cards: the star, backpack and chart between the edge buttons,
                  leaving the header to the card's name */}}
             <div class="m-card-tools">
@@ -765,17 +765,6 @@
 <div class="m-tab-panel active" id="sales-{{.CardID}}" role="region" aria-label="Sales">
     {{template "m-pane-head" dict "Title" "Sales" "Prev" .Prev "Next" .Next}}
     <div class="result-col"><div class="sales-pane" data-card="{{.CardID}}" data-pending></div></div>
-</div>
-{{end}}
-
-{{/* A Cards list's heading, given its Title, "Sellers", "Buyers" or "Sales",
-     between arrows to the panes beside it, Prev and Next, where it has them;
-     the card's own header stays above it */}}
-{{define "m-pane-head"}}
-<div class="m-pane-head">
-    {{with .Prev}}<button type="button" class="m-pane-prev" data-pane="{{.}}" aria-label="Back to the {{.}}" data-track="ui.cards.pane" data-track-value="{{.}}" data-track-scope="arrow"><i data-lucide="chevron-left"></i></button>{{end}}
-    <span class="m-pane-side">{{.Title}}</span>
-    {{with .Next}}<button type="button" class="m-pane-next" data-pane="{{.}}" aria-label="On to the {{.}}" data-track="ui.cards.pane" data-track-value="{{.}}" data-track-scope="arrow"><i data-lucide="chevron-right"></i></button>{{end}}
 </div>
 {{end}}
 

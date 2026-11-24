@@ -1,0 +1,23 @@
+{{/* What moves a phone's card between its panes: the edge buttons on its
+     picture and each list's heading (docs/adr/0010-mobile-card-view.md). The
+     arrows are lucide's own, inline, as every card carries several. */}}
+
+{{define "m-chevron-left"}}<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>{{end}}
+
+{{define "m-chevron-right"}}<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>{{end}}
+
+{{/* Each called with "Price", the best price where there is one, and the
+     right edge, which the buyers or the sales take, with "Pane" the list's
+     name and "Title" its label */}}
+{{define "m-edge-sell"}}<button type="button" class="m-edge m-edge-sell" data-pane="sellers" aria-label="Sellers" data-track="ui.cards.pane" data-track-value="sellers" data-track-scope="tap">{{template "m-chevron-left"}}<span class="m-edge-label">Sellers</span>{{with .Price}}<span class="m-edge-price">{{.}}</span>{{end}}</button>{{end}}
+
+{{define "m-edge-buy"}}<button type="button" class="m-edge m-edge-buy" data-pane="{{.Pane}}" aria-label="{{.Title}}" data-track="ui.cards.pane" data-track-value="{{.Pane}}" data-track-scope="tap"><span class="m-edge-label">{{.Title}}</span>{{with .Price}}<span class="m-edge-price">{{.}}</span>{{end}}{{template "m-chevron-right"}}</button>{{end}}
+
+{{/* A list's name, centred between the arrows to the panes beside it */}}
+{{define "m-pane-head"}}
+<div class="m-pane-head">
+    {{with .Prev}}<button type="button" class="m-pane-prev" data-pane="{{.}}" aria-label="Back to the {{.}}" data-track="ui.cards.pane" data-track-value="{{.}}" data-track-scope="arrow">{{template "m-chevron-left"}}</button>{{end}}
+    <span class="m-pane-side">{{.Title}}</span>
+    {{with .Next}}<button type="button" class="m-pane-next" data-pane="{{.}}" aria-label="On to the {{.}}" data-track="ui.cards.pane" data-track-value="{{.}}" data-track-scope="arrow">{{template "m-chevron-right"}}</button>{{end}}
+</div>
+{{end}}

@@ -242,7 +242,7 @@ func TestSealedSearchShowsSales(t *testing.T) {
 
 	for agent, want := range map[string][]string{
 		"": {`class="result-col buyers-col" data-buyers-mode="sales"`, `class="sales-pane" data-card="` + box + `" data-pending`},
-		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148": {`data-pane="sales-` + box + `"`, `id="sales-` + box + `" role="region"`, `class="sales-pane" data-card="` + box + `" data-pending`},
+		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148": {`class="m-edge m-edge-buy" data-pane="sales"`, `id="sales-` + box + `" role="region"`, `class="sales-pane" data-card="` + box + `" data-pending`},
 	} {
 		r := httptest.NewRequest(http.MethodGet, "/sealed?q="+url.QueryEscape("id:"+box), nil)
 		r.AddCookie(&http.Cookie{Name: "SearchBuyersMode", Value: "sales"})
