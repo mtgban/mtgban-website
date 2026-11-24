@@ -113,7 +113,7 @@
             if (up) {
                 var q = new URLSearchParams(location.search).get('q');
                 var suffix = q ? '?q=' + encodeURIComponent(q) : '';
-                var sealed = new URLSearchParams(location.search).get('sealed') === '1';
+                var sealed = location.pathname === '/sealed' || new URLSearchParams(location.search).get('sealed') === '1';
                 backEl.textContent = 'Exit offline mode';
                 backEl.href = (sealed ? '/sealed' : '/search') + suffix;
             }

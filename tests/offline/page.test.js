@@ -35,11 +35,11 @@ function makeEl(attrs = {}) {
 
 // Runs the page's real scripts against stand-ins for the document, the database
 // and the query. Each query answers with the rows queries[q] names.
-function loadPage(file, { search = '', ids = [], pills = [], navLinks = [], cookies = {}, queries = {}, broken = false, gates = {}, states = [], stored = { offline_live_search: 'false' } } = {}) {
+function loadPage(file, { search = '', pathname = '/offline', ids = [], pills = [], navLinks = [], cookies = {}, queries = {}, broken = false, gates = {}, states = [], stored = { offline_live_search: 'false' } } = {}) {
     const els = Object.fromEntries(ids.map((id) => [id, makeEl()]));
     const docListeners = {};
     const winListeners = {};
-    const location = { search, pathname: '/offline' };
+    const location = { search, pathname };
     const hold = { draw: null, fail: false, views: [], full: [] };
     const log = { namesRead: [], pushed: [], replaced: [], parsed: [], drafts: [], executed: [], rendered: [], sorted: [], mounted: null, errors: [], art: [], scrolls: [], dictReads: 0 };
     const timers = new Map();
@@ -202,6 +202,16 @@ for (const [file, ids, box, results] of [
         await page.settle();
         expect(page.log.pushed).toEqual(['?q=box&sealed=1']);
         expect(page.log.executed).toEqual([{ q: 'box', sealed: true }]);
+    });
+
+    test(file + ' searches sealed when it stands in for the sealed page', async () => {
+        const page = await started(file, { ids, pathname: '/sealed', search: '?q=box' });
+        expect(page.log.mounted.deps.sealed).toBe(true);
+        expect(page.log.executed).toEqual([{ q: 'box', sealed: true }]);
+        page.location.search = '?q=case';
+        page.pop();
+        await page.settle();
+        expect(page.log.executed.at(-1)).toEqual({ q: 'case', sealed: true });
     });
 
     test(file + ' clears the results when the box empties', async () => {

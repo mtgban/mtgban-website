@@ -38,7 +38,7 @@ function makeEl() {
 }
 
 // Loads the real offline-banner.js with fake DOM, timers, fetch, and indexedDB.
-function makeHarness(meta = {}) {
+function makeHarness(meta = {}, location = { pathname: '/offline', search: '' }) {
     const els = {
         'offline-banner': makeEl(),
         'offline-banner-age': makeEl(),
@@ -72,7 +72,7 @@ function makeHarness(meta = {}) {
     const src = readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', 'offline-banner.js'), 'utf8');
     new Function('window', 'document', 'navigator', 'location', 'indexedDB', 'fetch',
         'setInterval', 'clearInterval', 'OfflineAge', src)(
-        win, doc, { onLine: true }, { search: '' }, fakeIDB, fakeFetch,
+        win, doc, { onLine: true }, location, fakeIDB, fakeFetch,
         fakeSetInterval, fakeClearInterval, age);
     // Every fake above answers in a microtask, so the banner's chains have
     // all run by the time the event loop reaches the next macrotask.
@@ -96,6 +96,18 @@ test('banner hides exit link when the server dies after being seen up', async ()
     await h.tick(); // next 30s tick must still fire and hide the link
     expect(h.els['offline-banner-back'].hidden).toBe(true);
     expect(h.els['offline-settings-link'].style.display).toBe('none');
+});
+
+test('the exit link leads back to the page the shell stands in for', async () => {
+    for (const [pathname, search, href] of [
+        ['/sealed', '?q=box', '/sealed?q=box'],
+        ['/offline', '?q=box&sealed=1', '/sealed?q=box'],
+        ['/search', '?q=box', '/search?q=box'],
+    ]) {
+        const h = makeHarness({}, { pathname, search });
+        await h.flush();
+        expect(h.els['offline-banner-back'].href).toBe(href);
+    }
 });
 
 test('banner re-shows exit link when the server comes back', async () => {
