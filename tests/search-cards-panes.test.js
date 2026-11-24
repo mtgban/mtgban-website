@@ -48,6 +48,32 @@ test('a flick stops at the next column', () => {
     }
 });
 
+// tuck is run over a swipe's positions, a card 390 wide with its picture in
+// the second of four columns.
+const tuckSource = source.slice(source.indexOf('    var STEP = 24;'), source.indexOf('    // A card the deck lands on'));
+function swipe(open, from, to) {
+    let hidden = open;
+    const page = { classList: { contains: () => hidden, toggle: (_, on) => { hidden = on; } } };
+    const el = { ...card(true, ['buyers', 'sales']), clientWidth: 390, scrollWidth: 390 * 4, scrollLeft: from };
+    const tuck = new Function('panes', 'page', 'pager', tuckSource + '\nturns = new WeakMap(); return tuck;')(panes, page, () => {});
+    for (let i = 0; i <= 10; i++) {
+        el.scrollLeft = from + (to - from) * i / 10;
+        tuck(el);
+    }
+    return hidden;
+}
+
+test('the search bar stays down between two lists', () => {
+    expect(swipe(true, 1170, 780)).toBe(true);
+    expect(swipe(true, 780, 1170)).toBe(true);
+});
+
+test('the search bar comes up onto the picture and goes down leaving it', () => {
+    expect(swipe(true, 780, 700)).toBe(false);
+    expect(swipe(true, 0, 80)).toBe(false);
+    expect(swipe(false, 390, 470)).toBe(true);
+});
+
 test('landscape pairs sellers with buyers, and leaves the sales out', () => {
     const read = (f) => readFileSync(join(import.meta.dir, '..', 'css', f), 'utf8');
     for (const css of [read('search-mobile.css'), read('search-cards-mobile.css').split('@media (orientation: portrait)')[0]]) {

@@ -136,9 +136,10 @@
     var tapped = new WeakSet();
 
     // The search bar slides down as a swipe heads away from the picture and
-    // back up as one heads toward it, once it has moved STEP pixels that
-    // way, so a finger's small reversals and the snap's settling don't flip
-    // it back and forth. On the picture it always shows.
+    // back up as one comes onto it, once it has moved STEP pixels that way,
+    // so a finger's small reversals and the snap's settling don't flip it
+    // back and forth. Between two lists it stays down, and on the picture it
+    // always shows.
     var STEP = 24;
     var turns = new WeakMap();
 
@@ -159,7 +160,7 @@
             turn = 0;
         } else if (hidden) {
             if (off > turn) turn = off;
-            else if (turn - off > STEP) { hidden = false; turn = off; }
+            else if (Math.min(turn, card.clientWidth) - off > STEP) { hidden = false; turn = off; }
         } else {
             if (off < turn) turn = off;
             else if (off - turn > STEP) { hidden = true; turn = off; }
