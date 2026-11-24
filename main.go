@@ -124,8 +124,8 @@ type ConfigType struct {
 	// SearchHideNonAffiliates leaves the stores that are not affiliates out
 	// of a logged-out search, rather than listing them locked.
 	SearchHideNonAffiliates bool `json:"search_hide_non_affiliates"`
-	// SearchBuyersDefault is what the Buyers column shows a logged-in reader
-	// who never chose: "sales", or the buylist when empty.
+	// SearchBuyersDefault is what the Buyers column shows a reader with
+	// SearchSales who never chose: "sales", or the buylist when empty.
 	SearchBuyersDefault string `json:"search_buyers_default"`
 
 	// ACL and the Patreon grants each live in their own file; a path may be

@@ -30,14 +30,12 @@ function el(attrs = {}, classes = []) {
     };
 }
 
-// page is a root holding columns, switch buttons and Sales panes, and the
-// log-in prompt when prompt is given.
-function page(panes, prompt) {
+// page is a root holding columns, switch buttons and Sales panes.
+function page(panes) {
     const cols = [el({ 'data-buyers-mode': 'buylist' }), el({ 'data-buyers-mode': 'buylist' })];
     const buttons = [el({ 'data-buyers-set': 'buylist' }, ['on']), el({ 'data-buyers-set': 'sales' })];
     return {
         cols, buttons, panes,
-        getElementById: (id) => (id === 'sales-login' && prompt ? { innerHTML: prompt } : null),
         querySelector: (sel) => (sel === '[data-buyers-mode="sales"]' ? cols.find((c) => c.attrs['data-buyers-mode'] === 'sales') || null : null),
         querySelectorAll: (sel) => {
             if (sel === '[data-buyers-mode]') return cols;
@@ -133,14 +131,6 @@ test('a click on a switch button chooses its mode', () => {
     const target = { closest: () => null };
     // A click elsewhere is left alone.
     listeners[0].fn({ target, preventDefault: () => { throw new Error('prevented'); } });
-});
-
-test('a reader not logged in gets the one prompt in each pane, and no fetch', async () => {
-    const { api } = load();
-    const root = page([pending('a'), pending('b')], '<div>Log in</div>');
-    await api.choose(root, 'sales', () => { throw new Error('fetched'); });
-    expect(root.panes.map((p) => p.innerHTML)).toEqual(['<div>Log in</div>', '<div>Log in</div>']);
-    expect(root.panes.filter((p) => 'data-pending' in p.attrs)).toHaveLength(0);
 });
 
 test('a page that opens in Sales fills its panes, one in Buylist waits', async () => {

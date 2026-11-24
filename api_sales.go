@@ -21,8 +21,8 @@ const salesPaneMaxIDs = 100
 // first switch to Sales fetches them in one request. The answer maps each id
 // to its pane's markup, the same table on a phone's Cards as on desktop.
 func (s *site) SalesPaneAPI(w http.ResponseWriter, r *http.Request) {
-	if verifiedSignature(r) == "" && !(DevMode && !SigCheck) {
-		errorResponse(w, http.StatusUnauthorized, "log in to see recent sales")
+	if !canSeeSales(verifiedSignature(r)) {
+		errorResponse(w, http.StatusForbidden, "no access to recent sales")
 		return
 	}
 	idsParam := strings.TrimPrefix(r.URL.Path, "/data/sales/")

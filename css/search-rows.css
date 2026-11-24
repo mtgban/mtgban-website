@@ -182,9 +182,6 @@
     display: flex;
     justify-content: space-between;
 }
-.sales-locked {
-    background: var(--search-surface-2);
-}
 .sales-pane[data-pending]::before {
     content: "Loading recent sales…";
     display: block;

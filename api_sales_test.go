@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -12,28 +13,24 @@ import (
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 
+	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
 
 func TestBuyersMode(t *testing.T) {
 	cases := []struct {
-		chosen, gameDefault string
-		canSales            bool
-		want                string
+		chosen, gameDefault, want string
 	}{
-		{"", "", true, "buylist"},
-		{"", "sales", true, "sales"},
-		// A logged-out reader would see only the prompt.
-		{"", "sales", false, "buylist"},
-		{"buylist", "sales", true, "buylist"},
-		{"sales", "", true, "sales"},
-		{"sales", "", false, "sales"},
-		{"bogus", "", true, "buylist"},
+		{"", "", "buylist"},
+		{"", "sales", "sales"},
+		{"buylist", "sales", "buylist"},
+		{"sales", "", "sales"},
+		{"bogus", "", "buylist"},
 	}
 	for _, c := range cases {
-		got := buyersMode(c.chosen, c.gameDefault, c.canSales)
+		got := buyersMode(c.chosen, c.gameDefault)
 		if got != c.want {
-			t.Errorf("buyersMode(%q, %q, %v) = %q, want %q", c.chosen, c.gameDefault, c.canSales, got, c.want)
+			t.Errorf("buyersMode(%q, %q) = %q, want %q", c.chosen, c.gameDefault, got, c.want)
 		}
 	}
 }
@@ -51,9 +48,10 @@ func TestFillRecentSales(t *testing.T) {
 	keys := []string{"sold", "unsold"}
 
 	var v SearchVars
-	fillRecentSales(&v, recentFixture(), httptest.NewRequest(http.MethodGet, "/search", nil), "a-signature", keys)
+	granted := testSig(map[string]string{"SearchSales": "true"})
+	fillRecentSales(&v, recentFixture(), httptest.NewRequest(http.MethodGet, "/search", nil), granted, keys)
 	if v.BuyersMode != "buylist" || !v.CanSales {
-		t.Errorf("mode %q, can %v; want the buylist, logged in", v.BuyersMode, v.CanSales)
+		t.Errorf("mode %q, can %v; want the buylist, granted", v.BuyersMode, v.CanSales)
 	}
 	if !v.HasSales["sold"] || v.HasSales["unsold"] {
 		t.Errorf("HasSales = %v, want only the card with orders", v.HasSales)
@@ -62,9 +60,75 @@ func TestFillRecentSales(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/search", nil)
 	r.AddCookie(&http.Cookie{Name: "SearchBuyersMode", Value: "sales"})
 	v = SearchVars{}
-	fillRecentSales(&v, recentFixture(), r, "", keys)
-	if v.BuyersMode != "sales" || v.CanSales {
-		t.Errorf("logged out, chose Sales: mode %q, can %v", v.BuyersMode, v.CanSales)
+	fillRecentSales(&v, recentFixture(), r, granted, keys)
+	if v.BuyersMode != "sales" {
+		t.Errorf("chose Sales: mode %q", v.BuyersMode)
+	}
+	for name, sig := range map[string]string{
+		"logged out":       "",
+		"without the flag": testSig(map[string]string{"UserTier": "Vintage"}),
+		"flag off":         testSig(map[string]string{"SearchSales": "false"}),
+	} {
+		v = SearchVars{}
+		fillRecentSales(&v, recentFixture(), r, sig, keys)
+		if v.BuyersMode != "buylist" || v.CanSales || len(v.HasSales) != 0 {
+			t.Errorf("%s, chose Sales: mode %q, can %v, has %v", name, v.BuyersMode, v.CanSales, v.HasSales)
+		}
+	}
+}
+
+// SearchSales must be signed, and the Search entry must carry it to
+// the values.
+func TestSearchSalesIsAnACLProperty(t *testing.T) {
+	if !slices.Contains(OptionalFields, "SearchSales") {
+		t.Fatal("OptionalFields lacks SearchSales")
+	}
+	table := access.Table{"Admin": {"Search": {"SearchSales": "true"}}, "Legacy": {"Search": {}}}
+	for tier, want := range map[string]string{"Admin": "true", "Legacy": ""} {
+		if got := aclValuesIn(table, tier, nil).Get("SearchSales"); got != want {
+			t.Errorf("%s: SearchSales %q, want %q", tier, got, want)
+		}
+	}
+}
+
+// A page shows no trace of the sales to a reader without SearchSales, whatever
+// the mode cookie says, on desktop or phone.
+func TestSearchHidesSalesWithoutFlag(t *testing.T) {
+	skipWithoutDatastore(t)
+	readyToRender(t)
+	signingEnabled(t, true)
+	const bolt = "78380203-7623-50bc-ab48-577cd655ee9a"
+	saved := recentSalesStore.Snapshot()
+	recentSalesStore.Publish(&salesvelocity.RecentSnapshot{Cards: map[string]*salesvelocity.Recent{bolt: {}}})
+	t.Cleanup(func() { recentSalesStore.Publish(saved) })
+
+	for _, agent := range []string{"", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148"} {
+		for _, granted := range []bool{false, true} {
+			fields := url.Values{"UserEmail": {"reader@example.com"}, "UserTier": {"Test"}}
+			if granted {
+				fields.Set("SearchSales", "true")
+			}
+			r := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape("id:"+bolt), nil)
+			r.AddCookie(&http.Cookie{Name: "SearchBuyersMode", Value: "sales"})
+			r.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: signedAs(t, fields, time.Now().Add(time.Hour))})
+			if agent != "" {
+				r.Header.Set("User-Agent", agent)
+			}
+			rec := httptest.NewRecorder()
+			testSite.Search(rec, r)
+			body := rec.Body.String()
+			if !strings.Contains(body, bolt) {
+				t.Fatal("the page does not list the card")
+			}
+			for _, mark := range []string{"sales-pane", "search-buyers.js"} {
+				if strings.Contains(body, mark) != granted {
+					t.Errorf("agent %q, granted %v: page has %q: %v", agent, granted, mark, !granted)
+				}
+			}
+			if !granted && strings.Contains(body, "data-buyers-") {
+				t.Errorf("agent %q: the switch shows without the flag", agent)
+			}
+		}
 	}
 }
 
@@ -76,11 +140,17 @@ func TestSalesPaneAPI(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	testSite.SalesPaneAPI(rec, httptest.NewRequest(http.MethodGet, "/data/sales/sold", nil))
-	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("no signature: status %d, want 401", rec.Code)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("no signature: status %d, want 403", rec.Code)
+	}
+	plain := url.QueryEscape(signedAs(t, url.Values{"UserEmail": {"reader@example.com"}}, time.Now().Add(time.Hour)))
+	rec = httptest.NewRecorder()
+	testSite.SalesPaneAPI(rec, httptest.NewRequest(http.MethodGet, "/data/sales/sold?sig="+plain, nil))
+	if rec.Code != http.StatusForbidden || strings.Contains(rec.Body.String(), "147.59") {
+		t.Errorf("without SearchSales: status %d, want 403: %s", rec.Code, rec.Body.String())
 	}
 
-	sig := url.QueryEscape(signedAs(t, url.Values{"UserEmail": {"reader@example.com"}}, time.Now().Add(time.Hour)))
+	sig := url.QueryEscape(signedAs(t, url.Values{"UserEmail": {"reader@example.com"}, "SearchSales": {"true"}}, time.Now().Add(time.Hour)))
 	get := func(path, agent string) map[string]string {
 		t.Helper()
 		r := httptest.NewRequest(http.MethodGet, path+"?sig="+sig, nil)
@@ -231,6 +301,8 @@ func TestSalesPrinting(t *testing.T) {
 func TestSealedSearchShowsSales(t *testing.T) {
 	skipWithoutDatastore(t)
 	readyToRender(t)
+	signingEnabled(t, true)
+	granted := signedAs(t, url.Values{"UserEmail": {"reader@example.com"}, "SearchSales": {"true"}}, time.Now().Add(time.Hour))
 	uuids := backend().GetSealedUUIDsInSet("MH2")
 	if len(uuids) == 0 {
 		t.Skip("no MH2 sealed products")
@@ -246,6 +318,7 @@ func TestSealedSearchShowsSales(t *testing.T) {
 	} {
 		r := httptest.NewRequest(http.MethodGet, "/sealed?q="+url.QueryEscape("id:"+box), nil)
 		r.AddCookie(&http.Cookie{Name: "SearchBuyersMode", Value: "sales"})
+		r.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: granted})
 		if agent != "" {
 			r.Header.Set("User-Agent", agent)
 		}

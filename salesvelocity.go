@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -76,25 +77,35 @@ const (
 	buyersSales   = "sales"
 )
 
-// buyersMode is the mode the reader chose, else the game's default for a
-// reader logged in to see sales, else the buylist.
-func buyersMode(chosen, gameDefault string, canSales bool) string {
+// buyersMode is the mode the reader chose, else the game's default.
+func buyersMode(chosen, gameDefault string) string {
 	switch chosen {
 	case buyersBuylist, buyersSales:
 		return chosen
 	}
-	if canSales && gameDefault == buyersSales {
+	if gameDefault == buyersSales {
 		return buyersSales
 	}
 	return buyersBuylist
 }
 
+// canSeeSales says whether the reader's signature grants the recent sales.
+func canSeeSales(sig string) bool {
+	canSales, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchSales"))
+	return canSales || (DevMode && !SigCheck)
+}
+
 // fillRecentSales sets the Buyers column's mode for the reader and which
-// cards have orders. The search draws no sales: the page fetches the panes
-// from /data/sales/ once it is on show in Sales, so no mode costs a search.
+// cards have orders, the buylist and none for a reader the sales are hidden
+// from. The search draws no sales: the page fetches the panes from
+// /data/sales/ once it is on show in Sales, so no mode costs a search.
 func fillRecentSales(v *SearchVars, recent *salesvelocity.RecentSnapshot, r *http.Request, sig string, keys []string) {
-	v.CanSales = sig != "" || (DevMode && !SigCheck)
-	v.BuyersMode = buyersMode(readCookie(r, "SearchBuyersMode"), Config().SearchBuyersDefault, v.CanSales)
+	v.CanSales = canSeeSales(sig)
+	v.BuyersMode = buyersBuylist
+	if !v.CanSales {
+		return
+	}
+	v.BuyersMode = buyersMode(readCookie(r, "SearchBuyersMode"), Config().SearchBuyersDefault)
 	v.HasSales = map[string]bool{}
 	for _, cardID := range keys {
 		_, found := recent.For(cardID)
