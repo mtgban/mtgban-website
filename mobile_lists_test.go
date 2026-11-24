@@ -131,6 +131,57 @@ func TestMobileSalesList(t *testing.T) {
 	}
 }
 
+// Each list's heading has an arrow to the pane on either side of it, in the
+// order the panes come in, and none where the card ends.
+func TestMobileListArrows(t *testing.T) {
+	type arrows struct{ prev, next string }
+	for _, c := range []struct {
+		mode            string
+		sellers, buyers bool
+		sales           bool
+		want            map[string]arrows
+	}{
+		{"buylist", true, true, true, map[string]arrows{"sellers": {"", "picture"}, "buyers": {"picture", "sales"}, "sales": {"buyers", ""}}},
+		{"sales", true, true, true, map[string]arrows{"sellers": {"", "picture"}, "sales": {"picture", "buyers"}, "buyers": {"sales", ""}}},
+		{"buylist", true, true, false, map[string]arrows{"sellers": {"", "picture"}, "buyers": {"picture", ""}}},
+		{"buylist", true, false, true, map[string]arrows{"sellers": {"", "picture"}, "sales": {"picture", ""}}},
+		{"buylist", false, true, true, map[string]arrows{"buyers": {"picture", "sales"}, "sales": {"buyers", ""}}},
+	} {
+		vars := sealedPageVars("c")
+		vars.BuyersMode = c.mode
+		vars.HasSales = map[string]bool{"c": c.sales}
+		if !c.sellers {
+			delete(vars.FoundSellers, "c")
+		}
+		if !c.buyers {
+			delete(vars.FoundVendors, "c")
+		}
+		out := renderMobileSearch(t, vars)
+
+		for _, list := range []string{"sellers", "buyers", "sales"} {
+			want, shown := c.want[list]
+			_, panel, found := strings.Cut(out, `id="`+list+`-c"`)
+			if found != shown {
+				t.Errorf("%+v: %s list drawn %v, want %v", c, list, found, shown)
+				continue
+			}
+			if !shown {
+				continue
+			}
+			head, _, _ := strings.Cut(panel, "</div>")
+			for class, pane := range map[string]string{"m-pane-prev": want.prev, "m-pane-next": want.next} {
+				got := strings.Contains(head, class)
+				if got != (pane != "") {
+					t.Errorf("%+v: %s has %s %v, want %q", c, list, class, got, pane)
+				}
+				if pane != "" && !strings.Contains(head, `class="`+class+`" data-pane="`+pane+`"`) {
+					t.Errorf("%+v: %s's %s does not lead to the %s", c, list, class, pane)
+				}
+			}
+		}
+	}
+}
+
 // The sealed landing has the search landing's shape: the editions scroll in
 // the lists area above the search bar at the foot, the category button
 // left of the box and search right of it, so the box sits centred.

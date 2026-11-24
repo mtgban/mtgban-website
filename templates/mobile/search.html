@@ -348,7 +348,8 @@
                  the buyers, or before them where the reader's Buyers column
                  opens on Sales (docs/adr/0009-recent-tcgplayer-sales.md) */}}
             {{$hasSales := index $.HasSales $cardId}}
-            {{$salesFirst := and $hasSales (or (eq $.BuyersMode "sales") (not (or $hasBuyers $salesRow)))}}
+            {{$buyersList := or $hasBuyers $salesRow}}
+            {{$salesFirst := and $hasSales (or (eq $.BuyersMode "sales") (not $buyersList))}}
             {{$sellerConds := (index $.FoundSellers $cardId)}}
             {{$vendorConds := (index $.FoundVendors $cardId)}}
 
@@ -357,7 +358,7 @@
                  pairs as adjacent siblings */}}
             {{if $hasSellers}}<button type="button" class="m-edge m-edge-sell" data-pane="sellers-{{$cardId}}" aria-label="Sellers" data-track="ui.cards.pane" data-track-value="sellers" data-track-scope="tap"><i data-lucide="chevron-left"></i><span class="m-edge-label">Sellers</span>{{with edge_offer $sellerConds}}<span class="m-edge-price">{{.PriceLabel}}</span>{{end}}</button>{{end}}
             {{if $salesFirst}}<button type="button" class="m-edge m-edge-buy" data-pane="sales-{{$cardId}}" aria-label="Sales" data-track="ui.cards.pane" data-track-value="sales" data-track-scope="tap"><span class="m-edge-label">Sales</span><i data-lucide="chevron-right"></i></button>
-            {{else if or $hasBuyers $salesRow}}<button type="button" class="m-edge m-edge-buy" data-pane="buyers-{{$cardId}}" aria-label="Buyers" data-track="ui.cards.pane" data-track-value="buyers" data-track-scope="tap"><span class="m-edge-label">Buyers</span>{{with edge_offer $vendorConds}}<span class="m-edge-price">{{.PriceLabel}}</span>{{end}}<i data-lucide="chevron-right"></i></button>{{end}}
+            {{else if $buyersList}}<button type="button" class="m-edge m-edge-buy" data-pane="buyers-{{$cardId}}" aria-label="Buyers" data-track="ui.cards.pane" data-track-value="buyers" data-track-scope="tap"><span class="m-edge-label">Buyers</span>{{with edge_offer $vendorConds}}<span class="m-edge-price">{{.PriceLabel}}</span>{{end}}<i data-lucide="chevron-right"></i></button>{{end}}
             {{/* Cards: the star, backpack and chart between the edge buttons,
                  leaving the header to the card's name */}}
             <div class="m-card-tools">
@@ -375,21 +376,21 @@
             {{/* Sellers panel */}}
             {{if $hasSellers}}
             <div class="m-tab-panel active" id="sellers-{{$cardId}}" role="region" aria-label="Sellers">
-                {{template "m-pane-head" "Sellers"}}
+                {{template "m-pane-head" dict "Title" "Sellers" "Next" "picture"}}
                 {{template "result-sellers" dict "Page" $ "Card" $card "CardID" $cardId}}
             </div>
             {{end}}
 
-            {{if $salesFirst}}{{template "m-sales-panel" $cardId}}{{end}}
+            {{if $salesFirst}}{{template "m-sales-panel" dict "CardID" $cardId "Prev" "picture" "Next" (or (and $buyersList "buyers") "")}}{{end}}
 
             {{/* Buyers panel */}}
-            {{if or $hasBuyers $salesRow}}
+            {{if $buyersList}}
             <div class="m-tab-panel active" id="buyers-{{$cardId}}" role="region" aria-label="Buyers">
-                {{template "m-pane-head" "Buyers"}}
+                {{template "m-pane-head" dict "Title" "Buyers" "Prev" (or (and $salesFirst "sales") "picture") "Next" (or (and $hasSales (not $salesFirst) "sales") "")}}
                 {{template "result-buyers" dict "Page" $ "Card" $card "CardID" $cardId}}
             </div>
             {{end}}
-            {{if and $hasSales (not $salesFirst)}}{{template "m-sales-panel" $cardId}}{{end}}
+            {{if and $hasSales (not $salesFirst)}}{{template "m-sales-panel" dict "CardID" $cardId "Prev" "buyers"}}{{end}}
             {{if not (or $hasSellers $hasBuyers)}}
             <div class="no-offers"><i>No offers</i></div>
             {{end}}
@@ -757,20 +758,24 @@
     {{end}}
 {{end}}
 
-{{/* A Cards list of a card's recent sales, given its id: search-buyers.js
-     fills every card's the first time one is shown */}}
+{{/* A Cards list of a card's recent sales, given its id and the panes
+     beside it: search-buyers.js fills every card's the first time one is
+     shown */}}
 {{define "m-sales-panel"}}
-<div class="m-tab-panel active" id="sales-{{.}}" role="region" aria-label="Sales">
-    {{template "m-pane-head" "Sales"}}
-    <div class="result-col"><div class="sales-pane" data-card="{{.}}" data-pending></div></div>
+<div class="m-tab-panel active" id="sales-{{.CardID}}" role="region" aria-label="Sales">
+    {{template "m-pane-head" dict "Title" "Sales" "Prev" .Prev "Next" .Next}}
+    <div class="result-col"><div class="sales-pane" data-card="{{.CardID}}" data-pending></div></div>
 </div>
 {{end}}
 
-{{/* A Cards list's heading, given "Sellers", "Buyers" or "Sales"; the card's
-     own header stays above it */}}
+{{/* A Cards list's heading, given its Title, "Sellers", "Buyers" or "Sales",
+     between arrows to the panes beside it, Prev and Next, where it has them;
+     the card's own header stays above it */}}
 {{define "m-pane-head"}}
 <div class="m-pane-head">
-    <span class="m-pane-side">{{.}}</span>
+    {{with .Prev}}<button type="button" class="m-pane-prev" data-pane="{{.}}" aria-label="Back to the {{.}}" data-track="ui.cards.pane" data-track-value="{{.}}" data-track-scope="arrow"><i data-lucide="chevron-left"></i></button>{{end}}
+    <span class="m-pane-side">{{.Title}}</span>
+    {{with .Next}}<button type="button" class="m-pane-next" data-pane="{{.}}" aria-label="On to the {{.}}" data-track="ui.cards.pane" data-track-value="{{.}}" data-track-scope="arrow"><i data-lucide="chevron-right"></i></button>{{end}}
 </div>
 {{end}}
 
