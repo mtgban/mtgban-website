@@ -15,6 +15,12 @@
         return (getCookie(name) || '').split(',').filter(Boolean);
     }
 
+    // sealedURL says the URL asks for sealed products: the shell's own mode, or
+    // the sealed page it stands in for.
+    function sealedURL() {
+        return location.pathname === '/sealed' || new URLSearchParams(location.search).get('sealed') === '1';
+    }
+
     // start runs a page. hooks names its surface, boxId, formId and resultsId, and
     // how it draws: render(el, page, exec, ctx), with order(results, ctx, typing)
     // first if it sorts. page.typing says an answer is still being typed. Optional
@@ -27,7 +33,7 @@
         var env = null;
         var exec = null;
         var ctx = null;
-        var sealedMode = new URLSearchParams(location.search).get('sealed') === '1';
+        var sealedMode = sealedURL();
         // Suggestions read the current mode off this shared deps object.
         var searchDeps = null;
         // The latest search. One still running when a newer one starts, or the
@@ -316,7 +322,7 @@
                 var q = urlQuery();
                 clearTimeout(pauseTimer);
                 typing = false;
-                sealedMode = new URLSearchParams(location.search).get('sealed') === '1';
+                sealedMode = sealedURL();
                 queryChanged(q);
                 if (searchDeps) searchDeps.sealed = sealedMode;
                 if (box) box.value = q;
