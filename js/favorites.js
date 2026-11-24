@@ -776,7 +776,7 @@
         if (favs.length === 0) return;
 
         // Refresh if any entry is older than STALE_MS, or if any entry is missing
-        // prices (desktop favorites have no inline DOM to scrape best-price from).
+        // prices, as a newly added one is.
         var now = Date.now();
         var needsRefresh = favs.some(function(f) {
             var lastFetched = f.refreshedAt || f.t;
