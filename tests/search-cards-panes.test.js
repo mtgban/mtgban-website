@@ -47,3 +47,15 @@ test('a flick stops at the next column', () => {
         expect(rule.slice(0, rule.indexOf('}'))).toContain('scroll-snap-stop: always;');
     }
 });
+
+test('landscape pairs sellers with buyers, and leaves the sales out', () => {
+    const read = (f) => readFileSync(join(import.meta.dir, '..', 'css', f), 'utf8');
+    for (const css of [read('search-mobile.css'), read('search-cards-mobile.css').split('@media (orientation: portrait)')[0]]) {
+        expect(css).not.toContain(':has(.m-tab-panel + .m-tab-panel)');
+    }
+    // A forced display would show the sales whatever hides them.
+    const forced = [...read('search-mobile.css').matchAll(/([^{}]*)\{[^{}]*display: block !important/g)].map((m) => m[1].trim()).filter((s) => s.includes('> .m-tab-panel'));
+    expect(forced.length).toBe(2);
+    for (const sel of forced) expect(sel).toEndWith('> .m-tab-panel:not([id^="sales"])');
+    expect(read('search-cards-mobile.css')).toMatch(/\.m-layout-cards \.m-tab-panel\[id\^="sales"\] \{\n\s+display: none;/);
+});

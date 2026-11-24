@@ -2290,7 +2290,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     }
 
     /* 2-column grid: image | single panel (only one of sellers/buyers) */
-    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) {
+    .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) {
         display: grid;
         grid-template-columns: auto 1fr;
         grid-template-rows: auto auto 1fr;
@@ -2300,19 +2300,19 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
             "image  panel";
     }
 
-    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-card-header {
+    .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-card-header {
         grid-area: header;
     }
 
-    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-tabs {
+    .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-tabs {
         display: none;
     }
 
-    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-cond-pills {
+    .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-cond-pills {
         grid-area: pills;
     }
 
-    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-card-img-landscape {
+    .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-card-img-landscape {
         grid-area: image;
         display: block;
         width: 175px;
@@ -2324,14 +2324,14 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
         border-right: 1px solid var(--border);
     }
 
-    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-tab-panel {
+    .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-tab-panel:not([id^="sales"]) {
         grid-area: panel;
         display: block !important;
         min-width: 0;
         overflow: hidden;
     }
 
-    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-tab-panel::before {
+    .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-tab-panel::before {
         content: "Sellers";
         display: block;
         padding: 0.4em 0.75em;
@@ -2343,12 +2343,12 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
         background: rgba(30, 144, 255, 0.05);
     }
 
-    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-tab-panel[id^="buyers"]::before {
+    .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-tab-panel[id^="buyers"]::before {
         content: "Buyers";
     }
 
-    /* 3-column grid: image | sellers | buyers */
-    .m-card:has(.m-tab-panel + .m-tab-panel) {
+    /* 3-column grid: image | sellers | buyers, for a card with both */
+    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) {
         display: grid;
         grid-template-columns: auto 1fr 1fr;
         grid-template-rows: auto auto 1fr;
@@ -2358,20 +2358,20 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
             "image  sellers buyers";
     }
 
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-card-header {
+    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-card-header {
         grid-area: header;
     }
 
     /* Hide tab buttons — both panels are visible */
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tabs {
+    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-tabs {
         display: none;
     }
 
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-cond-pills {
+    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-cond-pills {
         grid-area: pills;
     }
 
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-card-img-landscape {
+    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-card-img-landscape {
         grid-area: image;
         display: block;
         width: 175px;
@@ -2383,24 +2383,25 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
         border-right: 1px solid var(--border);
     }
 
-    /* Force both panels visible regardless of .active state */
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel {
+    /* Force both panels visible regardless of .active state; the sales stay
+       out (search-cards-mobile.css) */
+    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-tab-panel:not([id^="sales"]) {
         display: block !important;
         min-width: 0;
         overflow: hidden;
     }
 
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel[id^="sellers"] {
+    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-tab-panel[id^="sellers"] {
         grid-area: sellers;
     }
 
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel[id^="buyers"] {
+    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-tab-panel[id^="buyers"] {
         grid-area: buyers;
         border-left: 1px solid var(--border);
     }
 
     /* Column headers replacing hidden tabs */
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel::before {
+    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-tab-panel::before {
         content: "Sellers";
         display: block;
         padding: 0.4em 0.75em;
@@ -2412,7 +2413,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
         background: rgba(30, 144, 255, 0.05);
     }
 
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel[id^="buyers"]::before {
+    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-tab-panel[id^="buyers"]::before {
         content: "Buyers";
     }
 

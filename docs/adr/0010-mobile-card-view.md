@@ -146,7 +146,8 @@ What the phone page already has, and this decision builds on:
    tap to reveal.
 8. **Portrait only.** In landscape a Cards page uses the landscape grid the
    phone page already had, picture and both lists side by side, with each
-   list's label and condition headings; the edge buttons are hidden there.
+   list's label and condition headings; the edge buttons and the sales are
+   hidden there.
 9. **Desktop and tablets are unchanged.** A tablet gets the desktop page
     and keeps it: one card per screen wastes a wide display, and the
     desktop table compares more stores at a glance. A tablet reader who
