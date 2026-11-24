@@ -937,7 +937,8 @@ requests. An unknown dump name answers "Not found". A search answers
 sealed products, on any path, only to the `sealed` mode, as the sealed dump does. Other user APIs: `/search/decklist/tcgplayer/`,
 `/search/decklist/cardmarket/` (CSV exports keyed to store SKUs), `/data/prices/{ids}`
 (`BatchPricesAPI`, batch best-retail/best-buylist for ≤50 ids), `/data/sales/{ids}`
-(`SalesPaneAPI`, the Buyers column's Sales panes for ≤100 ids, from the recent
+(`SalesPaneAPI`, search's Sales panes, a third column or the Buyers
+column's switch where there is no room, for ≤100 ids, from the recent
 orders in memory, for a signature carrying `SearchSales`, ADR-0009),
 `/api/palette/*` (public metadata for the command palette), and
 `/api/mtgban/search/` (`SearchAPI`, which shares `searchPrices` with the

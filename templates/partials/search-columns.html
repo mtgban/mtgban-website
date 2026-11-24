@@ -154,7 +154,8 @@
 {{end}}
 
 {{define "result-buyers"}}{{$page := .Page}}{{$card := .Card}}{{$cardId := .CardID}}
-{{/* Switch, for a reader with the sales, puts the Buylist/Sales switch on it
+{{/* Switch, on a page with sales, adds their column after this one, and the
+     switch that shows it in this one's place where there is no room for three
      (docs/adr/0009-recent-tcgplayer-sales.md); the phone shows the sales
      in a pane of their own instead */}}
 <div class="result-col{{if .Switch}} buyers-col{{end}}"{{if .Switch}} data-buyers-mode="{{$page.BuyersMode}}"{{end}}>
@@ -243,8 +244,11 @@
         {{end}}
     {{end}}
     </div>
-    {{if .Switch}}
-    <div class="sales-pane" data-card="{{$cardId}}" data-pending></div>
-    {{end}}
 </div>
+{{if .Switch}}
+<div class="result-col sales-col" data-buyers-mode="{{$page.BuyersMode}}">
+    <div class="result-col-header">Sales</div>
+    <div class="sales-pane" data-card="{{$cardId}}" data-pending></div>
+</div>
+{{end}}
 {{end}}

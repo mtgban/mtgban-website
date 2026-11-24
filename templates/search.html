@@ -522,11 +522,11 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}">
+                            <div class="result-body{{if $.HasSales}} with-sales{{end}}{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}">
                                 <!-- Sellers column -->
                                 {{template "result-sellers" dict "Page" $ "Card" $card "CardID" $cardId}}
                                 <!-- Buyers column -->
-                                {{template "result-buyers" dict "Page" $ "Card" $card "CardID" $cardId "Switch" $.CanSales}}
+                                {{template "result-buyers" dict "Page" $ "Card" $card "CardID" $cardId "Switch" $.HasSales}}
                             </div>
                             <!-- Last sold placeholder (feature currently disabled) -->
                             <div id="{{$cardId}}" style="display:none"></div>
@@ -567,7 +567,7 @@
 <script type="text/javascript" src="/js/search-quick-icons.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-track.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-velocity.js?hash={{.Hash}}" defer></script>
-{{if .CanSales}}<script type="text/javascript" src="/js/search-buyers.js?hash={{.Hash}}" defer></script>{{end}}
+{{if .HasSales}}<script type="text/javascript" src="/js/search-buyers.js?hash={{.Hash}}" defer></script>{{end}}
 
 <!-- Lightbox for the card image, used when the screen is too narrow to show
      the sidebar preview (see .qi-view-image / .card-image-modal). -->

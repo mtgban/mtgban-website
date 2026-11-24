@@ -1,4 +1,4 @@
-# ADR-0009: Recent TCGplayer sales in the Buyers column
+# ADR-0009: Recent TCGplayer sales in search
 
 **Status:** Proposed
 **Date:** 2026-11-22
@@ -96,18 +96,22 @@ What exists:
      datastore's sealed products, because only Magic's datastore matches a
      sealed id as a card's. An id two products share answers for neither.
    - Nothing on a request path reads the newspaper.
-5. **The Buyers column switches between Buylist and Sales.** Each card's
-   column header holds a two-way switch, and a click sets every card on the
-   page. The choice is kept in a cookie, `SearchBuyersMode` (`buylist`,
+5. **Sales is a third column, or a switch where it has no room.** A results
+   area at least 800px wide shows Sellers, Buyers and Sales side by side.
+   Up to 960px the sellers' and buyers' rows close up as in the tight band,
+   so no store name is cut. Narrower, each card's Buyers header holds a
+   two-way switch between Buylist and Sales, and a click sets every card on
+   the page. Both show the one pane a card has. A page where no card has
+   an order on record has neither, and keeps its two columns. The choice is kept in a cookie, `SearchBuyersMode` (`buylist`,
    `sales`), registered in the settings registry. Clicks are tracked as
    `ui.search.buyers_mode`. With no cookie, the mode is the game
    config's `search_buyers_default` (Pokemon's sets `sales`), else
-   `buylist`. Sealed search has the same switch and
-   shares the choice. The TCGplayer sales row stays above both modes,
-   unchanged. Offline search, which has no orders, shows no switch.
+   `buylist`; the three columns ignore it. Sealed search is the same and
+   shares the choice. The TCGplayer sales row stays atop Buyers,
+   unchanged. Offline search, which has no orders, shows no sales.
 6. **The search draws no sales.** The buylist renders as today, and each
-   card gets an empty Sales pane. When Sales is on show, because the page
-   opened in it or on the first switch, the page fetches every card's pane
+   card gets an empty Sales pane. When one is on show within a screen of the
+   reader, or on the first switch, the page fetches every card's pane
    in one same-origin request, `/data/sales/{ids}`, behind the same signing
    as the chart's data and rendered from the snapshot alone. Neither mode
    costs a search anything measurable (Consequences).
@@ -120,7 +124,8 @@ What exists:
      (white, centred: `2026-11-19`, the minute in its tooltip), and the
      price per copy with the quantity
      beside it above one copy. Rows are half the height of a buyer's (21px),
-     since a card can have 25 on show.
+     since a card can have 25 on show. The third column has room for
+     neither the source's name nor the quantity, and leaves them out.
    - A condition with more than 5 folds the rest under "N more (show)", which
      becomes a "Hide" drawn after the last of them. In the page the fold
      comes first, so a keyboard or screen reader goes on from it to the
@@ -159,6 +164,13 @@ What exists:
   rejected. With 14 orders on every card it made the search 39% slower
   and its page 18% larger; the fetch after the page is on show costs the
   search nothing.
+- **Fetch the folded orders when they are opened**: rejected. On a 100-card
+  page with 2,485 orders, 1,167 of them folded, it saves 25KB of 52KB
+  gzipped and 10ms of the 82ms the panes take to draw, against a wait each
+  time a fold opens.
+- **Keep the sales on screen as a card scrolls**, in a panel of their own
+  beside it: rejected for a column of the card's table, which needs no
+  wrapper around each card and leaves the pinned headers alone.
 - **Reload the whole table on the velocity's day**: rejected. The day
   lands when the pull starts, so it would show orders a day old.
 - **Seed from `tcgplayerlastsalemodel`**: rejected. It has no listing id,

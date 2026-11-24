@@ -97,8 +97,9 @@ func canSeeSales(sig string) bool {
 
 // fillRecentSales sets the Buyers column's mode for the reader and which
 // cards have orders, the buylist and none for a reader the sales are hidden
-// from. The search draws no sales: the page fetches the panes from
-// /data/sales/ once it is on show in Sales, so no mode costs a search.
+// from. The search draws no sales: the page fetches the panes (third column,
+// or the Buyers column's switch where there is no room) from /data/sales/
+// once one is on show, so no mode costs a search.
 func fillRecentSales(v *SearchVars, recent *salesvelocity.RecentSnapshot, r *http.Request, sig string, keys []string) {
 	v.CanSales = canSeeSales(sig)
 	v.BuyersMode = buyersBuylist
