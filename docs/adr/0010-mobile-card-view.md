@@ -51,8 +51,9 @@ What the phone page already has, and this decision builds on:
    search bar is at the bottom of the screen, within reach of a thumb, and
    stays fixed while the cards move up and down; it slides down out of the
    way once a swipe has gone a little way toward a list, so the list has
-   the whole height, and back up once one has gone a little way toward the
-   picture, so a finger's small reversals don't flicker it. The picture keeps room for it. Above it, the picture's best ask
+   the whole height, and back up once one has gone a little way onto the
+   picture, so a finger's small reversals don't flicker it; from the sales
+   back to the buyers it stays down. The picture keeps room for it. Above it, the picture's best ask
    at the left edge and its best offer at the right, the favorite,
    backpack and chart buttons between them, each edge with an arrow toward
    its list and its price under its label: the first priced, unlocked row of
