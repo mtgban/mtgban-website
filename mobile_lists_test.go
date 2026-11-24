@@ -88,6 +88,35 @@ func TestMobileListsAreTheDesktopTable(t *testing.T) {
 	}
 }
 
+// A priced row's store icon is drawn beside the name and in the quantity's
+// column, for the width to pick from; a row with a second price has none.
+func TestStoreIconBesideNameAndInQuantity(t *testing.T) {
+	vars := sealedPageVars("c")
+	vars.FoundSellers["c"]["NM"] = []SearchEntry{
+		{ScraperName: "With Icon", Price: 2, BundleIcon: "/icon.png"},
+		{ScraperName: "Two Prices", Price: 3, Secondary: 4, BundleIcon: "/icon.png"},
+	}
+	out := renderMobileSearch(t, vars)
+
+	_, first, found := strings.Cut(out, "With Icon")
+	if !found {
+		t.Fatal("the row with an icon is not on the page")
+	}
+	first, second, found := strings.Cut(first, "Two Prices")
+	if !found {
+		t.Fatal("the row with two prices is not on the page")
+	}
+	cell, rest, _ := strings.Cut(first, `<span class="price-right`)
+	for where, part := range map[string]string{"the store's cell": cell, "the quantity's column": rest} {
+		if got := strings.Count(part, `class="bundle-icon"`); got != 1 {
+			t.Errorf("%s holds %d icons, want 1", where, got)
+		}
+	}
+	if strings.Contains(second, `class="bundle-icon"`) {
+		t.Error("the row with two prices has an icon")
+	}
+}
+
 // A card with orders on record gets a Sales list after its buyers, or
 // before them where the reader's Buyers column opens on Sales, with the edge
 // button leading to whichever comes first; a sealed product as well.

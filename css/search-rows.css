@@ -285,6 +285,12 @@
     align-items: center;
     gap: 6px;
 }
+/* The store's icon: in the quantity's column, or beside its name where the
+   price columns close up to one (below) */
+.price-row .store-cell .bundle-icon {
+    display: none;
+    flex-shrink: 0;
+}
 /* Name takes its content width (overriding the row's flex:1) so the Fix link
    sits right after it, not pushed to the far end of the name column. */
 .price-row .store-cell .store-name {
@@ -621,6 +627,8 @@ html.admin-fix-mode .raw-record { display: inline-block; }
         font-size: 0.8em;
         opacity: 0.7;
     }
+    .price-row .store-cell .bundle-icon { display: block; }
+    .price-right .bundle-icon { display: none; }
 
     .rows-index {
         grid-template-columns: 1fr auto;
