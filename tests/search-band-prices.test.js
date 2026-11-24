@@ -23,6 +23,13 @@ test('the band stacks a row\'s quantity and second price under its price', () =>
     expect(block).not.toMatch(/\.qty[^{]*\{[^}]*display: none/);
 });
 
+test('a store\'s icon sits beside its name in the band, in the quantity\'s column elsewhere', () => {
+    const block = bandBlock();
+    expect(block).toContain('.price-row .store-cell .bundle-icon { display: block; }');
+    expect(block).toContain('.price-right .bundle-icon { display: none; }');
+    expect(read('css/search-rows.css')).toMatch(/\.price-row \.store-cell \.bundle-icon \{\n\s+display: none;/);
+});
+
 test('the band puts a sealed index\'s Sim median under its name and spread under its EV', () => {
     const block = bandBlock();
     expect(block).toMatch(/\.rows-index \{\n\s+grid-template-columns: 1fr auto;/);

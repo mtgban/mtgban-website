@@ -98,6 +98,7 @@
                         {{else}}
                             <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or .Shorthand "other"}}" data-track-scope="seller">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                         {{end}}
+                        {{if and .BundleIcon .Price (not .Secondary)}}<img class="bundle-icon" src="{{.BundleIcon}}" alt="">{{end}}
                         {{if .Listings}}
                             <span class="tcg-listings" title="{{plain_tip .ListingsTitle}}" data-tip="{{.ListingsTitle}}">{{.Listings}}</span>
                         {{end}}
@@ -136,7 +137,7 @@
                         {{else}}
                             <span class="qty">
                                 {{if and .BundleIcon .Price}}
-                                    <img style="padding-top:4px;" src="{{.BundleIcon}}">
+                                    <img class="bundle-icon" style="padding-top:4px;" src="{{.BundleIcon}}" alt="">
                                 {{else if not .NoQuantity}}
                                     {{.Quantity}}
                                 {{end}}
