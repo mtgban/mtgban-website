@@ -38,6 +38,60 @@ html:has(.m-landing) {
     padding-bottom: 4px;
 }
 
+/* The sales go two to a line, the store down to its icon and the quantity
+   left out to fit them; a condition's fold takes the cell after its last
+   order, the fifth while the rest are hidden. In a list under 360px a
+   four-figure price no longer fits in half, so it keeps one to a line. */
+@container search-results (width >= 360px) {
+    .m-layout-cards .sales-rows {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .m-layout-cards .sales-row:nth-child(odd of .sales-row) {
+        border-right: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+    }
+}
+
+.m-layout-cards .m-tab-panel .sales-row {
+    min-height: 24px;
+    padding: 0 10px 0 0;
+    gap: 0;
+    background: none;
+}
+
+.m-layout-cards .sales-src {
+    flex: none;
+    align-self: stretch;
+    padding: 0 7px 0 10px;
+}
+
+.m-layout-cards .sales-src-icon + .sales-src-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+.m-layout-cards .sales-qty {
+    display: none;
+}
+
+.m-layout-cards .sales-more {
+    display: flex;
+}
+
+.m-layout-cards .sales-more > summary {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-height: 24px;
+    padding: 0 10px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+}
+
 /* A sealed index's EV, Sim median and spread stack in the price column,
    the store's name centred beside them, where the narrow desktop band
    puts the median under the name. Only at phone width: a wider pane keeps

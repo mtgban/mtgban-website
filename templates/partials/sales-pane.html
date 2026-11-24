@@ -1,19 +1,23 @@
 {{/* The Buyers column's Sales mode (docs/adr/0009-recent-tcgplayer-sales.md):
-     each grade's newest orders, the rest folded, its average in the header.
+     each grade's newest orders, its average in the header. The fold comes
+     before the rest, so a reader goes on to them, and is drawn after them.
      Search draws it in place, and /data/sales/ for the first switch. */}}
 {{define "buyers-switch"}}<span class="buyers-switch" role="group" aria-label="Buyers column shows">
 <button type="button" class="buyers-switch-btn{{if ne . "sales"}} on{{end}}" aria-pressed="{{if ne . "sales"}}true{{else}}false{{end}}" data-buyers-set="buylist" data-track="ui.search.buyers_mode" data-track-value="buylist">Buylist</button><button type="button" class="buyers-switch-btn{{if eq . "sales"}} on{{end}}" aria-pressed="{{if eq . "sales"}}true{{else}}false{{end}}" data-buyers-set="sales" data-track="ui.search.buyers_mode" data-track-value="sales">Sales</button>
 </span>{{end}}
 
-{{define "sales-source"}}{{if eq . "TCGplayer"}}<img class="sales-src-icon" src="/img/logo/tcgplayer.png" alt="" width="14" height="14">{{end}}{{.}}{{end}}
+{{define "sales-source"}}{{if eq . "TCGplayer"}}<img class="sales-src-icon" src="/img/logo/tcgplayer.png" alt="" width="14" height="14">{{end}}<span class="sales-src-name">{{.}}</span>{{end}}
 
-{{define "sales-row"}}<div class="price-row sales-row">{{if .Link}}<a class="sales-src" href="{{.Link}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="TCGPlayer" data-track-scope="sales">{{template "sales-source" .Line.Source}}</a>{{else}}<span class="sales-src">{{template "sales-source" .Line.Source}}</span>{{end}}{{with .Line}}<span class="sales-date" title="{{.Time}}">{{.Date}}</span><span class="sales-price"><span class="price"><span class="cur">$</span><span class="amt">{{.Price}}</span></span><span class="sales-qty">{{.Qty}}</span></span>{{end}}</div>{{end}}
+{{define "sales-row"}}<div class="price-row sales-row{{if .More}} sales-row-more{{end}}">{{if .Link}}<a class="sales-src" href="{{.Link}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="TCGPlayer" data-track-scope="sales">{{template "sales-source" .Line.Source}}</a>{{else}}<span class="sales-src">{{template "sales-source" .Line.Source}}</span>{{end}}{{with .Line}}<span class="sales-date" title="{{.Time}}">{{.Date}}</span><span class="sales-price"><span class="price"><span class="cur">$</span><span class="amt">{{.Price}}</span></span><span class="sales-qty">{{.Qty}}</span></span>{{end}}</div>{{end}}
 
 {{define "sales-pane"}}
 {{range $group := .}}
 <div class="price-cond-header sales-cond-header"><span>Condition: {{.Grade}}</span><span class="sales-avg">avg <b>$ {{.Avg}}</b></span></div>
+<div class="sales-rows">
 {{range .Shown}}{{template "sales-row" dict "Line" . "Link" $group.Link}}{{end}}
-{{with .More}}<details class="sales-more"><summary><span class="sales-more-open">{{len .}} more</span><span class="sales-more-close">Fewer</span></summary>{{range .}}{{template "sales-row" dict "Line" . "Link" $group.Link}}{{end}}</details>{{end}}
+{{with .More}}<details class="sales-more"><summary><span class="sales-more-open">{{len .}} more (show)</span><span class="sales-more-close">Hide</span></summary></details>
+{{range .}}{{template "sales-row" dict "Line" . "Link" $group.Link "More" true}}{{end}}{{end}}
+</div>
 {{else}}
 <div class="no-offers"><i>No sales on record</i></div>
 {{end}}

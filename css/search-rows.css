@@ -193,7 +193,20 @@
     color: var(--normaltext);
     font-weight: 600;
 }
-.sales-pane > .price-row:where(:nth-child(even of .price-row)) {
+/* Half a buyer's row: a card has up to 20 orders a condition. The date and
+   the price follow the row's size, whatever the page's own rows take. */
+.price-row.sales-row {
+    height: 21px;
+    font-size: 0.75rem;
+}
+.price-row.sales-row .price {
+    font-size: inherit;
+}
+.sales-rows {
+    display: flex;
+    flex-direction: column;
+}
+.sales-rows > .sales-row:where(:nth-child(even of .sales-row)) {
     background: var(--search-surface-1);
 }
 .sales-src {
@@ -233,6 +246,10 @@
     color: var(--search-text-dim);
     font-variant-numeric: tabular-nums;
 }
+/* Its "Hide" ends the list: the folded rows follow it in the page. */
+.sales-more {
+    order: 1;
+}
 .sales-more > summary {
     padding: 3px 12px;
     font-size: var(--text-xs);
@@ -244,7 +261,8 @@
     display: none;
 }
 .sales-more[open] > summary .sales-more-open,
-.sales-more:not([open]) > summary .sales-more-close {
+.sales-more:not([open]) > summary .sales-more-close,
+.sales-more:not([open]) ~ .sales-row-more {
     display: none;
 }
 

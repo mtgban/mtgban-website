@@ -158,6 +158,19 @@ func TestSalesPaneLinks(t *testing.T) {
 			t.Errorf("%d rows have %q, want all 3:\n%s", got, want, out)
 		}
 	}
+	if got := strings.Count(out, "sales-row-more"); got != 1 {
+		t.Errorf("%d rows are folded, want 1:\n%s", got, out)
+	}
+	// The folded rows follow the fold, and a phone hides the source's name
+	// only beside its icon.
+	for _, want := range []string{
+		"1 more (show)</span><span class=\"sales-more-close\">Hide</span></summary></details>\n<div class=\"price-row sales-row sales-row-more\">",
+		`height="14"><span class="sales-src-name">TCGplayer</span>`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("pane lacks %q:\n%s", want, out)
+		}
+	}
 }
 
 // TestSalesLink covers the printing, condition and language a sales row's
