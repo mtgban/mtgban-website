@@ -1,8 +1,7 @@
 // The Buyers column's switch between the buylist and the recent sales
 // (docs/adr/0009-recent-tcgplayer-sales.md). A switch sets every card on the
 // page and is remembered in SearchBuyersMode. The search draws no sales, so
-// the page fetches every card's pane at once when Sales is first on show; a
-// reader not logged in gets the page's one log-in prompt in each instead.
+// the page fetches every card's pane at once when Sales is first on show.
 (function () {
     var MODES = ['buylist', 'sales'];
     // The panes still to draw: never fetched, or a fetch that failed.
@@ -79,30 +78,17 @@
         return inflight;
     }
 
-    // show fills the waiting panes: the log-in prompt where the page holds
-    // one, the fetched sales otherwise.
-    function show(root, fetchFn) {
-        var prompt = root.getElementById ? root.getElementById('sales-login') : null;
-        if (!prompt) return load(root, fetchFn);
-        root.querySelectorAll(WAITING).forEach(function (pane) {
-            pane.innerHTML = prompt.innerHTML;
-            pane.removeAttribute('data-pending');
-            pane.removeAttribute('data-failed');
-        });
-        return Promise.resolve();
-    }
-
     function choose(root, mode, fetchFn) {
         if (MODES.indexOf(mode) < 0) return Promise.resolve();
         apply(root, mode);
         if (typeof setCookie === 'function') setCookie('SearchBuyersMode', mode, 1000);
-        return mode === 'sales' ? show(root, fetchFn) : Promise.resolve();
+        return mode === 'sales' ? load(root, fetchFn) : Promise.resolve();
     }
 
     // start fills the panes of a page that opens in Sales.
     function start(root, fetchFn) {
         if (!root.querySelector('[data-buyers-mode="sales"]')) return Promise.resolve();
-        return show(root, fetchFn);
+        return load(root, fetchFn);
     }
 
     function onClick(e) {
@@ -117,5 +103,5 @@
         if (document.querySelector) start(document, window.fetch.bind(window));
     }
 
-    self.SearchBuyers = { apply: apply, pendingIDs: pendingIDs, fill: fill, load: load, show: show, choose: choose, start: start };
+    self.SearchBuyers = { apply: apply, pendingIDs: pendingIDs, fill: fill, load: load, choose: choose, start: start };
 })();

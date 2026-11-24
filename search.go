@@ -706,8 +706,8 @@ type SearchVars struct {
 	// CanVelocity shows the sales velocity row to the newspaper tiers.
 	CanVelocity bool
 
-	// The Buyers column's mode, "buylist" or "sales", whether the reader is
-	// logged in to see the sales, and the cards with any order on record
+	// The Buyers column's mode, "buylist" or "sales", whether the reader's
+	// tier shows the sales, and the cards with any order on record
 	// (docs/adr/0009).
 	BuyersMode string
 	CanSales   bool

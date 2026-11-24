@@ -526,7 +526,7 @@
                                 <!-- Sellers column -->
                                 {{template "result-sellers" dict "Page" $ "Card" $card "CardID" $cardId}}
                                 <!-- Buyers column -->
-                                {{template "result-buyers" dict "Page" $ "Card" $card "CardID" $cardId "Switch" true}}
+                                {{template "result-buyers" dict "Page" $ "Card" $card "CardID" $cardId "Switch" $.CanSales}}
                             </div>
                             <!-- Last sold placeholder (feature currently disabled) -->
                             <div id="{{$cardId}}" style="display:none"></div>
@@ -567,21 +567,7 @@
 <script type="text/javascript" src="/js/search-quick-icons.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-track.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-velocity.js?hash={{.Hash}}" defer></script>
-{{if not .CanSales}}
-{{/* The Sales pane of a reader not logged in, one copy the switch puts in each card */}}
-<template id="sales-login">
-    <div class="price-row sales-locked">
-        <span class="store-name dim">Log in to see recent sales</span>
-        <span class="locked-cta">
-            <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="sales_join">Join</a>
-            {{range $ref, $id := .PatreonIDs}}
-                <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="sales_login">Log in</a>
-            {{end}}
-        </span>
-    </div>
-</template>
-{{end}}
-<script type="text/javascript" src="/js/search-buyers.js?hash={{.Hash}}" defer></script>
+{{if .CanSales}}<script type="text/javascript" src="/js/search-buyers.js?hash={{.Hash}}" defer></script>{{end}}
 
 <!-- Lightbox for the card image, used when the screen is too narrow to show
      the sidebar preview (see .qi-view-image / .card-image-modal). -->

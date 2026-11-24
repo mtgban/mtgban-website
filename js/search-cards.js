@@ -52,7 +52,7 @@
 
     // The first time any card heads its sales' way, every card's are fetched.
     function showSales(pane) {
-        if (pane === 'sales' && window.SearchBuyers) SearchBuyers.show(document, window.fetch.bind(window));
+        if (pane === 'sales' && window.SearchBuyers) SearchBuyers.load(document, window.fetch.bind(window));
     }
 
     function paneAt(card) {

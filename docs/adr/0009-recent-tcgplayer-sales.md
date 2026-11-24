@@ -100,19 +100,17 @@ What exists:
    column header holds a two-way switch, and a click sets every card on the
    page. The choice is kept in a cookie, `SearchBuyersMode` (`buylist`,
    `sales`), registered in the settings registry. Clicks are tracked as
-   `ui.search.buyers_mode`. With no cookie, a logged-in reader gets the
-   game config's `search_buyers_default` (Pokemon's sets `sales`), and
-   everyone else gets `buylist`. Sealed search has the same switch and
+   `ui.search.buyers_mode`. With no cookie, the mode is the game
+   config's `search_buyers_default` (Pokemon's sets `sales`), else
+   `buylist`. Sealed search has the same switch and
    shares the choice. The TCGplayer sales row stays above both modes,
    unchanged. Offline search, which has no orders, shows no switch.
 6. **The search draws no sales.** The buylist renders as today, and each
    card gets an empty Sales pane. When Sales is on show, because the page
    opened in it or on the first switch, the page fetches every card's pane
    in one same-origin request, `/data/sales/{ids}`, behind the same signing
-   as the chart's data and rendered from the snapshot alone. A reader not
-   logged in gets one log-in prompt in the page, which the script copies
-   into each pane, with no fetch. Neither mode costs a search anything
-   measurable (Consequences).
+   as the chart's data and rendered from the snapshot alone. Neither mode
+   costs a search anything measurable (Consequences).
 7. **Sales shows each condition's 5 newest orders**, under `Condition: NM`
    headers, newest first.
    - Each header carries the condition's average price per copy over every
@@ -136,10 +134,10 @@ What exists:
      to keep the list short: each is the source's icon (the link), the full
      date and the price, with no quantity. The fold takes the empty place
      beside the fifth. A list under 360px wide goes back to one a line.
-8. **Every logged-in reader sees Sales**, any tier: a reader with a
-   verified signature. A logged-out reader gets the switch too, and Sales
-   shows a Join / Log in prompt in place of the orders. The velocity row
-   keeps its Newspaper-tier gate.
+8. **Sales shows to the tiers with `SearchSales`**, a flag on the ACL's
+   Search page, Admin's and Root's. A reader without it gets no switch, no
+   list on a phone and a 403 from `/data/sales/`. The velocity row keeps
+   its Newspaper-tier gate.
 9. **An API endpoint comes later**, reading the same snapshot. The snapshot
    is keyed by card id and made of plain values, so it needs no second
    cache. Nothing is built for it now.
@@ -192,6 +190,3 @@ What exists:
   in either mode: measured with `BenchmarkSearchPage`, on master against
   the branch with benchstat. The panes cost their own request, after the
   page is on show, and show "Loading recent sales…" until it answers.
-- **Free readers see each condition's recent prices and dates,** which
-  hand them roughly what the velocity row's details gate. This was chosen:
-  Sales is meant to bring readers in.

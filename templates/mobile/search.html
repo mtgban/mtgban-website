@@ -783,20 +783,7 @@
 {{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}" defer></script>{{end}}
 <script type="text/javascript" src="/js/search-track.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-velocity.js?hash={{.Hash}}" defer></script>
-{{if not .CanSales}}
-{{/* The Sales pane of a reader not logged in, one copy each card's Sales
-     list takes when it is first shown */}}
-<template id="sales-login">
-    <div class="price-row sales-locked">
-        <span class="store-name dim">Log in to see recent sales</span>
-        <span class="locked-cta">
-            <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="sales_join">Join</a>
-            {{range $ref, $id := .PatreonIDs}}<a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')" data-track="ui.row.locked" data-track-value="sales_login">Log in</a>{{end}}
-        </span>
-    </div>
-</template>
-{{end}}
-<script type="text/javascript" src="/js/search-buyers.js?hash={{.Hash}}" defer></script>
+{{if .CanSales}}<script type="text/javascript" src="/js/search-buyers.js?hash={{.Hash}}" defer></script>{{end}}
 {{if not .DisableChart}}
 <script type="text/javascript" src="/js/mobile-chart.js?hash={{.Hash}}" defer></script>
 {{end}}
