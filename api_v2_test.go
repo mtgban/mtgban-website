@@ -740,10 +740,10 @@ func TestPriceAPISkipsNonFinitePrices(t *testing.T) {
 	}
 }
 
-// TestPriceAPIGradedIndex files an index's prices by grade on v1's both
-// paths, and gives the base condition and v2's conditions to one only the
-// API serves, on either side and under a foil's suffix.
-func TestPriceAPIGradedIndex(t *testing.T) {
+// TestPriceAPIIndexByCondition files an index's prices by condition on v1's
+// both paths, and gives the base condition and v2's conditions to one only
+// the API serves, on either side and under a foil's suffix.
+func TestPriceAPIIndexByCondition(t *testing.T) {
 	seedV2Scrapers(t, testSite)
 	b := v2Backend()
 	foil := &matcher.CardObject{Card: matcher.Card{UUID: "lor-4", Identifiers: map[string]string{"mcmId": "600004"}}, Foil: true}
@@ -761,11 +761,11 @@ func TestPriceAPIGradedIndex(t *testing.T) {
 	buys.Add("lor-1", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 5})
 	buys.Add("lor-1", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 4})
 	sellers := append(slices.Clip(testSite.prices().sellers), mtgban.NewSellerFromInventory(trends, mtgban.ScraperInfo{Name: "TCGplayer Trends", Shorthand: "TCGTrends", MetadataOnly: true}))
-	vendors := append(slices.Clip(testSite.prices().vendors), mtgban.NewVendorFromBuylist(buys, mtgban.ScraperInfo{Name: "Graded Buyer", Shorthand: "GRADEDV", MetadataOnly: true}))
+	vendors := append(slices.Clip(testSite.prices().vendors), mtgban.NewVendorFromBuylist(buys, mtgban.ScraperInfo{Name: "Condition Buyer", Shorthand: "BYCONDV", MetadataOnly: true}))
 	sitePrices(t, testSite, sellers, vendors)
 	withConfigCopy(t)
 
-	stores := []string{"TCGTrends", "GRADEDV"}
+	stores := []string{"TCGTrends", "BYCONDV"}
 	retailConds := `"conditions":{"NM":10,"SP":8,"MP":6,"HP":4,"PO":2}`
 	foilConds := `"conditions":{"NM_foil":30,"SP_foil":25}`
 	buylistConds := `"conditions":{"NM":5,"SP":4}`
@@ -776,16 +776,16 @@ func TestPriceAPIGradedIndex(t *testing.T) {
 		{
 			nil,
 			`{"600001":{"TCGTrends":{"regular":10,` + retailConds + `}},"600004":{"TCGTrends":{"foil":30,` + foilConds + `}}}`,
-			`{"600001":{"GRADEDV":{"regular":5,` + buylistConds + `}}}`,
+			`{"600001":{"BYCONDV":{"regular":5,` + buylistConds + `}}}`,
 			"", "",
 		},
 		{
 			stores,
 			`{"600001":{"TCGTrends":{"regular":10,"cond":"NM",` + retailConds + `}},"600004":{"TCGTrends":{"foil":30,"cond":"NM",` + foilConds + `}}}`,
-			`{"600001":{"GRADEDV":{"regular":5,"cond":"NM",` + buylistConds + `}}}`,
+			`{"600001":{"BYCONDV":{"regular":5,"cond":"NM",` + buylistConds + `}}}`,
 			`{"600001":{"nonfoil":{"TCGTrends":[{"condition":"NM","price":10},{"condition":"SP","price":8},{"condition":"MP","price":6},{"condition":"HP","price":4},{"condition":"PO","price":2}]}},` +
 				`"600004":{"foil":{"TCGTrends":[{"condition":"NM","price":30},{"condition":"SP","price":25}]}}}`,
-			`{"600001":{"nonfoil":{"GRADEDV":[{"condition":"NM","price":5},{"condition":"SP","price":4}]}}}`,
+			`{"600001":{"nonfoil":{"BYCONDV":[{"condition":"NM","price":5},{"condition":"SP","price":4}]}}}`,
 		},
 	} {
 		Config().Stores.APIOnlyStores = tc.apiOnly

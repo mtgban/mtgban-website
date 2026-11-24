@@ -155,9 +155,9 @@ func newV2Store[T mtgban.GenericEntry](name string, record map[string][]T, withQ
 	}
 }
 
-// gradedStore reports whether the API files a store's prices by condition:
-// every store but an index, and an index only the API serves.
-func gradedStore(info mtgban.ScraperInfo) bool {
+// pricesByCondition reports whether the API files a store's prices by
+// condition: every store but an index, and an index only the API serves.
+func pricesByCondition(info mtgban.ScraperInfo) bool {
 	return !info.MetadataOnly || Config().apiOnly(info.Shorthand)
 }
 
@@ -171,7 +171,7 @@ func sellerSectionV2(b *matcher.Backend, p *prices, mode string, enabledStores [
 			continue
 		}
 		withQty := !info.MetadataOnly && !info.NoQuantityInventory
-		section.stores = append(section.stores, newV2Store(info.Shorthand, seller.Inventory(), withQty, gradedStore(info), false, v2Stock(info.Shorthand)))
+		section.stores = append(section.stores, newV2Store(info.Shorthand, seller.Inventory(), withQty, pricesByCondition(info), false, v2Stock(info.Shorthand)))
 	}
 	return section
 }
@@ -186,7 +186,7 @@ func vendorSectionV2(b *matcher.Backend, p *prices, mode string, enabledStores [
 		}
 		// An index vendor's quantity is a want-count where it says so
 		withQty := !info.MetadataOnly || info.QuantityPriority
-		section.stores = append(section.stores, newV2Store(info.Shorthand, vendor.Buylist(), withQty, gradedStore(info), true, nil))
+		section.stores = append(section.stores, newV2Store(info.Shorthand, vendor.Buylist(), withQty, pricesByCondition(info), true, nil))
 	}
 	return section
 }
@@ -220,7 +220,7 @@ func sellerSearchV2(b *matcher.Backend, p *prices, mode string, cardIDs []string
 			continue
 		}
 		withQty := !info.MetadataOnly && !info.NoQuantityInventory
-		section.stores = append(section.stores, newV2Store(info.Shorthand, found, withQty, gradedStore(info), false, v2Stock(info.Shorthand)))
+		section.stores = append(section.stores, newV2Store(info.Shorthand, found, withQty, pricesByCondition(info), false, v2Stock(info.Shorthand)))
 	}
 	return section
 }
@@ -246,7 +246,7 @@ func vendorSearchV2(b *matcher.Backend, p *prices, mode string, cardIDs []string
 			continue
 		}
 		withQty := !info.MetadataOnly || info.QuantityPriority
-		section.stores = append(section.stores, newV2Store(info.Shorthand, found, withQty, gradedStore(info), true, nil))
+		section.stores = append(section.stores, newV2Store(info.Shorthand, found, withQty, pricesByCondition(info), true, nil))
 	}
 	return section
 }
