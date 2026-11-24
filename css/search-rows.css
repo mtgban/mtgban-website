@@ -188,6 +188,9 @@
 .sales-pane[data-pending]::before {
     content: "Loading recent sales…";
     display: block;
+}
+.sales-pane[data-pending]::before,
+.sales-pane[data-failed] {
     padding: 8px 12px;
     font-size: var(--text-xs);
     font-style: italic;
