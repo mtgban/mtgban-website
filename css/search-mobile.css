@@ -615,293 +615,12 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     border-color: rgba(0, 0, 0, 0.15);
 }
 
-/* Tab toggle: Sellers / Buyers */
-.m-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border);
-    position: relative;
-}
-
-.m-tab {
-    flex: 1;
-    padding: 0.6em;
-    text-align: center;
-    font-size: 0.85rem;
-    font-weight: 600;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--greytext);
-    cursor: pointer;
-    min-height: 44px;
-    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.m-tab.active {
-    color: var(--activetext);
-    border-bottom-color: var(--dodgerblue);
-    background: rgba(30, 144, 255, 0.08);
-}
-
-/* Sliding tab indicator */
-.m-tabs:has(.m-tab + .m-tab) > .m-tab {
-    border-bottom-color: transparent;
-}
-
-.m-tabs:has(.m-tab + .m-tab)::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 50%;
-    height: 2px;
-    background: var(--dodgerblue);
-    transition: left 200ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-/* Slide indicator to second tab when it's active */
-.m-tabs:has(.m-tab:last-child.active)::after {
-    left: 50%;
-}
-
 .m-tab-panel {
     display: none;
 }
 
 .m-tab-panel.active {
     display: block;
-}
-
-/* Condition pills */
-.m-cond-pills {
-    display: flex;
-    align-items: center;
-    padding: 0.35em 0.75em;
-    border-bottom: 1px solid var(--border);
-}
-
-.m-cond-pills-left {
-    display: flex;
-    gap: 0.3em;
-    overflow-x: auto;
-}
-
-.m-cond-pills-right {
-    margin-left: auto;
-    flex-shrink: 0;
-    padding-left: 0.5em;
-}
-
-/* Override main.css @media (max-width: 768px) min-height: 44px on buttons */
-.m-cond-pill,
-.m-tab {
-    min-height: auto !important;
-}
-
-.m-cond-pill {
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 0.15em 0.5em;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: none;
-    color: var(--greytext);
-    cursor: pointer;
-    white-space: nowrap;
-    height: 24px;
-    display: inline-flex;
-    align-items: center;
-    line-height: 1;
-}
-
-.m-cond-pill.active {
-    color: white;
-    box-shadow: 0 0 6px rgba(30, 144, 255, 0.25);
-}
-
-/* Condition-specific colors: green=NM through red=PO */
-.m-cond-pill[data-cond="NM"].active {
-    background: #2d8a4e;
-    border-color: #2d8a4e;
-    box-shadow: 0 0 6px rgba(45, 138, 78, 0.3);
-}
-
-.m-cond-pill[data-cond="SP"].active {
-    background: var(--dodgerblue-fill);
-    border-color: var(--dodgerblue-fill);
-    box-shadow: 0 0 6px rgba(30, 144, 255, 0.25);
-}
-
-.m-cond-pill[data-cond="MP"].active {
-    background: #c5a84a;
-    border-color: #c5a84a;
-    box-shadow: 0 0 6px rgba(197, 168, 74, 0.3);
-}
-
-.m-cond-pill[data-cond="HP"].active {
-    background: #d97706;
-    border-color: #d97706;
-    box-shadow: 0 0 6px rgba(217, 119, 6, 0.3);
-}
-
-.m-cond-pill[data-cond="PO"].active {
-    background: #dc2626;
-    border-color: #dc2626;
-    box-shadow: 0 0 6px rgba(220, 38, 38, 0.3);
-}
-
-.m-cond-pill[data-cond="INDEX"].active {
-    background: #7c3aed;
-    border-color: #7c3aed;
-    box-shadow: 0 0 6px rgba(124, 58, 237, 0.3);
-}
-
-/* Mode toggle pill row in the mobile offline shell */
-.m-offline-mode-pills {
-    display: flex;
-    gap: 0.4em;
-    padding: 0.3em 0 0.1em;
-}
-
-.m-offline-mode-pills .m-cond-pill {
-    text-decoration: none;
-    flex: 1;
-    text-align: center;
-    font-size: 0.78rem;
-    padding: 0.3em 0.6em;
-    justify-content: center;
-}
-
-.m-offline-mode-pills .m-cond-pill.active {
-    background: var(--dodgerblue-fill);
-    border-color: var(--dodgerblue-fill);
-    color: white;
-    box-shadow: 0 0 6px rgba(30, 144, 255, 0.25);
-}
-
-/* Extra padding when the offline pill row is present; 52px is inherited from .m-search-bar-sticky rule above */
-.m-page:has(.m-offline-mode-pills) {
-    padding-top: calc(52px + 2.2em);
-}
-
-/* Condition groups (show/hide by active pill) */
-.m-cond-group {
-    display: none;
-}
-
-.m-cond-group.active {
-    display: block;
-}
-
-/* Content fade when switching conditions */
-@keyframes condFadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-.m-cond-group.active {
-    animation: condFadeIn 150ms ease;
-}
-
-/* Vendor rows (details/summary) */
-.m-vendor-row {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 0;
-    margin: 0;
-}
-
-.light-theme .m-vendor-row {
-    border-bottom-color: rgba(0, 0, 0, 0.06);
-}
-
-/* Alternating row tint for scan-ability */
-.m-vendor-row.m-vendor-flat:nth-child(even) {
-    background: rgba(255, 255, 255, 0.02);
-}
-
-.light-theme .m-vendor-row.m-vendor-flat:nth-child(even) {
-    background: rgba(0, 0, 0, 0.015);
-}
-
-.m-vendor-row:last-child {
-    border-bottom: none;
-}
-
-
-.m-vendor-name {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    overflow: clip visible;
-    text-overflow: ellipsis;
-    font-size: 0.9rem;
-}
-
-/* Only the store's name gives way to the ellipsis; the badges after it
-   (Best, hotlist, Card Kingdom's wait) stay whole */
-.m-vendor-name:has(> .m-vendor-label) {
-    display: flex;
-    align-items: baseline;
-    column-gap: 0.25em;
-}
-.m-vendor-name > .m-vendor-label {
-    min-width: 0;
-    overflow: hidden;
-    overflow: clip visible;
-    text-overflow: ellipsis;
-}
-.m-vendor-name > :not(.m-vendor-label) {
-    flex: none;
-}
-
-
-.m-vendor-name.dim {
-    opacity: 0.5;
-}
-
-
-.m-vendor-right {
-    display: grid;
-    grid-template-columns: 5em var(--m-vendor-qty-width, 2em) 1.4em;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.m-vendor-price {
-    font-family: var(--font-mono, monospace);
-    font-weight: 700;
-    font-size: 0.85rem;
-    white-space: nowrap;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-
-
-.m-vendor-name .ck-wait {
-    color: var(--awarning);
-    font-weight: 700;
-}
-
-.m-vendor-qty {
-    font-size: 0.7rem;
-    color: var(--greytext);
-    text-align: right;
-}
-
-/* Best price highlight */
-.m-best-price.m-vendor-flat {
-    background: color-mix(in srgb, var(--dodgerblue) 8%, transparent);
-    border-left: 3px solid var(--dodgerblue);
-    padding-left: calc(0.75rem - 3px);
-}
-
-.m-best-badge {
-    font-size: 0.6rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: var(--dodgerblue);
-    margin-left: 0.3em;
 }
 
 
@@ -2293,23 +2012,14 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) {
         display: grid;
         grid-template-columns: auto 1fr;
-        grid-template-rows: auto auto 1fr;
+        grid-template-rows: auto 1fr;
         grid-template-areas:
             "image  header"
-            "image  pills"
             "image  panel";
     }
 
     .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-card-header {
         grid-area: header;
-    }
-
-    .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-tabs {
-        display: none;
-    }
-
-    .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-cond-pills {
-        grid-area: pills;
     }
 
     .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-card-img-landscape {
@@ -2351,24 +2061,14 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) {
         display: grid;
         grid-template-columns: auto 1fr 1fr;
-        grid-template-rows: auto auto 1fr;
+        grid-template-rows: auto 1fr;
         grid-template-areas:
             "image  header  header"
-            "image  pills   pills"
             "image  sellers buyers";
     }
 
     .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-card-header {
         grid-area: header;
-    }
-
-    /* Hide tab buttons — both panels are visible */
-    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-tabs {
-        display: none;
-    }
-
-    .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-cond-pills {
-        grid-area: pills;
     }
 
     .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-card-img-landscape {
@@ -2400,7 +2100,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
         border-left: 1px solid var(--border);
     }
 
-    /* Column headers replacing hidden tabs */
+    /* Column headers naming each list */
     .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-tab-panel::before {
         content: "Sellers";
         display: block;
@@ -2421,23 +2121,6 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     .m-card-header {
         padding: 0.35em 0.75em;
         min-height: 36px;
-    }
-
-    .m-cond-pills {
-        padding: 0.25em 0.75em;
-    }
-
-
-    .m-vendor-name {
-        font-size: 0.8rem;
-    }
-
-    .m-vendor-price {
-        font-size: 0.8rem;
-    }
-
-    .m-best-price.m-vendor-flat {
-        padding-left: calc(0.5rem - 3px);
     }
 
     /* Chart drawer: slide from right instead of bottom in landscape */
@@ -2631,17 +2314,6 @@ body.m-setpicker-lock {
     color: var(--text);
     flex: 0 0 1.4em;
     text-align: center;
-}
-
-/* === Flat vendor row (no expandable detail), same layout as <details> > <summary> === */
-.m-vendor-row.m-vendor-flat {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 1rem 0 0.75rem;
-    min-height: 44px;
-    box-sizing: border-box;
-    gap: 0.5rem;
 }
 
 

@@ -1,6 +1,8 @@
 {{/* What moves a phone's card between its panes: the edge buttons on its
-     picture and each list's heading (docs/adr/0010-mobile-card-view.md). The
-     arrows are lucide's own, inline, as every card carries several. */}}
+     picture and each list's heading (docs/adr/0010-mobile-card-view.md),
+     drawn by the search and, through a template element, by the offline
+     page's script. The arrows are lucide's own, inline: every card carries
+     several, and offline nothing may be there to paint them. */}}
 
 {{define "m-chevron-left"}}<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>{{end}}
 

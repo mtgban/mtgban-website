@@ -4,7 +4,8 @@
 // rotation, returns to the card the reader left, opens a list from its edge
 // button, slides the search bar away while a list is in, jumps to a card
 // from the scrubber, fetches the sales as a card first heads their way, and
-// counts the lists read.
+// counts the lists read. The offline page draws its cards from script and
+// hands each new set over through SearchCards.
 (function () {
     'use strict';
 
@@ -351,4 +352,24 @@
     });
 
     cards().forEach(function (card) { shown.set(card, 'picture'); });
+
+    window.SearchCards = {
+        // New cards have been drawn: each on its picture, the deck on the
+        // card this history entry was left on, the first in a new one.
+        refresh: function () {
+            pager(false);
+            page.classList.remove('m-list-open');
+            centreAll();
+            cards().forEach(function (card) { shown.set(card, 'picture'); });
+            if (scrub) scrub.style.setProperty('--n', cards().length);
+            deck.scrollTop = ((history.state && history.state.cardsIndex) || 0) * pitch();
+            place();
+        },
+        // The deck scrolls upright, and the page in landscape. Upright the
+        // page is only moved by the keyboard, which keeps the box in view.
+        toTop: function () {
+            if (portrait.matches) deck.scrollTop = 0;
+            else window.scrollTo(0, 0);
+        }
+    };
 })();

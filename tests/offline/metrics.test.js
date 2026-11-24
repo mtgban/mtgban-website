@@ -4,11 +4,14 @@ import { registry, trackProblems } from '../track-registry.js';
 
 const desktop = read('templates/offline.html');
 const mobile = read('templates/mobile/offline.html');
+const sort = read('templates/partials/offline-sort.html');
 
 // --- Marks ---
 
-test('the five desktop sort pills count sort', () => {
-    const found = tagsWith(desktop, 'class="search-sort-pill"');
+test('the five sort pills, on desktop and phone, count sort', () => {
+    expect(desktop).toContain('{{template "offline-sort-pills" dict "Class" "search-sort"}}');
+    expect(mobile).toContain('{{template "offline-sort-pills" dict "Class" "m-sort"}}');
+    const found = tagsWith(sort, 'class="{{.Class}}-pill"');
     expect(found.length).toBe(5);
     found.forEach((t) => expectTrack(t, 'ui.offline.page', 'sort', undefined));
 });
@@ -27,6 +30,7 @@ test.each([
 test('every mark on the offline pages is in the registry', () => {
     expect(trackProblems(desktop)).toEqual([]);
     expect(trackProblems(mobile)).toEqual([]);
+    expect(trackProblems(sort)).toEqual([]);
 });
 
 // A stand-in element that records its attributes.
@@ -362,28 +366,6 @@ test('with no BAN a search still draws', async () => {
     expect(p.els['offline-results'].innerHTML).toBe('drawn 1');
 });
 
-// --- offline-page-mobile.js's card controls ---
-
-test('the mobile card tabs and condition pills count tab and condition', () => {
-    const src = read('js/offline/offline-page-mobile.js');
-    const f = fakeBAN();
-    let render = null;
-    const self = { OfflinePage: { start: (hooks) => { render = hooks.render; return { sealed: () => false }; } } };
-    const window = { BAN: f.BAN };
-    const document = { getElementById: () => null };
-    new Function('self', 'window', 'document', 'OfflineRenderMobile', src)(self, window, document, { render() {} });
-    const card = { querySelectorAll: () => [] };
-    const tab = Object.assign(el(), { closest: () => card });
-    const pill = Object.assign(el(), { closest: (sel) => (sel === '.m-card' ? card : { querySelectorAll: () => [] }) });
-    const orphan = Object.assign(el(), { closest: () => null });
-    const results = { querySelectorAll: (sel) => (sel === '.m-tab' ? [tab] : sel === '.m-cond-pill' ? [pill, orphan] : []) };
-    render(results, {}, {}, {});
-    tab.listeners.click.call(tab);
-    pill.listeners.click.call(pill);
-    orphan.listeners.click.call(orphan);
-    expect(f.calls).toEqual([['ui.offline.page', 'tab', undefined], ['ui.offline.page', 'condition', undefined]]);
-});
-
 // --- offline-images-ui.js ---
 
 function loadImagesUI(ban = true, { totalBytes = 0, estimate = null } = {}) {
@@ -458,7 +440,7 @@ test('the offline names hold the values the scripts send', () => {
     expect(registry['ui.offline.sync'].scopes).toEqual(['catalog', 'prices', 'images']);
     expect(registry['ui.offline.sw'].enum).toEqual(['install_ok', 'install_fail']);
     expect(registry['ui.offline.images'].enum).toEqual(['sync_now', 'pause', 'editions_changed']);
-    expect(registry['ui.offline.page'].enum).toEqual(['sort', 'tab', 'condition', 'kind']);
+    expect(registry['ui.offline.page'].enum).toEqual(['sort', 'kind']);
     expect(registry['ui.offline.search'].values).toBe('ValueNone');
     expect(registry['ui.offline.failover'].values).toBe('ValueNone');
 });

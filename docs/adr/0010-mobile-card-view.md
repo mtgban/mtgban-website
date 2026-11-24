@@ -157,9 +157,17 @@ What the phone page already has, and this decision builds on:
     desktop table compares more stores at a glance. A tablet reader who
     switches to the mobile view gets Cards too, which has to hold up at
     768px.
-10. **Out of scope:** the offline phone page (`templates/mobile/offline.html`),
-    which renders the phone's own rows in script and keeps their CSS in
-    `search-mobile.css`, and the sealed landing page.
+10. **The offline phone page is Cards too** (`templates/mobile/offline.html`).
+    It loads the same script and stylesheets, its lists are the offline
+    desktop page's columns (`js/offline/offline-render.js`), and the edge
+    buttons and list headings are the search's templates
+    (`templates/partials/card-panes.html`), which the page carries in a
+    `template` element for its script to put on each card it draws. A
+    drawing hands the new cards to `SearchCards.refresh`. Both offline pages
+    sort through `js/offline/offline-page.js`. Offline has no sales, and
+    none of the star, backpack and chart; Singles and Sealed share the
+    count's row, and the page's 100 results have no pager.
+11. **Out of scope:** the sealed landing page.
 
 ## Alternatives considered
 

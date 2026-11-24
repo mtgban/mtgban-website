@@ -2,7 +2,9 @@
 {{define "icons"}}<!-- no lucide: this page has no icons -->{{end}}
 
 {{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/search-rows.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/search-mobile.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/search-cards-mobile.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/offline.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
 {{end}}
@@ -17,6 +19,7 @@
     <script type="text/javascript" src="/js/offline/offline-search.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/offline/offline-age.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/offline/offline-render-shared.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/offline/offline-render.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/offline/offline-render-mobile.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/offline/offline-page.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/offline/offline-page-mobile.js?hash={{.Hash}}" defer></script>
@@ -24,7 +27,18 @@
 
 {{define "content"}}
 <script>(function(){try{var v=localStorage.getItem('theme');var pref=(v==='light'||v==='dark'||v==='system')?v:'system';var dark=pref==='dark'||(pref==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.body.setAttribute('data-theme-pref',pref);if(dark){document.body.classList.remove('light-theme');document.body.classList.add('dark-theme');}}catch(e){}})();</script>
-<div class="m-page">
+{{/* The search's Cards (docs/adr/0010-mobile-card-view.md), filled in by
+     offline-page-mobile.js */}}
+<div class="m-page m-layout-cards m-offline">
+    <div class="m-search-bar-sticky">
+        <div class="m-search-wrap">
+            <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform" data-track="ui.searchbar.submit" data-track-value="results">
+                <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search..." value="" maxlength="1000" autocapitalize="none" autocorrect="off" spellcheck="false">
+            </form>
+            <button class="m-search-btn" type="submit" form="searchform" title="Search"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
+        </div>
+    </div>
+
     <div id="offline-banner" class="offline-banner" role="status">
         <span class="offline-banner-dot" aria-hidden="true"></span>
         <span id="offline-banner-age">Offline prices: checking last refresh&hellip;</span>
@@ -36,20 +50,31 @@
         </a>
     </div>
 
-    <div class="m-search-bar-sticky">
-        <div class="m-search-wrap">
-            {{/* M3 mounts OfflineSearch on the mobile navbar #navsearchbox/#navsearchform only. */}}
-            {{/* No inline search box here - the navbar input is the single search surface. */}}
-        </div>
-        <div class="m-offline-mode-pills" id="m-offline-mode-pills">
-            <a class="m-cond-pill" id="offline-pill-singles" href="/offline" data-track="ui.offline.page" data-track-value="kind">Singles</a>
-            <a class="m-cond-pill" id="offline-pill-sealed" href="/offline?sealed=1" data-track="ui.offline.page" data-track-value="kind">Sealed</a>
-        </div>
+    <div class="m-result-meta">
+        <span class="m-offline-mode" id="m-offline-mode-pills">
+            <a id="offline-pill-singles" href="/offline" data-track="ui.offline.page" data-track-value="kind">Singles</a>
+            <a id="offline-pill-sealed" href="/offline?sealed=1" data-track="ui.offline.page" data-track-value="kind">Sealed</a>
+        </span>
+        <span class="m-meta-count" id="m-offline-count"></span>
+        <div class="m-sort-pills">{{template "offline-sort-pills" dict "Class" "m-sort"}}</div>
     </div>
 
-    <div class="m-offline-results-wrap">
-        <div id="m-offline-results"></div>
+    <div id="m-offline-notices"></div>
+
+    <div class="m-deck">
+        <div class="m-scrub" aria-hidden="true"><span class="m-scrub-thumb"></span></div>
+        <div class="m-results" id="m-offline-results"></div>
+        <div class="m-results-end"><p class="m-end-line" id="m-offline-end"></p></div>
     </div>
+    <script type="text/javascript" src="/js/search-cards.js?hash={{.Hash}}" defer></script>
+
+    {{/* What offline-render-mobile.js puts on each card, by data-part */}}
+    <template id="m-offline-parts">
+        <div data-part="edge-sellers">{{template "m-edge-sell" dict "Price" "{price}"}}</div>
+        <div data-part="edge-buyers">{{template "m-edge-buy" dict "Pane" "buyers" "Title" "Buyers" "Price" "{price}"}}</div>
+        <div data-part="head-sellers">{{template "m-pane-head" dict "Title" "Sellers" "Prev" "" "Next" "picture"}}</div>
+        <div data-part="head-buyers">{{template "m-pane-head" dict "Title" "Buyers" "Prev" "picture" "Next" ""}}</div>
+    </template>
 </div>
 {{end}}
 

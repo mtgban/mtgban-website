@@ -119,9 +119,11 @@ test('the stylesheets that size a drawn svg have no placeholder to pair', () => 
     expect(read('templates/upload.html')).toContain('{{define "upload-icon"}}');
     expect(read('templates/upload.html')).not.toContain('{{define "upload-icon"}}<i');
 
-    // templates/offline.html inlines the same way - the offline shell cannot
-    // reach the cdn by definition.
-    const offline = read('templates/offline.html');
+    // The offline pages' sort pills inline the same way - the offline shell
+    // cannot reach the cdn by definition - and so do the arrows on a phone's
+    // cards, which it draws too.
+    const offline = read('templates/partials/offline-sort.html');
+    expect(read('templates/partials/card-panes.html')).not.toContain('data-lucide');
     expect(offline).toContain('class="lucide lucide-clock"');
     expect(offline).not.toContain('data-lucide');
 

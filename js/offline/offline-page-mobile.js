@@ -1,7 +1,9 @@
-// The mobile offline page: the singles and sealed pills and each card's tabs,
-// on top of offline-page.js.
+// The mobile offline page: the singles and sealed pills and the Cards deck, on
+// top of offline-page.js.
 (function (root) {
     'use strict';
+
+    var parts = null;
 
     function singlesUrl(q) {
         return q ? '/offline?q=' + encodeURIComponent(q) : '/offline';
@@ -18,45 +20,39 @@
         p.classList.toggle('active', sealed);
     }
 
-    // Wire tab/pill interactions on freshly rendered .m-card nodes; scoped to
-    // the results container so listeners never attach outside it.
-    function wireCardInteractions(results) {
-        results.querySelectorAll('.m-tab').forEach(function (tab) {
-            tab.addEventListener('click', function () {
-                if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.page', 'tab');
-                var card = this.closest('.m-card');
-                card.querySelectorAll('.m-tab').forEach(function (t) { t.classList.remove('active'); });
-                card.querySelectorAll('.m-tab-panel').forEach(function (p) { p.classList.remove('active'); });
-                this.classList.add('active');
-                var target = document.getElementById(this.getAttribute('data-target'));
-                if (target) target.classList.add('active');
-            });
+    function readParts() {
+        parts = {back: root.cardBackForGame ? root.cardBackForGame() : ''};
+        document.getElementById('m-offline-parts').content.querySelectorAll('[data-part]').forEach(function (el) {
+            parts[el.getAttribute('data-part')] = el.innerHTML.trim();
         });
-        results.querySelectorAll('.m-cond-pill').forEach(function (pill) {
-            pill.addEventListener('click', function () {
-                var cond = this.getAttribute('data-cond');
-                var card = this.closest('.m-card');
-                if (!card) return;
-                if (window.BAN && window.BAN.track) window.BAN.track('ui.offline.page', 'condition');
-                this.closest('.m-cond-pills').querySelectorAll('.m-cond-pill').forEach(function (p) { p.classList.remove('active'); });
-                this.classList.add('active');
-                card.querySelectorAll('.m-cond-group').forEach(function (g) {
-                    g.classList.toggle('active', g.getAttribute('data-cond') === cond);
-                });
-            });
-        });
+    }
+
+    function paintCount(n, shown) {
+        document.getElementById('m-offline-count').textContent =
+            n ? n + ' result' + (n === 1 ? '' : 's') + (n > shown ? ' (' + shown + ' shown)' : '') : '';
+        document.getElementById('m-offline-end').textContent =
+            n > shown ? 'The first ' + shown + ' of ' + n + ' results' : n ? 'End of results' : '';
     }
 
     var page = root.OfflinePage.start({
         surface: 'mobile',
         closeKeyboard: true,
-        boxId: 'navsearchbox',
-        formId: 'navsearchform',
+        // The box at the foot, and the navbar's on a landscape phone
+        boxes: [['searchbox', 'searchform'], ['navsearchbox', 'navsearchform']],
         resultsId: 'm-offline-results',
         queryChanged: paintModePills,
+        ready: readParts,
         render: function (el, shown, exec, ctx) {
-            OfflineRenderMobile.render(el, shown, ctx);
-            wireCardInteractions(el);
+            document.getElementById('m-offline-notices').innerHTML = OfflineRenderShared.noticesHTML(exec);
+            OfflineRenderMobile.render(el, shown, ctx, parts);
+            paintCount(exec.results.length, shown.pageRows);
+            SearchCards.refresh();
+        },
+        recount: paintCount,
+        toTop: function () { SearchCards.toTop(); },
+        cleared: function () {
+            document.getElementById('m-offline-notices').innerHTML = '';
+            paintCount(0, 0);
         }
     });
 })(typeof self !== 'undefined' ? self : globalThis);

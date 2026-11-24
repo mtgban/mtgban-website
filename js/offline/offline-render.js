@@ -79,7 +79,20 @@
         return '<div class="price-cond-header">Condition: ' + cond + '</div>';
     }
 
-    function sellersColumn(res, ctx) {
+    // column wraps a side's rows as templates/partials/search-columns.html
+    // does.
+    function column(title, rows, before) {
+        return '<div class="result-col">' +
+            '<div class="result-col-header">' + title + '</div>' +
+            (rows === '' ? '<div class="no-offers"><i>No offers</i></div>' : '') +
+            (before || '') +
+            '<div class="rows-main">' + rows + '</div>' +
+            '</div>';
+    }
+
+    // sellers is a card's Sellers column, whether it has any row, and its best
+    // price: the first in the best condition there is.
+    function sellers(res, ctx) {
         var card = res.card;
         var shorts = Object.keys(res.retail || {}).filter(function (s) {
             return ctx.hiddenSellers.indexOf(s) === -1;
@@ -111,6 +124,7 @@
             return a.label.toLowerCase() < b.label.toLowerCase() ? -1 : 1;
         });
         var rowsMain = idxRows.map(function (r) { return r.html; }).join('');
+        var best = 0;
 
         // Condition-grouped regular store rows.
         var groups = {};
@@ -129,24 +143,18 @@
             var rows = groups[cond];
             if (!rows) return;
             rows.sort(rowComparator(ctx));
+            best = best || rows[0].price;
             rowsMain += condHeader(card, cond, false);
             rows.forEach(function (r) {
                 rowsMain += sellerRow(r.name, r.price, r.qty);
             });
         });
 
-        var html = '<div class="result-col">' +
-            '<div class="result-col-header">Sellers</div>';
-        if (rowsMain === '') {
-            html += '<div class="no-offers"><i>No offers</i></div>';
-        }
-        html += '<div class="rows-index"></div>' +
-            '<div class="rows-main">' + rowsMain + '</div>' +
-            '</div>';
-        return html;
+        return {html: column('Sellers', rowsMain, '<div class="rows-index"></div>'), any: rowsMain !== '', best: best};
     }
 
-    function buyersColumn(res, ctx) {
+    // buyers is the same for a card's Buyers column.
+    function buyers(res, ctx) {
         var card = res.card;
         var shorts = Object.keys(res.buylist || {}).filter(function (s) {
             return ctx.hiddenVendors.indexOf(s) === -1;
@@ -180,12 +188,14 @@
         });
 
         var rowsMain = indexHtml;
+        var best = 0;
         CONDITIONS.forEach(function (cond) {
             var rows = groups[cond];
             if (!rows) return;
             rows.sort(rowComparator(ctx));
             // Buyers default to highest offer first.
             if (!ctx.byStore) rows.reverse();
+            best = best || rows[0].price;
             rowsMain += condHeader(card, cond, true);
             var ref = refRetail(res, cond);
             rows.forEach(function (r) {
@@ -194,14 +204,7 @@
             });
         });
 
-        var html = '<div class="result-col">' +
-            '<div class="result-col-header">Buyers</div>';
-        if (rowsMain === '') {
-            html += '<div class="no-offers"><i>No offers</i></div>';
-        }
-        html += '<div class="rows-main">' + rowsMain + '</div>' +
-            '</div>';
-        return html;
+        return {html: column('Buyers', rowsMain), any: rowsMain !== '', best: best};
     }
 
     // titleLine mirrors editionTitle (utils.go:170-209) from catalog fields.
@@ -269,8 +272,8 @@
             ' data-set-code="' + escapeHtml(card.set) + '"' +
             ' data-foil="' + (card.f ? 'true' : 'false') + '"' +
             ' data-etched="' + (card.e ? 'true' : 'false') + '">' +
-            sellersColumn(res, ctx) +
-            buyersColumn(res, ctx) +
+            sellers(res, ctx).html +
+            buyers(res, ctx).html +
             '</div>';
     }
 
@@ -289,6 +292,8 @@
 
     root.OfflineRender = {
         render: render,
+        sellers: sellers,
+        buyers: buyers,
         buildHTML: buildHTML,
         noticesHTML: noticesHTML,
         condPrices: condPrices,

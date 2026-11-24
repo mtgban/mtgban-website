@@ -121,3 +121,15 @@ test('a list off screen skips its rows', () => {
     const css = readFileSync(join(import.meta.dir, '..', 'css', 'search-cards-mobile.css'), 'utf8');
     expect(css.match(/\.m-tab-panel > \.result-col \{([^}]*)\}/)[1]).toContain('content-visibility: auto;');
 });
+
+test('back to the top moves the deck upright and the page in landscape', () => {
+    const at = source.indexOf('toTop: function () {');
+    const body = source.slice(source.indexOf('{', at) + 1, source.indexOf('\n        }\n', at));
+    for (const matches of [true, false]) {
+        const deck = { scrollTop: 900 };
+        const scrolls = [];
+        new Function('portrait', 'deck', 'window', body)({ matches }, deck, { scrollTo: (x, y) => scrolls.push([x, y]) });
+        expect(deck.scrollTop).toBe(matches ? 0 : 900);
+        expect(scrolls).toEqual(matches ? [] : [[0, 0]]);
+    }
+});

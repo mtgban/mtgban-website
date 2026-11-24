@@ -37,17 +37,18 @@ function makeEl(attrs = {}) {
 // and the query. Each query answers with the rows queries[q] names.
 function loadPage(file, { search = '', pathname = '/offline', ids = [], pills = [], navLinks = [], cookies = {}, queries = {}, broken = false, gates = {}, states = [], stored = { offline_live_search: 'false' } } = {}) {
     const els = Object.fromEntries(ids.map((id) => [id, makeEl()]));
+    if (els['m-offline-parts']) els['m-offline-parts'].content = { querySelectorAll: () => [] };
     const docListeners = {};
     const winListeners = {};
     const location = { search, pathname };
     const hold = { draw: null, fail: false, views: [], full: [] };
-    const log = { namesRead: [], pushed: [], replaced: [], parsed: [], drafts: [], executed: [], rendered: [], sorted: [], mounted: null, errors: [], art: [], scrolls: [], dictReads: 0 };
+    const log = { namesRead: [], pushed: [], replaced: [], parsed: [], drafts: [], executed: [], rendered: [], sorted: [], mounted: null, mounts: [], refreshed: 0, errors: [], art: [], scrolls: [], dictReads: 0 };
     const timers = new Map();
     let nextTimer = 0;
 
     const document = {
         getElementById: (id) => els[id] || null,
-        querySelectorAll: (sel) => (sel === '.search-sort-pill' ? pills : sel === '.offline-mode-btn' ? navLinks : []),
+        querySelectorAll: (sel) => (sel === '[data-sort]' ? pills : sel === '.offline-mode-btn' ? navLinks : []),
         addEventListener: (type, fn) => { docListeners[type] = fn; },
     };
     const window = {
@@ -110,8 +111,10 @@ function loadPage(file, { search = '', pathname = '/offline', ids = [], pills = 
         },
         sortResults: (results, mode, reverse) => log.sorted.push({ mode, reverse, n: results.length }),
     };
-    const OfflineSearch = { mount: (opts) => { log.mounted = opts; } };
+    const OfflineSearch = { mount: (opts) => { log.mounted = log.mounted || opts; log.mounts.push(opts); } };
     const render = (el, page, ctx) => { log.rendered.push({ page, ctx }); el.innerHTML = 'drawn ' + page.results.length; };
+    const OfflineRenderShared = { noticesHTML: (exec) => exec.unsupported.join() };
+    const SearchCards = { refresh: () => { log.refreshed++; }, toTop: () => log.scrolls.push(['to', 0]) };
     const self = {};
     const consoleStub = { error: (...args) => log.errors.push(args) };
     const setTimeout = (fn) => { timers.set(++nextTimer, fn); return nextTimer; };
@@ -119,10 +122,10 @@ function loadPage(file, { search = '', pathname = '/offline', ids = [], pills = 
     const getComputedStyle = () => ({ top: '77px' });
     const names = ['self', 'document', 'window', 'location', 'history', 'console', 'getCookie', 'setCardArtSource', 'localStorage',
         'setTimeout', 'clearTimeout', 'getComputedStyle',
-        'OfflineDB', 'OfflineUtil', 'OfflineQuery', 'OfflineSearch', 'OfflineRender', 'OfflineRenderMobile'];
+        'OfflineDB', 'OfflineUtil', 'OfflineQuery', 'OfflineSearch', 'OfflineRender', 'OfflineRenderMobile', 'OfflineRenderShared', 'SearchCards'];
     const args = [self, document, window, location, history, consoleStub, (name) => cookies[name] || '',
         (el, url) => log.art.push(url), localStorage, setTimeout, clearTimeout, getComputedStyle,
-        OfflineDB, OfflineUtil, OfflineQuery, OfflineSearch, { render }, { render }];
+        OfflineDB, OfflineUtil, OfflineQuery, OfflineSearch, { render }, { render }, OfflineRenderShared, SearchCards];
     for (const src of [read('offline-live.js'), read('offline-page.js'), read(file)]) new Function(...names, src)(...args);
 
     return {
@@ -152,7 +155,8 @@ function loadPage(file, { search = '', pathname = '/offline', ids = [], pills = 
 }
 
 const DESKTOP = ['nav-searchbox', 'nav-searchform', 'offline-results', 'offline-count', 'cardImage', 'cardImageWrapper'];
-const MOBILE = ['navsearchbox', 'navsearchform', 'm-offline-results', 'offline-pill-singles', 'offline-pill-sealed'];
+const MOBILE = ['searchbox', 'searchform', 'navsearchbox', 'navsearchform', 'm-offline-results', 'm-offline-notices',
+    'm-offline-count', 'm-offline-end', 'm-offline-parts', 'offline-pill-singles', 'offline-pill-sealed'];
 
 async function started(file, opts) {
     const page = loadPage(file, opts);
@@ -163,7 +167,7 @@ async function started(file, opts) {
 
 for (const [file, ids, box, results] of [
     ['offline-page-desktop.js', DESKTOP, 'nav-searchbox', 'offline-results'],
-    ['offline-page-mobile.js', MOBILE, 'navsearchbox', 'm-offline-results'],
+    ['offline-page-mobile.js', MOBILE, 'searchbox', 'm-offline-results'],
 ]) {
     const row = (uuid) => ({ uuid });
 
@@ -494,6 +498,46 @@ test('the sidebar image follows a hover only where the pointer moved', async () 
     expect(page.log.art).toEqual(['/api/offline/images/b.webp']);
 });
 
+test('mobile puts each answer on the deck, its size in the count and at the end', async () => {
+    const queries = { sol: rows(1), x: rows(150) };
+    const page = await started('offline-page-mobile.js', { ids: MOBILE, search: '?q=sol', queries });
+    expect(page.log.refreshed).toBe(1);
+    expect(page.els['m-offline-count'].textContent).toBe('1 result');
+    expect(page.els['m-offline-end'].textContent).toBe('End of results');
+    page.log.mounted.onSubmit('x');
+    await page.settle();
+    expect(page.log.refreshed).toBe(2);
+    expect(page.els['m-offline-count'].textContent).toBe('150 results (100 shown)');
+    expect(page.els['m-offline-end'].textContent).toBe('The first 100 of 150 results');
+    page.log.mounted.onSubmit('');
+    expect(page.els['m-offline-count'].textContent).toBe('');
+    expect(page.els['m-offline-end'].textContent).toBe('');
+});
+
+test('mobile starts a new sort from the first card', async () => {
+    const pill = makeEl({ 'data-sort': 'retail' });
+    const page = await started('offline-page-mobile.js', { ids: MOBILE, pills: [pill], search: '?q=x', queries: { x: rows(3) } });
+    expect(page.log.scrolls).toEqual([]);
+    pill.fire('click');
+    await page.settle();
+    expect(page.log.sorted.at(-1)).toMatchObject({ mode: 'retail' });
+    expect(page.log.scrolls).toEqual([['to', 0]]);
+});
+
+// The box at the foot and the navbar's on a landscape phone are one search.
+test('both mobile boxes search, and each shows what the other was given', async () => {
+    const page = await started('offline-page-mobile.js', { ids: MOBILE, ...LIVE, search: '?q=sol', queries: { sol: rows(1), bolt: rows(2) } });
+    expect(page.els.searchbox.value).toBe('sol');
+    expect(page.els.navsearchbox.value).toBe('sol');
+    expect(page.log.mounts.map((m) => m.input)).toEqual([page.els.searchbox, page.els.navsearchbox]);
+    page.log.mounts[1].onType('bolt');
+    await page.settle();
+    expect(page.els.searchbox.value).toBe('bolt');
+    page.log.mounts[0].onSubmit('sol');
+    await page.settle();
+    expect(page.els.navsearchbox.value).toBe('sol');
+});
+
 test('mobile mode pills carry the query and mark the mode', async () => {
     const page = await started('offline-page-mobile.js', { ids: MOBILE, search: '?sealed=1' });
     const singles = page.els['offline-pill-singles'];
@@ -539,7 +583,7 @@ const rows = (n) => Array.from({ length: n }, (_, i) => ({ uuid: 'r' + i }));
 
 for (const [file, ids, box, results] of [
     ['offline-page-desktop.js', DESKTOP, 'nav-searchbox', 'offline-results'],
-    ['offline-page-mobile.js', MOBILE, 'navsearchbox', 'm-offline-results'],
+    ['offline-page-mobile.js', MOBILE, 'searchbox', 'm-offline-results'],
 ]) {
     const liveStart = (opts) => started(file, { ids, ...LIVE, ...opts });
 
@@ -999,11 +1043,11 @@ test('Enter closes the keyboard on a phone, and only with the setting on', async
     const live = await started('offline-page-mobile.js', { ids: MOBILE, ...LIVE, queries: { sol: rows(1) } });
     live.type('sol');
     live.log.mounted.onSubmit('sol');
-    expect(live.els.navsearchbox.attrs.blurred).toBe(true);
+    expect(live.els.searchbox.attrs.blurred).toBe(true);
 
     const off = await started('offline-page-mobile.js', { ids: MOBILE });
     off.log.mounted.onSubmit('sol');
-    expect(off.els.navsearchbox.attrs.blurred).toBeUndefined();
+    expect(off.els.searchbox.attrs.blurred).toBeUndefined();
 
     const desktop = await started('offline-page-desktop.js', { ids: DESKTOP, ...LIVE, queries: { sol: rows(1) } });
     desktop.type('sol');
