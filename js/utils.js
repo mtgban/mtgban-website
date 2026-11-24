@@ -53,3 +53,26 @@ function sameSiteURL(value) {
     if (new URL(href).origin !== window.location.origin) return '';
     return href;
 }
+
+/* Fits a box's open suggestions to the part of the screen the keyboard
+ * leaves.
+ */
+function fitSuggestions(input, list) {
+    var vv = window.visualViewport;
+    var inputRect = input.getBoundingClientRect();
+    var bottom = vv ? vv.height : window.innerHeight;
+    var available = Math.max(120, bottom - inputRect.bottom - 8);
+    // A box at the bottom of the screen opens its list upwards, at most
+    // up to the phone's navbar, or to the screen's top where the keyboard
+    // scrolled the navbar away. iOS counts that scroll in offsetTop too,
+    // and measures elements from the screen's top.
+    var listBottom = list.getBoundingClientRect().bottom;
+    if (listBottom <= inputRect.top + 1) {
+        var nav = document.querySelector('.m-nav');
+        var screenTop = vv ? Math.max(0, vv.offsetTop - window.scrollY) : 0;
+        var top = Math.max(screenTop, nav ? nav.getBoundingClientRect().bottom : 0);
+        available = Math.max(120, listBottom - top);
+    }
+    list.style.maxHeight = available + 'px';
+    list.style.overflowY = 'auto';
+}
