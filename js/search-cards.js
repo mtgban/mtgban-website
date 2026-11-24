@@ -344,7 +344,7 @@
         var btn = e.target.closest('[data-pane]');
         if (!btn || !deck.contains(btn)) return;
         var card = btn.closest('.m-card');
-        var pane = btn.getAttribute('data-pane').split('-')[0];
+        var pane = btn.getAttribute('data-pane');
         if (paneAt(card) === pane) return;
         tapped.add(card);
         show(card, pane, true);

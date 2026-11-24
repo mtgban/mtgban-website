@@ -150,9 +150,9 @@ func TestMobileSalesList(t *testing.T) {
 		if !strings.Contains(out, `<div class="sales-pane" data-card="c" data-pending>`) {
 			t.Errorf("mode %s, sealed %v: the Sales list has no pane to fill", c.mode, c.sealed)
 		}
-		first := `data-pane="buyers-c"`
+		first := `class="m-edge m-edge-buy" data-pane="buyers"`
 		if c.mode == "sales" {
-			first = `data-pane="sales-c"`
+			first = `class="m-edge m-edge-buy" data-pane="sales"`
 		}
 		if !strings.Contains(out, first) {
 			t.Errorf("mode %s, sealed %v: no edge button with %s", c.mode, c.sealed, first)

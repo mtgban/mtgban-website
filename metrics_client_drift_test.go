@@ -80,8 +80,9 @@ var trackValueAllowlist = []string{
 	`templates/upload.html: ui.cart: data-track-scope="{{$cart.Prefix}}">?</a><a class="opt-bt`,
 	`templates/arbit.html: ui.cart: data-track-scope="{{$buyCart.Prefix}}">?</a><a class="arb`,
 	`templates/arbit.html: ui.cart: data-track-scope="{{$sellCart.Prefix}}">?</a><a class="ar`,
-	// ui.cards.pane: . is a pane's name, a literal each call of the m-pane-head template passes, each a registered value.
-	`templates/mobile/search.html: ui.cards.pane: data-track-value="{{.}}" data-track-scope="arrow"><i data`,
+	// ui.cards.pane: . and .Pane are a pane's name, a literal each call of the m-pane-head and m-edge-buy templates passes, each a registered value.
+	`templates/partials/card-panes.html: ui.cards.pane: data-track-value="{{.}}" data-track-scope="arrow">{{templ`,
+	`templates/partials/card-panes.html: ui.cards.pane: data-track-value="{{.Pane}}" data-track-scope="tap"><span`,
 	// ui.screener.sort: .Field is a literal each call of the screener-sort template passes (current, prior, pct, abs), each a registered value (tests/metrics-sleepers-screener.test.js).
 	`templates/screener.html: ui.screener.sort: data-track-value="{{.Field}}" data-track-scope="desc">&#9`,
 	`templates/screener.html: ui.screener.sort: data-track-value="{{.Field}}" data-track-scope="asc">&#96`,
