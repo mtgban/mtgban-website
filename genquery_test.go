@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/matcher"
@@ -90,6 +91,30 @@ func TestTheRebuiltQueryKeepsTheMarksTheNumberCarries(t *testing.T) {
 		if co.Number != tagged.Number {
 			t.Errorf("%q also found %s, whose number is %q not %q",
 				query, co.Name, co.Number, tagged.Number)
+		}
+	}
+}
+
+// A two-sided token the matcher derives is in no name or number index, so
+// the query rebuilt for it has to be one that reaches it all the same.
+func TestTheRebuiltQueryFindsADerivedTokenPair(t *testing.T) {
+	skipWithoutDatastore(t)
+
+	// Beast // Plant, the two-sided token of New Capenna Commander.
+	const pair = "1966c5c9-23ef-51e0-88f8-6cfd4debced0_tp_43e94a5c-c16a-5d17-beaa-6c037102b652"
+	for _, uuid := range []string{pair, pair + "_f"} {
+		co, err := backend().GetUUID(uuid)
+		if err != nil {
+			t.Errorf("%s is not in this datastore: %s", uuid, err)
+			continue
+		}
+		found, err := searchAndFilter(currentDatastore(), currentPrices(), parseSearchOptionsWrapper(genQuery(co)))
+		if err != nil {
+			t.Errorf("%q found nothing: %s", genQuery(co), err)
+			continue
+		}
+		if !slices.Equal(found, []string{uuid}) {
+			t.Errorf("%q found %v, want %s alone", genQuery(co), found, uuid)
 		}
 	}
 }

@@ -1213,6 +1213,11 @@ func quoteIfFilter(name string) string {
 }
 
 func genQuery(co *matcher.CardObject) string {
+	// A two-sided token the matcher derives from two tokens is in no name
+	// or number index, so its id is the one query that reaches it.
+	if co.Identifiers["derivedTokenPair"] == "true" {
+		return co.UUID
+	}
 	query := quoteIfFilter(co.Name)
 	if !co.Sealed {
 		// cns: compares the number as printed, which is what co.Number is.
