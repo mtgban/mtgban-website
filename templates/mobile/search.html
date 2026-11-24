@@ -727,7 +727,7 @@
 {{define "m-search-end"}}
     {{/* A page with no pager is zero of zero */}}
     {{if eq .CurrentIndex .TotalIndex}}
-    <p class="m-end-line">End of results{{if not .CurrentIndex}} &middot; {{len .AllKeys}} shown{{end}}</p>
+    <p class="m-end-line">End of results</p>
     {{end}}
 
     {{/* Pagination */}}

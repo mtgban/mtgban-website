@@ -157,17 +157,17 @@ func TestMobileSealedLandingBarAtFoot(t *testing.T) {
 }
 
 // The drawer under the last card says where the results end: on an only
-// page, with the count, and on the last of several, beside the pager.
+// page, and on the last of several, beside the pager.
 func TestMobileEndDrawer(t *testing.T) {
-	const line = `<p class="m-end-line">End of results`
+	const line = `<p class="m-end-line">End of results</p>`
 	for _, c := range []struct {
 		at    Pagination
 		end   string
 		pager bool
 	}{
-		{Pagination{}, line + ` &middot; 2 shown</p>`, false},
+		{Pagination{}, line, false},
 		{Pagination{CurrentIndex: 1, TotalIndex: 3, NextIndex: 2}, "", true},
-		{Pagination{CurrentIndex: 3, TotalIndex: 3, PrevIndex: 2}, line + `</p>`, true},
+		{Pagination{CurrentIndex: 3, TotalIndex: 3, PrevIndex: 2}, line, true},
 	} {
 		vars := sealedPageVars("a", "b")
 		vars.Pagination = c.at
