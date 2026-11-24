@@ -3,7 +3,7 @@
 // keeps the search from zooming, puts cards back on their picture after a
 // rotation, returns to the card the reader left, opens a list from its edge
 // button, slides the search bar away while a list is in, jumps to a card
-// from the scrubber, fetches the sales when a card first shows them, and
+// from the scrubber, fetches the sales as a card first heads their way, and
 // counts the lists read.
 (function () {
     'use strict';
@@ -50,7 +50,7 @@
         return out;
     }
 
-    // The first time any card shows its sales, every card's are fetched.
+    // The first time any card heads its sales' way, every card's are fetched.
     function showSales(pane) {
         if (pane === 'sales' && window.SearchBuyers) SearchBuyers.show(document, window.fetch.bind(window));
     }
@@ -168,6 +168,21 @@
         turns.set(card, turn);
         page.classList.toggle('m-list-open', hidden);
         if (hidden) pager(false);
+    }
+
+    // A card STEP pixels off its picture, on the side its sales are, asks for
+    // them, so they are in when a swipe past the buyers gets there. It asks
+    // again only once it has been back on the picture, or every scroll would
+    // resend a fetch that failed.
+    var heading = new WeakSet();
+    function approach(card) {
+        var list = panes(card);
+        if (list.indexOf('sales') < 0) return;
+        var off = card.scrollLeft - list.indexOf('picture') * card.clientWidth;
+        if (off <= 1) heading.delete(card);
+        if (off <= STEP || heading.has(card)) return;
+        heading.add(card);
+        showSales('sales');
     }
 
     // A card the deck lands on sets the bar by where it rests.
@@ -319,6 +334,7 @@
         if (el === deck) place();
         if (window.closeActionsMenus) window.closeActionsMenus();
         if (el !== deck && el === cards()[current()]) tuck(el);
+        if (el !== deck) approach(el);
         clearTimeout(timers.get(el));
         timers.set(el, setTimeout(function () { settled(el); }, 150));
     }, { capture: true, passive: true });
