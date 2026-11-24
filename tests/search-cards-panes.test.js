@@ -85,3 +85,8 @@ test('landscape pairs sellers with buyers, and leaves the sales out', () => {
     for (const sel of forced) expect(sel).toEndWith('> .m-tab-panel:not([id^="sales"])');
     expect(read('search-cards-mobile.css')).toMatch(/\.m-layout-cards \.m-tab-panel\[id\^="sales"\] \{\n\s+display: none;/);
 });
+
+test('a list off screen skips its rows', () => {
+    const css = readFileSync(join(import.meta.dir, '..', 'css', 'search-cards-mobile.css'), 'utf8');
+    expect(css.match(/\.m-tab-panel > \.result-col \{([^}]*)\}/)[1]).toContain('content-visibility: auto;');
+});
