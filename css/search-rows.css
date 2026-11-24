@@ -138,13 +138,21 @@
 }
 
 /* The Buyers column's Buylist and Sales modes (templates/partials/sales-pane.html) */
+/* The title centred like the Sellers one, with the switch at the right. */
 .buyers-col > .result-col-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
 }
+.buyers-col > .result-col-header::before {
+    content: "";
+}
+/* Taller than the title, so its margins keep it from growing the header:
+   both columns' rows start on one line. */
 .buyers-switch {
+    justify-self: end;
+    margin-block: -3px;
     display: inline-flex;
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
     border-radius: 6px;
