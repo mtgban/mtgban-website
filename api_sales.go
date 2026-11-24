@@ -16,10 +16,11 @@ import (
 // search page's worth.
 const salesPaneMaxIDs = 100
 
-// SalesPaneAPI draws the Buyers column's Sales pane for each card id in the
-// path, comma-separated, from the recent orders in memory: the page's
-// first switch to Sales fetches them in one request. The answer maps each id
-// to its pane's markup, the same table on a phone's Cards as on desktop.
+// SalesPaneAPI draws the Sales pane (third column, or the Buyers column's
+// switch where there is no room) for each card id in the path,
+// comma-separated, from the recent orders in memory: the page fetches them in
+// one request. The answer maps each id to its pane's markup, the same table on
+// a phone's Cards as on desktop.
 func (s *site) SalesPaneAPI(w http.ResponseWriter, r *http.Request) {
 	if !canSeeSales(verifiedSignature(r)) {
 		errorResponse(w, http.StatusForbidden, "no access to recent sales")

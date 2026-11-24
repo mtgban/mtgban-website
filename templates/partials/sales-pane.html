@@ -1,7 +1,7 @@
-{{/* The Buyers column's Sales mode (docs/adr/0009-recent-tcgplayer-sales.md):
+{{/* The recent sales (docs/adr/0009-recent-tcgplayer-sales.md):
      each grade's newest orders, its average in the header. The fold comes
      before the rest, so a reader goes on to them, and is drawn after them.
-     Search draws it in place, and /data/sales/ for the first switch. */}}
+     /data/sales/ draws it. */}}
 {{define "buyers-switch"}}<span class="buyers-switch" role="group" aria-label="Buyers column shows">
 <button type="button" class="buyers-switch-btn{{if ne . "sales"}} on{{end}}" aria-pressed="{{if ne . "sales"}}true{{else}}false{{end}}" data-buyers-set="buylist" data-track="ui.search.buyers_mode" data-track-value="buylist">Buylist</button><button type="button" class="buyers-switch-btn{{if eq . "sales"}} on{{end}}" aria-pressed="{{if eq . "sales"}}true{{else}}false{{end}}" data-buyers-set="sales" data-track="ui.search.buyers_mode" data-track-value="sales">Sales</button>
 </span>{{end}}
@@ -12,7 +12,7 @@
 
 {{define "sales-pane"}}
 {{range $group := .}}
-<div class="price-cond-header sales-cond-header"><span>Condition: {{.Grade}}</span><span class="sales-avg">avg <b>$ {{.Avg}}</b></span></div>
+<div class="price-cond-header sales-cond-header"><span>{{if ne .Grade "Unopened"}}Condition: {{end}}{{.Grade}}</span><span class="sales-avg">avg <b>$ {{.Avg}}</b></span></div>
 <div class="sales-rows">
 {{range .Shown}}{{template "sales-row" dict "Line" . "Link" $group.Link}}{{end}}
 {{with .More}}<details class="sales-more"><summary><span class="sales-more-open">{{len .}} more (show)</span><span class="sales-more-close">Hide</span></summary></details>

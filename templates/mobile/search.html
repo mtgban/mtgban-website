@@ -772,7 +772,7 @@
 {{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}" defer></script>{{end}}
 <script type="text/javascript" src="/js/search-track.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/search-velocity.js?hash={{.Hash}}" defer></script>
-{{if .CanSales}}<script type="text/javascript" src="/js/search-buyers.js?hash={{.Hash}}" defer></script>{{end}}
+{{if .HasSales}}<script type="text/javascript" src="/js/search-buyers.js?hash={{.Hash}}" defer></script>{{end}}
 {{if not .DisableChart}}
 <script type="text/javascript" src="/js/mobile-chart.js?hash={{.Hash}}" defer></script>
 {{end}}

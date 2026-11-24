@@ -1,7 +1,8 @@
-// The Buyers column's switch between the buylist and the recent sales
-// (docs/adr/0009-recent-tcgplayer-sales.md). A switch sets every card on the
-// page and is remembered in SearchBuyersMode. The search draws no sales, so
-// the page fetches every card's pane at once when Sales is first on show.
+// The recent sales (docs/adr/0009-recent-tcgplayer-sales.md), in a column of
+// their own or, where it has no room, in the Buyers column's place by its
+// switch. A switch sets every card on the page and is remembered in
+// SearchBuyersMode. The search draws no sales, so the page fetches every
+// card's pane at once when one is first on show.
 (function () {
     var MODES = ['buylist', 'sales'];
     // The panes still to draw: never fetched, or a fetch that failed.
@@ -85,10 +86,20 @@
         return mode === 'sales' ? load(root, fetchFn) : Promise.resolve();
     }
 
-    // start fills the panes of a page that opens in Sales.
+    // start fills the panes once a sales column is on show within a screen of
+    // the reader, as the page opens, scrolls or grows to fit it. A fetch that
+    // failed is asked again as the next column comes up, the switch being
+    // hidden beside three.
     function start(root, fetchFn) {
-        if (!root.querySelector('[data-buyers-mode="sales"]')) return Promise.resolve();
-        return load(root, fetchFn);
+        var panes = root.querySelectorAll('.sales-col .sales-pane[data-pending]');
+        if (!panes.length) return;
+        var observer = new IntersectionObserver(function (entries) {
+            if (!entries.some(function (e) { return e.isIntersecting; })) return;
+            load(root, fetchFn).then(function () {
+                if (!pendingIDs(root).length) observer.disconnect();
+            });
+        }, { rootMargin: '100% 0px' });
+        panes.forEach(function (pane) { observer.observe(pane); });
     }
 
     function onClick(e) {

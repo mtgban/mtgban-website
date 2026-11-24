@@ -4,15 +4,21 @@ import { readFileSync } from 'fs';
 const source = readFileSync(new URL('../js/search-buyers.js', import.meta.url), 'utf8');
 
 // load runs the script over stubs, returning what it exports, its click
-// listener and the cookies it set.
+// listener, the cookies it set and the observers it made.
 function load() {
     const listeners = [];
     const cookies = [];
     const document = { addEventListener: (type, fn) => listeners.push({ type, fn }) };
     const self = {};
     const setCookie = (...a) => cookies.push(a);
-    new Function('document', 'self', 'setCookie', source)(document, self, setCookie);
-    return { api: self.SearchBuyers, listeners, cookies };
+    const observers = [];
+    class IntersectionObserver {
+        constructor(fn) { this.fn = fn; this.seen = []; this.off = false; observers.push(this); }
+        observe(el) { this.seen.push(el); }
+        disconnect() { this.off = true; }
+    }
+    new Function('document', 'self', 'setCookie', 'IntersectionObserver', source)(document, self, setCookie, IntersectionObserver);
+    return { api: self.SearchBuyers, listeners, cookies, observers };
 }
 
 // el is an element stub with attributes, classes and markup.
@@ -36,10 +42,10 @@ function page(panes) {
     const buttons = [el({ 'data-buyers-set': 'buylist' }, ['on']), el({ 'data-buyers-set': 'sales' })];
     return {
         cols, buttons, panes,
-        querySelector: (sel) => (sel === '[data-buyers-mode="sales"]' ? cols.find((c) => c.attrs['data-buyers-mode'] === 'sales') || null : null),
         querySelectorAll: (sel) => {
             if (sel === '[data-buyers-mode]') return cols;
             if (sel === '[data-buyers-set]') return buttons;
+            if (sel === '.sales-col .sales-pane[data-pending]') return panes.filter((p) => 'data-pending' in p.attrs);
             if (sel === '.sales-pane[data-pending], .sales-pane[data-failed]') {
                 return panes.filter((p) => 'data-pending' in p.attrs || 'data-failed' in p.attrs);
             }
@@ -47,6 +53,9 @@ function page(panes) {
         },
     };
 }
+
+// settle lets every promise already on its way finish.
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 const pending = (id) => el({ 'data-card': id, 'data-pending': '' });
 
@@ -133,20 +142,49 @@ test('a click on a switch button chooses its mode', () => {
     listeners[0].fn({ target, preventDefault: () => { throw new Error('prevented'); } });
 });
 
-test('a page that opens in Sales fills its panes, one in Buylist waits', async () => {
-    const { api } = load();
+test('a sales column fetches every pane once one is on show', async () => {
+    const { api, observers } = load();
     const asked = [];
     const fetchFn = (url) => {
         asked.push(url);
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ a: '<i>A</i>' }) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ a: '<i>A</i>', b: '<i>B</i>' }) });
     };
-    const buylist = page([pending('a')]);
-    await api.start(buylist, fetchFn);
-    expect(asked).toEqual([]);
+    const root = page([pending('a'), pending('b')]);
+    api.start(root, fetchFn);
+    expect(observers[0].seen).toEqual(root.panes);
 
-    const sales = page([pending('a')]);
-    sales.cols[0].attrs['data-buyers-mode'] = 'sales';
-    await api.start(sales, fetchFn);
-    expect(asked).toEqual(['/data/sales/a']);
-    expect(sales.panes[0].innerHTML).toBe('<i>A</i>');
+    // Hidden, as in a column with no room in Buylist.
+    observers[0].fn([{ isIntersecting: false }]);
+    expect(asked).toEqual([]);
+    expect(observers[0].off).toBe(false);
+
+    observers[0].fn([{ isIntersecting: false }, { isIntersecting: true }]);
+    await settle();
+    expect(asked).toEqual(['/data/sales/a,b']);
+    expect(observers[0].off).toBe(true);
+});
+
+test('a sales column whose fetch failed asks again as the next comes up', async () => {
+    const { api, observers } = load();
+    const root = page([pending('a')]);
+    const answers = [{ ok: false, status: 503 }, { ok: true, json: () => Promise.resolve({ a: '<i>A</i>' }) }];
+    let asked = 0;
+    api.start(root, () => Promise.resolve(answers[asked++]));
+
+    observers[0].fn([{ isIntersecting: true }]);
+    await settle();
+    expect('data-failed' in root.panes[0].attrs).toBe(true);
+    expect(observers[0].off).toBe(false);
+
+    observers[0].fn([{ isIntersecting: true }]);
+    await settle();
+    expect(asked).toBe(2);
+    expect(root.panes[0].innerHTML).toBe('<i>A</i>');
+    expect(observers[0].off).toBe(true);
+});
+
+test('a page with no sales column observes nothing', () => {
+    const { api, observers } = load();
+    api.start(page([]), () => { throw new Error('fetched'); });
+    expect(observers).toHaveLength(0);
 });

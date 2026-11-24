@@ -92,8 +92,8 @@ func TestSearchSalesIsAnACLProperty(t *testing.T) {
 }
 
 // A page shows no trace of the sales to a reader without SearchSales, whatever
-// the mode cookie says, on desktop or phone.
-func TestSearchHidesSalesWithoutFlag(t *testing.T) {
+// the mode cookie says, on desktop or phone, nor where no card has any.
+func TestSearchHidesSales(t *testing.T) {
 	skipWithoutDatastore(t)
 	readyToRender(t)
 	signingEnabled(t, true)
@@ -128,6 +128,19 @@ func TestSearchHidesSalesWithoutFlag(t *testing.T) {
 			if !granted && strings.Contains(body, "data-buyers-") {
 				t.Errorf("agent %q: the switch shows without the flag", agent)
 			}
+		}
+	}
+
+	// No card on the page has an order: no column and no switch.
+	recentSalesStore.Publish(&salesvelocity.RecentSnapshot{})
+	r := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape("id:"+bolt), nil)
+	fields := url.Values{"UserEmail": {"reader@example.com"}, "SearchSales": {"true"}}
+	r.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: signedAs(t, fields, time.Now().Add(time.Hour))})
+	rec := httptest.NewRecorder()
+	testSite.Search(rec, r)
+	for _, mark := range []string{"with-sales", "sales-pane", "data-buyers-", "search-buyers.js"} {
+		if strings.Contains(rec.Body.String(), mark) {
+			t.Errorf("a page with no sales has %q", mark)
 		}
 	}
 }
@@ -313,7 +326,7 @@ func TestSealedSearchShowsSales(t *testing.T) {
 	t.Cleanup(func() { recentSalesStore.Publish(saved) })
 
 	for agent, want := range map[string][]string{
-		"": {`class="result-col buyers-col" data-buyers-mode="sales"`, `class="sales-pane" data-card="` + box + `" data-pending`},
+		"": {`class="result-body with-sales`, `class="result-col buyers-col" data-buyers-mode="sales"`, `class="result-col sales-col" data-buyers-mode="sales"`, `class="sales-pane" data-card="` + box + `" data-pending`},
 		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148": {`class="m-edge m-edge-buy" data-pane="sales"`, `id="sales-` + box + `" role="region"`, `class="sales-pane" data-card="` + box + `" data-pending`},
 	} {
 		r := httptest.NewRequest(http.MethodGet, "/sealed?q="+url.QueryEscape("id:"+box), nil)

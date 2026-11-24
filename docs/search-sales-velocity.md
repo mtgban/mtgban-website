@@ -307,8 +307,8 @@ neither check catches.
 
 ## Recent orders
 
-Each card's newest TCGplayer orders per grade, for the Buyers column's Sales
-mode, load beside the velocity from the newspaper's
+Each card's newest TCGplayer orders per grade, for search's Sales
+column, load beside the velocity from the newspaper's
 `tcgplayerrecentsalemodel`. The `Recent sales` job runs every three hours
 and reads only the orders stamped since its last load, and every order of
 the game once a day. The pull writes them once a day, over a few hours, so most

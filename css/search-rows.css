@@ -175,7 +175,8 @@
 }
 .buyers-col[data-buyers-mode="sales"] > .rows-main,
 .buyers-col[data-buyers-mode="sales"] > .no-offers,
-.buyers-col[data-buyers-mode="buylist"] > .sales-pane {
+.sales-col[data-buyers-mode="buylist"],
+.sales-col > .result-col-header {
     display: none;
 }
 .sales-cond-header {
@@ -194,6 +195,7 @@
     color: var(--search-text-dim);
 }
 .sales-avg {
+    white-space: nowrap;
     font-style: normal;
     font-variant-numeric: tabular-nums;
 }
@@ -660,5 +662,73 @@ html.admin-fix-mode .raw-record { display: inline-block; }
     .rows-main > .price-row {
         height: auto;
         min-height: var(--price-row-h, 42px);
+    }
+}
+
+/* The sales, below the Buyers header where the page stacks its columns. */
+.with-sales > .result-col.sales-col { border-top: 0; }
+@media (min-width: 901px) {
+    /* Two columns: the sales take the Buyers column's place, the Sellers
+       running beside both. */
+    @container search-results (560px < width < 800px) {
+        .with-sales:has(> [data-buyers-mode="sales"]) { grid-template-rows: auto 1fr; }
+        .with-sales:has(> [data-buyers-mode="sales"]) > .result-col:first-child { grid-row: 1 / span 2; }
+        .with-sales > .sales-col { grid-column: 2; }
+    }
+    /* Three columns, each with its own header and no switch. */
+    @container search-results (width >= 800px) {
+        .with-sales { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 200px; }
+        .with-sales > .sales-col { display: flex; }
+        .with-sales > .sales-col > .result-col-header { display: block; }
+        .with-sales .buyers-switch { display: none; }
+        .with-sales > .buyers-col > .rows-main { display: grid; }
+        .with-sales > .buyers-col > .no-offers { display: block; }
+        .sales-col .sales-src-name,
+        .sales-col .sales-qty { display: none; }
+        .sales-col .sales-src { flex: none; }
+        .sales-col .sales-cond-header,
+        .sales-col .price-row.sales-row,
+        .sales-col .sales-more > summary { padding-inline: 10px; }
+    }
+    @container search-results (width >= 1100px) {
+        .with-sales { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 230px; }
+    }
+    /* Three columns and little room: the rows close up by the tight band's
+       rules, a buyer's ratio under its price. */
+    @container search-results (800px <= width <= 960px) {
+        .with-sales .rows-main,
+        .with-sales .rows-index { grid-template-columns: 1fr auto; }
+        .with-sales .rows-main .price-right {
+            grid-column: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: center;
+            line-height: 1.1;
+        }
+        .with-sales .rows-main .price-right > .secondary,
+        .with-sales .rows-main .price-right > .buylist-extra,
+        .with-sales .rows-main .price-right > .qty {
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+        .with-sales .rows-main .has-buylist-extra > .qty { display: none; }
+        .with-sales .price-row .store-cell .bundle-icon { display: block; }
+        .with-sales .price-right .bundle-icon { display: none; }
+        .with-sales .rows-index .price-row > .index-label-2,
+        .with-sales .rows-index .price-row > .index-label-3 { display: none; }
+        .with-sales .rows-index > .price-row { row-gap: 0; line-height: 1.1; }
+        .with-sales .rows-index .price-right.index-cols { display: contents; }
+        .with-sales .rows-index .price-row > .store-name { grid-row: 1; }
+        .with-sales .rows-index .index-cols > .price:first-child { grid-column: 2; grid-row: 1; }
+        .with-sales .rows-index .index-cols > .price:nth-child(2) { grid-column: 1; grid-row: 2; }
+        .with-sales .rows-index .index-cols > .price:nth-child(3) { grid-column: 2; grid-row: 2; }
+        .with-sales .rows-index .index-cols > .price:nth-child(n+2) {
+            grid-template-columns: auto auto auto;
+            font-size: 0.75em;
+            opacity: 0.75;
+        }
+        .with-sales .rows-index:has(.index-label) .index-cols > .price:nth-child(2)::before { content: "Sim"; }
+        .with-sales .rows-index:has(.index-label) .index-cols > .price:nth-child(3)::before { content: "±"; }
     }
 }
