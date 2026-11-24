@@ -895,17 +895,17 @@ func TestSearchAPIReadsANumberAfterAName(t *testing.T) {
 	}
 }
 
-// A condition filter narrows an index the API grades, as it does a store;
+// A condition filter narrows an index the API files by condition, as it does a store;
 // any other index carries no condition to filter.
-func TestConditionFilterNarrowsAGradedIndex(t *testing.T) {
+func TestConditionFilterNarrowsAnIndexByCondition(t *testing.T) {
 	withConfigCopy(t)
-	Config().Stores.APIOnlyStores = []string{"GRADED"}
+	Config().Stores.APIOnlyStores = []string{"BYCOND"}
 	config := parseSearchOptionsWrapper("Forest cond:SP")
 	if len(config.EntryFilters) == 0 {
 		t.Fatal("cond:SP parsed to no entry filter")
 	}
 	entry := mtgban.InventoryEntry{Conditions: "NM", Price: 1}
-	for shorthand, want := range map[string]bool{"GRADED": false, "PLAIN": true} {
+	for shorthand, want := range map[string]bool{"BYCOND": false, "PLAIN": true} {
 		info := mtgban.ScraperInfo{Shorthand: shorthand, MetadataOnly: true}
 		if got := sellerEntryFound(currentPrices(), info, "id", entry, &config); got != want {
 			t.Errorf("an NM entry of index %s under cond:SP: found = %v, want %v", shorthand, got, want)

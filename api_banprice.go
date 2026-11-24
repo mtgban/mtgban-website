@@ -640,7 +640,7 @@ func apiSearchConfig(b *matcher.Backend, uuids, enabledStores []string, filterBy
 // row seen per store is the record's best entry and keys the base price; a
 // zero base price drops the store; each grade keeps its best price and its
 // total copies, through setGrade like the entry loop. INDEX rows are
-// graded by the condition their entry carries.
+// filed by the condition their entry carries.
 func banPricesFromRows(b *matcher.Backend, p *prices, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
 	// Rows carry neither MetadataOnly (the vendor qty rule needs it: sealed
 	// metadata vendors keep their grade bucket, so INDEX membership is not
@@ -821,7 +821,7 @@ func getSellerPrices(b *matcher.Backend, p *prices, mode string, enabledStores [
 		// Needs to be explicitly requested, all the index prices are skipped,
 		// and of course any seller without quantity information
 		shouldQty := qty && !seller.Info().MetadataOnly && !seller.Info().NoQuantityInventory
-		shouldBaseCond := gradedStore(seller.Info()) && !seller.Info().SealedMode
+		shouldBaseCond := pricesByCondition(seller.Info()) && !seller.Info().SealedMode
 
 		rule := EntryRule{
 			Finish: finishFilter,
@@ -1075,7 +1075,7 @@ func getVendorPrices(b *matcher.Backend, p *prices, mode string, enabledStores [
 
 		// Loop through cards
 		shouldQty := qty && (!vendor.Info().MetadataOnly || vendor.Info().QuantityPriority)
-		shouldBaseCond := gradedStore(vendor.Info()) && !vendor.Info().SealedMode
+		shouldBaseCond := pricesByCondition(vendor.Info()) && !vendor.Info().SealedMode
 
 		rule := EntryRule{
 			Finish: finishFilter,
