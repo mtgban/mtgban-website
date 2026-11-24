@@ -121,14 +121,21 @@ What exists:
      product page in that condition and printing), the date
      (white, centred: `2026-11-19`, the minute in its tooltip), and the
      price per copy with the quantity
-     beside it above one copy.
-   - A condition with more than 5 folds the rest under "N more". Shipping
+     beside it above one copy. Rows are half the height of a buyer's (21px),
+     since a card can have 25 on show.
+   - A condition with more than 5 folds the rest under "N more (show)", which
+     becomes a "Hide" drawn after the last of them. In the page the fold
+     comes first, so a keyboard or screen reader goes on from it to the
+     orders it opened. Shipping
      is not shown. A card with no order on record says so.
    - Sales mode leaves out the buylist's index rows and ignores its
      condition filters.
    - Phones have no switch: a card with orders has a Sales list of its
      own, the same table, after its buyers or before them where the
-     reader's mode is Sales (ADR-0010).
+     reader's mode is Sales (ADR-0010). It lays the orders out two to a line
+     to keep the list short: each is the source's icon (the link), the full
+     date and the price, with no quantity. The fold takes the empty place
+     beside the fifth. A list under 360px wide goes back to one a line.
 8. **Every logged-in reader sees Sales**, any tier: a reader with a
    verified signature. A logged-out reader gets the switch too, and Sales
    shows a Join / Log in prompt in place of the orders. The velocity row
