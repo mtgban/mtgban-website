@@ -268,7 +268,7 @@ test('jump counts with no value', () => {
 
 // An element of an arbit section: its classes, and the section and thead it sits in.
 function inSection(classes, { store = 'CK', section = true, thead = false, type = '' } = {}) {
-    const sec = { getAttribute: (k) => (k === 'data-store' ? store : null) };
+    const sec = { getAttribute: (k) => (k === 'data-store' ? store : null), querySelectorAll: () => [] };
     const el = {
         type,
         classList: { contains: (c) => classes.includes(c) },
