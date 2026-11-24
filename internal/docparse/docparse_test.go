@@ -455,3 +455,29 @@ func TestParseRowOneFieldRowLeavesTheHeaderAlone(t *testing.T) {
 		t.Errorf("name after a one-field row = %q, want Lightning Bolt", res.Card.Name)
 	}
 }
+
+func TestListKey(t *testing.T) {
+	list := func(change func(e *Entry)) []Entry {
+		e := Entry{CardID: "a", OriginalCondition: "NM", Quantity: 2, OriginalPrice: 1.5}
+		change(&e)
+		return []Entry{e, {CardID: "b"}}
+	}
+	same := func(*Entry) {}
+	key := ListKey(true, list(same))
+	if again := ListKey(true, list(same)); again != key {
+		t.Errorf("the same list is keyed %s, then %s", key, again)
+	}
+	if ListKey(false, list(same)) == key {
+		t.Error("the other mode has the same key")
+	}
+	for name, change := range map[string]func(e *Entry){
+		"card":      func(e *Entry) { e.CardID = "c" },
+		"condition": func(e *Entry) { e.OriginalCondition = "SP" },
+		"quantity":  func(e *Entry) { e.Quantity = 1 },
+		"price":     func(e *Entry) { e.OriginalPrice = 2 },
+	} {
+		if ListKey(true, list(change)) == key {
+			t.Errorf("another %s has the same key", name)
+		}
+	}
+}

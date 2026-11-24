@@ -6,6 +6,8 @@ package docparse
 
 import (
 	"errors"
+	"fmt"
+	"hash/fnv"
 	"sort"
 	"strconv"
 	"strings"
@@ -230,6 +232,19 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 	}
 
 	return uploadedDataClean
+}
+
+// ListKey names a list by its mode and rows, the same each time the same list
+// is posted.
+func ListKey(buylist bool, entries []Entry) string {
+	h := fnv.New64a()
+	fmt.Fprintf(h, "%t\n", buylist)
+	for i := range entries {
+		e := &entries[i]
+		fmt.Fprintf(h, "%q %q %q %q %d %g %q %t %q\n", e.CardID, e.Card.Name, e.OriginalCondition, e.IgnoredCondition,
+			e.Quantity, e.OriginalPrice, e.Notes, e.Unpacked, e.UnpackedFrom)
+	}
+	return strconv.FormatUint(h.Sum64(), 16)
 }
 
 // isCardmarketIDHeader reports whether a lowercased header names a Cardmarket

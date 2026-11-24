@@ -539,6 +539,10 @@ type UploadVars struct {
 	// list was unpacked
 	UnpackedSections []UnpackedSection
 
+	// ListKey names the list, for the page to tell a refresh of it from
+	// another list where the browser does not.
+	ListKey string
+
 	// SharePreview is a share link's unfurl, set on the page refusing a
 	// reader with no signature, which is what a link unfurler is.
 	SharePreview *embed.SharePreview
@@ -864,6 +868,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	fillUploadKeys(&pageVars.UploadVars, blMode, selected, ids, prices, indexes)
 
 	fillUploadEntries(&pageVars.UploadVars, r, b, in, uploadName, uploadedData)
+	pageVars.ListKey = docparse.ListKey(blMode, uploadedData)
 
 	pageVars.Metadata = uploadMetadata(b, p, st, uploadedData)
 	pageVars.Metadata.fillSales(salesVelocityStore.Snapshot())

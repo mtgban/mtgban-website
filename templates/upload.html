@@ -337,6 +337,8 @@
                             // goes with the server's default options.
                             if (window.syncUploadOptionsFromSettings) syncUploadOptionsFromSettings();
                             if (field === 'upload' && window.showUploadProcessing) showUploadProcessing();
+                            // Sent from the form, the same list is a new one
+                            try { sessionStorage.removeItem('uploadList'); } catch (e) {}
                             form.submit();
                         }
                     </script>
@@ -853,12 +855,17 @@
          different question - what to buy and where - so a standing preference
          for it does not carry to a view that exists to be read. A reload still
          keeps whichever view was open, including the optimizer if it was picked
-         by hand: that is an answer to what the reader just did, not a setting. */}}
+         by hand: that is an answer to what the reader just did, not a setting.
+
+         Safari reports the refresh of a posted page as a plain navigation, so
+         the page being the list the tab already showed is a reload too, unless
+         the upload form just sent it (submitForm). */}}
     <script>
     (function () {
         var nav = performance.getEntriesByType('navigation')[0];
-        var isReload = (nav && nav.type !== 'navigate') || sessionStorage.getItem('uploadReload') === '1';
+        var isReload = (nav && nav.type !== 'navigate') || sessionStorage.getItem('uploadReload') === '1' || sessionStorage.getItem('uploadList') === {{.ListKey}};
         sessionStorage.removeItem('uploadReload');
+        sessionStorage.setItem('uploadList', {{.ListKey}});
         window.BAN_UPLOAD_RELOAD = isReload;
         var opts = (getCookie('UploadOptimizerOpts') || '').split(',');
         var view = isReload ? sessionStorage.getItem('uploadResView') : {{if .UnpackedSections}}'results'{{else}}opts.indexOf('noresults') >= 0 ? 'optimizer' : 'results'{{end}};

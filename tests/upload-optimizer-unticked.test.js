@@ -101,3 +101,36 @@ test('a new list starts ticked and forgets the old one', () => {
     expect(ck.dispatched).toEqual([]);
     expect('uploadOptUnticked' in store).toBe(false);
 });
+
+// The start view's script as templates/upload.html writes it, run for a page
+// showing the list key after the tab stored stored.
+function startView(key, navType, stored) {
+    const store = { ...stored };
+    const sessionStorage = {
+        getItem: (k) => (k in store ? store[k] : null),
+        setItem: (k, v) => { store[k] = v; },
+        removeItem: (k) => { delete store[k]; },
+    };
+    const from = template.indexOf("var nav = performance.getEntriesByType('navigation')[0];");
+    const script = template.slice(from, template.indexOf('var opts =', from)).replaceAll('{{.ListKey}}', JSON.stringify(key));
+    const window = {};
+    const performance = { getEntriesByType: () => [{ type: navType }] };
+    new Function('window', 'performance', 'sessionStorage', script)(window, performance, sessionStorage);
+    return { reload: window.BAN_UPLOAD_RELOAD, store };
+}
+
+test('a page is a reload when the browser says so, the page asked for it, or the list is the same', () => {
+    expect(startView('k', 'navigate', {}).reload).toBe(false);
+    expect(startView('k', 'navigate', { uploadList: 'other' }).reload).toBe(false);
+    expect(startView('k', 'reload', {}).reload).toBe(true);
+    expect(startView('k', 'navigate', { uploadReload: '1', uploadList: 'other' }).reload).toBe(true);
+    // Safari's refresh of a posted page
+    expect(startView('k', 'navigate', startView('k', 'navigate', {}).store).reload).toBe(true);
+});
+
+test('the upload form sends a new list, even the same one again', () => {
+    const submit = template.slice(template.indexOf('function submitForm('));
+    const cleared = submit.indexOf("sessionStorage.removeItem('uploadList')");
+    expect(cleared).toBeGreaterThan(0);
+    expect(cleared).toBeLessThan(submit.indexOf('form.submit();'));
+});
