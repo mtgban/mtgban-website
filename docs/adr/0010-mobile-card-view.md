@@ -71,7 +71,9 @@ What the phone page already has, and this decision builds on:
    TCGplayer orders on record has its recent sales one swipe past the
    buyers, the desktop's Sales table (ADR-0009), or one swipe before them
    where the reader's Buyers column opens on Sales, as it does by default
-   on Pokemon; the sales are fetched the first time any card shows them.
+   on Pokemon; the sales are fetched the first time any card is swiped
+   24 px off its picture towards them, a list early where the buyers come
+   first, so they are there when a swipe lands on them.
    A card with only one side has two panes. A list shows every condition
    group with its heading, is headed with its name under the card's
    header, centred between arrows to the list or picture on either side,
@@ -106,7 +108,7 @@ What the phone page already has, and this decision builds on:
    the search bar down or up by the way the card in view is moving, a
    class it sets when that changes; move the deck to the card the
    scrubber points at, and its thumb to the card in view; fetch the sales
-   when a card first shows them; close the ⋮ menu when the deck scrolls.
+   as a card first heads their way; close the ⋮ menu when the deck scrolls.
    The one gesture it reads is the pager's: a vertical swipe of 40 px on
    the last card raises the drawer and a swipe down lowers it, since the
    deck has no slide past that card to snap to; while it is up the deck

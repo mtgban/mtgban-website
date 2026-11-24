@@ -74,6 +74,37 @@ test('the search bar comes up onto the picture and goes down leaving it', () => 
     expect(swipe(false, 390, 470)).toBe(true);
 });
 
+// approach is run over a swipe's positions, as tuck is above; what it asks
+// for is counted.
+const approachSource = source.slice(source.indexOf('    var heading = new WeakSet();'), source.indexOf('    // A card the deck lands on'));
+function asks(of, ...stops) {
+    const asked = [];
+    const el = { ...of, clientWidth: 390, scrollLeft: stops[0] };
+    const approach = new Function('panes', 'STEP', 'showSales', approachSource + '\nreturn approach;')(panes, 24, (pane) => asked.push(pane));
+    for (let s = 1; s < stops.length; s++) {
+        for (let i = 0; i <= 10; i++) {
+            el.scrollLeft = stops[s - 1] + (stops[s] - stops[s - 1]) * i / 10;
+            approach(el);
+        }
+    }
+    return asked;
+}
+
+test('the sales are asked for as a swipe leaves the picture their way', () => {
+    expect(asks(card(true, ['buyers', 'sales']), 390, 430)).toEqual(['sales']);
+    expect(asks(card(true, ['buyers', 'sales']), 390, 780, 1170, 780)).toEqual(['sales']);
+    expect(asks(card(true, ['buyers', 'sales']), 390, 780, 390, 780)).toEqual(['sales', 'sales']);
+    expect(asks(card(true, ['buyers', 'sales']), 390, 415, 413, 416, 410, 440)).toEqual(['sales']);
+    expect(asks(card(true, ['sales', 'buyers']), 390, 430)).toEqual(['sales']);
+    expect(asks(card(false, ['buyers', 'sales']), 0, 40)).toEqual(['sales']);
+    expect(asks(card(false, ['sales', 'buyers']), 0, 40)).toEqual(['sales']);
+});
+
+test('no other swipe asks for the sales', () => {
+    expect(asks(card(true, ['buyers', 'sales']), 390, 0, 390, 410, 390)).toEqual([]);
+    expect(asks(card(true, ['buyers']), 390, 780)).toEqual([]);
+});
+
 test('landscape pairs sellers with buyers, and leaves the sales out', () => {
     const read = (f) => readFileSync(join(import.meta.dir, '..', 'css', f), 'utf8');
     for (const css of [read('search-mobile.css'), read('search-cards-mobile.css').split('@media (orientation: portrait)')[0]]) {
