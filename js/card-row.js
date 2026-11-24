@@ -1,6 +1,5 @@
 // Reads a search result row into the object favorites and the backpack store:
-// the card identity from the header data attributes and, when the
-// row panels are open, its best prices.
+// the card identity, from the header data attributes.
 window.CardRow = (function () {
     "use strict";
 
@@ -33,42 +32,6 @@ window.CardRow = (function () {
         var isEtched = finishClass === 'etched';
         var hasContentWarning = row.getAttribute('data-has-warning') === 'true';
 
-        // Locate the surrounding card container to find best-price rows.
-        // Mobile: .m-card. Desktop: each card's results sit between .result-header rows; the .result-body follows.
-        var cardContainer = row.closest('.m-card') || row.parentNode;
-
-        var sellPrice = null;
-        var sellVendor = '';
-        var sellersPanel = cardContainer.querySelector('[id^="sellers-"]');
-        if (sellersPanel) {
-            var bestSell = sellersPanel.querySelector('.m-best-price');
-            if (bestSell) {
-                var sp = bestSell.querySelector('.m-vendor-price');
-                if (sp) {
-                    var psp = parseFloat(sp.textContent.trim().replace('$', '').trim());
-                    if (!isNaN(psp)) sellPrice = psp;
-                }
-                var sn = bestSell.querySelector('.m-vendor-name');
-                if (sn) sellVendor = sn.textContent.replace('Best', '').trim();
-            }
-        }
-
-        var buyPrice = null;
-        var buyVendor = '';
-        var buyersPanel = cardContainer.querySelector('[id^="buyers-"]');
-        if (buyersPanel) {
-            var bestBuy = buyersPanel.querySelector('.m-best-price');
-            if (bestBuy) {
-                var bp = bestBuy.querySelector('.m-vendor-price');
-                if (bp) {
-                    var pbp = parseFloat(bp.textContent.trim().replace('$', '').trim());
-                    if (!isNaN(pbp)) buyPrice = pbp;
-                }
-                var bn = bestBuy.querySelector('.m-vendor-name');
-                if (bn) buyVendor = bn.textContent.replace('Best', '').trim();
-            }
-        }
-
         var query = queryName(name);
         if (setCode) query += ' s:' + setCode;
         if (number) query += ' cns:' + number;
@@ -86,10 +49,6 @@ window.CardRow = (function () {
             finishTag: finishTag,
             finishClass: finishClass,
             treatments: treatments,
-            sellPrice: sellPrice,
-            sellVendor: sellVendor,
-            buyPrice: buyPrice,
-            buyVendor: buyVendor,
             query: query,
             t: Date.now(),
             img: imageUrl,
