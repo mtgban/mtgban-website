@@ -5,9 +5,26 @@ globalThis.self = globalThis.self || globalThis;
 // utils.js is a plain script the page loads, so its helpers are globals.
 (0, eval)(readFileSync(new URL('../../js/utils.js', import.meta.url), 'utf8'));
 await import('../../js/offline/offline-render-shared.js');
+await import('../../js/offline/offline-render.js');
 await import('../../js/offline/offline-render-mobile.js');
 
-const R = globalThis.OfflineRenderMobile;
+// What templates/mobile/offline.html's m-offline-parts holds, in short.
+const PARTS = {
+    'edge-sellers': '<button class="m-edge m-edge-sell"><span class="m-edge-price">{price}</span></button>',
+    'edge-buyers': '<button class="m-edge m-edge-buy"><span class="m-edge-price">{price}</span></button>',
+    'head-sellers': '<div class="m-pane-head">Sellers</div>',
+    'head-buyers': '<div class="m-pane-head">Buyers</div>',
+    back: '/img/backs/magic.webp',
+};
+const R = { buildHTML: (results, ctx) => globalThis.OfflineRenderMobile.buildHTML(results, ctx, PARTS) };
+
+// One of the card's lists: from its panel's id to the next one's.
+function list(html, name) {
+    const from = html.indexOf('id="' + name + '-');
+    if (from < 0) return '';
+    const next = html.indexOf('class="m-tab-panel', from);
+    return html.slice(from, next < 0 ? undefined : next);
+}
 
 const CTX = {
     sets: {
@@ -54,6 +71,8 @@ test('header data attributes', () => {
     expect(html).toContain('data-image-url="/api/offline/images/img-key-1.webp"');
     expect(html).toContain('data-set-code="NEO"');
     expect(html).toContain('data-card-name="Boseiju, Who Endures"');
+    // The scrubber names the card by its set and number
+    expect(html).toContain('data-number="177"');
 });
 
 test('keyrune icon when set.k present', () => {
@@ -93,110 +112,79 @@ test('no finish badge on regular card', () => {
     expect(html).not.toContain('class="m-badge etched"');
 });
 
-test('condition pills present and NM first and active', () => {
+test('each list is the desktop page\'s column, under its heading', () => {
     const html = R.buildHTML([result()], CTX);
-    expect(html).toContain('class="m-cond-pills"');
-    expect(html).toContain('class="m-cond-pill active" data-cond="NM"');
-    expect(html).toContain('class="m-cond-pill" data-cond="SP"');
-    // NM before SP
-    expect(html.indexOf('data-cond="NM"')).toBeLessThan(html.indexOf('data-cond="SP"'));
+    expect(list(html, 'sellers')).toContain(PARTS['head-sellers'] + globalThis.OfflineRender.sellers(result(), CTX).html);
+    expect(list(html, 'buyers')).toContain(PARTS['head-buyers'] + globalThis.OfflineRender.buyers(result(), CTX).html);
 });
 
-test('no condition pills for sealed product', () => {
-    const r = result({
-        uuid: 'uuid-box',
-        card: {uuid: 'uuid-box', n: 'Box', num: '', r: '', set: 'NEO', f: false, e: false, s: true},
-        retail: {CK: {sealed: 99}},
-        buylist: {CK: {sealed: 70}},
-    });
-    const html = R.buildHTML([r], CTX);
-    expect(html).not.toContain('class="m-cond-pills"');
-});
-
-test('sellers and buyers tabs with correct data-target ids', () => {
+test('the sellers come before the buyers, as search-cards.js and landscape read them', () => {
     const html = R.buildHTML([result()], CTX);
-    expect(html).toContain('data-target="sellers-uuid-1"');
-    expect(html).toContain('data-target="buyers-uuid-1"');
-    expect(html).toContain('class="m-tab active"');
-});
-
-test('sellers panel id and active class', () => {
-    const html = R.buildHTML([result()], CTX);
-    expect(html).toContain('id="sellers-uuid-1"');
     expect(html).toContain('<div class="m-tab-panel active" id="sellers-uuid-1"');
+    expect(html).toContain('<div class="m-tab-panel active" id="buyers-uuid-1"');
+    expect(html.indexOf('id="sellers-')).toBeLessThan(html.indexOf('id="buyers-'));
 });
 
-test('buyers panel id present', () => {
-    const html = R.buildHTML([result()], CTX);
-    expect(html).toContain('id="buyers-uuid-1"');
-});
-
-test('first seller row in NM group has m-best-price and m-best-badge', () => {
-    const html = R.buildHTML([result()], CTX);
-    expect(html).toContain('m-best-price');
-    expect(html).toContain('<span class="m-best-badge">Best</span>');
-});
-
-test('seller NM rows show price and qty', () => {
-    const html = R.buildHTML([result()], CTX);
-    expect(html).toContain('$ 30.00');
-    expect(html).toContain('class="m-vendor-qty">4');
-});
-
-test('SYP index buyer row shows hash qty not dollar price', () => {
-    const ctx = Object.assign({}, CTX, {
-        stores: Object.assign({}, CTX.stores, {SYP: {n: 'TCGplayer SYP', i: true}}),
-    });
+test('the edge buttons carry the best price of the best condition', () => {
     const r = result();
-    r.buylist = {SYP: {qty: 48, regular: 1.79}};
-    const html = R.buildHTML([r], ctx);
-    expect(html).toContain('# 48');
-    expect(html).not.toContain('$ 1.79');
+    r.retail.ABU = {regular: 12, conditions: {SP: 12}};
+    const html = R.buildHTML([r], CTX);
+    expect(html).toContain('m-edge-sell"><span class="m-edge-price">$ 30.00</span>');
+    expect(html).toContain('m-edge-buy"><span class="m-edge-price">$ 20.00</span>');
 });
 
-test('buyer NM row has ratio title attribute', () => {
-    const html = R.buildHTML([result()], CTX);
-    // ref = min(CK 30, TCGLow 27.5, TCGMarket 29.1) = 27.5; 20/27.5*100 = 72.73
-    expect(html).toContain('title="Ratio: 72.73%"');
+test('a side with only reference prices has an edge button without a price', () => {
+    const html = R.buildHTML([result({retail: {TCGLow: {regular: 1.5}}, buylist: {}})], CTX);
+    expect(html).toContain('m-edge-sell"></button>');
+    expect(html).not.toContain('{price}');
 });
 
-test('buyer ratio absent for SP rows', () => {
-    const html = R.buildHTML([result()], CTX);
-    const buyersHtml = html.slice(html.indexOf('id="buyers-uuid-1"'));
-    const spGroup = buyersHtml.slice(buyersHtml.indexOf('data-cond="SP"'));
-    expect(spGroup).not.toContain('title="Ratio:');
+test('a side with nothing has no edge button and no list', () => {
+    const html = R.buildHTML([result({buylist: {}})], CTX);
+    expect(html).toContain('m-edge-sell');
+    expect(html).not.toContain('m-edge-buy');
+    expect(list(html, 'buyers')).toBe('');
+    expect(html).not.toContain('No offers');
+});
+
+test('a card with no offers says so once', () => {
+    const html = R.buildHTML([result({retail: {}, buylist: {}})], CTX);
+    expect(html.match(/No offers/g)).toHaveLength(1);
+    expect(html).not.toContain('m-edge');
+});
+
+test('the name searches for it, staying in sealed for a product', () => {
+    expect(R.buildHTML([result()], CTX)).toContain('href="?q=%22Boseiju%2C%20Who%20Endures%22"');
+    const box = result({card: {uuid: 'b', n: 'Box', num: '', r: '', set: 'NEO', f: false, e: false, s: true}});
+    expect(R.buildHTML([box], CTX)).toContain('href="?sealed=1&amp;q=%22Box%22"');
 });
 
 test('hidden sellers filtered from sellers panel', () => {
     const ctx = Object.assign({}, CTX, {hiddenSellers: ['CK']});
     const html = R.buildHTML([result()], ctx);
-    const sellersHtml = html.slice(html.indexOf('id="sellers-'), html.indexOf('id="buyers-'));
-    expect(sellersHtml).not.toContain('Card Kingdom');
+    expect(list(html, 'sellers')).toContain('TCG (Low / Market)');
+    expect(list(html, 'sellers')).not.toContain('Card Kingdom');
 });
 
 test('hidden vendors filtered from buyers panel', () => {
     const ctx = Object.assign({}, CTX, {hiddenVendors: ['CK']});
-    const html = R.buildHTML([result()], ctx);
-    const buyersHtml = html.slice(html.indexOf('id="buyers-'));
-    expect(buyersHtml).not.toContain('Card Kingdom');
+    const r = result();
+    r.buylist.ABU = {regular: 15, conditions: {NM: 15}};
+    const html = R.buildHTML([r], ctx);
+    expect(list(html, 'buyers')).toContain('ABU Games');
+    expect(list(html, 'buyers')).not.toContain('Card Kingdom');
 });
 
-test('no-offers row when both sides empty', () => {
-    const r = result({retail: {}, buylist: {}});
-    const html = R.buildHTML([r], CTX);
-    expect(html.match(/No offers/g).length).toBeGreaterThanOrEqual(2);
-});
-
-test('landscape image stub present', () => {
-    const html = R.buildHTML([result()], CTX);
-    expect(html).toContain('class="m-card-img-landscape"');
+test('the first pictures load eagerly, the rest as they come near', () => {
+    const html = R.buildHTML([result(), result(), result()], CTX);
     expect(html).toContain('src="/api/offline/images/img-key-1.webp"');
+    expect(html.match(/loading="(eager|lazy)"/g)).toEqual(['loading="eager"', 'loading="eager"', 'loading="lazy"']);
 });
 
-test('landscape image omitted when card has no image key', () => {
-    const r = result({i: undefined});
-    const html = R.buildHTML([r], CTX);
-    expect(html).not.toContain('m-card-img-landscape');
+test('a card the sync holds no picture for shows the card back', () => {
+    const html = R.buildHTML([result({i: undefined})], CTX);
+    expect(html).toContain('class="m-card-img-landscape"');
+    expect(html).toContain('src="/img/backs/magic.webp"');
 });
 
 test('header data-image-url empty when card has no image key', () => {
@@ -221,32 +209,7 @@ test('foil card uses foil price from entry.foil', () => {
         buylist: {},
     });
     const html = R.buildHTML([r], CTX);
-    expect(html).toContain('$ 60.00');
-});
-
-test('INDEX group appears before condition groups in sellers panel', () => {
-    const html = R.buildHTML([result()], CTX);
-    const sellersHtml = html.slice(html.indexOf('id="sellers-'), html.indexOf('id="buyers-'));
-    const idxPos = sellersHtml.indexOf('data-cond="INDEX"');
-    const nmPos = sellersHtml.indexOf('data-cond="NM"');
-    expect(idxPos).toBeGreaterThan(-1);
-    expect(idxPos).toBeLessThan(nmPos);
-});
-
-test('notices: unsupported operator escaped', () => {
-    const html = R.noticesHTML({results: [], unsupported: ['date>2020'], truncated: false});
-    expect(html).toContain('offline-notice-warn');
-    expect(html).toContain('date&gt;2020');
-});
-
-test('notices: empty results shows offline-empty', () => {
-    const html = R.noticesHTML({results: [], unsupported: [], truncated: false});
-    expect(html).toContain('offline-empty');
-});
-
-test('notices: truncated shows truncation notice', () => {
-    const html = R.noticesHTML({results: [result()], unsupported: [], truncated: true});
-    expect(html).toContain('truncated');
+    expect(html).toContain('<span class="amt">60.00</span>');
 });
 
 test('country flag appended to store name', () => {
@@ -256,29 +219,6 @@ test('country flag appended to store name', () => {
     r.buylist.ABU = {regular: 15, conditions: {NM: 15}};
     const html = R.buildHTML([r], ctx);
     expect(html).toContain('ABU Games \u{1F1EF}\u{1F1F5}');
-});
-
-test('keyruneClasses mirrors keyruneForCardSet rarity/foil mapping', () => {
-    expect(R.keyruneClasses({r: 'mythic', f: false, e: false})).toBe(' ss-mythic');
-    expect(R.keyruneClasses({r: 'common', f: false, e: false})).toBe('');
-    expect(R.keyruneClasses({r: 'rare', f: true, e: false})).toBe(' ss-foil ss-grad');
-    expect(R.keyruneClasses({r: 'rare', f: true, e: false})).not.toContain('ss-rare');
-    expect(R.keyruneClasses({r: 'rare', f: false, e: true})).toBe(' ss-timeshifted');
-    expect(R.keyruneClasses({r: 'token', f: false, e: false})).toBe('');
-});
-
-test('index-only card: INDEX m-cond-group gets active class', () => {
-    const r = {
-        uuid: 'uuid-idx',
-        card: {uuid: 'uuid-idx', n: 'Sol Ring', num: '263', r: 'rare', set: 'NEO', f: false, e: false, s: false},
-        retail: {TCGLow: {regular: 1.50}, TCGMarket: {regular: 1.75}},
-        buylist: {},
-    };
-    const html = R.buildHTML([r], CTX);
-    const sellersStart = html.indexOf('id="sellers-uuid-idx"');
-    const sellersHtml = html.slice(sellersStart, html.indexOf('id="buyers-uuid-idx"'));
-    expect(sellersHtml).toContain('m-cond-group active');
-    expect(sellersHtml).toContain('data-cond="INDEX"');
 });
 
 // A row priceRows left unpriced carries no price objects, and renders as no offers.

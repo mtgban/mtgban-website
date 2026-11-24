@@ -1,13 +1,9 @@
-// The desktop offline page: the result count, the sort pills and the sidebar
-// image, on top of offline-page.js.
+// The desktop offline page: the result count and the sidebar image, on top of offline-page.js.
 (function (root) {
     'use strict';
 
     var PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
-    var sortMode = getCookie('SearchDefaultSort') || 'chrono';
-    var reverse = false;
-    if (sortMode === 'hybrid') sortMode = 'alpha';
     // The result the arrow keys are on, and the first one starts out showing.
     var cursor = 0;
     // The header stuck on top after the last move, -1 until there is one.
@@ -16,13 +12,6 @@
     function paintCount(n, shown) {
         document.getElementById('offline-count').textContent =
             n + ' result' + (n === 1 ? '' : 's') + ' found' + (n > shown ? ' (' + shown + ' shown)' : '');
-    }
-
-    function paintPills() {
-        document.querySelectorAll('.search-sort-pill').forEach(function (b) {
-            b.classList.toggle('active', b.getAttribute('data-sort') === sortMode);
-            b.classList.toggle('reversed', b.getAttribute('data-sort') === sortMode && reverse);
-        });
     }
 
     // The renderers emit exactly one shape, /api/offline/images/<key>.webp for
@@ -49,10 +38,6 @@
             wrapper.setAttribute('data-set', setCode || '');
             wrapper.toggleAttribute('data-sealed', page.sealed());
         }
-    }
-
-    function needsAllPrices() {
-        return sortMode === 'retail' || sortMode === 'buylist';
     }
 
     function showRowImage(row) {
@@ -168,8 +153,7 @@
 
     var page = root.OfflinePage.start({
         surface: 'desktop',
-        boxId: 'nav-searchbox',
-        formId: 'nav-searchform',
+        boxes: [['nav-searchbox', 'nav-searchform']],
         resultsId: 'offline-results',
         queryChanged: paintNavLinks,
         move: moveCursor,
@@ -186,26 +170,10 @@
                 var row = e.target.closest('[data-image-url]');
                 if (row) showRowImage(row);
             });
-
-            document.querySelectorAll('.search-sort-pill').forEach(function (b) {
-                b.addEventListener('click', function () {
-                    var mode = b.getAttribute('data-sort');
-                    reverse = (mode === sortMode) ? !reverse : false;
-                    sortMode = mode;
-                    page.repaint();
-                });
-            });
         },
-        // A price sort needs every row priced, so it waits for the pause.
-        order: function (results, ctx, typing) {
-            if (typing && needsAllPrices()) OfflineQuery.sortResults(results, 'chrono', false, ctx.sets);
-            else OfflineQuery.sortResults(results, sortMode, reverse, ctx.sets);
-        },
-        needsAllPrices: needsAllPrices,
         render: function (el, shown, exec, ctx) {
             OfflineRender.render(el, shown, ctx);
             paintCount(exec.results.length, shown.pageRows);
-            paintPills();
             cursor = 0;
             movedTo = -1;
             var first = el.querySelector('.result-header');

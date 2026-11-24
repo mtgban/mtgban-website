@@ -21,13 +21,14 @@
         return location.pathname === '/sealed' || new URLSearchParams(location.search).get('sealed') === '1';
     }
 
-    // start runs a page. hooks names its surface, boxId, formId and resultsId, and
-    // how it draws: render(el, page, exec, ctx), with order(results, ctx, typing)
-    // first if it sorts. page.typing says an answer is still being typed. Optional
-    // are ready() at page load, cleared() when the box empties, queryChanged(q) when
-    // the query or the singles or sealed mode may have, page load included, move(step)
-    // for an arrow key, recount(total, shown) when only an answer's size changed,
-    // and closeKeyboard to give up the box on Enter.
+    // start runs a page. hooks names its surface, its search boxes (the ids of
+    // each and its form) and resultsId, and how it draws: render(el, page, exec,
+    // ctx). page.typing says an answer is still being typed. Optional are ready()
+    // at page load, cleared() when the box empties, queryChanged(q) when the query
+    // or the singles or sealed mode may have, page load included, move(step) for an
+    // arrow key, recount(total, shown) when only an answer's size changed, toTop()
+    // where the results scroll rather than the page, and closeKeyboard to give up
+    // the box on Enter.
     function start(hooks) {
         var dicts = null;
         var env = null;
@@ -52,6 +53,10 @@
         var shownTop = null;
         // The rows on screen, in order, whether they settled, and their notices.
         var shown = null;
+        var boxes = [];
+        var sortMode = getCookie('SearchDefaultSort') || 'chrono';
+        var reverse = false;
+        if (sortMode === 'hybrid') sortMode = 'alpha';
 
         function countSearch(q) {
             if (!q || q === countedQuery) return;
@@ -77,6 +82,40 @@
 
         function resultsEl() {
             return document.getElementById(hooks.resultsId);
+        }
+
+        // Every box but the one being typed in shows the query too.
+        function fillBoxes(q, typedIn) {
+            boxes.forEach(function (box) {
+                if (box !== typedIn) box.value = q;
+            });
+        }
+
+        function sortPills() {
+            return document.querySelectorAll('[data-sort]');
+        }
+
+        function paintPills() {
+            sortPills().forEach(function (b) {
+                b.classList.toggle('active', b.getAttribute('data-sort') === sortMode);
+                b.classList.toggle('reversed', b.getAttribute('data-sort') === sortMode && reverse);
+            });
+        }
+
+        function needsAllPrices() {
+            return sortMode === 'retail' || sortMode === 'buylist';
+        }
+
+        // A price sort needs every row priced, so it waits for the pause.
+        function order(results, draft) {
+            if (draft && needsAllPrices()) OfflineQuery.sortResults(results, 'chrono', false, ctx.sets);
+            else OfflineQuery.sortResults(results, sortMode, reverse, ctx.sets);
+        }
+
+        // Draw the last answer again, as a new sort asks, which also ends typing.
+        function repaint() {
+            if (typing) settle(lastQuery.trim()).catch(showErrorNotice);
+            else if (exec) redraw().catch(showErrorNotice);
         }
 
         // Compose a shell URL carrying the query and active mode.
@@ -147,9 +186,9 @@
         function view(draft, stale) {
             return {
                 size: draft ? TYPING_ROWS : PAGE_SIZE,
-                order: hooks.order && function (results) { hooks.order(results, ctx, draft); },
+                order: function (results) { order(results, draft); },
                 bestMatch: !draft && live(),
-                allPrices: draft ? null : hooks.needsAllPrices,
+                allPrices: draft ? null : needsAllPrices,
                 stale: stale
             };
         }
@@ -158,7 +197,10 @@
         function followTop(answer) {
             var top = answer.results.length + ':' +
                 answer.results.slice(0, TYPING_ROWS).map(function (row) { return row.uuid; }).join();
-            if (live() && shownTop !== null && top !== shownTop) window.scrollTo(0, 0);
+            if (live() && shownTop !== null && top !== shownTop) {
+                if (hooks.toTop) hooks.toTop();
+                else window.scrollTo(0, 0);
+            }
             shownTop = top;
         }
 
@@ -203,6 +245,7 @@
                 pageRows: Math.min(exec.results.length, PAGE_SIZE)
             });
             hooks.render(resultsEl(), page, exec, ctx);
+            paintPills();
             followTop(exec);
         }
 
@@ -212,7 +255,10 @@
             var complete = await OfflineQuery.showPage(answer, env, view(false));
             if (turn !== latestDraw || answer !== exec) return;
             // A set that could not be opened changes the answer itself
-            if (complete) draw(false);
+            if (complete) {
+                draw(false);
+                call('toTop');
+            }
             else runQuery(lastQuery).catch(showErrorNotice);
         }
 
@@ -305,6 +351,7 @@
 
         function showErrorNotice(err) {
             shown = null;
+            call('cleared');
             resultsEl().innerHTML =
                 '<div class="offline-notice offline-notice-warn">Offline data is not ready. Enable offline mode in Settings and let a sync finish.</div>';
             console.error('offline shell setup failed', err);
@@ -315,8 +362,15 @@
             if (location.pathname !== '/offline' && window.BAN && window.BAN.track) window.BAN.track('ui.offline.failover');
             call('ready');
             queryChanged(urlQuery());
-            var box = document.getElementById(hooks.boxId);
-            var form = document.getElementById(hooks.formId);
+            boxes = hooks.boxes.map(function (ids) { return document.getElementById(ids[0]); }).filter(Boolean);
+            sortPills().forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var mode = b.getAttribute('data-sort');
+                    reverse = (mode === sortMode) ? !reverse : false;
+                    sortMode = mode;
+                    repaint();
+                });
+            });
 
             window.addEventListener('popstate', function () {
                 var q = urlQuery();
@@ -325,7 +379,7 @@
                 sealedMode = sealedURL();
                 queryChanged(q);
                 if (searchDeps) searchDeps.sealed = sealedMode;
-                if (box) box.value = q;
+                fillBoxes(q);
                 runQuery(q).catch(showErrorNotice);
             });
 
@@ -344,12 +398,25 @@
                     sets: dicts.sets,
                     sealed: sealedMode
                 };
+                hooks.boxes.forEach(function (ids) {
+                    mountBox(document.getElementById(ids[0]), document.getElementById(ids[1]));
+                });
+                var q = urlQuery();
+                fillBoxes(q);
+                countSearch(q.trim());
+                return runQuery(q);
+            }).catch(showErrorNotice);
+
+            function mountBox(box, form) {
                 OfflineSearch.mount({
                     input: box,
                     form: form,
                     deps: searchDeps,
                     live: live,
-                    onType: typed,
+                    onType: function (value) {
+                        fillBoxes(value, box);
+                        typed(value);
+                    },
                     onArrow: function (step) {
                         afterTyping(function () {
                             if (hooks.move) hooks.move(step);
@@ -357,6 +424,7 @@
                     },
                     onSubmit: function (q) {
                         if (live() && hooks.closeKeyboard) box.blur();
+                        fillBoxes(q, box);
                         if (typing) {
                             settle(q, true).catch(showErrorNotice);
                             return;
@@ -369,21 +437,12 @@
                         runQuery(q).catch(showErrorNotice);
                     }
                 });
-                var q = urlQuery();
-                if (box) box.value = q;
-                countSearch(q.trim());
-                return runQuery(q);
-            }).catch(showErrorNotice);
+            }
         });
 
         return {
             sealed: function () { return sealedMode; },
-            afterTyping: afterTyping,
-            // Draw the last answer again, as a new sort asks, which also ends typing.
-            repaint: function () {
-                if (typing) settle(lastQuery.trim()).catch(showErrorNotice);
-                else if (exec) redraw().catch(showErrorNotice);
-            }
+            afterTyping: afterTyping
         };
     }
 

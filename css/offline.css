@@ -25,7 +25,8 @@
 }
 
 /* Sort pills show a direction arrow on the active pill: green asc, red desc (rotated). */
-.offline-shell .search-sort-dir {
+.offline-shell .search-sort-dir,
+.m-offline .m-sort-dir {
     display: none;
     align-items: center;
 }
@@ -33,11 +34,13 @@
     width: 14px;
     height: 14px;
 }
-.offline-shell .search-sort-pill.active .search-sort-dir {
+.offline-shell .search-sort-pill.active .search-sort-dir,
+.m-offline .m-sort-pill.active .m-sort-dir {
     display: inline-flex;
     color: #22c55e;
 }
-.offline-shell .search-sort-pill.active.reversed .search-sort-dir {
+.offline-shell .search-sort-pill.active.reversed .search-sort-dir,
+.m-offline .m-sort-pill.active.reversed .m-sort-dir {
     color: #ef4444;
     transform: rotate(180deg);
 }
@@ -135,56 +138,78 @@
     contain-intrinsic-size: auto 2000px;
     overflow: clip;
 }
-.m-offline-results-wrap .m-card {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 530px;
+/* Upright, a phone's deck is as tall as the screen and skips its lists itself */
+@media (orientation: landscape) {
+    .m-offline .m-card {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 530px;
+    }
 }
 
-/* The navbar's box is the only one this page has, so unlike other pages it
-   shows on an upright phone too, taking the place of the wordmark. Its
-   suggestions span the nav and open over the singles and sealed pills. */
-body:has(#m-offline-results) .m-nav {
-    z-index: 102;
+/* One line for the age and the exit, which the picture wants the rest of */
+.m-offline .offline-banner {
+    gap: 0.5em;
+    padding: 0.3em 0.75em;
+    font-size: 0.8em;
 }
-body:has(#m-offline-results) .m-nav-search {
-    display: flex;
-    align-items: center;
-    gap: 0.35em;
+
+.m-offline #offline-banner-age {
+    min-width: 8em;
+}
+
+/* The phone's page is the search's Cards (search-cards-mobile.css), under the
+   banner: the Singles and Sealed pills share the count's row, and what the
+   search could not do shows above the cards. */
+.m-offline .m-result-meta {
+    padding: 0.25em 0.5em;
+}
+
+.m-offline .m-meta-count {
     flex: 1;
-    min-width: 0;
-    margin: 0 0.5em;
 }
-body:has(#m-offline-results) .m-nav-search form {
-    flex: 1;
-    min-width: 0;
-    position: static;
-}
-body:has(#m-offline-results) .m-nav-search .autocomplete-items {
-    left: 0;
-    right: 0;
-    width: auto;
-}
-body:has(#m-offline-results) .m-nav-filter-btn {
+
+.m-offline:not(:has(.m-card)) .m-sort-pills,
+.m-offline:not(:has(.m-card ~ .m-card)) .m-scrub {
     display: none;
 }
-@media (orientation: portrait) {
-    body:has(#m-offline-results) .m-nav-logo-lockup {
-        display: none;
-    }
-}
-/* Landscape hides the bar other pages only keep a search box in, and here it
-   holds the Singles and Sealed pills. */
-@media (orientation: landscape) {
-    .m-search-bar-sticky:has(.m-offline-mode-pills) {
-        display: block !important;
-    }
-    .m-page:has(.m-offline-mode-pills) {
-        padding-top: 52px;
-    }
+
+.m-offline .m-sort-pill {
+    min-height: 0;
+    background: none;
 }
 
-/* Condition label for sealed offline results (mirrors search.html condHeader) */
-.m-page .m-cond-label { padding: 0.3em 0.75em; font-size: 0.8em; color: var(--activetext); }
+.m-offline-mode {
+    display: inline-flex;
+    flex: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.m-offline-mode a {
+    padding: 0.5em;
+    color: var(--greytext);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.m-offline-mode a.active {
+    background: var(--dodgerblue-fill);
+    color: white;
+}
+
+.m-offline .offline-notice,
+.m-offline .offline-empty {
+    margin: 0.5em;
+}
+
+/* Where the search's star and chart are online; it holds the picture's snap
+   before the picture has loaded */
+.m-offline .m-card-tools {
+    min-width: 44px;
+    min-height: 44px;
+}
 
 /* The result the arrow keys are on */
 .offline-shell .result-header.offline-cursor {
