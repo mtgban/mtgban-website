@@ -74,8 +74,9 @@ What the phone page already has, and this decision builds on:
    on Pokemon; the sales are fetched the first time any card shows them.
    A card with only one side has two panes. A list shows every condition
    group with its heading, is headed with its name under the card's
-   header, and scrolls inside its pane when it is taller than the
-   screen. While a list is open, up and down scroll that list and stop at
+   header, centred between arrows to the list or picture on either side,
+   and scrolls inside its pane when it is taller than the screen.
+   While a list is open, up and down scroll that list and stop at
    its ends; moving to another card starts from the picture, and every card
    opens on its picture. A flick moves one card, not several; to go
    further at once, a thin scrubber on the right edge, as long as its cards
@@ -197,10 +198,11 @@ What the phone page already has, and this decision builds on:
   picture, sellers, buyers). The panes carry labels, and the edge buttons
   are the route for assistive technology. Scrolling to a list is instant
   under `prefers-reduced-motion`.
-- `ui.cards.pane` counts the lists a reader opens, by tap or swipe, in
-  place of `ui.row.tab`, `ui.row.condition` and `ui.row.detail`, whose
-  rows are gone; `search.view` keeps only
-  the listing priority and the sealed contents.
+- `ui.cards.pane` counts the lists a reader opens, by tap, swipe or a
+  list heading's arrow, and the arrows back to the picture, in place of
+  `ui.row.tab`, `ui.row.condition` and `ui.row.detail`, whose rows are
+  gone; `search.view` keeps only the listing priority and the sealed
+  contents.
 
 ## Open questions
 

@@ -584,18 +584,21 @@ html:has(.m-landing) {
         display: none;
     }
 
+    /* The list's name centred between the arrows to the panes beside it */
     .m-layout-cards .m-pane-head {
-        display: flex;
+        display: grid;
+        grid-template: 100% / 44px minmax(0, 1fr) 44px;
         flex: none;
         align-items: center;
-        gap: 0.5em;
-        padding: 0.3em 0.75em;
+        height: 30px;
         background: var(--background);
         border-bottom: 1px solid var(--border);
     }
 
     .m-layout-cards .m-pane-side {
-        flex: 1;
+        grid-column: 2;
+        grid-row: 1;
+        text-align: center;
         font-size: 0.7rem;
         font-weight: 700;
         text-transform: uppercase;
@@ -603,8 +606,31 @@ html:has(.m-landing) {
         color: var(--greytext);
     }
 
-    .m-layout-cards .m-tab-panel:not([id^="sellers"]) .m-pane-side {
-        text-align: right;
+    .m-layout-cards .m-pane-head button {
+        grid-row: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        align-self: stretch;
+        /* The row's own height, over main.css's 44px for a page's buttons */
+        min-height: 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: var(--greytext);
+    }
+
+    .m-layout-cards .m-pane-head svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .m-layout-cards .m-pane-prev {
+        grid-column: 1;
+    }
+
+    .m-layout-cards .m-pane-next {
+        grid-column: 3;
     }
 
     /* The edge bar under the picture: sellers at the left, buyers at the
