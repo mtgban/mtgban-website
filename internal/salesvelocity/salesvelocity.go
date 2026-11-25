@@ -570,7 +570,8 @@ func startOfDay(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
-// shortCondition is TCGplayer's grade abbreviated, anything else as sent.
+// shortCondition is TCGplayer's grade abbreviated, "" for a sealed product's
+// Unopened, anything else as sent.
 func shortCondition(condition string) string {
 	switch condition {
 	case "Near Mint":
@@ -583,6 +584,8 @@ func shortCondition(condition string) string {
 		return "HP"
 	case "Damaged":
 		return "DMG"
+	case "Unopened":
+		return ""
 	}
 	return condition
 }

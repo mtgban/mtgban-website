@@ -1,5 +1,6 @@
 {{/* The recent sales (docs/adr/0009-recent-tcgplayer-sales.md):
-     each grade's newest orders, its average in the header. The fold comes
+     each grade's newest orders, its average in the header. A sealed
+     product's header names no condition, since it only sells unopened. The fold comes
      before the rest, so a reader goes on to them, and is drawn after them.
      /data/sales/ draws it. */}}
 {{define "buyers-switch"}}<span class="buyers-switch" role="group" aria-label="Buyers column shows">
@@ -12,7 +13,7 @@
 
 {{define "sales-pane"}}
 {{range $group := .}}
-<div class="price-cond-header sales-cond-header"><span>{{if ne .Grade "Unopened"}}Condition: {{end}}{{.Grade}}</span><span class="sales-avg">avg <b>$ {{.Avg}}</b></span></div>
+<div class="price-cond-header sales-cond-header">{{if ne .Grade "Unopened"}}<span>Condition: {{.Grade}}</span>{{end}}<span class="sales-avg">avg <b>$ {{.Avg}}</b></span></div>
 <div class="sales-rows">
 {{range .Shown}}{{template "sales-row" dict "Line" . "Link" $group.Link}}{{end}}
 {{with .More}}<details class="sales-more"><summary><span class="sales-more-open">{{len .}} more (show)</span><span class="sales-more-close">Hide</span></summary></details>
