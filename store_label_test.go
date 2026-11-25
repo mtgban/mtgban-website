@@ -179,3 +179,36 @@ func TestGradedStoreSharingAName(t *testing.T) {
 		t.Errorf("the name finds %v, %v; want the raw store", inv, err)
 	}
 }
+
+// gradedTwins is a site of a store, the seller of slabs sharing its name and
+// one whose own name says what it sells, each with its price for one card.
+func gradedTwins(t *testing.T) *site {
+	t.Helper()
+	store := func(name, shorthand string, graded bool, price float64) mtgban.Seller {
+		return mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"FIXTUREA-1": {{Conditions: "NM", Price: price, Quantity: 1}}},
+			mtgban.ScraperInfo{Name: name, Shorthand: shorthand, GradedMode: graded})
+	}
+	return fixtureSite(t, fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}}), []mtgban.Seller{
+		store("Same Store", "ZZSLAB", true, 400),
+		store("Same Store", "ZZSAME", false, 100),
+		store("Other Store Graded", "ZZOTHER", true, 300),
+	}, nil)
+}
+
+// Keyed by name, a store and the seller of slabs sharing its name each keep
+// their own price.
+func TestPricesByNameKeepAGradedStoreApart(t *testing.T) {
+	s := gradedTwins(t)
+	stores := []string{"ZZSAME", "ZZSLAB", "ZZOTHER"}
+	for where, hashes := range map[string][]string{"full dump": nil, "by hash": {"FIXTUREA-1"}} {
+		got := getSellerPrices(s.backend(), s.prices(), "", stores, "", hashes, "", false, false, false, "names")["FIXTUREA-1"]
+		for name, want := range map[string]float64{"Same Store": 100, "Same Store (Graded)": 400, "Other Store Graded": 300} {
+			if got[name] == nil || got[name].Regular != want {
+				t.Errorf("%s: %q holds %+v, want %v", where, name, got[name], want)
+			}
+		}
+		if len(got) != 3 {
+			t.Errorf("%s: %d stores, want 3: %v", where, len(got), got)
+		}
+	}
+}

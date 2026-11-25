@@ -974,7 +974,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		sortOfferRows(r, shown.keys, result)
 	}
 
-	preview := searchPreview(r, b, shown.keys, result)
+	preview := searchPreview(r, b, p, shown.keys, result)
 	fillEmbed(&pageVars.SearchVars, pageVars.Metadata, b, p, preview, shown.keys)
 
 	if pageVars.IsGraded {
@@ -1135,7 +1135,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	result.sellers, result.vendors = collectOffers(b, p, page, config, keys)
 	sortOfferRows(page, keys, result)
 
-	payload, err := json.Marshal(searchPreview(page, b, keys, result))
+	payload, err := json.Marshal(searchPreview(page, b, p, keys, result))
 	if err != nil {
 		oembedError(w, http.StatusInternalServerError)
 		return
@@ -1147,13 +1147,13 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 
 // searchPreview is the preview of a search's first cards, with their
 // cheapest offers.
-func searchPreview(r *http.Request, b *matcher.Backend, allKeys []string, result searchResults) *embed.OEmbed {
+func searchPreview(r *http.Request, b *matcher.Backend, p *prices, allKeys []string, result searchResults) *embed.OEmbed {
 	// Every card is quoted with its own index prices: one shared list would
 	// print the first card's numbers under every other card's heading.
 	return embed.Generate(b, externalURL(r), allKeys, func(cardID string) string {
 		return editionTitle(b, cardID)
 	}, func(cardID string) []embed.Entry {
-		return EmbedSellerEntries(result.sellers, cardID, true)
+		return EmbedSellerEntries(p, result.sellers, cardID, true)
 	})
 }
 

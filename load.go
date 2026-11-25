@@ -217,8 +217,13 @@ func (p *prices) scraperName(shorthand string) string {
 // listedName is scraperName where stores are listed side by side: a seller
 // of slabs is marked, since it can share its store's name.
 func (p *prices) listedName(shorthand string) string {
-	name := p.scraperName(shorthand)
 	info, _ := p.scraperInfo(shorthand)
+	return gradedName(info, p.scraperName(shorthand))
+}
+
+// gradedName is a store's name, marked where it sells slabs under a name that
+// does not say so.
+func gradedName(info mtgban.ScraperInfo, name string) string {
 	if info.GradedMode && !strings.HasSuffix(name, "Graded") {
 		return name + " (Graded)"
 	}
