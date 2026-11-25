@@ -18,8 +18,7 @@ import (
 )
 
 // TCGplayer's sellers and copies per grade, from the newspaper's nightly
-// scrape of every listing. They fill the quantity TCGplayer's own row on
-// search leaves empty.
+// scrape of every listing, shown on TCGplayer's own row on search.
 
 // tcgListingsStore is the shorthand of the TCGplayer store the counts go on.
 const tcgListingsStore = "TCGPlayer"

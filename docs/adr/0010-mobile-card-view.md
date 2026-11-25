@@ -1,6 +1,6 @@
 # ADR-0010: Cards, the swipeable search on phones
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-11-22
 **Deciders:** Vittorio Giovara
 **Change:** PR #1538
