@@ -26,7 +26,7 @@ func TestEdgeOffer(t *testing.T) {
 		{"only locked rows", map[mtgban.Condition][]SearchEntry{mtgban.NM: {locked}}, ""},
 	}
 	for _, tc := range tests {
-		got := edgeOffer(tc.found)
+		got := edgeOffer(AllConditions, tc.found)
 		name := ""
 		if got != nil {
 			name = got.ScraperName

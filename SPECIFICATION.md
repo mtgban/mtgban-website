@@ -530,7 +530,7 @@ by `init()` in pages.go): each entry declares its link, name, icon,
 description, handler func, template, `CanPOST`, `AlwaysOnForDev`, optional
 `ShouldHide` (a predicate that drops the entry - and, for a section like
 Newspaper, its subpages with it - when e.g. no data is loaded yet for the
-current game), `SubPages` (e.g. `/sets`, `/sealed` under Search) and
+current game), `SubPages` (e.g. `/sets`, `/sealed`, `/graded` under Search) and
 `SettingsTab` (the settings modal tab the page's gear opens on). Page
 handlers are methods on `*site` (site.go); `NavElem.Handle` is
 `func(*site, http.ResponseWriter, *http.Request)`, filled with method
@@ -695,6 +695,15 @@ override; phone UA detection via `mileusna/useragent`).
   Arbitrage, Reverse and Global show a rate over `0.1/day` as text beside
   the card's name, upload's optimizer in the INFO column, with the row's
   details as its tooltip, for whoever reaches those pages.
+- `/graded` (`search_graded.go`) is the search over the sellers of slabs
+  alone (`SearchConfig.GradedOnly`), shown only where a `GradedMode` seller
+  is loaded. It finds only the cards one offers, and lists each card's offers
+  under their slabs' grades (`groupBySlab`: "PSA 10", "CGC 10 Pristine",
+  a grader's unscored labels, then the other slabs) in place of the
+  conditions. The Buyers column is Last Sold, which shows no buylist and
+  none of the raw copies' sales; nothing records a slab's sales yet, so it
+  is empty. Charts, alerts, exports, the random card and the price, buylist
+  and velocity sorts are all of raw copies, and left off.
 
 ### 5.2 Upload (`upload.go`)
 

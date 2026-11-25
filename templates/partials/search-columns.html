@@ -79,10 +79,10 @@
         {{if not (and (eq $conditions "INDEX") $card.Sealed)}}
             {{$entries := (index $condsEntry $conditions)}}
             {{if and $entries (ne $conditions "INDEX")}}
-                <div class="price-cond-header cond-{{$conditions}}">{{if $card.Sealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
+                <div class="price-cond-header{{if not $page.IsGraded}} cond-{{$conditions}}{{end}}">{{if $card.Sealed}}Purchase from{{else if $page.IsGraded}}{{$conditions}}{{else}}Condition: {{$conditions}}{{end}}</div>
             {{end}}
             {{range $entries}}
-                <div class="price-row cond-{{$conditions}}{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
+                <div class="price-row{{if not $page.IsGraded}} cond-{{$conditions}}{{end}}{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
                     {{if .Locked}}
                         <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
                         <span class="locked-cta">
@@ -98,7 +98,7 @@
                         {{else}}
                             <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="{{or .Shorthand "other"}}" data-track-scope="seller">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                         {{end}}
-                        {{with .SlabName}}<span class="slab-name" title="{{.}}">{{.}}</span>{{end}}
+                        {{with .SlabName}}{{if ne . (print $conditions)}}<span class="slab-name" title="{{.}}">{{.}}</span>{{end}}{{end}}
                         {{if and .BundleIcon .Price (not .Secondary)}}<img class="bundle-icon" src="{{.BundleIcon}}" alt="">{{end}}
                         {{if .Listings}}
                             <span class="tcg-listings" title="{{plain_tip .ListingsTitle}}" data-tip="{{.ListingsTitle}}">{{.Listings}}</span>
@@ -155,6 +155,14 @@
 {{end}}
 
 {{define "result-buyers"}}{{$page := .Page}}{{$card := .Card}}{{$cardId := .CardID}}
+{{/* No store buys slabs, so the Graded page shows what they last sold for,
+     never the raw copies' sales. Nothing records a slab's sales yet. */}}
+{{if $page.IsGraded}}
+<div class="result-col">
+    <div class="result-col-header">Last Sold</div>
+    <div class="no-offers"><i>No sales on record</i></div>
+</div>
+{{else}}
 {{/* Switch, on a page with sales, adds their column after this one, and the
      switch that shows it in this one's place where there is no room for three
      (docs/adr/0009-recent-tcgplayer-sales.md); the phone shows the sales
@@ -251,5 +259,6 @@
     <div class="result-col-header">Sales</div>
     <div class="sales-pane" data-card="{{$cardId}}" data-pending></div>
 </div>
+{{end}}
 {{end}}
 {{end}}

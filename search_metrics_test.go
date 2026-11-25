@@ -531,7 +531,7 @@ func TestSearchSource(t *testing.T) {
 }
 
 func TestSearchPageNameAndChartKind(t *testing.T) {
-	for path, want := range map[string]string{"/search": "search", "/sealed": "sealed", "/sets": "sets", "/anything": "search"} {
+	for path, want := range map[string]string{"/search": "search", "/sealed": "sealed", "/graded": "graded", "/sets": "sets", "/anything": "search"} {
 		if got := searchPageName(path); got != want {
 			t.Errorf("searchPageName(%q) = %q, want %q", path, got, want)
 		}

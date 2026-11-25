@@ -284,7 +284,7 @@
     // page's popular strip, for signed-in readers only. The server resolves
     // the query itself; the page sends nothing but the text.
     function sendPopularVote(q) {
-        if (window.location.pathname === '/sealed') return;
+        if (window.location.pathname === '/sealed' || window.location.pathname === '/graded') return;
         if (document.documentElement.dataset.signedIn !== 'true') return;
         var nav = window.navigator;
         if (!nav || typeof nav.sendBeacon !== 'function') return;
@@ -327,6 +327,10 @@
         // route still matters when the landing page later refreshes its art.
         if (!href && window.location.pathname === '/sealed') {
             href = '/sealed?q=' + encodeURIComponent(q) + scopeParam(scope);
+        }
+        // A card's own URL searches its raw copies.
+        if (window.location.pathname === '/graded') {
+            href = '/graded?q=' + encodeURIComponent(q) + scopeParam(scope);
         }
         addSearch(q, answer.label, href, scope);
     }

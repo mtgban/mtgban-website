@@ -54,6 +54,9 @@ func newPostStores(b *matcher.Backend, p *prices, r *http.Request, cardIDs []str
 			if shouldSkipStoreNG(seller, config.StoreFilters) {
 				continue
 			}
+			if config.GradedOnly && !seller.Info().GradedMode {
+				continue
+			}
 			store := &postSeller{info: seller.Info(), inventory: seller.Inventory()}
 			s.sellers[strings.ToLower(store.info.Shorthand)] = store
 			// An index lists everything under INDEX, which is no offer
@@ -132,6 +135,17 @@ func (s *postStores) withoutSellerOffers(pending []string) []string {
 		})
 	}
 	return pending
+}
+
+// offered returns the cards of keys a seller offers, in order.
+func (s *postStores) offered(keys []string) []string {
+	missing := map[string]bool{}
+	for _, cardID := range s.withoutSellerOffers(slices.Clone(keys)) {
+		missing[cardID] = true
+	}
+	return slices.DeleteFunc(slices.Clone(keys), func(cardID string) bool {
+		return missing[cardID]
+	})
 }
 
 // withoutVendorOffers is withoutSellerOffers for the vendors and the custom

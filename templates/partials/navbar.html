@@ -14,7 +14,7 @@
         <span class="nav2-search-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         </span>
-        <form id="nav-searchform" action="{{if .IsSealed}}/sealed{{else}}/search{{end}}" autocomplete="off" spellcheck="false" data-track="ui.searchbar.submit" data-track-value="nav">
+        <form id="nav-searchform" action="{{if .IsSealed}}/sealed{{else if .IsGraded}}/graded{{else}}/search{{end}}" autocomplete="off" spellcheck="false" data-track="ui.searchbar.submit" data-track-value="nav">
             <input id="nav-searchbox" type="text" name="q" placeholder="Search cards, sets, products…" value="{{if not .IsMultiChart}}{{.SearchQuery}}{{end}}" maxlength="1000" autocapitalize="none" autocorrect="off" autofocus onFocus="this.setSelectionRange(0, this.value.length)">
             {{/* The pinned bar rides along as a hidden field rather than as a
                  second text input of its own. A form carrying two fields that
@@ -32,7 +32,7 @@
 
     <div class="nav2-sections">
         {{range .Nav}}
-            {{if or (eq .Name "Search") (eq .Name "Sealed")}}
+            {{if or (eq .Name "Search") (eq .Name "Sealed") (eq .Name "Graded")}}
                 <a class="nav2-section-btn" href="{{.Link}}" data-tool="{{slug .Name}}" data-icon="{{.Short}}" data-desc="{{.Description}}">{{.Name}}</a>
             {{end}}
         {{end}}
@@ -57,7 +57,7 @@
                 <span class="tools-tile-hint-x" aria-hidden="true">&times;</span>
             </button>
             {{range .Nav}}
-                {{if and (ne .Name "Home") (ne .Name "Search") (ne .Name "Sealed") (ne .Name "Account")}}
+                {{if and (ne .Name "Home") (ne .Name "Search") (ne .Name "Sealed") (ne .Name "Graded") (ne .Name "Account")}}
                     <a class="tools-tile{{if eq .Name "Admin"}} is-admin{{end}}" href="{{.Link}}" data-tool="{{slug .Name}}">
                         <span class="tools-tile-icon">{{.Short}}</span>
                         <span class="tools-tile-text">

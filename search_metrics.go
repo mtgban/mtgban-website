@@ -296,11 +296,14 @@ func searchFacts(run searchRun) []fact {
 	return facts
 }
 
-// searchPageName is the page a search path draws: search, sealed or sets.
+// searchPageName is the page a search path draws: search, sealed, graded or
+// sets.
 func searchPageName(path string) string {
 	switch path {
 	case "/sealed":
 		return "sealed"
+	case "/graded":
+		return "graded"
 	case "/sets":
 		return "sets"
 	}
