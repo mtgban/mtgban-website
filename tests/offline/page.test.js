@@ -577,6 +577,14 @@ test('mobile mode pills drop the query when the box empties', async () => {
     expect(page.els['offline-pill-sealed'].href).toBe('/offline?sealed=1');
 });
 
+test('mobile puts the deck back, its end drawer lowered, when the box empties', async () => {
+    const page = await started('offline-page-mobile.js', { ids: MOBILE, search: '?q=sol', queries: { sol: [{ uuid: 'r0' }] } });
+    const before = page.log.refreshed;
+    page.log.mounted.onSubmit('');
+    await page.settle();
+    expect(page.log.refreshed).toBe(before + 1);
+});
+
 // Results as you type.
 const LIVE = { stored: { offline_live_search: 'true' } };
 const rows = (n) => Array.from({ length: n }, (_, i) => ({ uuid: 'r' + i }));

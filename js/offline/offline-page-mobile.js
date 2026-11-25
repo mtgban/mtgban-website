@@ -53,6 +53,7 @@
         cleared: function () {
             document.getElementById('m-offline-notices').innerHTML = '';
             paintCount(0, 0);
+            SearchCards.refresh();
         }
     });
 })(typeof self !== 'undefined' ? self : globalThis);
