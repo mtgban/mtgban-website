@@ -380,8 +380,10 @@ save, and each has an admin tab that edits it (§5.9):
   `uploader` (the Moxfield and Collectr endpoints), `handoff_origins`
   (the sites `/upload/handoff` takes a card list from, each `{"name",
   "seller"}`: the name its results are headed with, and the path segment
-  its URLs name a seller after), `sql_config`, `user_state_config`,
-  `observability_config` and `new_newspaper_sql_config`. The config may
+  its URLs name a seller after; a list in a link is known by its referrer
+  alone, so a site listed here also trusts whoever can place a link on it),
+  `sql_config`, `user_state_config`, `observability_config` and
+  `new_newspaper_sql_config`. The config may
   set any of these keys itself, and its value wins (`Over`); code reads the
   result through `Infrastructure()`. A path in the config's own bucket is
   read with the key pair the config was read with (`BAN_CONFIG_KEY`/
