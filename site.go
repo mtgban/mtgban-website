@@ -154,7 +154,7 @@ func newSite() *site {
 		Sellers: func() []mtgban.Seller { return s.prices().sellers },
 		Vendors: func() []mtgban.Vendor { return s.prices().vendors },
 
-		ScraperName:       func(shorthand string) string { return s.prices().scraperName(shorthand) },
+		ScraperName:       func(shorthand string) string { return s.prices().listedName(shorthand) },
 		CardObjectSources: cardobject2sources,
 		FinishNames:       finishNames,
 		Finishes:          s.palette.FinishList,

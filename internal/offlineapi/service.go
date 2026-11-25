@@ -46,6 +46,8 @@ type Deps struct {
 	Sellers func() []mtgban.Seller
 	Vendors func() []mtgban.Vendor
 
+	// ScraperName is a store's name as the lists of stores have it, a seller
+	// of slabs marked as one.
 	ScraperName       func(shorthand string) string
 	CardObjectSources func(co *matcher.CardObject) []string
 
