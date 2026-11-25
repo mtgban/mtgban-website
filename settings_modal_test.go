@@ -391,7 +391,7 @@ func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 		if got := paneTabs(body); !slices.Equal(got, want) {
 			t.Errorf("panes = %v, want %v", got, want)
 		}
-		for _, id := range []string{
+		ids := []string{
 			`data-tab="arbit" data-path="/arbit"`,
 			`data-tab="upload" data-path="/upload"`,
 			`data-tab="offline" data-path=""`,
@@ -400,11 +400,14 @@ func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 			`id="opt-customfallback"`,
 			`id="opt-customsealedrate"`,
 			`id="opt-customsealedfallback"`,
-			`id="opt-customsealedproduct"`,
-			`id="opt-customsealedkind"`,
 			`id="offline-img-editions-picker"`,
 			`id="sleep-editions-picker"`,
-		} {
+		}
+		// Neither is drawn when the datastore labels no sealed product
+		if len(testSite.datastore().kinds) > 0 {
+			ids = append(ids, `id="opt-customsealedproduct"`, `id="opt-customsealedkind"`)
+		}
+		for _, id := range ids {
 			if !strings.Contains(body, id) {
 				t.Errorf("body lacks %s", id)
 			}
