@@ -30,6 +30,8 @@ type catalogCard struct {
 	// PlainNumber is the number cn: reads, where the printed one reads
 	// differently: "2" of "ST01-002", or an empty one, which reads as none.
 	PlainNumber *string `json:"pn,omitempty"`
+	// TokenPair marks a pairing of two token faces, suggested after the cards.
+	TokenPair bool `json:"tp,omitempty"`
 }
 
 // imageKey is the key the mirror filed this card's image under, and so what
@@ -87,6 +89,8 @@ func newCatalogCard(co *matcher.CardObject, products []string, magic bool) catal
 		Sealed:   co.Sealed,
 		Products: products,
 		Image:    imageKey(co, magic),
+
+		TokenPair: co.Identifiers["derivedTokenPair"] == "true",
 	}
 	if co.PlainNumber != co.Number {
 		plain := co.PlainNumber

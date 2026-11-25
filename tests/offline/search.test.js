@@ -186,6 +186,24 @@ test('capped at 10 rows', async () => {
     expect(out).toHaveLength(10);
 });
 
+test('token pairs come after every card', async () => {
+    const names = [{ key: 'goblin', uuids: ['g'] }];
+    const cards = { g: { uuid: 'g', n: 'Goblin', set: 'NEO' } };
+    for (let i = 10; i < 30; i++) {
+        names.push({ key: 'goblin ' + i, uuids: ['p' + i], tp: true });
+        cards['p' + i] = { uuid: 'p' + i, n: 'Goblin // ' + i, set: 'NEO' };
+    }
+    names.push({ key: 'goblin guide', uuids: ['gg'] });
+    cards.gg = { uuid: 'gg', n: 'Goblin Guide', set: 'NEO' };
+    const d = deps();
+    d.allNames = async () => names;
+    d.getCard = async (u) => cards[u];
+    const found = async (typed) => (await OfflineSearch.suggest(typed, d)).map((r) => r.name);
+    expect((await found('goblin')).slice(0, 3)).toEqual(['Goblin', 'Goblin Guide', 'Goblin // 10']);
+    expect(await found('goblin')).toHaveLength(10);
+    expect(await found('goblin 17')).toEqual(['Goblin // 17']);
+});
+
 test('missing card record is skipped, not thrown', async () => {
     const d = deps();
     d.getCard = async function (u) { return u === 'u-sol' ? undefined : CARDS[u]; };

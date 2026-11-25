@@ -154,8 +154,8 @@ test('the name index is scanned once per catalog version', async () => {
 
     // A sync that rebuilt the index stamps a new version: the next read scans it
     state.version = 'v2';
-    state.names = [{ key: 'bolt', uuids: ['a'] }, { key: 'shock', uuids: ['b'] }];
-    expect((await DB.allNames()).map((n) => n.key)).toEqual(['bolt', 'shock']);
+    state.names = [{ key: 'bolt', uuids: ['a'] }, { key: 'shock', uuids: ['b'], tp: true }];
+    expect(await DB.allNames()).toEqual(state.names);
     expect(state.scans).toBe(2);
 
     // Offline mode turned off clears the stamp with the index

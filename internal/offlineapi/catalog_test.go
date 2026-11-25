@@ -189,6 +189,21 @@ func TestNewCatalogCardSealed(t *testing.T) {
 	}
 }
 
+// The catalog marks a pairing of token faces, whose names the client offers
+// after the cards'.
+func TestNewCatalogCardTokenPair(t *testing.T) {
+	for _, want := range []bool{true, false} {
+		ids := map[string]string{}
+		if want {
+			ids["derivedTokenPair"] = "true"
+		}
+		card := newCatalogCard(&matcher.CardObject{Card: matcher.Card{Name: "Goblin // Angel", Identifiers: ids}}, nil, true)
+		if card.TokenPair != want {
+			t.Errorf("TokenPair = %v of identifiers %v", card.TokenPair, ids)
+		}
+	}
+}
+
 // cn: reads a card's plain number, so the catalog carries it wherever the
 // printed number would read differently, an empty one included.
 func TestNewCatalogCardPlainNumber(t *testing.T) {

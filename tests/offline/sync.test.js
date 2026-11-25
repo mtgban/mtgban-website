@@ -16,6 +16,7 @@ function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAt
     const control = { cancelAtFirstPrice, onDone: null };
     const meta = { aesKey, storesKey: '', catalogVersion };
     const index = {};
+    const pairs = {};
     const imgstate = { NEO: { code: 'NEO', keys: ['a'], done: true } };
     const sets = { NEO: { code: 'NEO', version: 'v1', blob: 'neo' }, DMU: { code: 'DMU', version: 'v1', blob: 'dmu' } };
     const posts = [];
@@ -36,7 +37,7 @@ function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAt
         putRow: async () => {},
         deleteRow: async (store, code) => { delete (store === 'imgstate' ? imgstate : sets)[code]; },
         clearCatalog: async () => { Object.keys(index).forEach((k) => { delete index[k]; }); },
-        putCards: async (batch) => { batch.names.forEach((row) => { index[row.key] = row.uuids; }); },
+        putCards: async (batch) => { batch.names.forEach((row) => { index[row.key] = row.uuids; pairs[row.key] = !!row.tp; }); },
     };
     const self = {
         postMessage: (m) => {
@@ -69,7 +70,7 @@ function loadWorker({ pricesFail = false, aesKey = 'k', extraSets = {}, cancelAt
         control.onDone = resolve;
         self.onmessage({ data: msg });
     });
-    return { runSync, sync, control, imgstate, sets, posts, meta, index };
+    return { runSync, sync, control, imgstate, sets, posts, meta, index, pairs };
 }
 
 // The worker asks for the scripts of the build its page passed in ?hash=,
@@ -179,4 +180,15 @@ test('an index from this name fold is kept', async () => {
     const w = loadWorker();
     await w.runSync(SYNC);
     expect(w.posts.some((m) => m.stage === 'catalog')).toBe(false);
+});
+
+test('a name only token pairs carry is marked in the index', async () => {
+    const catalog = { version: 'c1', cards: {
+        'u-pair': { n: 'Goblin // Angel', set: 'TDOM', tp: true },
+        'u-both': { n: 'Goblin // Beast', set: 'TDOM', tp: true },
+        'u-card': { n: 'Goblin // Beast', set: 'TC15' },
+    } };
+    const w = loadWorker({ catalogVersion: 'c0', catalog });
+    await w.runSync(SYNC);
+    expect(w.pairs).toEqual({ 'goblin angel': true, 'goblin beast': false });
 });
