@@ -545,10 +545,11 @@ function resultsTable(kind, headers, rows) {
     return Object.assign(table(headers, rows), element({ 'data-sort-table': kind }));
 }
 
-function reloaded(tables, session, reload = true, local = storage()) {
+function reloaded(tables, session, reload = true, local = storage(), sorting = '') {
     const doc = page(tables);
-    const fns = new Function('document', 'localStorage', 'sessionStorage', 'window', source +
-        '\nreturn {uresSortBy, uresMenuAct};')(doc, local, session, { BAN_UPLOAD_RELOAD: reload });
+    const getCookie = (name) => (name === 'UploadSorting' ? sorting : '');
+    const fns = new Function('document', 'localStorage', 'sessionStorage', 'window', 'getCookie', source +
+        '\nreturn {uresSortBy, uresMenuAct};')(doc, local, session, { BAN_UPLOAD_RELOAD: reload }, getCookie);
     doc.listeners.DOMContentLoaded.forEach((fn) => fn());
     return fns;
 }
@@ -591,6 +592,26 @@ test('a new list starts unsorted and forgets the last one', () => {
     const next = storeTable('opt-SZ', optHeads(), offers());
     reloaded([next], session, false);
     expect(idxs(next)).toEqual(['0', '1', '2']);
+    expect(session.map).toEqual({});
+});
+
+test('a Sorting setting changed since replaces a clicked header and an order picked from the menu', () => {
+    const session = tabSession();
+    const before = storeTable('opt-SZ', optHeads(), offers());
+    const first = reloaded([before], session, false, storage(), 'setchrono');
+    first.uresMenuAct('opt', 'name', 'toggle');
+    first.uresSortBy(before.tHead.rows[0].cells[1]);
+    expect(idxs(before)).toEqual(['0', '2', '1']);
+
+    const same = storeTable('opt-SZ', optHeads(), offers());
+    reloaded([same], session, true, storage(), 'setchrono');
+    expect(idxs(same)).toEqual(['0', '2', '1']);
+
+    const heads = optHeads();
+    const changed = storeTable('opt-SZ', heads, offers());
+    reloaded([changed], session, true, storage(), 'alphabetical');
+    expect(idxs(changed)).toEqual(['0', '1', '2']);
+    expect(heads.map((th) => th.getAttribute('aria-sort'))).toEqual([null, null]);
     expect(session.map).toEqual({});
 });
 
