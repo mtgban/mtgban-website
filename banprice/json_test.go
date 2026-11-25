@@ -35,6 +35,9 @@ func TestWriteJSONMatchesEncodingJSON(t *testing.T) {
 					for range random.IntN(4) {
 						entries = append(entries, Entry{
 							Condition: odd[random.IntN(len(odd))],
+							Grader:    odd[random.IntN(len(odd))],
+							Score:     prices[random.IntN(len(prices))],
+							Label:     odd[random.IntN(len(odd))],
 							Price:     prices[random.IntN(len(prices))],
 							Qty:       random.IntN(3) - 1,
 							Available: random.IntN(3),

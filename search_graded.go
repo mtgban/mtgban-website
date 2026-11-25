@@ -49,13 +49,13 @@ func gradedSearch(config *SearchConfig) {
 	config.SkipBuylist = true
 }
 
-// slabGroup is the group a row is listed under on the Graded page, and
-// whether its slab has a grader to list it under.
-func slabGroup(entry SearchEntry) (mtgban.Condition, bool) {
-	if entry.Slab == nil || entry.Slab.Grader == "" {
+// slabGroup is the group a slab is listed under, on the Graded page and in
+// the API, and whether it has a grader to list it under.
+func slabGroup(slab *mtgban.Slab) (mtgban.Condition, bool) {
+	if slab == nil || slab.Grader == "" {
 		return otherSlabs, false
 	}
-	return mtgban.Condition(entry.SlabName()), true
+	return mtgban.Condition(slabName(slab)), true
 }
 
 // groupBySlab lists each card's offers under their slabs' grades rather than
@@ -70,7 +70,7 @@ func groupBySlab(found map[string]map[mtgban.Condition][]SearchEntry, byPrice bo
 		groups := map[mtgban.Condition][]SearchEntry{}
 		for _, cond := range AllConditions {
 			for _, entry := range conds[cond] {
-				group, graded := slabGroup(entry)
+				group, graded := slabGroup(entry.Slab)
 				if graded {
 					slabs[group] = *entry.Slab
 				} else {

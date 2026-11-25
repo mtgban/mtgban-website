@@ -422,12 +422,23 @@ func filterV2Finishes(finishes []banprice.Finish, filter string) []banprice.Fini
 }
 
 // v2StoreList is the enabled sellers and vendors, as stores.json lists them.
-// filter=singles or filter=sealed keeps one kind of store. qty is listed as
+// filter=singles, filter=sealed or filter=graded keeps one kind of store. qty is listed as
 // v2's prices carry it.
 func v2StoreList(p *prices, enabledSellers, enabledVendors []string, filter string) banprice.Stores {
 	keep := func(info mtgban.ScraperInfo, enabled []string) bool {
-		if filter == "singles" && info.SealedMode || filter == "sealed" && !info.SealedMode {
-			return false
+		switch filter {
+		case "singles":
+			if !rawSingles(info) {
+				return false
+			}
+		case "sealed":
+			if !info.SealedMode {
+				return false
+			}
+		case "graded":
+			if !info.GradedMode {
+				return false
+			}
 		}
 		return slices.Contains(enabled, info.Shorthand)
 	}
@@ -437,6 +448,7 @@ func v2StoreList(p *prices, enabledSellers, enabledVendors []string, filter stri
 			Name:      v2StoreName(info),
 			Country:   info.CountryFlag,
 			Sealed:    info.SealedMode,
+			Graded:    info.GradedMode,
 			Index:     info.MetadataOnly,
 		}
 	}
@@ -488,7 +500,7 @@ func writeV2FinishesCSV(w http.ResponseWriter, finishes []banprice.Finish) {
 func writeV2StoresCSV(w http.ResponseWriter, stores banprice.Stores) {
 	w.Header().Set("Content-Type", "text/csv")
 	csvWriter := csv.NewWriter(w)
-	csvWriter.Write([]string{"Kind", "Shorthand", "Name", "Country", "Sealed", "Index", "Quantities", "Credit Multiplier", "Updated"})
+	csvWriter.Write([]string{"Kind", "Shorthand", "Name", "Country", "Sealed", "Index", "Quantities", "Credit Multiplier", "Updated", "Graded"})
 	for _, side := range []struct {
 		kind   string
 		stores []banprice.Store
@@ -503,7 +515,7 @@ func writeV2StoresCSV(w http.ResponseWriter, stores banprice.Stores) {
 			}
 			csvWriter.Write([]string{side.kind, store.Shorthand, store.Name, store.Country,
 				strconv.FormatBool(store.Sealed), strconv.FormatBool(store.Index), strconv.FormatBool(store.Quantities),
-				credit, updated})
+				credit, updated, strconv.FormatBool(store.Graded)})
 		}
 	}
 	csvWriter.Flush()

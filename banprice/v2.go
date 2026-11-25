@@ -13,7 +13,10 @@ const FinishSealed = "sealed"
 var ConditionOrder = []string{"NM", "SP", "MP", "HP", "PO"}
 
 // Entry is one condition of one finish at one store. Condition is empty for
-// an index price and for sealed product, which carry none. Qty is the
+// an index price and for sealed product, which carry none. A slab's is its
+// grade, as "PSA 9", or "Other slabs" with no grader it can be filed under;
+// Grader, Score and Label are what its store says of it, each where it says,
+// and empty on anything else. Qty is the
 // copies the store's own listings in the condition hold, Price being the
 // best of their prices; on a buylist, the copies it buys. Available is
 // every copy in the condition on sale there at any price, where a source
@@ -21,6 +24,9 @@ var ConditionOrder = []string{"NM", "SP", "MP", "HP", "PO"}
 // Qty on a buylist is no limit.
 type Entry struct {
 	Condition string  `json:"condition,omitempty"`
+	Grader    string  `json:"grader,omitempty"`
+	Score     float64 `json:"score,omitempty"`
+	Label     string  `json:"label,omitempty"`
 	Price     float64 `json:"price"`
 	Qty       int     `json:"qty,omitempty"`
 	Available int     `json:"available,omitempty"`
@@ -71,6 +77,9 @@ type Store struct {
 	Name      string `json:"name"`
 	Country   string `json:"country,omitempty"`
 	Sealed    bool   `json:"sealed,omitempty"`
+
+	// Graded marks a store of slabs, which the graded endpoints alone price.
+	Graded bool `json:"graded,omitempty"`
 
 	// Index marks a store whose prices index a market rather than list its
 	// own stock. Its entries carry a condition only where only the API serves

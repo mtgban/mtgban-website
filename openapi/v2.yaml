@@ -4,7 +4,8 @@ info:
   version: 2.0.0
   description: >-
     Retail and buylist prices for singles and sealed products across many
-    stores, by finish and by condition.
+    stores, by finish and by condition. Graded cards (slabs) are priced by
+    the graded endpoints alone.
 
 servers:
   - url: https://api.mtgban.com/v2/{game}
@@ -76,6 +77,52 @@ paths:
         - $ref: "#/components/parameters/id"
         - $ref: "#/components/parameters/vendor"
         - $ref: "#/components/parameters/finish"
+      responses:
+        "200": { $ref: "#/components/responses/Prices" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /graded.json:
+    get:
+      summary: Prices for every graded card (slab)
+      description: JSON only, and retail only
+      parameters:
+        - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/vendor"
+        - $ref: "#/components/parameters/finish"
+      responses:
+        "200": { $ref: "#/components/responses/Prices" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /graded/{setOrId}.json:
+    get:
+      summary: Prices for one edition's or one card's slabs
+      description: JSON only, and retail only. setOrId is as above
+      parameters:
+        - name: setOrId
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/vendor"
+        - $ref: "#/components/parameters/finish"
+      responses:
+        "200": { $ref: "#/components/responses/Prices" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /search/retail/graded/{query}.json:
+    get:
+      summary: Prices for the slabs of every card matching a search
+      description: JSON only
+      parameters:
+        - name: query
+          in: path
+          required: true
+          description: Search text in the site syntax
+          schema: { type: string }
+        - name: scope
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/id"
       responses:
         "200": { $ref: "#/components/responses/Prices" }
         default: { $ref: "#/components/responses/Error" }
@@ -305,7 +352,8 @@ components:
     filter:
       name: filter
       in: query
-      schema: { type: string, enum: [sealed, singles] }
+      description: stores.json alone takes graded
+      schema: { type: string, enum: [sealed, singles, graded] }
     report:
       name: report
       in: path
@@ -532,7 +580,7 @@ components:
           type: object
           additionalProperties:
             type: array
-            description: One entry per condition, best condition first
+            description: One entry per condition, best condition first, or per slab grade and label
             items: { $ref: "#/components/schemas/Entry" }
     Entry:
       type: object
@@ -540,11 +588,20 @@ components:
       properties:
         condition:
           type: string
-          enum: [NM, SP, MP, HP, PO]
           description: >-
-            Near Mint, Slightly Played, Moderately Played, Heavily Played
-            or Poor, best first; absent for an index price and for sealed
-            products
+            NM, SP, MP, HP or PO (Near Mint, Slightly Played, Moderately
+            Played, Heavily Played or Poor), best first; absent for an index
+            price and for sealed products. A slab's is its grade, such as
+            PSA 9 or CGC 10 Pristine, by grader (PSA, BGS, CGC, TAG) and
+            then best grade first, or Other slabs, last, without a grader
+            it can be filed under
+        grader: { type: string, description: "A slab's grader: PSA, BGS, CGC or TAG" }
+        score: { type: number, format: float, description: "A slab's score, 1 to 10 in half steps" }
+        label:
+          type: string
+          description: >-
+            The rest of a slab's label, such as Pristine, or the store's own
+            wording where it could not be read
         price:
           type: number
           format: float
@@ -572,6 +629,7 @@ components:
         name: { type: string, description: The store's display name }
         country: { type: string }
         sealed: { type: boolean, description: The store prices sealed products }
+        graded: { type: boolean, description: The store prices slabs, read from the graded endpoints }
         index: { type: boolean, description: The store's prices index a market and carry no condition }
         quantities: { type: boolean, description: The store's prices carry qty }
         credit_multiplier:
