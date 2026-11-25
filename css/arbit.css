@@ -788,6 +788,9 @@ button.arb-filter-reset:disabled {
 @media (max-width: 560px) {
     /* An INFO cell with no buylist facts takes no room on a card */
     .arb-table.phone-cards td:has(> .bl-info:only-child:empty) { display: none; }
+    /* A chip past the edge has no scrollbar to show it, so they wrap */
+    .arb-table.phone-cards > thead > tr { flex-wrap: wrap; overflow-x: visible; }
+    .arb-table.phone-cards > thead > tr > th { padding: 4px 6px; }
 }
 
 /* ── Row removal ── */
