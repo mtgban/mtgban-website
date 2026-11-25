@@ -252,6 +252,11 @@ func (p *prices) isSealedScraper(shorthand string) bool {
 	return info.SealedMode
 }
 
+// rawSingles says whether a store trades singles that are not slabs.
+func rawSingles(info mtgban.ScraperInfo) bool {
+	return !info.SealedMode && !info.GradedMode
+}
+
 // sealedStores is isSealedScraper's answer for every loaded shorthand, for
 // a page listing stores.
 func (p *prices) sealedStores() map[string]bool {

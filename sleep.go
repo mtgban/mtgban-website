@@ -102,7 +102,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	skipEditions = append(skipEditions, playtestEditions...)
 
 	pageVars.SellerKeys = p.filterSellers(func(info mtgban.ScraperInfo) bool {
-		return !info.SealedMode && !slices.Contains(blocklistRetail, info.Shorthand)
+		return rawSingles(info) && !slices.Contains(blocklistRetail, info.Shorthand)
 	})
 	pageVars.StoreNames = p.storeNames()
 
@@ -345,7 +345,7 @@ func sleeperPairs(p *prices, blocklistRetail, blocklistBuylist []string) []sleep
 		if seller.Info().CountryFlag != "" {
 			continue
 		}
-		if seller.Info().SealedMode {
+		if !rawSingles(seller.Info()) {
 			continue
 		}
 
@@ -504,7 +504,7 @@ func getGap(b *matcher.Backend, p *prices, blocklistRetail []string, ref, target
 	var referenceSeller mtgban.Seller
 	var targetSeller mtgban.Seller
 	for _, seller := range p.sellers {
-		if seller.Info().SealedMode ||
+		if !rawSingles(seller.Info()) ||
 			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
 			continue
 		}

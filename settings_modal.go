@@ -81,7 +81,7 @@ func sleepBlocklists(sig string) (retail, buylist []string) {
 // hide cookie is applied, so a hidden store still shows, unticked.
 func sleepModalKeys(p *prices, blocklistRetail, blocklistBuylist []string) (sellers, vendors []string) {
 	sellers = p.filterSellers(func(info mtgban.ScraperInfo) bool {
-		return info.CountryFlag == "" && !info.SealedMode && !info.MetadataOnly &&
+		return info.CountryFlag == "" && rawSingles(info) && !info.MetadataOnly &&
 			!slices.Contains(blocklistRetail, info.Shorthand)
 	})
 	vendors = p.filterVendors(func(info mtgban.ScraperInfo) bool {
