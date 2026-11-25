@@ -140,3 +140,42 @@ func TestCustomReferenceListsEachStoreOnce(t *testing.T) {
 		}
 	}
 }
+
+// A seller of slabs named as its store is marked wherever stores are listed,
+// sorts after it, and is never the one the store's name finds.
+func TestGradedStoreSharingAName(t *testing.T) {
+	store := func(name, shorthand string, graded bool, price float64) mtgban.Seller {
+		return mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"card": {{Conditions: "NM", Price: price}}},
+			mtgban.ScraperInfo{Name: name, Shorthand: shorthand, GradedMode: graded})
+	}
+	withPrices(t, []mtgban.Seller{
+		store("Same Store", "ZZSLAB", true, 50),
+		store("Same Store", "ZZSAME", false, 5),
+		store("Other Store Graded", "ZZOTHER", true, 9),
+	}, nil)
+	p := currentPrices()
+
+	for shorthand, want := range map[string]string{
+		"ZZSAME":  "Same Store",
+		"ZZSLAB":  "Same Store (Graded)",
+		"ZZOTHER": "Other Store Graded",
+	} {
+		if got := p.storeNames()[shorthand]; got != want {
+			t.Errorf("%s is listed as %q, want %q", shorthand, got, want)
+		}
+	}
+	if got := sortKeysByScraperName(p, []string{"ZZSLAB", "ZZSAME"}); got[0] != "ZZSAME" {
+		t.Errorf("sorted %v, want the raw store first", got)
+	}
+	if got := string(guideStoresJSON(p)); !strings.Contains(got, `"name":"Same Store (Graded)","code":"ZZSLAB"`) {
+		t.Errorf("the guide lists %s, want the slab seller marked", got)
+	}
+	if got := storeFactorOptions(p, []string{"ZZSLAB"}, nil); !strings.Contains(got, "Same Store (Graded)") {
+		t.Errorf("store factors offer %s, want the slab seller marked", got)
+	}
+
+	inv, err := findSellerInventoryByName(p, "same store", false)
+	if err != nil || inv["card"][0].Price != 5 {
+		t.Errorf("the name finds %v, %v; want the raw store", inv, err)
+	}
+}

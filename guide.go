@@ -48,10 +48,10 @@ type GuideStore struct {
 func guideStoresJSON(p *prices) template.JS {
 	stores := map[string]*GuideStore{}
 
-	ensure := func(name, shorthand string, sealed bool) *GuideStore {
+	ensure := func(shorthand string, sealed bool) *GuideStore {
 		s := stores[shorthand]
 		if s == nil {
-			s = &GuideStore{Name: name, Code: shorthand, Sealed: sealed}
+			s = &GuideStore{Name: p.listedName(shorthand), Code: shorthand, Sealed: sealed}
 			stores[shorthand] = s
 		}
 		return s
@@ -65,7 +65,7 @@ func guideStoresJSON(p *prices) template.JS {
 		if Config().apiOnly(info.Shorthand) {
 			continue
 		}
-		s := ensure(info.Name, info.Shorthand, info.SealedMode)
+		s := ensure(info.Shorthand, info.SealedMode)
 		if info.MetadataOnly {
 			s.Index = true
 		} else {
@@ -80,7 +80,7 @@ func guideStoresJSON(p *prices) template.JS {
 		if Config().apiOnly(info.Shorthand) {
 			continue
 		}
-		s := ensure(info.Name, info.Shorthand, info.SealedMode)
+		s := ensure(info.Shorthand, info.SealedMode)
 		s.Buylist = true
 	}
 
