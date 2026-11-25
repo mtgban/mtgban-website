@@ -1,6 +1,6 @@
 # ADR-0009: Recent TCGplayer sales in search
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-11-22
 **Deciders:** Vittorio Giovara
 

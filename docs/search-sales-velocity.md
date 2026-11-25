@@ -48,11 +48,11 @@ The rate is the copies over 30, to one decimal.
 |---|---|---|---|
 | No data | no sale in 365 days | no row | none |
 | Zero | sales in the year, none in the window | `0/day` | `no sale in 30 days`, then the last sale with its price and condition when known |
-| A rate | copies in the window | `2.3/day`, or `<0.1/day` under a tenth | copies, orders, days with a sale, then the trend and the last sale with its price, condition and date |
+| A rate | copies in the window | `2.3/day`, or `<0.1/day` under a tenth | copies, days with a sale, orders, the trend when there is one, then the last sale with its price, condition and date |
 
 `text` (`internal/salesvelocity`) writes both. The counts sit two label and
-value pairs a row, `copies 458 · days 30/30` over `orders 391 · vs. $30–100
-top 1%`, and a rule sets the trend and the last sale off below them:
+value pairs a row, `copies 458 · days 30/30` over `orders 391 · 7-day trend
+2.4×`, and a rule sets the last sale off below them:
 `last sale | $12.34 LP · Nov 17`. The date carries its year only when that
 is not the year of the window's last day. The rule is a blank line in the
 tooltip format, which ends a table (`tipBlocks`, templates.go). The row's
