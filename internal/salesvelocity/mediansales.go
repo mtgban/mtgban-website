@@ -20,7 +20,8 @@ const (
 )
 
 // MedianSalesVendor is the median sale as a store buying the cards seller sells,
-// each grade at its own price, nil when none of them has enough orders.
+// each grade seller lists at its own price, nil when none of them has enough
+// orders.
 func (s *RecentSnapshot) MedianSalesVendor(seller mtgban.Seller, now time.Time) mtgban.Vendor {
 	info := mtgban.ScraperInfo{
 		Name:       "TCG Median Sales",
@@ -28,12 +29,12 @@ func (s *RecentSnapshot) MedianSalesVendor(seller mtgban.Seller, now time.Time) 
 		SealedMode: seller.Info().SealedMode,
 	}
 	buylist := mtgban.BuylistRecord{}
-	for cardID := range seller.Inventory() {
+	for cardID, stock := range seller.Inventory() {
 		r, found := s.For(cardID)
 		if !found {
 			continue
 		}
-		entries := r.medianSalesEntries(now)
+		entries := r.medianSalesEntries(stock, now)
 		if len(entries) > 0 {
 			buylist[cardID] = entries
 		}
@@ -44,22 +45,30 @@ func (s *RecentSnapshot) MedianSalesVendor(seller mtgban.Seller, now time.Time) 
 	return mtgban.NewVendorFromBuylist(buylist, info)
 }
 
-// medianSalesEntries is r's median sale in each grade with enough orders, a sealed
-// product's Unopened as NM. NM leads, at no price when it has too few:
-// mtgban.Arbit reads the first entry as NM and drops a trade at no price.
-func (r *Recent) medianSalesEntries(now time.Time) []mtgban.BuylistEntry {
+// medianSalesEntries is r's median sale in each grade stock lists with enough
+// orders, a sealed product's Unopened as NM. NM leads, at no price when it is
+// not listed or has too few: mtgban.Arbit reads the first entry as NM, drops a
+// trade at no price, and prices a copy in its own grade alone.
+func (r *Recent) medianSalesEntries(stock []mtgban.InventoryEntry, now time.Time) []mtgban.BuylistEntry {
 	entries := []mtgban.BuylistEntry{{Conditions: mtgban.NM}}
 	for i, orders := range r.Grades {
+		grade := mtgban.Condition(Grades[i])
+		if Grades[i] == unopened {
+			grade = mtgban.NM
+		}
+		if len(orders) < medianSalesMin || !listsGrade(stock, grade) {
+			continue
+		}
 		price := medianSales(orders, now)
 		if price == 0 {
 			continue
 		}
-		if i == 0 || Grades[i] == unopened {
+		if grade == mtgban.NM {
 			entries[0].BuyPrice = price
 			continue
 		}
 		entries = append(entries, mtgban.BuylistEntry{
-			Conditions: mtgban.Condition(Grades[i]),
+			Conditions: grade,
 			BuyPrice:   price,
 		})
 	}
@@ -67,6 +76,16 @@ func (r *Recent) medianSalesEntries(now time.Time) []mtgban.BuylistEntry {
 		return nil
 	}
 	return entries
+}
+
+// listsGrade reports whether stock has a copy in grade.
+func listsGrade(stock []mtgban.InventoryEntry, grade mtgban.Condition) bool {
+	for i := range stock {
+		if stock[i].Conditions == grade {
+			return true
+		}
+	}
+	return false
 }
 
 // medianSales is the median price of the recent orders, the middle two's
