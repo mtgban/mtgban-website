@@ -24,6 +24,7 @@ type datastore struct {
 	numbers  *numbersSnapshot
 	sources  *sourcesSnapshot
 	names    *suggest.Names
+	singles  []string // single names, token pairs last
 	editions *editionsSnapshot
 	palette  *palette.Snapshot
 	finishes []banprice.Finish
