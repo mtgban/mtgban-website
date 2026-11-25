@@ -120,8 +120,9 @@ test('the row under the pointer is found by height, the ends taking what is past
 });
 
 // An editor of one rule, with just enough of the DOM for binding to wire it.
-// Given kinds, its rows have a product and a kind select too.
-function editor(vals, kinds) {
+// Given kinds, its rows have a product and a kind select too; given stores,
+// their reference is a select of those.
+function editor(vals, kinds, stores) {
     const isA = (c, sel) => c.className.split(' ').includes(sel.slice(1));
     const node = (className) => ({
         className, dataset: {}, attrs: {}, children: [], listeners: {}, hidden: false, focused: 0,
@@ -134,8 +135,8 @@ function editor(vals, kinds) {
         focus() { this.focused++; },
     });
     // Picks nothing for a value it has no option for, as a select does.
-    const select = (cookie) => {
-        const n = Object.assign(node('field'), { options: [{ value: '', textContent: 'Any' }], picked: '' });
+    const select = (cookie, values = ['']) => {
+        const n = Object.assign(node('field'), { options: values.map((value) => ({ value, textContent: value || 'Any' })), picked: '' });
         n.dataset.cookie = cookie;
         n.remove = (i) => n.options.splice(i, 1);
         n.appendChild = (o) => n.options.push(o);
@@ -146,6 +147,10 @@ function editor(vals, kinds) {
         const row = node('custom-rule');
         const fields = {};
         FIELDS.forEach((f, i) => { fields[f] = Object.assign(node('field'), { value: rowVals[i] }); });
+        if (stores) {
+            fields.seller = select('UploadCustomBuyer', stores);
+            fields.seller.value = rowVals[2];
+        }
         if (kinds) ['product', 'kind'].forEach((f) => { fields[f] = select('UploadCustomSealed' + f); });
         row.querySelector = (sel) => {
             const m = sel.match(/data-field="([^"]+)"/);
@@ -246,4 +251,22 @@ test('a sealed rule lists the products, and the kinds of the one picked', () => 
     at(0, 'product').value = 'deck';
     at(0, 'product').fire('change');
     expect(picks()[0]).toEqual(['deck', 'intro']);
+});
+
+test('a reference store missing from this load survives a save', () => {
+    const ed = editor(['0.8', '7', 'CK', ''], undefined, ['TCGLow', 'CK']);
+    const cookies = { UploadCustomBuyer: 'GONE', UploadCustomRules: '0.6:2:SCG:' };
+    const { R } = load(cookies, ed.document);
+    const binding = R.binding(ed.container);
+    binding.load();
+    const sellers = () => ed.rows.map((r) => r.querySelector('[data-field="seller"]'));
+    expect(sellers().map((s) => s.value)).toEqual(['GONE', 'SCG']);
+    binding.save();
+    expect(cookies.UploadCustomRules).toBe('0.6:2:SCG:');
+
+    // It travels with its rule, and no list names a store twice
+    R.move(ed.container, 1, 0);
+    expect(sellers().map((s) => s.value)).toEqual(['SCG', 'GONE']);
+    R.move(ed.container, 1, 0);
+    expect(sellers()[0].options.map((o) => o.value)).toEqual(['TCGLow', 'CK', 'GONE', 'SCG']);
 });

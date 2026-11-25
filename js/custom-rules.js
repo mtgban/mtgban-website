@@ -87,9 +87,23 @@
         options(field(row, 'kind'), kindsOf(container, product), kind);
     }
 
+    // setStore picks store in select, kept as an option of its own when this
+    // load does not have it.
+    function setStore(select, store) {
+        select.value = store;
+        if (select.value === store) return;
+        var o = document.createElement('option');
+        o.value = o.textContent = store;
+        select.appendChild(o);
+        select.value = store;
+    }
+
     // write puts a rule's values in row.
     function write(container, row, vals) {
-        FIELDS.slice(0, REQUIRED).forEach(function (f, i) { field(row, f).value = vals[i]; });
+        field(row, 'rate').value = vals[0];
+        field(row, 'min').value = vals[1];
+        setStore(field(row, 'seller'), vals[2]);
+        setStore(field(row, 'fallback'), vals[3]);
         cover(container, row, vals[4] || '', vals[5] || '');
         markRate(row);
     }
@@ -276,6 +290,10 @@
         }
         return {
             load: function () {
+                ['seller', 'fallback'].forEach(function (f) {
+                    var saved = getCookie(field(first, f).dataset.cookie);
+                    if (saved) setStore(field(first, f), saved);
+                });
                 if (field(first, 'product')) {
                     cover(container, first, getCookie(field(first, 'product').dataset.cookie), getCookie(field(first, 'kind').dataset.cookie));
                 }
