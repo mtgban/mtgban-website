@@ -475,6 +475,11 @@
         return copies;
     }
 
+    // takable is how many copies take would take out.
+    function takable(counts) {
+        return live().reduce(function (n, e) { return n + Math.min(e.qty, counts[key(e)] || 0); }, 0);
+    }
+
     // shift moves counts[key] copies of each entry to backpack p as one undo
     // step, joining the card in that grade there or starting it where there
     // is room, and says how many copies went: none when one entry does not fit.
@@ -1087,7 +1092,8 @@
             var next = section ? section.querySelector(".section-fold") : btn.parentNode.querySelector(".pack-add-btn");
             if (focused && btn.hidden && next) next.focus();
         };
-        var ask = (section ? "Remove this store's ticked cards from " : "Remove these results from ") + packName(p) + "?";
+        var n = takable(picked(rows, p));
+        var ask = "Remove " + n + (n === 1 ? " card" : " cards") + " from " + packName(p) + "?";
         var other = sentPack !== p && tabs().some(function (t) { return t.pack === sentPack; });
         if (other) ask += " These cards were sent from " + packName(sentPack) + ".";
         // The dialog hands focus back to the button before it calls doTake

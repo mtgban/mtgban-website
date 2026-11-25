@@ -812,7 +812,7 @@ describe('taking from the open backpack on a send', () => {
         const p = page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, sections: [[['uuid-1', 1, false, 'NM']]] });
         expect(p.optSections[0].take.hidden).toBe(false);
         p.window.takeRowsFromBackpack(p.optSections[0].take);
-        expect(confirms).toEqual(["Remove this store's ticked cards from Backpack 1? These cards were sent from Trades."]);
+        expect(confirms).toEqual(["Remove 1 card from Backpack 1? These cards were sent from Trades."]);
         expect(live(p)).toEqual([[1, 'uuid-1', 1], [2, 'uuid-1', 3]]);
         expect(ids['backpack-toast'].textContent).toBe('Removed 1 copy from Backpack 1');
         // The condition and copies menu (upload-edit.js) still edits the backpack sent
@@ -849,7 +849,7 @@ describe('taking from the open backpack on a send', () => {
         const session = sent();
         const p = page({ store, tabs: 2, active: 2, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, sections: [[['uuid-1', 1, false, 'NM']]] });
         p.window.takeRowsFromBackpack(p.optSections[0].take);
-        expect(confirms).toEqual(["Remove this store's ticked cards from Trades?"]);
+        expect(confirms).toEqual(["Remove 1 card from Trades?"]);
         expect(live(p)).toEqual([[1, 'uuid-1', 2], [2, 'uuid-1', 2]]);
     });
 
@@ -1855,6 +1855,7 @@ describe('taking an Upload store section out', () => {
             sections: [[['a', 1], ['a', 2], ['b', 3], ['c', 2, true], ['x', 1]]],
         });
         p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(confirms).toEqual(['Remove 4 cards from the backpack?']);
         expect(live(p)).toEqual([['a', 1], ['c', 2]]);
         expect(ids['backpack-toast'].textContent).toBe('Removed 4 copies from the backpack');
     });
@@ -1896,7 +1897,7 @@ describe('taking an Upload store section out', () => {
         const before = p.m.mtgban_backpack;
         p.window.confirm = (msg) => { confirms.push(msg); return false; };
         p.window.takeRowsFromBackpack(p.optSections[0].take);
-        expect(confirms).toEqual(["Remove this store's ticked cards from the backpack?"]);
+        expect(confirms).toEqual(["Remove 1 card from the backpack?"]);
         expect(p.m.mtgban_backpack).toBe(before);
         expect(p.optSections[0].take.hidden).toBe(false);
     });
@@ -1908,7 +1909,7 @@ describe('taking an Upload store section out', () => {
         p.window.confirmDialog = (msg, onOk, opts) => { asked.push([msg, opts.confirmLabel]); ok = onOk; };
         const before = p.m.mtgban_backpack;
         p.window.takeRowsFromBackpack(p.optSections[0].take);
-        expect(asked).toEqual([["Remove this store's ticked cards from the backpack?", 'Remove']]);
+        expect(asked).toEqual([["Remove 1 card from the backpack?", 'Remove']]);
         expect(confirms).toEqual([]);
         expect(p.m.mtgban_backpack).toBe(before);
         ok();
@@ -2164,7 +2165,7 @@ describe('the Upload results\' backpack pair', () => {
     test('takes the tab\'s rows out once asked', () => {
         const p = page({ store: [{ id: 'a', qty: 3, t: 2, m: 2 }, { id: 'b', cond: 'SP', qty: 1, t: 1, m: 1 }], results: [['a', 2, 'NM'], ['b', 1, 'SP']] });
         p.window.takeRowsFromBackpack(p.res.take);
-        expect(confirms).toEqual(['Remove these results from the backpack?']);
+        expect(confirms).toEqual(['Remove 3 cards from the backpack?']);
         expect(live(p)).toEqual([['a', 'NM', 1]]);
     });
 
