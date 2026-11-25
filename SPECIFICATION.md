@@ -812,6 +812,9 @@ product).
   set).
   8 sort orders (`arbitLess()`: available, sell price, buy price,
   profitability, diff, spread, edition, alpha).
+  Arbit alone also compares against the median TCGplayer sale, of recent
+  orders' prices, as one more vendor (`RecentSnapshot.MedianSaleVendor`),
+  for a signature carrying `SearchSales`.
 - **Sleepers** scores cards by how often they appear as opportunities across
   all seller×vendor pairs (`getTiers()`), plus variants: long-unreprinted
   (`getReprints()` — the 2-year/$3 floors are not in sleep.go: they live in

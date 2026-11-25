@@ -15,6 +15,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
 
 const (
@@ -342,7 +343,7 @@ type Arbitrage struct {
 	Key   string
 	Arbit []mtgban.ArbitEntry
 
-	// RuleTip spells the rule behind the custom buylist's section
+	// RuleTip says where the prices of a section with no buylist come from
 	RuleTip string
 
 	// BuyCart loads the store bought from and SellCart the buylist sold
@@ -366,6 +367,9 @@ type Arbitrage struct {
 
 	// Disable the Profitability, Difference, and Spread columns
 	HasNoArbit bool
+
+	// The section sells at the median sale, which has no buylist's ratio
+	MedianSale bool
 
 	// List of cardId:marketPrice that might not have the best prices
 	SussyList map[string]float64
@@ -431,6 +435,12 @@ func arbit(s *site, w http.ResponseWriter, r *http.Request, reverse bool) {
 		customRules = readCustomBuylistRules(r)
 	}
 
+	// So is the median sale, for a reader the recent sales show to
+	var recent *salesvelocity.RecentSnapshot
+	if !reverse && canSeeSales(sig) {
+		recent = recentSalesStore.Snapshot()
+	}
+
 	if r.FormValue("page") == "options" {
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
 		return
@@ -452,6 +462,7 @@ func arbit(s *site, w http.ResponseWriter, r *http.Request, reverse bool) {
 	s.scraperCompare(w, r, p, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults:      true,
 		CustomBuylist:   customRules,
+		RecentSales:     recent,
 		ExcludedVendors: nonEmpty(filters),
 	})
 
@@ -537,6 +548,9 @@ type scraperCompareOpts struct {
 	// The reader's custom buylist rules, compared against as a vendor;
 	// none without a rule
 	CustomBuylist []customBuylistRule
+
+	// The sales whose median is compared against as a vendor, nil for none
+	RecentSales *salesvelocity.RecentSnapshot
 
 	// Stores the reader's hidden-stores cookie names, for the count
 	ExcludedVendors int
@@ -916,6 +930,13 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 				scrapers = append(scrapers, custom)
 			}
 		}
+
+		if cmp.RecentSales != nil {
+			medianSale := cmp.RecentSales.MedianSaleVendor(source.(mtgban.Seller), start)
+			if medianSale != nil {
+				scrapers = append(scrapers, medianSale)
+			}
+		}
 	}
 
 	// The grades the reader dropped, which TCGDirect's own below must not
@@ -1017,7 +1038,9 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 				}
 			}
 		}
-		if !applied["stable"] && scraper.Info().SealedMode {
+		// What a product sold for owes nothing to its simulated contents
+		simulated := scraper.Info().SealedMode && scraper.Info().Shorthand != salesvelocity.MedianSaleStore
+		if !applied["stable"] && simulated {
 			sussy = map[string]float64{}
 
 			for _, res := range arbit {
@@ -1065,6 +1088,14 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 		_, isCustom := scraper.(*customBuylistVendor)
 		if isCustom {
 			entry.RuleTip = customBuylistTips(p, cmp.CustomBuylist, scraper.Info().SealedMode)
+		}
+		if scraper.Info().Shorthand == salesvelocity.MedianSaleStore {
+			entry.RuleTip = salesvelocity.MedianSaleTip
+			entry.MedianSale = true
+			// The rows are this request's own copies
+			for i := range arbit {
+				arbit[i].BuylistEntry.URL = salesLink(b, p, arbit[i].CardID, arbit[i].InventoryEntry.Conditions)
+			}
 		}
 		if pageVars.GlobalMode {
 			entry.HasNoCredit = true
