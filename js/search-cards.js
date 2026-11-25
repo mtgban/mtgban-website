@@ -35,6 +35,8 @@
     var deck = document.querySelector('.m-layout-cards .m-results');
     if (!deck) return;
     var page = deck.closest('.m-page');
+    // The cards, the scrubber and the end drawer, without the page's sheets
+    var stage = deck.parentNode;
 
     var portrait = window.matchMedia('(orientation: portrait)');
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -99,7 +101,6 @@
         width = window.innerWidth;
         centreAll();
     });
-    portrait.addEventListener('change', centreAll);
 
     // pitch is a card's height, a whole pixel (the stylesheet rounds it
     // down), so every card starts on a pixel and lands exactly in place.
@@ -113,7 +114,9 @@
         return Math.round(deck.scrollTop / pitch());
     }
 
+    // In landscape the page scrolls instead, and the deck's place means nothing.
     function remember() {
+        if (!portrait.matches) return;
         var state = Object.assign({}, history.state || {}, { cardsIndex: current() });
         try { history.replaceState(state, ''); } catch (e) {}
     }
@@ -129,6 +132,12 @@
     window.addEventListener('pageshow', function (e) { if (e.persisted) restore(); });
     // The card in view as the page is left, even mid-swipe.
     window.addEventListener('pagehide', remember);
+    // A turned phone takes each card to its picture and the deck to its card.
+    portrait.addEventListener('change', function () {
+        pager(false);
+        centreAll();
+        restore();
+    });
 
     // Settled scrolls: the card the reader is on, and the list a swipe
     // opened. Debounced scroll, since not every Safari sends scrollend.
@@ -240,6 +249,7 @@
     }
 
     function jump(e) {
+        pager(false);
         var n = cards().length;
         var r = scrub.getBoundingClientRect();
         var f = Math.min(Math.max((e.clientY - r.top) / Math.max(r.height, 1), 0), 1);
@@ -271,15 +281,16 @@
     }
 
     // The end drawer, the pager or where the results end: the last card
-    // cannot scroll on, so a swipe up on it raises the drawer, and a swipe
-    // down anywhere lowers it again. While it is up the script owns every
-    // swipe, since nothing under it scrolls: a sideways one folds the drawer
-    // and moves the card one list over.
+    // cannot scroll on, so a swipe up that began on it raises the drawer, and
+    // a swipe down anywhere on the cards lowers it again. While it is up the
+    // script owns every swipe there, since nothing under it scrolls: a sideways
+    // one folds the drawer and moves the card one list over.
     var drawer = page.querySelector('.m-results-end');
     var SWIPE = 40;
-    var startX = null, startY = null;
+    var startX = null, startY = null, mayRaise = false;
 
     function held(e) {
+        if (e.target.closest('.m-actions-menu')) return;
         if (e.cancelable) e.preventDefault();
         if (startX === null) return;
         var dx = e.touches[0].clientX - startX;
@@ -297,8 +308,8 @@
     function pager(open) {
         if (page.classList.contains('m-pager-open') === open) return;
         page.classList.toggle('m-pager-open', open);
-        if (open) page.addEventListener('touchmove', held, { passive: false });
-        else page.removeEventListener('touchmove', held, { passive: false });
+        if (open) stage.addEventListener('touchmove', held, { passive: false });
+        else stage.removeEventListener('touchmove', held, { passive: false });
     }
 
     function onLast() {
@@ -307,18 +318,19 @@
     }
 
     if (drawer) {
-        page.addEventListener('touchstart', function (e) {
-            var one = e.touches.length === 1;
+        stage.addEventListener('touchstart', function (e) {
+            var one = e.touches.length === 1 && !e.target.closest('.m-actions-menu, .m-scrub');
+            mayRaise = onLast();
             startX = one ? e.touches[0].clientX : null;
             startY = one ? e.touches[0].clientY : null;
         }, { passive: true });
-        page.addEventListener('touchmove', function (e) {
+        stage.addEventListener('touchmove', function (e) {
             if (startY === null) return;
             var dx = e.touches[0].clientX - startX;
             var dy = e.touches[0].clientY - startY;
             var open = page.classList.contains('m-pager-open');
             if (Math.abs(dx) > Math.abs(dy)) return;
-            if (!open && dy < -SWIPE && onLast() && !page.classList.contains('m-list-open')) {
+            if (!open && dy < -SWIPE && mayRaise && !page.classList.contains('m-list-open')) {
                 pager(true);
                 startX = startY = null;
             } else if (open && dy > SWIPE) {
@@ -326,7 +338,7 @@
                 startX = startY = null;
             }
         }, { passive: true });
-        page.addEventListener('touchend', function () { startX = startY = null; }, { passive: true });
+        stage.addEventListener('touchend', function () { startX = startY = null; }, { passive: true });
     }
 
     document.addEventListener('scroll', function (e) {
