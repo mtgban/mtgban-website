@@ -233,12 +233,5 @@ func (s *site) UploadHandoff(w http.ResponseWriter, r *http.Request) {
 		observe(r, "upload.handoff_page", shown)
 	}
 
-	// A phone gets the handoff in the mobile layout, though the Upload page
-	// it belongs to keeps the desktop one, so it marks the mobile view itself.
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
-	}
-
 	render(w, "upload_handoff.html", pageVars)
 }
