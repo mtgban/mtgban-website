@@ -692,6 +692,13 @@ body.settings-open {
 .custom-rule [aria-invalid="true"] {
     border-color: var(--adanger);
 }
+.custom-rules .settings-btn {
+    padding: 0.35em 0.8em;
+    font-size: var(--text-md);
+}
+.custom-rule > .settings-btn {
+    padding-inline: 0;
+}
 .custom-rule-grip {
     cursor: grab;
     touch-action: none;
@@ -714,8 +721,9 @@ body.settings-open {
 @media (max-width: 720px) {
     .custom-rules,
     .custom-rules[data-kinds] {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) 1.75em;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) 2.25em;
     }
+    .custom-rules .settings-btn { min-height: 2.25rem; }
     .custom-rules-head { display: none; }
     .custom-rule {
         display: grid;
