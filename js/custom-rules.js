@@ -1,13 +1,16 @@
 // The custom buylist's rules after the first, for singles or for sealed:
 // rows drawn from the first rule's, kept in the cookie the container's
-// data-rules names as rate:min:seller:fallback items joined by commas.
+// data-rules names as rate:min:seller:fallback items joined by commas, with
+// :product:kind after each where the container's data-kinds lists those.
 // The first rule's fields keep their own cookies.
 (function () {
     'use strict';
 
     // The most a tier can set, as maxCustomBuylistRules in search.go
     var MAX = 10;
-    var FIELDS = ['rate', 'min', 'seller', 'fallback'];
+    var FIELDS = ['rate', 'min', 'seller', 'fallback', 'product', 'kind'];
+    // How many of them every rule has
+    var REQUIRED = 4;
 
     function validRate(v) {
         var n = Number(v);
@@ -21,14 +24,14 @@
         return n >= 1 ? Math.min(n, MAX) : 1;
     }
 
-    // parse reads the cookie into rules of four strings, as many as follow
-    // the first within max, dropping what the server drops: an item short of
-    // four fields or with no valid rate.
+    // parse reads the cookie into rules of up to six strings, as many as
+    // follow the first within max, dropping what the server drops: an item
+    // short of four fields or with no valid rate.
     function parse(raw, max) {
         var out = [];
         String(raw || '').split(',').forEach(function (item) {
             var parts = item.split(':');
-            if (parts.length < FIELDS.length || !validRate(parts[0])) return;
+            if (parts.length < REQUIRED || !validRate(parts[0])) return;
             if (out.length < max - 1) out.push(parts.slice(0, FIELDS.length));
         });
         return out;
@@ -43,7 +46,64 @@
     }
 
     function values(row) {
-        return FIELDS.map(function (f) { return field(row, f).value; });
+        return FIELDS.map(function (f) { return field(row, f); }).filter(Boolean).map(function (e) { return e.value; });
+    }
+
+    function label(v) {
+        v = v.replace(/_/g, ' ');
+        return v.charAt(0).toUpperCase() + v.slice(1);
+    }
+
+    // options redraws a select as Any and names, then picks value, kept as
+    // an option of its own when the datastore no longer has it.
+    function options(select, names, value) {
+        names = names.slice().sort();
+        if (value && names.indexOf(value) < 0) names.push(value);
+        while (select.options.length > 1) select.remove(1);
+        names.forEach(function (name) {
+            var o = document.createElement('option');
+            o.value = name;
+            o.textContent = label(name);
+            select.appendChild(o);
+        });
+        select.value = value;
+    }
+
+    // kindsOf is the kinds of one product in data-kinds, of every one for Any.
+    function kindsOf(container, product) {
+        var kinds = JSON.parse(container.getAttribute('data-kinds'));
+        if (product) return kinds[product] || [];
+        var all = [];
+        Object.keys(kinds).forEach(function (p) {
+            kinds[p].forEach(function (k) { if (all.indexOf(k) < 0) all.push(k); });
+        });
+        return all;
+    }
+
+    // cover sets a row's product and kind, each drawn from data-kinds.
+    function cover(container, row, product, kind) {
+        if (!field(row, 'product')) return;
+        options(field(row, 'product'), Object.keys(JSON.parse(container.getAttribute('data-kinds'))), product);
+        options(field(row, 'kind'), kindsOf(container, product), kind);
+    }
+
+    // write puts a rule's values in row.
+    function write(container, row, vals) {
+        FIELDS.slice(0, REQUIRED).forEach(function (f, i) { field(row, f).value = vals[i]; });
+        cover(container, row, vals[4] || '', vals[5] || '');
+        markRate(row);
+    }
+
+    // wireProduct lists only the kinds the picked product has, dropping a
+    // kind it has not.
+    function wireProduct(container, row) {
+        var product = field(row, 'product');
+        if (!product) return;
+        product.addEventListener('change', function () {
+            var kind = field(row, 'kind').value;
+            var kinds = kindsOf(container, product.value);
+            options(field(row, 'kind'), kinds, kinds.indexOf(kind) < 0 ? '' : kind);
+        });
     }
 
     function changed(container) {
@@ -74,10 +134,7 @@
         var rows = rowsOf(container);
         var rules = rows.map(values);
         rules.splice(to, 0, rules.splice(from, 1)[0]);
-        rows.forEach(function (row, i) {
-            FIELDS.forEach(function (f, j) { field(row, f).value = rules[i][j]; });
-            markRate(row);
-        });
+        rows.forEach(function (row, i) { write(container, row, rules[i]); });
     }
 
     // rowAt is the index of the row at height y, the nearest past either end.
@@ -153,8 +210,8 @@
         row.querySelectorAll('[id]').forEach(function (e) { e.removeAttribute('id'); });
         row.querySelectorAll('[data-cookie]').forEach(function (e) { e.removeAttribute('data-cookie'); });
         row.querySelectorAll('.custom-rule-grip').forEach(function (g) { g.remove(); });
-        FIELDS.forEach(function (f, i) { field(row, f).value = vals[i]; });
-        markRate(row);
+        write(container, row, vals);
+        wireProduct(container, row);
         addGrip(container, row);
         var remove = document.createElement('button');
         remove.type = 'button';
@@ -196,9 +253,13 @@
     function binding(container) {
         var cookie = container.getAttribute('data-rules');
         var add = container.querySelector('.custom-rules-add');
+        var first = container.querySelector('.custom-rule');
+        if (!container.dataset.wired) {
+            container.dataset.wired = '1';
+            wireProduct(container, first);
+        }
         if (add && !add.dataset.wired) {
             add.dataset.wired = '1';
-            var first = container.querySelector('.custom-rule');
             addGrip(container, first);
             first.addEventListener('input', function () { markRate(first); });
             add.addEventListener('click', function () {
@@ -210,7 +271,12 @@
             });
         }
         return {
-            load: function () { render(container, parse(getCookie(cookie), limit(container))); },
+            load: function () {
+                if (field(first, 'product')) {
+                    cover(container, first, getCookie(field(first, 'product').dataset.cookie), getCookie(field(first, 'kind').dataset.cookie));
+                }
+                render(container, parse(getCookie(cookie), limit(container)));
+            },
             save: function () { setCookie(cookie, format(collect(container)), 1000); },
             serialize: function () { return cookie + '=' + format(collect(container)); },
         };

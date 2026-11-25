@@ -243,6 +243,7 @@ func (s *site) newDatastore(b *matcher.Backend, loadedAt time.Time) *datastore {
 		finishes: v2FinishList(b),
 		odds:     newProductOdds(b, sources),
 		bulk:     bulkrates.New(b),
+		kinds:    newSealedKinds(b),
 		loadedAt: loadedAt,
 	}
 }

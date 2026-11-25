@@ -23,15 +23,17 @@ function fakeRow(vals) {
 function fakeContainer(rows, max = 5, rules = 'UploadCustomRules') {
     return {
         getAttribute: (name) => ({ 'data-max': String(max), 'data-rules': rules })[name] ?? null,
-        querySelector: () => null,
+        dataset: {},
+        querySelector: (sel) => (sel === '.custom-rule' ? fakeRow(rows[0]) : null),
         querySelectorAll: (sel) => (sel === '.custom-rule' ? rows.map(fakeRow) : []),
     };
 }
 
-test('parse keeps the first four fields of items at a valid rate, as many as follow the first within the tier', () => {
+test('parse keeps items of four to six fields at a valid rate, as many as follow the first within the tier', () => {
     const { R } = load();
     expect(R.parse('', 5)).toEqual([]);
-    expect(R.parse('0.6:2:TCGLow::TCGSealed:', 5)).toEqual([['0.6', '2', 'TCGLow', '']]);
+    expect(R.parse('0.6:2:TCGLow:', 5)).toEqual([['0.6', '2', 'TCGLow', '']]);
+    expect(R.parse('0.6:2:SS::booster_box:collector:x', 5)).toEqual([['0.6', '2', 'SS', '', 'booster_box', 'collector']]);
     expect(R.parse('0.6:2:TCGLow,half:2:TCGLow:,0:2:TCGLow:,0.5::CK:', 5)).toEqual([['0.5', '', 'CK', '']]);
     expect(R.parse(Array(6).fill('0.5::CK:').join(','), 5)).toHaveLength(4);
     expect(R.parse(Array(12).fill('0.5::CK:').join(','), 10)).toHaveLength(9);
@@ -100,7 +102,8 @@ test('the row under the pointer is found by height, the ends taking what is past
 });
 
 // An editor of one rule, with just enough of the DOM for binding to wire it.
-function editor(vals) {
+// Given kinds, its rows have a product and a kind select too.
+function editor(vals, kinds) {
     const node = (className) => ({
         className, dataset: {}, attrs: {}, children: [], listeners: {}, hidden: false, focused: 0,
         setAttribute(k, v) { this.attrs[k] = v; },
@@ -111,10 +114,20 @@ function editor(vals) {
         remove() { this.parent.children.splice(this.parent.children.indexOf(this), 1); },
         focus() { this.focused++; },
     });
+    // Picks nothing for a value it has no option for, as a select does.
+    const select = (cookie) => {
+        const n = Object.assign(node('field'), { options: [{ value: '', textContent: 'Any' }], picked: '' });
+        n.dataset.cookie = cookie;
+        n.remove = (i) => n.options.splice(i, 1);
+        n.appendChild = (o) => n.options.push(o);
+        Object.defineProperty(n, 'value', { get: () => n.picked, set(v) { n.picked = n.options.some((o) => o.value === v) ? v : ''; } });
+        return n;
+    };
     const makeRow = (rowVals) => {
         const row = node('custom-rule');
         const fields = {};
         FIELDS.forEach((f, i) => { fields[f] = Object.assign(node('field'), { value: rowVals[i] }); });
+        if (kinds) ['product', 'kind'].forEach((f) => { fields[f] = select('UploadCustomSealed' + f); });
         row.querySelector = (sel) => {
             const m = sel.match(/data-field="([^"]+)"/);
             return m ? fields[m[1]] : row.children.find((c) => '.' + c.className === sel);
@@ -131,7 +144,8 @@ function editor(vals) {
     const add = node('custom-rules-add');
     const container = {
         changes: 0,
-        getAttribute: (name) => ({ 'data-max': '5', 'data-rules': 'UploadCustomRules' })[name] ?? null,
+        dataset: {},
+        getAttribute: (name) => ({ 'data-max': '5', 'data-rules': 'UploadCustomRules', 'data-kinds': JSON.stringify(kinds) })[name] ?? null,
         dispatchEvent(e) { if (e.type === 'change') this.changes++; },
         insertBefore(row) { row.parent = { children: rows }; rows.push(row); },
         querySelector: (sel) => (sel === '.custom-rule' ? rows[0] : add),
@@ -177,4 +191,40 @@ test('grips show from two rules, and the arrows move a rule as far as the ends',
     // Back to one rule, nothing is left to order
     ed.rows[1].children.find((c) => c.className === 'custom-rule-remove').fire('click');
     expect(grips().map((g) => g.hidden)).toEqual([true]);
+});
+
+test('a sealed rule lists the products, and the kinds of the one picked', () => {
+    const ed = editor(['0.8', '7', 'SS', ''], { booster_box: ['collector', 'draft'], deck: ['intro'] });
+    const cookies = {
+        UploadCustomSealedproduct: 'booster_box', UploadCustomSealedkind: 'collector',
+        UploadCustomRules: '0.5:1:SS:,0.4:1:SS::booster_crate:gone',
+    };
+    const { R } = load(cookies, ed.document);
+    const binding = R.binding(ed.container);
+    binding.load();
+    const at = (row, f) => ed.rows[row].querySelector('[data-field="' + f + '"]');
+    const shown = (row, f) => at(row, f).options.map((o) => o.textContent);
+    const picks = () => ed.rows.map((r, i) => [at(i, 'product').value, at(i, 'kind').value]);
+
+    expect(picks()).toEqual([['booster_box', 'collector'], ['', ''], ['booster_crate', 'gone']]);
+    expect(shown(0, 'product')).toEqual(['Any', 'Booster box', 'Deck']);
+    expect(shown(0, 'kind')).toEqual(['Any', 'Collector', 'Draft']);
+    expect(shown(1, 'kind')).toEqual(['Any', 'Collector', 'Draft', 'Intro']);
+    // A label the datastore lost stays, so a save does not widen the rule to Any
+    expect(shown(2, 'product')).toEqual(['Any', 'Booster box', 'Deck', 'Booster crate']);
+    binding.save();
+    expect(cookies.UploadCustomRules).toBe('0.5:1:SS:::,0.4:1:SS::booster_crate:gone');
+
+    // Kinds travel with their product to a row that listed others
+    R.move(ed.container, 0, 1);
+    expect(picks()).toEqual([['', ''], ['booster_box', 'collector'], ['booster_crate', 'gone']]);
+
+    // Another product drops a kind it has not, and keeps one it has
+    at(1, 'product').value = 'deck';
+    at(1, 'product').fire('change');
+    expect([picks()[1], shown(1, 'kind')]).toEqual([['deck', ''], ['Any', 'Intro']]);
+    at(0, 'kind').value = 'intro';
+    at(0, 'product').value = 'deck';
+    at(0, 'product').fire('change');
+    expect(picks()[0]).toEqual(['deck', 'intro']);
 });

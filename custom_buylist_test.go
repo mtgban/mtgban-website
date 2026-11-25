@@ -476,6 +476,16 @@ func TestCustomBuylistRuleTip(t *testing.T) {
 			want: "50% of REFSealed (or ALTSealed) if ≥ $20.00",
 		},
 		{
+			name: "a sealed rule for one kind of one product",
+			rule: customBuylistRule{rate: 0.8, minPrice: 40, seller: "REFSealed", product: "booster_box", kind: "collector", sealed: true},
+			want: "80% of REFSealed on booster box, collector if ≥ $40.00",
+		},
+		{
+			name: "a sealed rule for a kind of any product",
+			rule: customBuylistRule{rate: 0.8, seller: "REFSealed", kind: "prerelease_kit", sealed: true},
+			want: "80% of REFSealed on prerelease kit",
+		},
+		{
 			name: "a sealed fallback that sells no sealed is not applied",
 			rule: customBuylistRule{rate: 0.5, seller: "REFSealed", fallback: "REF", sealed: true},
 			want: "50% of REFSealed",
@@ -530,32 +540,33 @@ func TestSearchSpellsTheCustomBuylistRule(t *testing.T) {
 	}
 }
 
-// The rules after the first come from one cookie a kind, rate:min:seller:
-// fallback items joined by commas: an item short of four fields or with no
-// valid rate is dropped alone, fields past the fourth are ignored, and the
-// chain stops at the tier's limit.
+// The rules after the first come from one cookie for singles and one for
+// sealed, rate:min:seller:fallback items joined by commas, a sealed one's
+// product and kind after: an item short of four fields or with no valid rate
+// is dropped alone, fields past the chain's are ignored, and the chain stops
+// at the tier's limit.
 func TestParseCustomBuylistRules(t *testing.T) {
-	first := [4]string{"0.8", "7", "CK", "TCGLow"}
+	first := [6]string{"0.8", "7", "CK", "TCGLow"}
 	one := customBuylistRule{rate: 0.8, minPrice: 7, seller: "CK", fallback: "TCGLow"}
 	two := customBuylistRule{rate: 0.6, minPrice: 2, seller: "TCGLow"}
 	for _, tt := range []struct {
 		name  string
-		first [4]string
+		first [6]string
 		extra string
 		limit int
 		want  []customBuylistRule
 	}{
 		{"the first rule alone", first, "", 5, []customBuylistRule{one}},
 		{"a second rule", first, "0.6:2:TCGLow:", 5, []customBuylistRule{one, two}},
-		{"a bad first rate keeps the rest", [4]string{"NaN"}, "0.6:2:TCGLow:", 5, []customBuylistRule{two}},
+		{"a bad first rate keeps the rest", [6]string{"NaN"}, "0.6:2:TCGLow:", 5, []customBuylistRule{two}},
 		{"a bad rate drops its item", first, "half:2:TCGLow:,0.6:2:TCGLow:", 5, []customBuylistRule{one, two}},
 		{"a short item is dropped", first, "0.6:2:TCGLow,0.6:2:TCGLow:", 5, []customBuylistRule{one, two}},
-		{"a long item keeps its first four", first, "0.6:2:TCGLow::TCGSealed:", 5, []customBuylistRule{one, two}},
+		{"a long item drops what is past its fields", first, "0.6:2:TCGLow::::x", 5, []customBuylistRule{one, two}},
 		{"as many as the limit", first, strings.Repeat("0.6:2:TCGLow:,", 6), 5, []customBuylistRule{one, two, two, two, two}},
 		{"a limit of one keeps the first", first, "0.6:2:TCGLow:", 1, []customBuylistRule{one}},
-		{"a limit of one takes an extra for a bad first", [4]string{"NaN"}, "0.6:2:TCGLow:,0.6:2:TCGLow:", 1, []customBuylistRule{two}},
+		{"a limit of one takes an extra for a bad first", [6]string{"NaN"}, "0.6:2:TCGLow:,0.6:2:TCGLow:", 1, []customBuylistRule{two}},
 		{"ten at most", first, strings.Repeat("0.6:2:TCGLow:,", 12), maxCustomBuylistRules, append([]customBuylistRule{one}, slices.Repeat([]customBuylistRule{two}, 9)...)},
-		{"none", [4]string{}, "", 5, nil},
+		{"none", [6]string{}, "", 5, nil},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			got := parseCustomBuylistRules(tt.first, tt.extra, tt.limit, false)
@@ -614,6 +625,18 @@ func TestCustomBuylistReadsSinglesAndSealedApart(t *testing.T) {
 			want: append([]customBuylistRule{one}, sealedRules(customBuylistRule{rate: 0.8, minPrice: 7, seller: "SS"})...),
 		},
 		{
+			name:  "a sealed rule has a product and kind, a singles one ignores the same fields",
+			limit: "2",
+			set: map[string]string{
+				"UploadCustomRules":         "0.6:2:TCGLow::booster_box:collector",
+				"UploadCustomSealedProduct": "booster_box", "UploadCustomSealedKind": "collector",
+				"UploadCustomSealedRules": "0.4:20:SS::deck:",
+			},
+			want: append([]customBuylistRule{one, {rate: 0.6, minPrice: 2, seller: "TCGLow"}}, sealedRules(
+				customBuylistRule{rate: 0.8, minPrice: 7, seller: "SS", product: "booster_box", kind: "collector"},
+				customBuylistRule{rate: 0.4, minPrice: 20, seller: "SS", product: "deck"})...),
+		},
+		{
 			name: "a bad sealed rate drops the sealed rule alone",
 			set:  map[string]string{"UploadCustomSealedRate": "0"},
 			want: []customBuylistRule{one},
@@ -637,7 +660,8 @@ func TestCustomBuylistReadsSinglesAndSealedApart(t *testing.T) {
 				"UploadCustomRate": "customrate", "UploadCustomMinPrice": "customminprice", "UploadCustomBuyer": "customseller",
 				"UploadCustomRules": "customrules", "UploadCustomSealedRate": "customsealedrate",
 				"UploadCustomSealedMinPrice": "customsealedminprice", "UploadCustomSealedBuyer": "customsealedseller",
-				"UploadCustomSealedRules": "customsealedrules",
+				"UploadCustomSealedRules": "customsealedrules", "UploadCustomSealedProduct": "customsealedproduct",
+				"UploadCustomSealedKind": "customsealedkind",
 			}
 			for cookie, field := range fields {
 				if set[cookie] != "" {
@@ -660,6 +684,88 @@ func TestCustomBuylistReadsSinglesAndSealedApart(t *testing.T) {
 				t.Errorf("upload reads %+v off the cookies, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+// A sealed rule prices only the products it names, on search, upload and
+// arbit alike, the rest going on to the next rule.
+func TestCustomBuylistCoversProductAndKind(t *testing.T) {
+	ids := map[[2]string]string{}
+	for _, id := range backend().GetSealedUUIDs() {
+		co, err := backend().GetUUID(id)
+		if err == nil && !customBuylistSkips(backend(), co, time.Now().Add(-customBuylistMinAge)) {
+			ids[[2]string{co.Layout, co.Side}] = id
+		}
+	}
+	box, pack, draft := ids[[2]string{"booster_box", "collector"}], ids[[2]string{"booster_pack", "collector"}], ids[[2]string{"booster_box", "draft"}]
+	if box == "" || pack == "" || draft == "" {
+		t.Skip("no datastore")
+	}
+	inv := mtgban.InventoryRecord{}
+	for _, id := range []string{box, pack, draft} {
+		inv[id] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 10, Quantity: 1}}
+	}
+	ref := mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "REFSealed", SealedMode: true})
+	withPrices(t, []mtgban.Seller{ref}, []mtgban.Vendor{})
+
+	for _, tt := range []struct {
+		name, product, kind string
+		want                map[string]float64
+	}{
+		{"any", "", "", map[string]float64{box: 8, pack: 8, draft: 8}},
+		{"a product", "booster_box", "", map[string]float64{box: 8, pack: 7, draft: 8}},
+		{"a kind", "", "collector", map[string]float64{box: 8, pack: 8, draft: 7}},
+		{"a kind of a product", "booster_box", "collector", map[string]float64{box: 8, pack: 7, draft: 7}},
+		{"a label the datastore lacks", "booster_crate", "", map[string]float64{box: 7, pack: 7, draft: 7}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			rules := []customBuylistRule{
+				{rate: 0.8, seller: "REFSealed", product: tt.product, kind: tt.kind, sealed: true},
+				{rate: 0.7, seller: "REFSealed", sealed: true},
+			}
+			search, upload, arbit := map[string]float64{}, map[string]float64{}, map[string]float64{}
+			for _, offer := range customBuylistOffers(backend(), currentPrices(), rules, []string{box, pack, draft}) {
+				search[offer.cardID] = offer.price
+			}
+			refs := customBuylistRefs(currentPrices(), rules)
+			for id := range tt.want {
+				entries, rule := uploadCustomBuylistEntries(backend(), refs, id)
+				if len(entries) == 1 {
+					upload[id] = entries[0].Price * rule.Rate
+				}
+			}
+			for id, entries := range newCustomBuylistVendor(backend(), currentPrices(), rules, ref).Buylist() {
+				arbit[id] = entries[0].BuyPrice
+			}
+			if !maps.Equal(search, tt.want) || !maps.Equal(upload, tt.want) || !maps.Equal(arbit, tt.want) {
+				t.Errorf("search pays %v, upload %v and arbit %v, want %v", search, upload, arbit, tt.want)
+			}
+		})
+	}
+}
+
+// The dropdowns list what the datastore labels: Magic's products by category
+// and kind, with nothing for a game that labels none.
+func TestNewSealedKinds(t *testing.T) {
+	kinds := newSealedKinds(backend())
+	if len(kinds) == 0 {
+		t.Skip("no datastore")
+	}
+	if !slices.Contains(kinds["booster_box"], "collector") || !slices.IsSorted(kinds["booster_box"]) {
+		t.Errorf("booster boxes come as %v", kinds["booster_box"])
+	}
+	for product, names := range kinds {
+		for _, name := range append([]string{product}, names...) {
+			if name == "" || strings.ContainsAny(name, ":,;") {
+				t.Errorf("%q of %q does not fit a rule's field", name, product)
+			}
+		}
+	}
+	if got := sealedKindsJSON(nil); got != "" {
+		t.Errorf("no kinds render as %q", got)
+	}
+	if got := sealedKindsJSON(map[string][]string{"deck": {"intro"}}); got != `{"deck":["intro"]}` {
+		t.Errorf("kinds render as %s", got)
 	}
 }
 

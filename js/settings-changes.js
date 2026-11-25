@@ -40,7 +40,7 @@
         'UploadAltPrice', 'UploadCustomBuyer', 'UploadCustomSealedBuyer', 'UploadCustomSinglesFallback', 'UploadCustomSealedFallback',
         'UploadPercSpread', 'UploadPercSpreadMax', 'UploadMinVal', 'UploadMaxVal', 'UploadMargin', 'UploadCustomPercMax',
         'UploadMultiplier', 'UploadMaxQty', 'UploadCustomMinPrice', 'UploadCustomRate', 'UploadCustomRules',
-        'UploadCustomSealedMinPrice', 'UploadCustomSealedRate', 'UploadCustomSealedRules', 'UploadTiebreakOrder',
+        'UploadCustomSealedMinPrice', 'UploadCustomSealedRate', 'UploadCustomSealedRules', 'UploadCustomSealedProduct', 'UploadCustomSealedKind', 'UploadTiebreakOrder',
         'SleepersSellersList', 'SleepersVendorsList', 'SleepersEditionList', 'NewspaperList',
         'ArbitVendorsList', 'GlobalVendorsList', 'ReverseVendorsList'
     ];

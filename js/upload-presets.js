@@ -15,11 +15,12 @@
         ['customseller', 'UploadCustomBuyer', 'TCGLow'], ['customsealedseller', 'UploadCustomSealedBuyer', 'TCGSealed'],
         ['customminprice', 'UploadCustomMinPrice', '7'], ['customrate', 'UploadCustomRate', '0.8'],
     ];
-    // A fallback, the sealed rule's own rate and minimum, or the rules after
-    // the first, are in a preset only when set, None being no key.
+    // A fallback, the sealed rule's own rate, minimum, product and kind, or
+    // the rules after the first, are in a preset only when set, None being no key.
     var OPTIONAL = [
         ['customfallback', 'UploadCustomSinglesFallback'], ['customsealedfallback', 'UploadCustomSealedFallback'],
         ['customsealedrate', 'UploadCustomSealedRate'], ['customsealedminprice', 'UploadCustomSealedMinPrice'],
+        ['customsealedproduct', 'UploadCustomSealedProduct'], ['customsealedkind', 'UploadCustomSealedKind'],
         ['customrules', 'UploadCustomRules'], ['customsealedrules', 'UploadCustomSealedRules'],
     ];
     var NUMERIC = ['percspread', 'percspreadmax', 'minval', 'maxval', 'margin', 'custompercmax', 'multiplier', 'maxqty', 'customminprice', 'customrate', 'customsealedminprice', 'customsealedrate'];

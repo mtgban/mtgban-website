@@ -29,5 +29,6 @@ type datastore struct {
 	finishes []banprice.Finish
 	odds     *productOdds
 	bulk     *bulkrates.Rates
+	kinds    map[string][]string // sealed product kinds per category
 	loadedAt time.Time
 }

@@ -2585,7 +2585,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 
 			if slices.ContainsFunc(rules, func(rule customBuylistRule) bool { return !rule.sealed && rule.seller != "" }) {
 				for _, cardID := range ids.cardIDs {
-					entries, rule := uploadCustomBuylistEntries(refs, cardID, false)
+					entries, rule := uploadCustomBuylistEntries(b, refs, cardID)
 					processEntry(b, p, results, entries, "", cardID, customStore, false, ids.shouldCheckForConditions, false, rule)
 				}
 				enabledStores = append(enabledStores, customStore)
@@ -2595,7 +2595,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 			hasSealed := slices.ContainsFunc(rules, func(rule customBuylistRule) bool { return rule.sealed && rule.seller != "" })
 			if hasSealed && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
 				for _, productID := range ids.sealedProductIDs {
-					entries, rule := uploadCustomBuylistEntries(refs, productID, true)
+					entries, rule := uploadCustomBuylistEntries(b, refs, productID)
 					processEntry(b, p, results, entries, "", productID, customSealedStore, false, false, false, rule)
 				}
 				enabledSealedStores = append(enabledSealedStores, customSealedStore)
@@ -2648,6 +2648,8 @@ func uploadCustomBuylistRules(r *http.Request) []customBuylistRule {
 	sealedFallback := r.FormValue("customsealedfallback")
 	extra := r.FormValue("customrules")
 	sealedExtra := r.FormValue("customsealedrules")
+	product := r.FormValue("customsealedproduct")
+	kind := r.FormValue("customsealedkind")
 	if !r.Form.Has("custombuylist") {
 		customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
 		customBuylist = slices.Contains(customOpts, "enabled")
@@ -2655,21 +2657,25 @@ func uploadCustomBuylistRules(r *http.Request) []customBuylistRule {
 		sealedFallback = readCookie(r, "UploadCustomSealedFallback")
 		extra = readCookie(r, "UploadCustomRules")
 		sealedExtra = readCookie(r, "UploadCustomSealedRules")
+		product = readCookie(r, "UploadCustomSealedProduct")
+		kind = readCookie(r, "UploadCustomSealedKind")
 	}
 	if !customBuylist {
 		return nil
 	}
-	singles := [4]string{
+	singles := [6]string{
 		getUploadSetting(r, "customrate", "UploadCustomRate"),
 		getUploadSetting(r, "customminprice", "UploadCustomMinPrice"),
 		getUploadSetting(r, "customseller", "UploadCustomBuyer"),
 		fallback,
 	}
-	sealed := [4]string{
+	sealed := [6]string{
 		getUploadSetting(r, "customsealedrate", "UploadCustomSealedRate"),
 		getUploadSetting(r, "customsealedminprice", "UploadCustomSealedMinPrice"),
 		getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer"),
 		sealedFallback,
+		product,
+		kind,
 	}
 	limit := customBuylistRulesMax(verifiedSignature(r))
 	return slices.Concat(
@@ -2678,15 +2684,19 @@ func uploadCustomBuylistRules(r *http.Request) []customBuylistRule {
 	)
 }
 
-// uploadCustomBuylistEntries is what the first singles or sealed rule that
-// applies to one card or sealed product prices it off, and that rule as
+// uploadCustomBuylistEntries is what the first rule covering one card or
+// sealed product that applies to it prices it off, and that rule as
 // processEntry takes it: one rule a call, since processEntry ANDs the rules
 // it is given and keeps the lowest of the inventory prices it is handed
 // again.
-func uploadCustomBuylistEntries(refs []customBuylistRef, cardID string, sealed bool) ([]mtgban.InventoryEntry, EntryRule) {
+func uploadCustomBuylistEntries(b *matcher.Backend, refs []customBuylistRef, cardID string) ([]mtgban.InventoryEntry, EntryRule) {
 	rule := EntryRule{SkipSets: customBuylistSkipSets, SkipOversized: true, ReleasedBy: time.Now().Add(-customBuylistMinAge)}
+	co, err := b.GetUUID(cardID)
+	if err != nil {
+		return nil, rule
+	}
 	for _, ref := range refs {
-		if ref.rule.sealed != sealed {
+		if !ref.rule.covers(co) {
 			continue
 		}
 		entries := ref.reference(cardID)
