@@ -873,7 +873,7 @@ func adminScraperTable(p *prices, kind string, now time.Time, pageVars *PageVars
 			status = "🔴"
 		}
 
-		name := scraper.info.Name
+		name := gradedName(scraper.info, scraper.info.Name)
 		if scraper.info.SealedMode {
 			name += " 📦"
 		}

@@ -64,7 +64,7 @@ func (s *site) BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 		if info.MetadataOnly || slices.Contains(blocklistRetail, info.Shorthand) {
 			continue
 		}
-		name := p.scraperName(info.Shorthand)
+		name := p.listedName(info.Shorthand)
 		inventory := seller.Inventory()
 		for _, cardID := range cardIDs {
 			entries, found := inventory[cardID]

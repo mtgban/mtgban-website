@@ -37,6 +37,9 @@ type Service struct {
 	// HiddenStores returns the sellers and vendors the stores endpoint
 	// leaves out for the request's reader, nil for none.
 	HiddenStores func(r *http.Request) (sellers, vendors []string)
+	// SellerName is a seller's name as the list has it, a seller of slabs
+	// marked as one.
+	SellerName func(info mtgban.ScraperInfo) string
 
 	// PromoAliases returns the shorthands a promo type also answers to, so
 	// the endpoint can offer them beside the type itself.
@@ -754,7 +757,7 @@ func (s *Service) Stores(w http.ResponseWriter, r *http.Request) {
 		seen["s:"+info.Shorthand] = true
 		out.Sellers = append(out.Sellers, Store{
 			Shorthand: info.Shorthand,
-			Name:      info.Name,
+			Name:      s.SellerName(info),
 			Country:   info.CountryFlag,
 			Sealed:    info.SealedMode,
 		})

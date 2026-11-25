@@ -1,11 +1,20 @@
 package main
 
 import (
+	"bytes"
+	"encoding/csv"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/alerts"
+	"github.com/mtgban/mtgban-website/internal/palette"
+	"github.com/mtgban/mtgban-website/internal/sessionstore"
 )
 
 func TestStoreLabel(t *testing.T) {
@@ -210,5 +219,114 @@ func TestPricesByNameKeepAGradedStoreApart(t *testing.T) {
 		if len(got) != 3 {
 			t.Errorf("%s: %d stores, want 3: %v", where, len(got), got)
 		}
+	}
+}
+
+// Wherever stores are named side by side, the seller of slabs sharing its
+// store's name is marked, and the one whose name says so is left alone.
+func TestGradedStoreIsMarkedWhereStoresAreNamed(t *testing.T) {
+	signingEnabled(t, false)
+	s := gradedTwins(t)
+	p := s.prices()
+	want := map[string]string{"ZZSAME": "Same Store", "ZZSLAB": "Same Store (Graded)", "ZZOTHER": "Other Store Graded"}
+
+	for _, store := range alertStorePrices(p, "FIXTUREA-1", false, alerts.SideRetail, nil) {
+		if store.Name != want[store.Shorthand] {
+			t.Errorf("the alert lists %s as %q, want %q", store.Shorthand, store.Name, want[store.Shorthand])
+		}
+	}
+	for shorthand, name := range want {
+		got := alertStoreLabel(p, shorthand)
+		if got != name {
+			t.Errorf("an alert is sent about %s as %q, want %q", shorthand, got, name)
+		}
+		bar := newArbitBar(arbitState{}, arbitMode{Global: true}, arbitOffer{}, s.backend(), p, shorthand)
+		if bar.Sell.Label != name {
+			t.Errorf("the bar labels %s %q, want %q", shorthand, bar.Sell.Label, name)
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	s.palette.Stores(rec, httptest.NewRequest(http.MethodGet, "/api/palette/stores.json", nil))
+	var listed palette.StoresResponse
+	err := json.Unmarshal(rec.Body.Bytes(), &listed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed.Sellers) != len(want) {
+		t.Errorf("the palette lists %v", listed.Sellers)
+	}
+	for _, store := range listed.Sellers {
+		if store.Name != want[store.Shorthand] {
+			t.Errorf("the palette lists %s as %q, want %q", store.Shorthand, store.Name, want[store.Shorthand])
+		}
+	}
+
+	var pv PageVars
+	adminScraperTable(p, sessionstore.Retail, time.Now(), &pv)
+	for _, row := range pv.Tables[0] {
+		if row[0] != want[row[1]] {
+			t.Errorf("the admin table lists %s as %q, want %q", row[1], row[0], want[row[1]])
+		}
+	}
+
+	var buf bytes.Buffer
+	w := csv.NewWriter(&buf)
+	priced := map[string]map[string]*BanPrice{"FIXTUREA-1": {"ZZSAME": {Regular: 10}, "ZZSLAB": {Regular: 400}, "ZZOTHER": {Regular: 300}}}
+	err = SimplePrice2CSV(s.backend(), p, w, priced, nil, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Flush()
+	header, _, _ := strings.Cut(buf.String(), "\n")
+	if !strings.HasSuffix(header, ",Other Store Graded,Same Store,Same Store (Graded)") {
+		t.Errorf("the CSV's header is %q", header)
+	}
+}
+
+// A favorite quoted at a slab seller says so.
+func TestBatchPricesMarkAGradedStore(t *testing.T) {
+	signingEnabled(t, false)
+	slabs := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"FIXTUREA-1": {{Conditions: "NM", Price: 400}}},
+		mtgban.ScraperInfo{Name: "Same Store", Shorthand: "ZZSLAB", GradedMode: true})
+	buyer := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Buyer", Shorthand: "ZZBUY"})
+	s := fixtureSite(t, fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}}),
+		[]mtgban.Seller{slabs}, []mtgban.Vendor{buyer})
+	rec := httptest.NewRecorder()
+	s.BatchPricesAPI(rec, httptest.NewRequest(http.MethodGet, "/data/prices/FIXTUREA-1", nil))
+	var got map[string]PriceResult
+	err := json.Unmarshal(rec.Body.Bytes(), &got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["FIXTUREA-1"].SellVendor != "Same Store (Graded)" {
+		t.Errorf("quoted at %q, want the slab seller marked", got["FIXTUREA-1"].SellVendor)
+	}
+}
+
+// The arbitrage pages' store menu and title mark the slab seller.
+func TestArbitMarksAGradedStore(t *testing.T) {
+	withSigMode(t, true, false)
+	s := gradedTwins(t)
+	allow := []string{"ZZSAME", "ZZSLAB", "ZZOTHER"}
+	render := func(path string, pageVars PageVars) string {
+		rec := httptest.NewRecorder()
+		pageVars.UserNav = &NavElem{Short: "beta"}
+		s.scraperCompare(rec, httptest.NewRequest(http.MethodGet, path, nil), s.prices(), pageVars, allow, nil, scraperCompareOpts{AllResults: true, AnySpread: true})
+		return rec.Body.String()
+	}
+	for _, page := range []string{
+		render("/arbit?source=ZZSLAB", PageVars{}),
+		render("/global?source=ZZSLAB", PageVars{ArbitVars: ArbitVars{GlobalMode: true}}),
+	} {
+		for _, want := range []string{">Same Store (Graded)</option>", ">Same Store</option>", ">Other Store Graded</option>", " Same Store (Graded)</title>"} {
+			if !strings.Contains(page, want) {
+				t.Errorf("the page lacks %s", want)
+			}
+		}
+	}
+	page := render("/global?source=ZZSAME&legit=0", PageVars{ArbitVars: ArbitVars{GlobalMode: true}})
+	if !strings.Contains(page, `id="Same Store (Graded)"`) {
+		t.Error("the slab seller's table is not marked")
 	}
 }

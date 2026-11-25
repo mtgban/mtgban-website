@@ -37,7 +37,7 @@ func alertStorePrices(p *prices, cardID string, sealed bool, side alerts.Side, b
 			}
 		}
 		out = append(out, alerts.StorePrice{
-			Shorthand: info.Shorthand, Name: p.scraperName(info.Shorthand), Prices: prices,
+			Shorthand: info.Shorthand, Name: p.listedName(info.Shorthand), Prices: prices,
 			PickedOnly: slices.Contains(alertPickedOnlyStores, info.Shorthand) ||
 				side == alerts.SideBuylist && info.CountryFlag != "",
 		})

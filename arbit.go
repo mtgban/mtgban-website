@@ -798,8 +798,8 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 	// kept in load order (updates replace entries in place), so without this the
 	// menu follows config order instead of name order.
 	sort.SliceStable(menuScrapers, func(i, j int) bool {
-		return strings.ToLower(p.scraperName(menuScrapers[i].Info().Shorthand)) <
-			strings.ToLower(p.scraperName(menuScrapers[j].Info().Shorthand))
+		return strings.ToLower(p.listedName(menuScrapers[i].Info().Shorthand)) <
+			strings.ToLower(p.listedName(menuScrapers[j].Info().Shorthand))
 	})
 
 	// Populate the menu bar with the pool selected above
@@ -815,7 +815,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 		}
 
 		nav := NavElem{
-			Name:  p.scraperName(scraper.Info().Shorthand),
+			Name:  p.listedName(scraper.Info().Shorthand),
 			Short: scraper.Info().Shorthand,
 			Link:  link,
 		}
@@ -1067,7 +1067,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 			creditInfo = source.Info()
 		}
 
-		name := p.scraperName(scraper.Info().Shorthand)
+		name := p.listedName(scraper.Info().Shorthand)
 		if name == "" {
 			name = scraper.Info().Name
 		}
@@ -1112,7 +1112,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 	}
 
 	if pageVars.GlobalMode {
-		pageVars.Title = "Market Imbalance in " + p.scraperName(source.Info().Shorthand)
+		pageVars.Title = "Market Imbalance in " + p.listedName(source.Info().Shorthand)
 	} else {
 		pageVars.Title = "Arbitrage"
 		if pageVars.ReverseMode {
@@ -1120,7 +1120,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 		} else {
 			pageVars.Title += " from "
 		}
-		pageVars.Title += p.scraperName(source.Info().Shorthand)
+		pageVars.Title += p.listedName(source.Info().Shorthand)
 	}
 
 	if countArbit(r) {
