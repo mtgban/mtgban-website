@@ -302,12 +302,15 @@
 /* Outside the store's link, so it neither links nor underlines; the cell's
    gap spaces it, and the name is what shortens. */
 .price-row .store-cell .bl-pill { margin-left: 0; flex-shrink: 0; }
-/* A graded copy's slab: one label can be a sentence, so it shortens before
-   the name, down to room for a grader and score. */
+/* A graded copy's slab: one label can be a sentence, so it keeps room for a
+   grader and score, less where it needs less, and grows into what the name
+   leaves. */
 .price-row .store-cell .slab-name {
-    flex-shrink: 9;
-    min-width: 7ch;
+    flex: 1 0 7ch;
+    min-width: 0;
+    max-width: max-content;
     overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--search-text-dim);

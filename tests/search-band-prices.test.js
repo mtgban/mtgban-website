@@ -85,3 +85,14 @@ test('a phone card\'s "No offers" keeps to the left edge, clear of its icons', (
     const cards = read('css/search-cards-mobile.css');
     expect(cards).toMatch(/\.m-layout-cards \.m-card > \.no-offers \{[^}]*justify-self: start;/);
 });
+
+// A floor in min-width padded "BGS 9" out to seven characters, cutting the
+// store's name short on a 320px phone.
+test('a short slab takes no more room than it needs', () => {
+    const css = read('css/search-rows.css');
+    const rule = css.match(/\.store-cell \.slab-name \{([^}]*)\}/)[1];
+    expect(rule).toContain('flex: 1 0 7ch;');
+    expect(rule).toContain('max-width: max-content;');
+    // Clipped rather than scrolled, its least width is its text's otherwise
+    expect(rule).toContain('min-width: 0;');
+});
