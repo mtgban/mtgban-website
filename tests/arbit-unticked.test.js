@@ -86,6 +86,36 @@ test('each mode and source keeps its own', () => {
     }
 });
 
+// The listing a row is kept by, as templates/arbit.html prints it for a copy
+// of the source and, on Global, the reference's listing it is set against.
+const listingAttr = read('templates/arbit.html').match(/<tr data-arb-id="\{\{\.CardID\}\}" data-arb-listing="([^"]*)"/)[1];
+function listing(mode, copy, ref) {
+    return listingAttr
+        .replace(/\{\{if \$\.GlobalMode\}\}(.*?)\{\{end\}\}/, mode === 'global' ? '$1' : '')
+        .replace(/\{\{\.(InventoryEntry|ReferenceEntry)\.(Conditions|InstanceID)\}\}/g, (_, side, field) => (side === 'InventoryEntry' ? copy : ref)[field]);
+}
+
+const copy = { Conditions: 'NM', InstanceID: '1' };
+const refs = [{ Conditions: 'NM', InstanceID: '7' }, { Conditions: 'SP', InstanceID: '8' }];
+
 test('the rows carry the listing they are kept by', () => {
-    expect(read('templates/arbit.html')).toContain('<tr data-arb-id="{{.CardID}}" data-arb-listing="{{.InventoryEntry.Conditions}} {{.InventoryEntry.InstanceID}}"');
+    expect(listing('arbit', copy, refs[0])).toBe('NM 1');
+    expect(listing('reverse', copy, refs[1])).toBe('NM 1');
+    expect(listing('global', copy, refs[1])).toBe('NM 1 SP 8');
+});
+
+test('one copy against two of the reference\'s listings on Global is two rows, kept apart', () => {
+    const arbit = { mode: 'global', source: 'TCGLow' };
+    const rows = refs.map((ref) => ['bolt', listing('global', copy, ref)]);
+    for (const unticked of [0, 1]) {
+        const store = {};
+        const before = section('CK', rows);
+        const page = load([before], store, arbit);
+        before.rows[unticked].classList.add('arb-removed');
+        page.change(before);
+
+        const after = section('CK', rows);
+        load([after], store, arbit).fire('DOMContentLoaded');
+        expect(shown(after)).toEqual([unticked !== 0, unticked !== 1]);
+    }
 });
