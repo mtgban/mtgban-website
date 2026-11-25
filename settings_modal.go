@@ -91,28 +91,29 @@ func sleepModalKeys(p *prices, blocklistRetail, blocklistBuylist []string) (sell
 	return sellers, vendors
 }
 
-// uploadStoreLists is every store an upload may be priced against, by kind.
+// uploadStoreLists is every store an upload may be priced against, by kind,
+// in display order.
 // Sellers skip MetadataOnly entries; vendors do not.
 func uploadStoreLists(p *prices, sig string) (singlesSellers, sealedSellers, singlesVendors, sealedVendors []string) {
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
-	singlesSellers = p.filterSellers(func(info mtgban.ScraperInfo) bool {
+	singlesSellers = sortKeysByScraperName(p, p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		return !info.MetadataOnly && !info.SealedMode &&
 			!slices.Contains(blocklistRetail, info.Shorthand)
-	})
-	sealedSellers = p.filterSellers(func(info mtgban.ScraperInfo) bool {
+	}))
+	sealedSellers = sortKeysByScraperName(p, p.filterSellers(func(info mtgban.ScraperInfo) bool {
 		return !info.MetadataOnly && info.SealedMode &&
 			!slices.Contains(Config().Stores.UploadSealedBlockList, info.Shorthand) &&
 			!Config().apiOnly(info.Shorthand)
-	})
-	singlesVendors = p.filterVendors(func(info mtgban.ScraperInfo) bool {
+	}))
+	singlesVendors = sortKeysByScraperName(p, p.filterVendors(func(info mtgban.ScraperInfo) bool {
 		return !info.SealedMode &&
 			!slices.Contains(blocklistBuylist, info.Shorthand)
-	})
-	sealedVendors = p.filterVendors(func(info mtgban.ScraperInfo) bool {
+	}))
+	sealedVendors = sortKeysByScraperName(p, p.filterVendors(func(info mtgban.ScraperInfo) bool {
 		return info.SealedMode &&
 			!slices.Contains(Config().Stores.UploadSealedBlockList, info.Shorthand) &&
 			!Config().apiOnly(info.Shorthand)
-	})
+	}))
 	return singlesSellers, sealedSellers, singlesVendors, sealedVendors
 }
 
