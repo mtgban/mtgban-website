@@ -61,6 +61,12 @@
     // hand over a list nothing can price - and gathering that list can be
     // minutes of somebody's afternoon.
     if (root.getAttribute("data-can-upload") !== "true") {
+        // A fragment's list does not outlast the log in, unlike one an
+        // opener still holds
+        var back = document.getElementById("handoff-return");
+        if (linked && back) {
+            back.textContent = "follow the link here again";
+        }
         return;
     }
 
