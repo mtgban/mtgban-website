@@ -464,6 +464,19 @@ func TestHandoffHandlerAsksBeforeItReceives(t *testing.T) {
 	})
 }
 
+// A phone gets the handoff in the mobile layout, as the Upload page it
+// belongs to.
+func TestHandoffOnAPhone(t *testing.T) {
+	withSigMode(t, true, false)
+	req := httptest.NewRequest(http.MethodGet, "/upload/handoff", nil)
+	req.AddCookie(&http.Cookie{Name: "MobileView", Value: "true"})
+	rec := httptest.NewRecorder()
+	testSite.UploadHandoff(rec, req)
+	if !strings.Contains(rec.Body.String(), `<body class="light-theme mobile`) {
+		t.Error("a phone was not given the mobile layout")
+	}
+}
+
 // TestHandoffDocumentsItself pins that the page says what reaches it and in
 // what shape, for both readers who see it: somebody who opened the URL
 // themselves, and somebody being turned away.
