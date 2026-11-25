@@ -68,9 +68,11 @@ func tcgplayerLinkFor(co *matcher.CardObject) string {
 // no lookup can tell which of them a link meant. TCGplayer sells a Secret
 // Lair's English and Japanese printings as one product - SLD #1112 and
 // #1112jpn both file under 450544 - and a handful of dagger variants the same
-// way. matcher keeps the first filer and drops the rest, deterministically,
-// so the answer is a real printing of the right card under the right name; it
-// just is not always the one a caller started from.
+// way, as it does a foreign black-bordered set's languages: FBB, FBBFR and
+// FBBDE #121 all file under 109645. matcher keeps the first filer and drops
+// the rest, deterministically, so the answer is a real printing of the right
+// card under the right name; it just is not always the one a caller started
+// from.
 func tcgplayerSharedProductIDs() map[string]bool {
 	printings := map[string]map[string]bool{}
 	for _, uuid := range backend().GetUUIDs() {
@@ -111,6 +113,12 @@ func manapoolLinkFor(co *matcher.CardObject) string {
 		strings.ToLower(co.SetCode), strings.ToLower(co.Number), finish)
 }
 
+// manapoolNumbered reports whether a printing has a number an address can
+// carry: a two-sided token sheet's "7//10" is two numbers, and no path.
+func manapoolNumbered(co *matcher.CardObject) bool {
+	return co.Number != "" && co.Identifiers["derivedTokenPair"] != "true"
+}
+
 // manapoolLinkPrintings are the printings each Mana Pool address answers to.
 // More than one is a set filing a card in two languages under one number -
 // F16 #10 in English and in German - which an address naming no language
@@ -119,7 +127,7 @@ func manapoolLinkPrintings() map[string]map[string]bool {
 	printings := map[string]map[string]bool{}
 	for _, uuid := range backend().GetUUIDs() {
 		co, err := backend().GetUUID(uuid)
-		if err != nil || co.Sealed || co.Number == "" {
+		if err != nil || co.Sealed || !manapoolNumbered(co) {
 			continue
 		}
 		link := manapoolLinkFor(co)
@@ -172,7 +180,7 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 			}
 		}
 
-		if co.Number != "" {
+		if manapoolNumbered(co) {
 			link := manapoolLinkFor(co)
 			checkedMP++
 			reply := checkForLinks(backend(), discordGuildID(), link)
@@ -206,12 +214,13 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 	t.Logf("%d tcgplayer printings, %d mana pool; %d printings share a product id with another and were not asked",
 		checkedTCG, checkedMP, sharedTCG)
 
-	// The shared ids are a property of how TCGplayer sells Secret Lairs, not
-	// of this code, but a jump would mean the id space had stopped naming one
-	// printing - which is the assumption the link rests on. 2,543 of 150,619
-	// printings, 1.7%, on the September datastore; this fires at 3%.
-	if sharedTCG*100 > (checkedTCG+sharedTCG)*3 {
-		t.Errorf("%d of %d printings share a product id, well past the 1.7%% this datastore has carried",
+	// The shared ids are a property of how TCGplayer sells Secret Lairs and
+	// a set's other languages, not of this code, but a jump would mean the id
+	// space had stopped naming one printing - which is the assumption the
+	// link rests on. 6,484 of 165,342 printings, 3.9%, on the November
+	// datastore; this fires at 6%.
+	if sharedTCG*100 > (checkedTCG+sharedTCG)*6 {
+		t.Errorf("%d of %d printings share a product id, well past the 3.9%% this datastore has carried",
 			sharedTCG, checkedTCG+sharedTCG)
 	}
 }
