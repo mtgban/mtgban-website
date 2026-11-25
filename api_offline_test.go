@@ -3,6 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -140,6 +141,46 @@ func TestOfflinePricesBlockOneSide(t *testing.T) {
 			if retail != slices.Contains(tc.retail, shorthand) || buylist != slices.Contains(tc.buylist, shorthand) {
 				t.Errorf("%s: %s in retail %v, buylist %v", target, shorthand, retail, buylist)
 			}
+		}
+	}
+}
+
+// Offline rows carry no slab, so a seller of slabs named as its store is told
+// apart by its name in the catalog.
+func TestOfflineCatalogMarksAGradedStore(t *testing.T) {
+	withSigMode(t, true, false)
+	withConfigCopy(t)
+
+	inv := mtgban.InventoryRecord{}
+	inv.Add("FIXTUREA-1", &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 1, URL: "u"})
+	s := fixtureSite(t, fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01",
+		[][2]string{{"Fixture Card Alpha", "1"}}), []mtgban.Seller{
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Same Store", Shorthand: "ZZSAME"}),
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Same Store", Shorthand: "ZZSLAB", GradedMode: true}),
+	}, nil)
+	s.offline.RefreshManifest()
+
+	w := httptest.NewRecorder()
+	s.offline.Handle(w, httptest.NewRequest(http.MethodGet, "/api/offline/catalog.json", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+	gr, err := gzip.NewReader(w.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var catalog struct {
+		Stores map[string]struct {
+			Name string `json:"n"`
+		} `json:"stores"`
+	}
+	err = json.NewDecoder(gr).Decode(&catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for shorthand, want := range map[string]string{"ZZSAME": "Same Store", "ZZSLAB": "Same Store (Graded)"} {
+		if got := catalog.Stores[shorthand].Name; got != want {
+			t.Errorf("%s is named %q, want %q", shorthand, got, want)
 		}
 	}
 }
