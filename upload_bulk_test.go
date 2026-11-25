@@ -67,12 +67,16 @@ func TestBulkOffersMagic(t *testing.T) {
 		{"16790491-a95d-5f99-8ae4-1f3bc0d78f4f_f", ""},        // Solitude, H2R foil
 		{"485ea57b-16d8-54ba-a84a-c86e57cc70d7", ""},          // The First Sliver, H1R foil
 		{"00dc5683-b09e-5860-8ebb-ed9ad78bf9b0", "Bulk Rare"}, // Glittering Wish, TSR
+		// A playtest card outside Mystery Booster 2 keeps its row
+		{"43a4c626-e28a-58a9-a724-de287a1bd7db", "Bulk Rare"}, // Counterspell, SLD
 		// Refused: memorabilia, book promo, Un-set, gold border, token,
 		// Japanese, Phyrexian
 		{"d15b218d-411f-5517-98b7-ff366fe7f0a6", ""},   // Shivan Dragon, CED
 		{"35a44c3b-c344-5685-ba89-2e227233e94f", ""},   // Shivan Dragon, 30A
 		{"4bfcac0c-4b5f-5821-a126-8dfba5d2d384", ""},   // Mana Crypt, PHPR
 		{"03c64bd2-e1f9-5451-bc06-aee5f1db8612", ""},   // Hardy of Myra's Marvels, UNF
+		{"180727de-6673-5851-accd-bf73832db14a", ""},   // Earl of Squirrel, PUST
+		{"0110702e-0151-574a-af73-7259033dcc4e", ""},   // Kozilek, Compleated, MB2 playtest
 		{"00460d79-3570-58b8-af87-7b89106eb48c", ""},   // Balance, PTC
 		{"00093ed9-5b6b-5a88-bd12-7c3e260abf1c", ""},   // Inkling, TBRC
 		{"00b8e1e4-70e7-5d35-80ae-8b5acdd9c29e", ""},   // Royal Assassin, 4BB
