@@ -160,7 +160,11 @@ window.addEventListener("message", (event) =&gt; {
             <code>Cross-Origin-Opener-Policy: same-origin</code> is cut off
             from the windows it opens, and cannot send a message here. It
             can link here with the list in the fragment, which is taken
-            when the referrer is an allowed origin:
+            when the referrer is an allowed origin. The link has to send at
+            least its origin as the referrer: with
+            <code>rel="noreferrer"</code>, or a <code>no-referrer</code> or
+            <code>same-origin</code> policy, it sends none, and the list is
+            not taken.
         </p>
 <pre class="handoff-example">// a link the reader follows, opened in a new tab or not
 "https://mtgban.com/upload/handoff#mtgban-handoff-rows="
