@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -722,9 +723,10 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	files = append(files, "templates/partials/meta-description.html")
 
 	// Every desktop page carries the settings modal's shell, and the mobile
-	// Upload, whose options live there; its body is fetched from
-	// /api/settings/modal on open
-	if !isMobile || name == "upload.html" {
+	// pages that link to it; its body is fetched from /api/settings/modal on
+	// open
+	settingsPages := []string{"upload.html", "news.html", "sleep.html", "user.html"}
+	if !isMobile || slices.Contains(settingsPages, name) {
 		files = append(files, "templates/partials/settings-modal.html")
 	}
 	if !isMobile && name == "admin.html" {

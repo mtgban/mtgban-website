@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -217,9 +218,47 @@ func TestPhoneMenuListsTheResponsivePages(t *testing.T) {
 	}
 }
 
-// The mobile base carries no settings modal, and Upload's options live in
-// it: a phone's Upload brings the shell, its scripts and a link of its own,
-// where a desktop's has the base's and the navbar's gear.
+// A phone page that links to the settings opens them on its own tab, which
+// takes the modal's shell, its scripts and the icons it draws.
+func TestPhoneSettingsLinksOpenTheModal(t *testing.T) {
+	for _, dir := range []string{"templates", "templates/mobile"} {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range entries {
+			name := e.Name()
+			if e.IsDir() || strings.HasPrefix(name, "base") {
+				continue
+			}
+			_, files := renderTemplateFiles(name, true)
+			page := dir + "/" + name
+			if !slices.Contains(files, page) {
+				continue
+			}
+			body, err := os.ReadFile(page)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(body), `settings=1"`) && !slices.Contains(files, "templates/partials/settings-modal.html") {
+				t.Errorf("%s links to the settings and carries no modal", page)
+			}
+		}
+	}
+	for _, name := range []string{"upload.html", "news.html", "sleep.html", "user.html"} {
+		pv := PageVars{IsMobile: true, UserNav: &NavElem{}, User: &UserVars{}, SettingsTab: "the-tab"}
+		page := renderPage(t, name, true, pv)
+		for _, want := range []string{`id="settings-modal"`, `src="/js/settings-loader.js`, `src="/js/utils.js`, `src="/js/offline/offline-images-ui.js`, `src="/js/icons.js`, `BAN_SETTINGS = { tab: "the-tab" }`} {
+			n := strings.Count(page, want)
+			if n != 1 {
+				t.Errorf("%s on a phone: %d of %s, want 1", name, n, want)
+			}
+		}
+	}
+}
+
+// Upload has its settings on a phone and on a desktop, by a link of its own
+// on the phone, where a desktop has the navbar's gear.
 func TestUploadOnAPhoneKeepsItsSettings(t *testing.T) {
 	results := PageVars{UploadVars: UploadVars{UploadEntries: []UploadEntry{{}}}}
 	for _, c := range []struct {

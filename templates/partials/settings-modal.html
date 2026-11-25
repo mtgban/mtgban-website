@@ -1,3 +1,13 @@
+{{/* What the modal needs of a page, in the mobile base's head; the desktop
+     base carries its own */}}
+{{define "settings-modal-scripts"}}
+    <script type="text/javascript" src="/js/utils.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-images.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/offline/offline-images-ui.js?hash={{.Hash}}" defer></script>
+    <script>window.BAN_SETTINGS = { tab: "{{.SettingsTab}}" };</script>
+    <script type="text/javascript" src="/js/settings-loader.js?hash={{.Hash}}" defer></script>
+{{end}}
+
 {{define "settings-modal-slot"}}
 <div class="settings-backdrop" id="settings-backdrop" hidden></div>
 <div class="settings-modal" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" hidden>

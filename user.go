@@ -467,7 +467,7 @@ func (s *site) User(w http.ResponseWriter, r *http.Request) {
 	pageVars := genPageNav(s, r, "Account", sig)
 	pageVars.User = &UserVars{}
 	if pageVars.ErrorMessage == "" {
-		pageVars.User = s.userVars(r.Context(), parseSig(sig), pageVars.IsMobile)
+		pageVars.User = s.userVars(r.Context(), parseSig(sig))
 		hasSession := pageVars.User.SignedIn && readCookie(r, sessionCookie) != ""
 		pageVars.User.CanRefresh = hasSession && renewalEnabled()
 		pageVars.User.CanEndSessions = hasSession && UserStateDB != nil
@@ -535,7 +535,7 @@ func (s *site) writeAccountAction(w http.ResponseWriter, r *http.Request) {
 }
 
 // userVars reads the reader off the signed values and builds the page.
-func (s *site) userVars(ctx context.Context, sigParams url.Values, isMobile bool) *UserVars {
+func (s *site) userVars(ctx context.Context, sigParams url.Values) *UserVars {
 	v := &UserVars{
 		Name:       sigParams.Get("UserName"),
 		Email:      sigParams.Get("UserEmail"),
@@ -553,7 +553,7 @@ func (s *site) userVars(ctx context.Context, sigParams url.Values, isMobile bool
 	if !v.SignedIn {
 		return v
 	}
-	v.Features = userFeatures(s, sigParams, isMobile)
+	v.Features = userFeatures(s, sigParams)
 	if v.Unverified {
 		v.Discord = DiscordStatus{State: "unverified"}
 		return v
@@ -566,7 +566,7 @@ func (s *site) userVars(ctx context.Context, sigParams url.Values, isMobile bool
 
 // userFeatures lists the personal features the signed reader's tier
 // grants; nobody for an anonymous one.
-func userFeatures(s *site, sigParams url.Values, isMobile bool) []UserFeature {
+func userFeatures(s *site, sigParams url.Values) []UserFeature {
 	if sigParams.Get("UserEmail") == "" {
 		return nil
 	}
@@ -577,10 +577,7 @@ func userFeatures(s *site, sigParams url.Values, isMobile bool) []UserFeature {
 			UserFeature{Name: "Recent searches", Description: "What you looked up lately, on every device you sign in on", Link: "/search"},
 		)
 	}
-	// The settings modal is desktop only.
-	if !isMobile {
-		out = append(out, UserFeature{Name: "Settings", Description: "Your preferences, mostly saved in this browser", Link: "/user?settings=1"})
-	}
+	out = append(out, UserFeature{Name: "Settings", Description: "Your preferences, mostly saved in this browser", Link: "/user?settings=1"})
 	if navOffers(s, sigParams, "Alerts") && sigParams.Get("UserEmailUnverified") != "true" {
 		out = append(out, UserFeature{Name: "Price alerts", Description: "Cards you watch, delivered to Discord or email", Link: "/alerts"})
 	}

@@ -34,6 +34,7 @@
     <title>{{block "title" .}}{{.Title}}{{end}}</title>
 
     {{block "extra-head" .}}{{end}}
+    {{block "settings-modal-scripts" .}}{{end}}
     <!-- Before content: setCardArtSource must exist for mid-page art seeding. -->
     <script type="text/javascript" src="/js/card-art-fallback.js?hash={{.Hash}}"></script>
 </head>

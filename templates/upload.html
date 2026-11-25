@@ -6,13 +6,6 @@
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
 {{end}}
 
-{{/* The mobile base carries neither the settings modal's loader nor the
-     helpers the modal's shell calls; Upload's options live in the modal. */}}
-{{define "extra-head"}}{{if .IsMobile}}
-    <script type="text/javascript" src="/js/utils.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/settings-loader.js?hash={{.Hash}}" defer></script>
-{{end}}{{end}}
-
 {{define "upload-settings-link"}}<a class="upload-share-link upload-settings-link" href="?settings=1" title="Settings" onclick="if(window.openSettings){window.openSettings('upload');}return false;" data-track="ui.settings.open" data-track-value="gear">{{template "upload-icon" "settings"}} Settings</a>{{end}}
 
 {{/* The icons this page draws as it loads, as the markup lucide would have
