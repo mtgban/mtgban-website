@@ -298,6 +298,12 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		}
 		return
 	}
+	// Every price endpoint but graded leaves the sellers of slabs out, and
+	// graded is v2's alone
+	isGraded := version == APIVersionV2 && kind == "graded"
+	enabledSellers = onlyGraded(p, enabledSellers, isGraded)
+	enabledVendors = onlyGraded(p, enabledVendors, isGraded)
+
 	if strings.HasPrefix(urlPath, "stores") {
 		output := apiStoreUnion(enabledSellers, enabledVendors)
 		filter := r.FormValue("filter")
@@ -351,7 +357,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		return
 	}
 
-	if kind != "retail" && kind != "buylist" && kind != "all" && kind != "sealed" {
+	if kind != "retail" && kind != "buylist" && kind != "all" && kind != "sealed" && !isGraded {
 		out.Error = "Not found"
 		json.NewEncoder(w).Encode(&out)
 		return
@@ -428,7 +434,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	}
 
 	// Only filtered output can have csv encoding, and only for retail or buylist requests
-	checkCSVoutput := (filterByEdition == "" && filterByHash == nil && filterByFinish == "") || kind == "all"
+	checkCSVoutput := (filterByEdition == "" && filterByHash == nil && filterByFinish == "") || kind == "all" || isGraded
 	if strings.HasSuffix(urlPath, ".csv") && checkCSVoutput {
 		out.Error = "Invalid request"
 		json.NewEncoder(w).Encode(&out)
@@ -455,10 +461,17 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		dumpType += "sealed"
 	}
 
+	if isGraded && canAccessMode(enabledModes, "graded") {
+		dumpType += "graded"
+	}
+
 	// v2 serves v1's CSV, which already has one row per uuid with its finish
 	isV2 := version == APIVersionV2 && strings.HasSuffix(urlPath, ".json")
 	var retailV2, buylistV2 *v2Section
 
+	if isGraded && canAccessMode(enabledModes, "graded") {
+		retailV2 = gradedSectionV2(b, p, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish)
+	}
 	if ((kind == "retail" || kind == "all") && canRetail) || isSealed {
 		dumpType += "retail"
 		if isV2 {

@@ -945,7 +945,7 @@ expanded at request time from the live sellers minus the retail blocklist
 and the live vendors minus the buylist one — or `DEV_ACCESS`) and
 `APImode`; a request with neither `sig` nor `API` falls back to
 `Config.Stores.APIDemoStores` and is refused the full `all`/`retail`/`buylist` dumps,
-by those exact names; it keeps the sealed dump and per-set or per-card
+by those exact names; it keeps the sealed and graded dumps and per-set or per-card
 requests. An unknown dump name answers "Not found". A search answers
 sealed products, on any path, only to the `sealed` mode, as the sealed dump does. Other user APIs: `/search/decklist/tcgplayer/`,
 `/search/decklist/cardmarket/` (CSV exports keyed to store SKUs), `/data/prices/{ids}`
@@ -985,6 +985,14 @@ store is sealed, an index (its prices quote a market, with or without a
 a vendor's credit multiplier, and when its prices were collected.
 `finishes.json` (v2 only) lists the finish keys the game's prices use with
 a label and a count, commonest first; `filter=singles|sealed` narrows both.
+Slabs are v2's alone (`api_graded.go`), under `graded[/<set-code>|<id>].json`
+and `search/retail/graded/`, JSON and retail only, for a key with the
+`graded` mode: every other price endpoint and search, and v1's `stores.json`,
+leaves a `GradedMode` seller out whatever the scope. Their `condition` is the
+grade the Graded page lists them under (`slabGroup`), with the slab's
+`grader`, `score` and `label`; a store's list has one entry per grade and
+label, in the page's order (`compareSlabs`). v2's `stores.json` marks such a
+store `graded`, and takes `filter=graded`.
 v2's JSON takes no `tag`: its prices are keyed by store shorthand, which
 `stores.json` maps to each store's display name. Its `.csv` prices are
 v1's CSV and still honor `tag=names`. v2 spells MTGBAN ids `ban`, where

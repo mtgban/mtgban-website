@@ -622,6 +622,9 @@ func (s *site) SearchExport(w http.ResponseWriter, r *http.Request) {
 	s.searchPrices(w, r, false)
 }
 
+// gradedSearchPath is a search of slabs, in either version, on either side.
+var gradedSearchPath = regexp.MustCompile(`^/api/(mtgban|v2)/search/(retail|buylist)/graded/`)
+
 // searchPrices runs a search and writes its prices: for the price API when
 // isAPI, else as the site's CSV export.
 func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) {
@@ -651,6 +654,12 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	// v2 serves v1's CSV, as its price API does
 	isV2 := isAPI && strings.HasPrefix(r.URL.Path, "/api/v2/search/")
 	isV2JSON := isV2 && isJSON
+	// Slabs are v2's alone, in JSON, and only sold
+	isGraded := isV2JSON && strings.HasPrefix(r.URL.Path, "/api/v2/search/retail/graded/")
+	if isAPI && !isGraded && gradedSearchPath.MatchString(r.URL.Path) {
+		http.NotFound(w, r)
+		return
+	}
 
 	// The site's own exports are CSV; JSON is the API's
 	if !isAPI && !isCSV {
@@ -682,6 +691,10 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	var blocklistRetail, blocklistBuylist []string
 	if !keyScoped {
 		blocklistRetail, blocklistBuylist = getDefaultBlocklists(sig)
+	}
+	// Every API search but graded leaves the sellers of slabs out
+	if isAPI && !isGraded {
+		blocklistRetail = slices.Concat(blocklistRetail, gradedStores(p))
 	}
 
 	// Expand blocklist as needed
@@ -740,6 +753,9 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 			idOpt = "mtgjson"
 		}
 	}
+	if isGraded {
+		gradedSearch(&config)
+	}
 	// The site's export holds what the page showed, the reader's backpacks
 	// included; a key's caller has none.
 	if !isAPI {
@@ -762,6 +778,9 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 		if config.SkipSealed {
 			allKeys = withoutSealed(b, allKeys)
 		}
+		if isGraded {
+			allKeys = newPostStores(b, p, r, allKeys, config).offered(allKeys)
+		}
 		sortSearchKeys(r, ds, p, allKeys, dropOdds(b, config), config.Sales, readSearchSort(r, config), readSearchReverse(r, config))
 		if len(allKeys) > MaxAPISearchResults {
 			allKeys = allKeys[:MaxAPISearchResults]
@@ -774,15 +793,19 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	if isSealed && config.SkipSealed {
 		canRetail, canBuylist = false, false
 	}
+	if isGraded {
+		canRetail = canAccessMode(enabledModes, "graded")
+	}
 
 	// The demo (sig-less) JSON endpoint sees only the demo stores; per the
 	// storeEligible precedence an explicit store list is the entire policy,
 	// so it replaces the parsed store filters (blocklists included)
 	demoStores := sig == "" && isJSON
 	demoFilter := func(name string, forSeller bool) []FilterStoreElem {
+		stores := onlyGraded(p, Config().Stores.APIDemoStores, isGraded)
 		return []FilterStoreElem{{
 			Name:          name,
-			Values:        fixupStoreCodeNG(p, strings.Join(Config().Stores.APIDemoStores, ",")),
+			Values:        fixupStoreCodeNG(p, strings.Join(stores, ",")),
 			OnlyForSeller: forSeller,
 			OnlyForVendor: !forSeller,
 		}}
@@ -820,7 +843,9 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 		if demoStores {
 			cfg.StoreFilters = demoFilter("seller", true)
 		}
-		if isV2JSON {
+		if isGraded {
+			retailV2 = gradedSearchV2(b, p, idOpt, allKeys, cfg)
+		} else if isV2JSON {
 			retailV2 = sellerSearchV2(b, p, idOpt, allKeys, cfg, isSealed)
 		} else {
 			foundSellers = searchSellers(p, allKeys, cfg)

@@ -133,6 +133,9 @@ func sortedKeys[T any](keys []string, m map[string]T) []string {
 // breaks the build here instead of vanishing from the output.
 type entryFields struct {
 	Condition string
+	Grader    string
+	Score     float64
+	Label     string
 	Price     float64
 	Qty       int
 	Available int
@@ -154,6 +157,24 @@ func appendEntries(b []byte, entries []Entry) ([]byte, error) {
 		if e.Condition != "" {
 			b = append(b, `"condition":`...)
 			b = appendString(b, e.Condition)
+			b = append(b, ',')
+		}
+		if e.Grader != "" {
+			b = append(b, `"grader":`...)
+			b = appendString(b, e.Grader)
+			b = append(b, ',')
+		}
+		if e.Score != 0 {
+			b = append(b, `"score":`...)
+			b, err = appendFloat(b, e.Score)
+			if err != nil {
+				return nil, err
+			}
+			b = append(b, ',')
+		}
+		if e.Label != "" {
+			b = append(b, `"label":`...)
+			b = appendString(b, e.Label)
 			b = append(b, ',')
 		}
 		b = append(b, `"price":`...)

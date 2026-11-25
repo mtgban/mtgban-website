@@ -2,7 +2,7 @@ openapi: 3.0.0
 info:
   title: BAN Price API
   version: 1.0.0
-  description: Retail and buylist prices for singles and sealed products across many stores.
+  description: Retail and buylist prices for singles and sealed products across many stores. Graded cards (slabs) are version 2 only.
 
 servers:
   - url: https://api.mtgban.com/v1/{game}
