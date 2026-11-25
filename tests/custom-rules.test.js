@@ -3,12 +3,11 @@ import { readFileSync } from 'fs';
 
 const source = readFileSync(new URL('../js/custom-rules.js', import.meta.url), 'utf8');
 
-function load(cookies = {}) {
-    const window = {};
+function load(cookies = {}, document = {}, window = {}) {
     const setCookie = (name, value) => { if (value === '') delete cookies[name]; else cookies[name] = value; };
     const getCookie = (name) => cookies[name] || '';
     new Function('window', 'document', 'setCookie', 'getCookie', 'Event', source)(
-        window, {}, setCookie, getCookie, class Event { constructor(t) { this.type = t; } });
+        window, document, setCookie, getCookie, class Event { constructor(t) { this.type = t; } });
     return { R: window.CustomBuylistRules, cookies };
 }
 
@@ -68,4 +67,114 @@ test('the sealed rules save to a cookie of their own', () => {
     const { R, cookies } = load({ UploadCustomRules: '0.5::CK:' });
     R.binding(fakeContainer([['0.8', '7', 'TCGSealed', ''], ['0.6', '20', 'SS', '']], 5, 'UploadCustomSealedRules')).save();
     expect(cookies).toEqual({ UploadCustomRules: '0.5::CK:', UploadCustomSealedRules: '0.6:20:SS:' });
+});
+
+// Rows that keep what is written to them, one every 30px from 100 down.
+function liveRows(list) {
+    return list.map((vals, n) => {
+        const fields = {};
+        FIELDS.forEach((f, i) => { fields[f] = { value: vals[i], attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; } }; });
+        fields.rate.getBoundingClientRect = () => ({ top: 100 + 30 * n });
+        return { querySelector: (sel) => fields[sel.match(/data-field="([^"]+)"/)[1]], fields };
+    });
+}
+
+test('a move reorders the values over the same rows, the first included', () => {
+    const { R } = load();
+    const rules = [['0.8', '7', 'CK', 'TCGLow'], ['0.6', '2', 'TCGLow', ''], ['bad', '', 'SCG', '']];
+    const rows = liveRows(rules);
+    const container = { querySelectorAll: () => rows };
+    const now = () => rows.map((r) => FIELDS.map((f) => r.fields[f].value));
+    R.move(container, 0, 2);
+    expect(now()).toEqual([rules[1], rules[2], rules[0]]);
+    R.move(container, 1, 0);
+    expect(now()).toEqual([rules[2], rules[1], rules[0]]);
+    // A bad rate is marked where it lands and nowhere else
+    expect(rows.map((r) => 'aria-invalid' in r.fields.rate.attrs)).toEqual([true, false, false]);
+});
+
+test('the row under the pointer is found by height, the ends taking what is past them', () => {
+    const { R } = load();
+    const container = { querySelectorAll: () => liveRows([['1', '', '', ''], ['1', '', '', ''], ['1', '', '', '']]) };
+    expect([0, 100, 129, 130, 160, 900].map((y) => R.rowAt(container, y))).toEqual([0, 0, 0, 1, 2, 2]);
+});
+
+// An editor of one rule, with just enough of the DOM for binding to wire it.
+function editor(vals) {
+    const node = (className) => ({
+        className, dataset: {}, attrs: {}, children: [], listeners: {}, hidden: false, focused: 0,
+        setAttribute(k, v) { this.attrs[k] = v; },
+        removeAttribute(k) { delete this.attrs[k]; },
+        addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); },
+        fire(type, e = {}) { (this.listeners[type] || []).forEach((fn) => fn(e)); },
+        appendChild(c) { this.children.push(c); c.parent = this; },
+        remove() { this.parent.children.splice(this.parent.children.indexOf(this), 1); },
+        focus() { this.focused++; },
+    });
+    const makeRow = (rowVals) => {
+        const row = node('custom-rule');
+        const fields = {};
+        FIELDS.forEach((f, i) => { fields[f] = Object.assign(node('field'), { value: rowVals[i] }); });
+        row.querySelector = (sel) => {
+            const m = sel.match(/data-field="([^"]+)"/);
+            return m ? fields[m[1]] : row.children.find((c) => '.' + c.className === sel);
+        };
+        row.querySelectorAll = (sel) => row.children.filter((c) => '.' + c.className === sel);
+        row.cloneNode = () => {
+            const copy = makeRow(FIELDS.map((f) => fields[f].value));
+            row.children.forEach((c) => copy.appendChild(node(c.className)));
+            return copy;
+        };
+        return row;
+    };
+    const rows = [makeRow(vals)];
+    const add = node('custom-rules-add');
+    const container = {
+        changes: 0,
+        getAttribute: (name) => ({ 'data-max': '5', 'data-rules': 'UploadCustomRules' })[name] ?? null,
+        dispatchEvent(e) { if (e.type === 'change') this.changes++; },
+        insertBefore(row) { row.parent = { children: rows }; rows.push(row); },
+        querySelector: (sel) => (sel === '.custom-rule' ? rows[0] : add),
+        querySelectorAll: (sel) => ({
+            '.custom-rule': rows, '.custom-rule ~ .custom-rule': rows.slice(1),
+            '.custom-rule-grip': rows.flatMap((r) => r.querySelectorAll('.custom-rule-grip')),
+        })[sel],
+    };
+    return { container, rows, add, document: { createElement: () => node('') } };
+}
+
+test('grips show from two rules, and the arrows move a rule as far as the ends', () => {
+    const ed = editor(['0.8', '7', 'CK', '']);
+    const tracked = [];
+    const { R } = load({}, ed.document, { BAN: { track: (...a) => tracked.push(a) } });
+    R.binding(ed.container).load();
+    const grips = () => ed.container.querySelectorAll('.custom-rule-grip');
+    const rates = () => ed.rows.map((r) => r.querySelector('[data-field="rate"]').value);
+    const press = (row, key) => {
+        let prevented = false;
+        grips()[row].fire('keydown', { key, preventDefault() { prevented = true; } });
+        return prevented;
+    };
+    expect(grips().map((g) => g.hidden)).toEqual([true]);
+
+    ed.add.fire('click');
+    ed.rows[1].querySelector('[data-field="rate"]').value = '0.5';
+    expect(grips().map((g) => g.hidden)).toEqual([false, false]);
+    ed.container.changes = 0;
+
+    press(0, 'ArrowUp');
+    press(1, 'ArrowDown');
+    expect(press(0, 'Tab')).toBe(false);
+    expect(rates()).toEqual(['0.8', '0.5']);
+    expect([ed.container.changes, tracked.length]).toEqual([0, 0]);
+
+    expect(press(0, 'ArrowDown')).toBe(true);
+    expect(rates()).toEqual(['0.5', '0.8']);
+    expect(grips().map((g) => g.focused)).toEqual([0, 1]);
+    expect(ed.container.changes).toBe(1);
+    expect(tracked).toEqual([['ui.settings.custom_rule', 'move']]);
+
+    // Back to one rule, nothing is left to order
+    ed.rows[1].children.find((c) => c.className === 'custom-rule-remove').fire('click');
+    expect(grips().map((g) => g.hidden)).toEqual([true]);
 });
