@@ -92,6 +92,10 @@
     font-size: 0.9em;
     white-space: nowrap;
 }
+/* The longest runs past the narrowest phones */
+@media (max-width: 359px) {
+    #handoff-guide p code { white-space: normal; }
+}
 
 .handoff-cols,
 .handoff-fields {
