@@ -700,6 +700,8 @@ test('the custom buylist rules after the first travel with a preset only when se
         customsealedrules: ['UploadCustomSealedRules', '0.4:20:TCGSealed:'],
         customsealedrate: ['UploadCustomSealedRate', '0.5'],
         customsealedminprice: ['UploadCustomSealedMinPrice', '40'],
+        customsealedproduct: ['UploadCustomSealedProduct', 'booster_box'],
+        customsealedkind: ['UploadCustomSealedKind', 'collector'],
     };
     const on = { UploadCustomOpts: 'enabled,' };
     const opts = { mode: 'true', tab: 'singles', custombuylist: 'true', stores: [] };

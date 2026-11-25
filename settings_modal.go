@@ -146,6 +146,19 @@ func uploadSettingsKeys(p *prices, sig string) uploadModalKeys {
 	}
 }
 
+// sealedKindsJSON is the kinds of each category of sealed product for the
+// custom buylist's sealed rules, empty where there are none.
+func sealedKindsJSON(kinds map[string][]string) string {
+	if len(kinds) == 0 {
+		return ""
+	}
+	out, err := json.Marshal(kinds)
+	if err != nil {
+		return ""
+	}
+	return string(out)
+}
+
 var settingsTabNames = map[string]string{
 	"search":  "Search",
 	"upload":  "Upload",
@@ -208,6 +221,9 @@ type settingsModalVars struct {
 	UploadSealedSellerKeys []string
 	CanUploadCustom        bool
 	UploadCustomRulesMax   int
+	// The kinds of each category of sealed product, as JSON, empty where
+	// the game's products have no labels
+	UploadSealedKinds      string
 	UploadVendorKeys       []string
 	UploadSealedVendorKeys []string
 
@@ -277,6 +293,7 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 	v.UploadSealedSellerKeys = up.SealedSellerKeys
 	v.CanUploadCustom = up.CanUploadCustom
 	v.UploadCustomRulesMax = up.CustomRulesMax
+	v.UploadSealedKinds = sealedKindsJSON(ds.kinds)
 	v.UploadVendorKeys = up.VendorKeys
 	v.UploadSealedVendorKeys = up.SealedVendorKeys
 

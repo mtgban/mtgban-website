@@ -43,6 +43,7 @@
             'UploadSorting', 'UploadAltPrice', 'UploadPriceSource', 'UploadTiebreak',
             'UploadCustomBuyer', 'UploadCustomSealedBuyer',
             'UploadCustomSinglesFallback', 'UploadCustomSealedFallback',
+            'UploadCustomSealedProduct', 'UploadCustomSealedKind',
         ],
         misc: {
             // search

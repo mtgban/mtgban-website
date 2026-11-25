@@ -56,6 +56,8 @@ var settings = []Setting{
 	{Name: "UploadCustomMinPrice", Storage: "cookie", Path: "root", Kind: "number", Default: "7", Class: "preference", Area: "upload"},
 	{Name: "UploadCustomRate", Storage: "cookie", Path: "root", Kind: "number", Default: "0.8", Class: "preference", Area: "upload"},
 	{Name: "UploadCustomRules", Storage: "cookie", Path: "root", Kind: "blob", Class: "preference", Area: "upload"},
+	{Name: "UploadCustomSealedKind", Storage: "cookie", Path: "root", Kind: "blob", Class: "preference", Area: "upload"},
+	{Name: "UploadCustomSealedProduct", Storage: "cookie", Path: "root", Kind: "blob", Class: "preference", Area: "upload"},
 	{Name: "UploadCustomSealedMinPrice", Storage: "cookie", Path: "root", Kind: "number", Default: "7", Class: "preference", Area: "upload"},
 	{Name: "UploadCustomSealedRate", Storage: "cookie", Path: "root", Kind: "number", Default: "0.8", Class: "preference", Area: "upload"},
 	{Name: "UploadCustomSealedRules", Storage: "cookie", Path: "root", Kind: "blob", Class: "preference", Area: "upload"},

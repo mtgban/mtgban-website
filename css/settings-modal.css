@@ -651,10 +651,13 @@ body.settings-open {
    of column names */
 .custom-rules {
     display: grid;
-    grid-template-columns: 4.5em 6em repeat(2, minmax(0, 14em)) 1.75em 1.75em;
+    grid-template-columns: 3.5em 6em repeat(2, minmax(0, 14em)) 1.75em 1.75em;
     gap: 0.5em;
     align-items: center;
     justify-content: start;
+}
+.custom-rules[data-kinds] {
+    grid-template-columns: 3.5em 6em minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 0.9fr) 1.75em 1.75em;
 }
 .custom-rules + .custom-rules {
     margin-top: 1.25em;
@@ -706,9 +709,11 @@ body.settings-open {
     justify-self: start;
 }
 /* No room for a row on a phone: each rule takes two, rate and minimum, then
-   the reference and fallback, each field under its own name */
+   the reference and fallback, and a third where it has a product and kind,
+   each field under its own name */
 @media (max-width: 720px) {
-    .custom-rules {
+    .custom-rules,
+    .custom-rules[data-kinds] {
         grid-template-columns: repeat(2, minmax(0, 1fr)) 1.75em;
     }
     .custom-rules-head { display: none; }
@@ -726,6 +731,7 @@ body.settings-open {
         min-width: 0;
     }
     .custom-rule-field > span { display: block; }
+    .custom-rule select { padding-left: 0.5em; padding-right: 1.5em; }
     .custom-rule-field:nth-child(odd) { grid-column: 1; }
     .custom-rule-field:nth-child(even) { grid-column: 2; }
     .custom-rule-remove { grid-row: 1; grid-column: 3; align-self: end; }

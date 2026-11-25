@@ -401,6 +401,8 @@ func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 			`id="opt-customfallback"`,
 			`id="opt-customsealedrate"`,
 			`id="opt-customsealedfallback"`,
+			`id="opt-customsealedproduct"`,
+			`id="opt-customsealedkind"`,
 			`id="offline-img-editions-picker"`,
 			`id="sleep-editions-picker"`,
 		} {
@@ -628,6 +630,9 @@ func TestSettingsBodyDrawsCustomRulesMax(t *testing.T) {
 	one, five := render(1), render(5)
 	if strings.Count(one, `data-max="1"`) != 2 || strings.Contains(one, `class="custom-rules-add"`) {
 		t.Error("a tier of one rule is offered more")
+	}
+	if strings.Contains(five, `data-field="product"`) || strings.Contains(five, "data-kinds") {
+		t.Error("a game with no labels on its products is offered them")
 	}
 	if strings.Count(five, `data-max="5"`) != 2 || strings.Count(five, `class="custom-rules-add"`) != 2 {
 		t.Error("a tier of five rules has no Add rule for each kind")

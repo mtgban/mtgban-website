@@ -50,6 +50,8 @@ function syncUploadOptionsFromSettings() {
         add('customrules',          getCookie('UploadCustomRules')          || '');
         add('customsealedrate',     getCookie('UploadCustomSealedRate')     || '');
         add('customsealedminprice', getCookie('UploadCustomSealedMinPrice') || '');
+        add('customsealedproduct',  getCookie('UploadCustomSealedProduct')  || '');
+        add('customsealedkind',     getCookie('UploadCustomSealedKind')     || '');
         add('customsealedrules',    getCookie('UploadCustomSealedRules')    || '');
     }
 }

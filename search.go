@@ -2462,11 +2462,39 @@ func customBuylistSkips(b *matcher.Backend, co *matcher.CardObject, releasedBy t
 // prices at a rate, from a minimum price.
 // With a fallback set, a price index fills in the grades a singles
 // reference does not price, and another sealed seller the products a
-// sealed reference does not.
+// sealed reference does not. A sealed rule may cover one category of
+// product, one kind, or one kind of one category, as the datastore labels
+// them.
 type customBuylistRule struct {
 	rate, minPrice   float64
 	seller, fallback string
+	product, kind    string
 	sealed           bool
+}
+
+// covers reports whether the rule is one for co: of its kind, and for a
+// sealed product of the category and kind the rule names, if any.
+func (rule customBuylistRule) covers(co *matcher.CardObject) bool {
+	return rule.sealed == co.Sealed &&
+		(rule.product == "" || rule.product == co.Layout) &&
+		(rule.kind == "" || rule.kind == co.Side)
+}
+
+// newSealedKinds is the kinds of sealed product each category holds, as the
+// datastore labels them, which only Magic's does.
+func newSealedKinds(b *matcher.Backend) map[string][]string {
+	kinds := map[string][]string{}
+	for _, uuid := range b.GetSealedUUIDs() {
+		co, err := b.GetUUID(uuid)
+		if err != nil || co.Layout == "" || co.Side == "" || slices.Contains(kinds[co.Layout], co.Side) {
+			continue
+		}
+		kinds[co.Layout] = append(kinds[co.Layout], co.Side)
+	}
+	for _, names := range kinds {
+		slices.Sort(names)
+	}
+	return kinds
 }
 
 // maxCustomBuylistRules caps the singles chain and the sealed one each,
@@ -2496,17 +2524,19 @@ func readCustomBuylistRules(r *http.Request) []customBuylistRule {
 		return nil
 	}
 
-	singles := [4]string{
+	singles := [6]string{
 		readCookie(r, "UploadCustomRate"),
 		readCookie(r, "UploadCustomMinPrice"),
 		readCookie(r, "UploadCustomBuyer"),
 		readCookie(r, "UploadCustomSinglesFallback"),
 	}
-	sealed := [4]string{
+	sealed := [6]string{
 		readCookie(r, "UploadCustomSealedRate"),
 		readCookie(r, "UploadCustomSealedMinPrice"),
 		readCookie(r, "UploadCustomSealedBuyer"),
 		readCookie(r, "UploadCustomSealedFallback"),
+		readCookie(r, "UploadCustomSealedProduct"),
+		readCookie(r, "UploadCustomSealedKind"),
 	}
 	limit := customBuylistRulesMax(verifiedSignature(r))
 	return slices.Concat(
@@ -2517,7 +2547,7 @@ func readCustomBuylistRules(r *http.Request) []customBuylistRule {
 
 // sealedFirstRule is the first sealed rule's settings, at the first singles
 // rule's rate and minimum price where it has no rate of its own.
-func sealedFirstRule(singles, sealed [4]string) [4]string {
+func sealedFirstRule(singles, sealed [6]string) [6]string {
 	if sealed[0] == "" {
 		sealed[0], sealed[1] = singles[0], singles[1]
 	}
@@ -2526,9 +2556,10 @@ func sealedFirstRule(singles, sealed [4]string) [4]string {
 
 // parseCustomBuylistRules is the singles chain, or the sealed one, up to
 // limit rules: the first rule, then those extra holds, each
-// "rate:min:seller:fallback", joined by commas. A rule at no valid rate is
-// dropped, and so is an item short of four fields; any further are ignored.
-func parseCustomBuylistRules(first [4]string, extra string, limit int, sealed bool) []customBuylistRule {
+// "rate:min:seller:fallback", with ":product:kind" after it for sealed,
+// joined by commas. A rule at no valid rate is dropped, and so is an item
+// short of four fields; any past those of its chain are ignored.
+func parseCustomBuylistRules(first [6]string, extra string, limit int, sealed bool) []customBuylistRule {
 	var rules []customBuylistRule
 	rule, ok := newCustomBuylistRule(first, sealed)
 	if ok {
@@ -2541,9 +2572,9 @@ func parseCustomBuylistRules(first [4]string, extra string, limit int, sealed bo
 		if len(rules) == limit {
 			break
 		}
-		var fields [4]string
+		var fields [6]string
 		parts := strings.Split(item, ":")
-		if len(parts) < len(fields) {
+		if len(parts) < 4 {
 			continue
 		}
 		copy(fields[:], parts)
@@ -2556,19 +2587,24 @@ func parseCustomBuylistRules(first [4]string, extra string, limit int, sealed bo
 }
 
 // newCustomBuylistRule is the singles or sealed rule its rate, minimum
-// price, reference and fallback spell, false at no valid rate.
-func newCustomBuylistRule(fields [4]string, sealed bool) (customBuylistRule, bool) {
+// price, reference and fallback spell, with a sealed one's product and kind,
+// false at no valid rate.
+func newCustomBuylistRule(fields [6]string, sealed bool) (customBuylistRule, bool) {
 	rate := customBuylistSetting(fields[0])
 	if rate == 0 {
 		return customBuylistRule{}, false
 	}
-	return customBuylistRule{
+	rule := customBuylistRule{
 		rate:     rate,
 		minPrice: customBuylistSetting(fields[1]),
 		seller:   fields[2],
 		fallback: fields[3],
 		sealed:   sealed,
-	}, true
+	}
+	if sealed {
+		rule.product, rule.kind = fields[4], fields[5]
+	}
+	return rule, true
 }
 
 // customBuylistRef is one rule with the inventories it prices off, looked
@@ -2685,11 +2721,16 @@ func customBuylistSetting(s string) float64 {
 }
 
 // tip spells the rule on one line for a tooltip:
-// 80% of CK (or TCG Low) if ≥ $7.00.
+// 80% of CK (or TCG Low) if ≥ $7.00, or for a sealed rule that names them
+// 80% of CKSealed on booster box, collector.
 func (rule customBuylistRule) tip(p *prices) string {
 	tip := fmt.Sprintf("%.4g%% of %s", rule.rate*100, customBuylistTipName(p, rule.seller))
 	if rule.fallback != rule.seller && customBuylistFallback(p, rule) != nil {
 		tip += " (or " + customBuylistTipName(p, rule.fallback) + ")"
+	}
+	covered := slices.DeleteFunc([]string{rule.product, rule.kind}, func(s string) bool { return s == "" })
+	if len(covered) > 0 {
+		tip += " on " + strings.ReplaceAll(strings.Join(covered, ", "), "_", " ")
 	}
 	if rule.minPrice > 0 {
 		tip += fmt.Sprintf(" if ≥ $%.2f", rule.minPrice)
@@ -2741,7 +2782,7 @@ type customOffer struct {
 }
 
 // customBuylistOffers prices cardIDs off the reference seller inventories
-// by the first rule of its kind that applies to each, each card once: a price at every
+// by the first rule covering each that applies, each card once: a price at every
 // condition the reference lists, or at INDEX when the reference is a price
 // index, which has one meaningful price. A rule applies when its reference
 // has a best price, at least the rule's minimum.
@@ -2762,7 +2803,7 @@ func customBuylistOffers(b *matcher.Backend, p *prices, rules []customBuylistRul
 		}
 
 		for i, ref := range refs {
-			if ref.rule.sealed != co.Sealed {
+			if !ref.rule.covers(co) {
 				continue
 			}
 			entries := ref.reference(cardID)

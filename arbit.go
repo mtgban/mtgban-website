@@ -657,6 +657,9 @@ func newCustomBuylistVendor(b *matcher.Backend, p *prices, rules []customBuylist
 			continue
 		}
 		for _, ref := range refs {
+			if !ref.rule.covers(co) {
+				continue
+			}
 			// An index files its one price under whatever grade its scraper
 			// uses, so it buys at NM only
 			entries := customBuylistEntries(ref.reference(cardID), ref.rule, ref.isIndex)
