@@ -727,3 +727,24 @@ test('the custom buylist rules after the first travel with a preset only when se
         expect(applied.cookies[cookie]).toBe('');
     }
 });
+
+test('a preset from before the sealed rule and the four-field rules matches what a settings save stores', () => {
+    const { doc, win, select } = mountDoc();
+    const cookies = { UploadCustomOpts: 'enabled,', UploadCustomRate: '0.9', UploadCustomMinPrice: '5' };
+    const { P } = loadPresets({ cookies, win });
+    const opts = Object.assign({}, P.current(doc), { customrules: '0.6:2:TCGLow:::,0.5::CK:SCG:TCGSealed:' });
+    const a = P.store.save({ name: 'A', opts }).preset;
+    P.mount(doc);
+    pick(select, a.id);
+    expect(select._text()).toBe('A');
+
+    Object.assign(cookies, { UploadCustomSealedRate: '0.9', UploadCustomSealedMinPrice: '5', UploadCustomRules: '0.6:2:TCGLow:,0.5::CK:SCG' });
+    P.refresh();
+    expect(select._text()).toBe('A');
+    expect(P.store.list()[0].opts).toEqual(opts);
+
+    // A sealed rate of its own is a change
+    cookies.UploadCustomSealedRate = '0.7';
+    P.refresh();
+    expect(select._text()).toBe('A (modified)');
+});
