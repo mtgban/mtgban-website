@@ -796,10 +796,12 @@ func errorResponse(w http.ResponseWriter, status int, msg string) {
 	}{Error: msg})
 }
 
-// Look up a seller with its name and return its inventory
+// Look up a seller with its name and return its inventory; a seller of slabs
+// can share its store's name, and is found by its shorthand instead
 func findSellerInventoryByName(p *prices, name string, sealed bool) (mtgban.InventoryRecord, error) {
 	for _, seller := range p.sellers {
-		if seller.Info().SealedMode == sealed && strings.EqualFold(seller.Info().Name, name) {
+		info := seller.Info()
+		if info.SealedMode == sealed && !info.GradedMode && strings.EqualFold(info.Name, name) {
 			return seller.Inventory(), nil
 		}
 	}
@@ -1781,12 +1783,12 @@ func getTCGSimulationIQR(p *prices, productID string) float64 {
 }
 
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
-// by their resolved display name (case-insensitive). Stable for equal names.
+// by their listed name (case-insensitive). Stable for equal names.
 func sortKeysByScraperName(p *prices, keys []string) []string {
 	out := make([]string, len(keys))
 	copy(out, keys)
 	sort.SliceStable(out, func(i, j int) bool {
-		return strings.ToLower(p.scraperName(out[i])) < strings.ToLower(p.scraperName(out[j]))
+		return strings.ToLower(p.listedName(out[i])) < strings.ToLower(p.listedName(out[j]))
 	})
 	return out
 }

@@ -214,17 +214,28 @@ func (p *prices) scraperName(shorthand string) string {
 	return info.Name
 }
 
-// storeNames is every loaded store's display name by shorthand, with the
+// listedName is scraperName where stores are listed side by side: a seller
+// of slabs is marked, since it can share its store's name.
+func (p *prices) listedName(shorthand string) string {
+	name := p.scraperName(shorthand)
+	info, _ := p.scraperInfo(shorthand)
+	if info.GradedMode && !strings.HasSuffix(name, "Graded") {
+		return name + " (Graded)"
+	}
+	return name
+}
+
+// storeNames is every loaded store's listed name by shorthand, with the
 // configured overrides, for the pages that name stores by key.
 func (p *prices) storeNames() map[string]string {
 	names := make(map[string]string, len(p.sellers)+len(p.vendors))
 	for _, seller := range p.sellers {
 		shorthand := seller.Info().Shorthand
-		names[shorthand] = p.scraperName(shorthand)
+		names[shorthand] = p.listedName(shorthand)
 	}
 	for _, vendor := range p.vendors {
 		shorthand := vendor.Info().Shorthand
-		names[shorthand] = p.scraperName(shorthand)
+		names[shorthand] = p.listedName(shorthand)
 	}
 	for shorthand, name := range Config().ScraperConfig.NameOverride {
 		if _, loaded := names[shorthand]; !loaded {

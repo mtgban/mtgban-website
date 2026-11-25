@@ -210,7 +210,7 @@ func storeFactorOptions(p *prices, sellers, vendors []string) string {
 	add := func(shorthand string, sells bool) {
 		o, ok := byKey[shorthand]
 		if !ok {
-			name := p.scraperName(shorthand)
+			name := p.listedName(shorthand)
 			if name == "" {
 				name = shorthand
 			}
