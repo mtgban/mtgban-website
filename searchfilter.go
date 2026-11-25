@@ -87,6 +87,9 @@ type SearchConfig struct {
 	// Leave out sealed products, for a key not sold the sealed mode
 	SkipSealed bool
 
+	// Search the sellers of slabs alone, and list only the cards they offer
+	GradedOnly bool
+
 	// Append the reader's custom buylist, set by a handler that has checked
 	// the reader's signature
 	CustomBuylist bool

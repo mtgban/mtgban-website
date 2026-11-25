@@ -29,7 +29,7 @@ func TestPaletteNames(t *testing.T) {
 		{"ui.palette.help", f("copy open_guide"), nil},
 		{"ui.palette.sealed", f("search contents unpack"), nil},
 		{"ui.palette.upload", f("url file page_results export"), f("tcgplayer moxfield manabox archidekt cubecobra mythictools sheets picker page download estimate deckbox tcgplayer_csv")},
-		{"ui.palette.nav", f("home changelog account search sets sealed newspaper syp screener sleepers upload global arbitrage reverse alerts api other"), f("leaf parent sub")},
+		{"ui.palette.nav", f("home changelog account search sets sealed graded newspaper syp screener sleepers upload global arbitrage reverse alerts api other"), f("leaf parent sub")},
 		{"ui.key", f("type_to_focus paste_to_search settings_hotkey backpack_tab_move backpack_tab_switch"), nil},
 		{"ui.search.key", f("tab_to_search result_page_down result_page_up pack_add pack_take"), nil},
 		{"ui.nav.layout", f("promote swap demote dock undock reorder"), nil},

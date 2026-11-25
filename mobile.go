@@ -90,6 +90,7 @@ var mobileEnabledPages = []string{
 	"Search",
 	"Sets",
 	"Sealed",
+	"Graded",
 	"Newspaper",
 	"TCG Syp List",
 	"Screener (Beta)",

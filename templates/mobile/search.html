@@ -201,9 +201,9 @@
             <a class="m-sort-pill{{if $isChronoSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=chrono{{if and $isChronoSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Chronological" data-track="ui.search.sort" data-track-value="chrono" {{if $isChronoSorted}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="clock"></i>{{if $isChronoSorted}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
             <a class="m-sort-pill{{if $isAlphaSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort={{if $isAlphaSorted}}{{.SearchSort}}{{else}}{{.AlphaSort}}{{end}}{{if and $isAlphaSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Alphabetical" data-track="ui.search.sort" data-track-value="alpha" {{if $isAlphaSorted}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="a-large-small"></i>{{if $isAlphaSorted}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
             <a class="m-sort-pill{{if eq .SearchSort "number"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=number{{if and (eq .SearchSort "number") (not .ReverseMode)}}&reverse=true{{end}}" title="Collector Number" data-track="ui.search.sort" data-track-value="number" {{if eq .SearchSort "number"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="hash"></i>{{if eq .SearchSort "number"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            <a class="m-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price" data-track="ui.search.sort" data-track-value="retail" {{if eq .SearchSort "retail"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="tag"></i>{{if eq .SearchSort "retail"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            <a class="m-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price" data-track="ui.search.sort" data-track-value="buylist" {{if eq .SearchSort "buylist"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            {{if .HasVelocity}}{{if .CanVelocity}}<a class="m-sort-pill{{if eq .SearchSort "velocity"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=velocity{{if and (eq .SearchSort "velocity") (not .ReverseMode)}}&reverse=true{{end}}" title="Sales Velocity" data-track="ui.search.sort" data-track-value="velocity" {{if eq .SearchSort "velocity"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="gauge"></i>{{if eq .SearchSort "velocity"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>{{else}}<span class="m-sort-pill sort-pill-locked" title="Increase your tier to sort by sales velocity" data-track="ui.search.sort_locked" data-track-value="velocity"><i data-lucide="gauge"></i></span>{{end}}{{end}}
+            {{if not .IsGraded}}<a class="m-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price" data-track="ui.search.sort" data-track-value="retail" {{if eq .SearchSort "retail"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="tag"></i>{{if eq .SearchSort "retail"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>{{end}}
+            {{if not .IsGraded}}<a class="m-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price" data-track="ui.search.sort" data-track-value="buylist" {{if eq .SearchSort "buylist"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>{{end}}
+            {{if and .HasVelocity (not .IsGraded)}}{{if .CanVelocity}}<a class="m-sort-pill{{if eq .SearchSort "velocity"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=velocity{{if and (eq .SearchSort "velocity") (not .ReverseMode)}}&reverse=true{{end}}" title="Sales Velocity" data-track="ui.search.sort" data-track-value="velocity" {{if eq .SearchSort "velocity"}}data-track-scope="reverse"{{else}}data-track-scope="sort"{{end}}><i data-lucide="gauge"></i>{{if eq .SearchSort "velocity"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>{{else}}<span class="m-sort-pill sort-pill-locked" title="Increase your tier to sort by sales velocity" data-track="ui.search.sort_locked" data-track-value="velocity"><i data-lucide="gauge"></i></span>{{end}}{{end}}
         </div>
         {{end}}
     </div>
@@ -348,7 +348,7 @@
                  the buyers, or before them where the reader's Buyers column
                  opens on Sales (docs/adr/0009-recent-tcgplayer-sales.md) */}}
             {{$hasSales := index $.HasSales $cardId}}
-            {{$buyersList := or $hasBuyers $salesRow}}
+            {{$buyersList := or $hasBuyers $salesRow $.IsGraded}}
             {{$salesFirst := and $hasSales (or (eq $.BuyersMode "sales") (not $buyersList))}}
             {{$sellerConds := (index $.FoundSellers $cardId)}}
             {{$vendorConds := (index $.FoundVendors $cardId)}}
@@ -356,9 +356,9 @@
             {{/* Cards: the best ask and offer at the picture's edges, each
                  opening its list; never between the panels, which landscape
                  pairs as adjacent siblings */}}
-            {{if $hasSellers}}{{$ask := edge_offer $sellerConds}}{{template "m-edge-sell" dict "Price" (and $ask $ask.PriceLabel)}}{{end}}
+            {{if $hasSellers}}{{$ask := edge_offer $.CondKeys $sellerConds}}{{template "m-edge-sell" dict "Price" (and $ask $ask.PriceLabel)}}{{end}}
             {{if $salesFirst}}{{template "m-edge-buy" dict "Pane" "sales" "Title" "Sales" "Price" ""}}
-            {{else if $buyersList}}{{$offer := edge_offer $vendorConds}}{{template "m-edge-buy" dict "Pane" "buyers" "Title" "Buyers" "Price" (and $offer $offer.PriceLabel)}}{{end}}
+            {{else if $buyersList}}{{$offer := edge_offer $.CondKeys $vendorConds}}{{template "m-edge-buy" dict "Pane" "buyers" "Title" (or (and $.IsGraded "Last Sold") "Buyers") "Price" (and $offer $offer.PriceLabel)}}{{end}}
             {{/* Cards: the star, backpack and chart between the edge buttons,
                  leaving the header to the card's name */}}
             <div class="m-card-tools">
@@ -386,7 +386,7 @@
             {{/* Buyers panel */}}
             {{if $buyersList}}
             <div class="m-tab-panel active" id="buyers-{{$cardId}}" role="region" aria-label="Buyers">
-                {{template "m-pane-head" dict "Title" "Buyers" "Prev" (or (and $salesFirst "sales") "picture") "Next" (or (and $hasSales (not $salesFirst) "sales") "")}}
+                {{template "m-pane-head" dict "Title" (or (and $.IsGraded "Last Sold") "Buyers") "Prev" (or (and $salesFirst "sales") "picture") "Next" (or (and $hasSales (not $salesFirst) "sales") "")}}
                 {{template "result-buyers" dict "Page" $ "Card" $card "CardID" $cardId}}
             </div>
             {{end}}

@@ -496,7 +496,8 @@
     if (!form || !input || typeof autocomplete !== 'function') return;
 
     var sealed = location.pathname.indexOf('/sealed') === 0;
-    form.action = sealed ? '/sealed' : '/search';
+    var graded = location.pathname.indexOf('/graded') === 0;
+    form.action = sealed ? '/sealed' : graded ? '/graded' : '/search';
     // The banner, not the path: with the network down the service worker
     // answers /search and /sealed with this same shell.
     var onShell = !!document.getElementById('offline-banner');

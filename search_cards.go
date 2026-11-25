@@ -4,9 +4,10 @@ import "github.com/mtgban/go-mtgban/mtgban"
 
 // edgeOffer is the offer a Cards slide names at its edge for one side of a
 // card: the first priced, unlocked offer of the first grade that has one,
-// grades best first and rows as the search ranked them. Nil when none has.
-func edgeOffer(found map[mtgban.Condition][]SearchEntry) *SearchEntry {
-	for _, grade := range AllConditions {
+// the page's grades best first and rows as the search ranked them. Nil when
+// none has.
+func edgeOffer(grades []mtgban.Condition, found map[mtgban.Condition][]SearchEntry) *SearchEntry {
+	for _, grade := range grades {
 		if grade == "INDEX" {
 			continue
 		}

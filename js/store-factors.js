@@ -85,7 +85,7 @@
 
     function onSearchPage() {
         var p = (window.location && window.location.pathname) || '';
-        return p === '/search' || p.indexOf('/search/') === 0 || p === '/sealed' || p.indexOf('/sealed/') === 0;
+        return p === '/search' || p.indexOf('/search/') === 0 || p === '/sealed' || p === '/graded' || p.indexOf('/sealed/') === 0;
     }
 
     // Brings the cookie to the preference on every page, reloading only

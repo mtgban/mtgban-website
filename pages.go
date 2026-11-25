@@ -180,6 +180,16 @@ func init() {
 					},
 				},
 				{
+					Name:        "Graded",
+					Short:       "🏅",
+					Description: "Graded card search",
+					Link:        "/graded",
+					SettingsTab: "search",
+					ShouldHide: func(s *site) bool {
+						return !s.prices().hasGradedStores()
+					},
+				},
+				{
 					// A favorites list shared by link; the id is the credential.
 					Name:       "FavoritesShared",
 					Link:       "/search/shared",

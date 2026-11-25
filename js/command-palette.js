@@ -75,7 +75,7 @@
     // A nav entry's name to its ui.palette.nav value; any other name is other, Admin is not counted.
     var NAV_SLUGS = {
         'Home': 'home', 'Changelog': 'changelog', 'Account': 'account', 'Search': 'search',
-        'Sets': 'sets', 'Sealed': 'sealed', 'Newspaper': 'newspaper', 'TCG Syp List': 'syp',
+        'Sets': 'sets', 'Sealed': 'sealed', 'Graded': 'graded', 'Newspaper': 'newspaper', 'TCG Syp List': 'syp',
         'Screener (Beta)': 'screener', 'Sleepers': 'sleepers', 'Upload': 'upload', 'Global': 'global',
         'Arbitrage': 'arbitrage', 'Reverse': 'reverse', 'Alerts': 'alerts', 'API': 'api'
     };

@@ -731,6 +731,7 @@ type SearchVars struct {
 	EditionSort []string
 	EditionList map[string][]EditionEntry
 	IsSealed    bool
+	IsGraded    bool
 	TotalSets   int
 	TotalCards  int
 	TotalUnique int
@@ -777,6 +778,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// The pinned bar lives in the url alone, so a page opened without it
 	// starts with nothing pinned.
 	pageVars.IsSealed = r.URL.Path == "/sealed"
+	pageVars.IsGraded = r.URL.Path == "/graded"
 	scope := strings.TrimSpace(r.FormValue("scope"))
 	pinnedConfig := scopeConfig(ds, p, scope, pageVars.IsSealed, false)
 	pinned := pinnedConfig.CardFilters
@@ -821,8 +823,14 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// stores in name order, whatever the listing priority cookie says
 	pageVars.DisableChart = sig == "" && SigCheck
 	pageVars.ListingLocked = pageVars.DisableChart
+	// The charts, the alerts and the exports are all of raw copies
+	if pageVars.IsGraded {
+		pageVars.DisableChart = true
+		pageVars.CanAlerts = false
+	}
 	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
 	fillSearchPrefs(&pageVars.SearchVars, r)
+	pageVars.CanDownloadCSV = pageVars.CanDownloadCSV && !pageVars.IsGraded
 
 	if len(query) > MaxSearchQueryLen {
 		pageVars.ErrorMessage = TooLongMessage
@@ -835,7 +843,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.ModalMode = roster.modal
 	pageVars.ChartIDsCSV = strings.Join(roster.ids, ",")
 	landing := query == "" && !scopeOnly
-	pageVars.Title = searchTitle(pageVars.Title, roster.id != "", pageVars.IsSealed, isSetsPage && landing)
+	pageVars.Title = searchTitle(pageVars.Title, roster.id != "", pageVars.IsSealed, pageVars.IsGraded, isSetsPage && landing)
 
 	// If neither bar holds anything there is nothing to do
 	if landing {
@@ -887,6 +895,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
+	}
+	if pageVars.IsGraded {
+		gradedSearch(&config)
 	}
 	packs := resolveBackpacks(r.Context(), sig, b, &config)
 
@@ -952,17 +963,32 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	applyStoreFactors(result, readStoreFactors(r))
 
 	pageVars.Metadata, pageVars.Printings = searchMetadata(ds, p, config.Sales, shown.keys, preferFlavor)
-	fillRecentSales(&pageVars.SearchVars, recentSalesStore.Snapshot(), r, sig, shown.keys)
+	// The recent sales are of raw copies
+	if !pageVars.IsGraded {
+		fillRecentSales(&pageVars.SearchVars, recentSalesStore.Snapshot(), r, sig, shown.keys)
+	}
 
 	// Optionally sort according to price
-	if !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores" {
+	byPrice := !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores"
+	if byPrice {
 		sortOfferRows(r, shown.keys, result)
 	}
 
 	preview := searchPreview(r, b, shown.keys, result)
 	fillEmbed(&pageVars.SearchVars, pageVars.Metadata, b, p, preview, shown.keys)
 
-	rebuildIndexRows(&pageVars.SearchVars, pageVars.Metadata, b, p, config, shown.keys, result)
+	if pageVars.IsGraded {
+		// No index quotes a slab, so there are no index rows to rebuild
+		if pageVars.ListingLocked {
+			for _, cardID := range shown.keys {
+				gateNonAffiliates(result.sellers[cardID], Affiliates().List, Config().SearchHideNonAffiliates)
+			}
+		}
+		pageVars.CondKeys = groupBySlab(result.sellers, byPrice)
+		pageVars.Embed.RetailLabel, pageVars.Embed.BuylistLabel = "", ""
+	} else {
+		rebuildIndexRows(&pageVars.SearchVars, pageVars.Metadata, b, p, config, shown.keys, result)
+	}
 
 	fillSearchResults(&pageVars.SearchVars, b, query, config, result, shown.keys)
 
@@ -986,13 +1012,15 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 }
 
 // searchTitle names the page for what it shows: a chart, the sealed products,
-// the editions tree, or a search. A chart of sealed products is a chart.
-func searchTitle(title string, charting, sealed, editions bool) string {
+// the graded cards, the editions tree, or a search. A chart of sealed products is a chart.
+func searchTitle(title string, charting, sealed, graded, editions bool) string {
 	switch {
 	case charting:
 		return strings.Replace(title, "Search", "Chart", 1)
 	case sealed:
 		return strings.Replace(title, "Search", "Sealed Search", 1)
+	case graded:
+		return strings.Replace(title, "Search", "Graded Search", 1)
 	case editions:
 		return strings.Replace(title, "Search", "Editions", 1)
 	}
@@ -1092,6 +1120,9 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	applySearchScope(&config, scopeConfig(ds, p, strings.TrimSpace(page.FormValue("scope")), sealed, false))
 	if sealed {
 		config.SearchMode = "sealed"
+	}
+	if page.URL.Path == "/graded" {
+		gradedSearch(&config)
 	}
 
 	result := runSearch(page, ds, p, config)
@@ -1199,6 +1230,10 @@ func searchSortFrom(r *http.Request, config SearchConfig) (sort, from string) {
 	} {
 		// The order alone would say which cards sell fastest.
 		if asked.sort == "velocity" && !config.VelocitySort {
+			continue
+		}
+		// These order by what raw copies go for.
+		if config.GradedOnly && slices.Contains(rawSorts, asked.sort) {
 			continue
 		}
 		if asked.sort != "" {
@@ -1384,6 +1419,9 @@ func runSearch(r *http.Request, ds *datastore, p *prices, config SearchConfig) s
 
 	if config.SkipSealed {
 		allKeys = withoutSealed(b, allKeys)
+	}
+	if config.GradedOnly {
+		allKeys = newPostStores(b, p, r, allKeys, config).offered(allKeys)
 	}
 
 	// Limit results to avoid hogging the website with large queries
@@ -2324,6 +2362,9 @@ func searchSellers(p *prices, cardIDs []string, config SearchConfig) (foundSelle
 	// Search sellers
 	for _, seller := range p.sellers {
 		if shouldSkipStoreNG(seller, config.StoreFilters) {
+			continue
+		}
+		if config.GradedOnly && !seller.Info().GradedMode {
 			continue
 		}
 
