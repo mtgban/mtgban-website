@@ -336,7 +336,7 @@ function uresChainChanged(area, table) {
 // The header each table is sorted by and the orders picked from the menus
 // are kept in the tab's session, so a reload of the page (a store dropped or
 // added, the Reload button or the browser's) sorts the same way; a new list
-// starts unsorted.
+// starts unsorted, as does a page whose Sorting setting changed.
 var UPLOAD_SORTS_SESSION = 'uploadSorts';
 
 // The areas whose order the reader picked from the menu on this page
@@ -377,7 +377,7 @@ function uresSaveSorts() {
             if (uresPicked.has(table)) sort.picked = true;
             if (Object.keys(sort).length) tables[uresTableKey(table)] = sort;
         });
-        sessionStorage.setItem(UPLOAD_SORTS_SESSION, JSON.stringify({areas: uresAreaPicked, tables: tables}));
+        sessionStorage.setItem(UPLOAD_SORTS_SESSION, JSON.stringify({setting: getCookie('UploadSorting'), areas: uresAreaPicked, tables: tables}));
     } catch (e) {}
 }
 
@@ -387,7 +387,9 @@ function uresRestoreSorts() {
     var saved = null;
     try {
         if (window.BAN_UPLOAD_RELOAD) saved = JSON.parse(sessionStorage.getItem(UPLOAD_SORTS_SESSION) || 'null');
-        else sessionStorage.removeItem(UPLOAD_SORTS_SESSION);
+        // Kept under another Sorting setting, they would hide the one just picked
+        if (saved && saved.setting !== getCookie('UploadSorting')) saved = null;
+        if (!saved) sessionStorage.removeItem(UPLOAD_SORTS_SESSION);
     } catch (e) {}
     if (!saved || !saved.tables) return [];
     uresAreaPicked = saved.areas || {};
