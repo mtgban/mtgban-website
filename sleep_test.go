@@ -341,3 +341,43 @@ func TestSleepGapPresetsUseStoreNames(t *testing.T) {
 		}
 	}
 }
+
+// A seller of slabs is in none of Sleepers: not its pairs, its gap, its
+// pickers nor its settings grid.
+func TestSleepersLeaveGradedSellersOut(t *testing.T) {
+	skipWithoutDatastore(t)
+	// DevMode so render reads templates from disk, and opens the gap pickers
+	withSigMode(t, true, false)
+	cardID := somePlainCardUUIDs(t, 1)[0]
+	seller := func(name, shorthand string, graded bool) mtgban.Seller {
+		return mtgban.NewSellerFromInventory(mtgban.InventoryRecord{cardID: {{Conditions: "NM", Price: 5, Quantity: 1}}},
+			mtgban.ScraperInfo{Name: name, Shorthand: shorthand, GradedMode: graded})
+	}
+	withPrices(t, []mtgban.Seller{
+		seller("Raw Shop", "RAW", false),
+		seller("Slab Shop", "SLAB", true),
+	}, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{cardID: {{Conditions: "NM", BuyPrice: 100}}},
+			mtgban.ScraperInfo{Name: "Raw Buyer", Shorthand: "BUY"}),
+	})
+	p := currentPrices()
+
+	pairs := sleeperPairs(p, nil, nil)
+	if len(pairs) != 1 || pairs[0].seller.Info().Shorthand != "RAW" {
+		t.Errorf("got %d pairs, want the raw seller's alone", len(pairs))
+	}
+	if got := getGap(backend(), p, nil, "RAW", "SLAB", nil); got != nil {
+		t.Errorf("the gap against the slab seller = %v, want none", got)
+	}
+	keys, _ := sleepModalKeys(p, nil, nil)
+	if len(keys) != 1 || keys[0] != "RAW" {
+		t.Errorf("settings grid = %v, want RAW alone", keys)
+	}
+
+	rec := httptest.NewRecorder()
+	testSite.Sleepers(rec, httptest.NewRequest(http.MethodGet, "/sleepers", nil))
+	body := rec.Body.String()
+	if !strings.Contains(body, "Raw Shop") || strings.Contains(body, "Slab Shop") {
+		t.Error("the pickers do not list the raw seller alone")
+	}
+}

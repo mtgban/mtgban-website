@@ -821,7 +821,8 @@ product).
   `getReprints()` reads via `GetReprints()`, see §5.5), CK hotlist growth
   (`getHotlist()`), market-gap (`getGap()`), copies sold a day
   (`getVelocity()`, on a log scale). Scores are normalized onto S–F
-  tiers (`SleeperLetters`), 34 cards per tier (`MaxSleepers`).
+  tiers (`SleeperLetters`), 34 cards per tier (`MaxSleepers`). A seller of
+  slabs (`GradedMode`) is left out.
 
 ### 5.4 Newspaper (`news.go`)
 
