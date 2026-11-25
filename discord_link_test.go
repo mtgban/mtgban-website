@@ -101,7 +101,8 @@ func tcgplayerSharedProductIDs() map[string]bool {
 
 // manapoolLinkFor spells the address Mana Pool files a printing under: its set
 // and its number as printed, with the finish in the query rather than in the
-// path.
+// path. A two-sided token sheet's two numbers are joined by a dash, as in
+// tm21/10-14 for Beast // Construct.
 func manapoolLinkFor(co *matcher.CardObject) string {
 	finish := "nonfoil"
 	if co.Etched {
@@ -110,13 +111,19 @@ func manapoolLinkFor(co *matcher.CardObject) string {
 		finish = "foil"
 	}
 	return fmt.Sprintf("https://manapool.com/card/%s/%s/a-card?conditions=NM&finish=%s",
-		strings.ToLower(co.SetCode), strings.ToLower(co.Number), finish)
+		strings.ToLower(co.SetCode), strings.ReplaceAll(strings.ToLower(co.Number), "//", "-"), finish)
 }
 
-// manapoolNumbered reports whether a printing has a number an address can
-// carry: a two-sided token sheet's "7//10" is two numbers, and no path.
-func manapoolNumbered(co *matcher.CardObject) bool {
-	return co.Number != "" && co.Identifiers["derivedTokenPair"] != "true"
+// manapoolAddressed reports whether a printing has an address to ask: a
+// number, and for a two-sided token sheet both faces in the sheet's own set.
+// A sheet across two sets carries numbers the address's one set cannot name.
+func manapoolAddressed(co *matcher.CardObject) bool {
+	if co.Identifiers["derivedTokenPair"] != "true" {
+		return co.Number != ""
+	}
+	faceA, errA := backend().GetUUID(co.Identifiers["tokenPairPartA"])
+	faceB, errB := backend().GetUUID(co.Identifiers["tokenPairPartB"])
+	return errA == nil && errB == nil && faceA.SetCode == co.SetCode && faceB.SetCode == co.SetCode
 }
 
 // manapoolLinkPrintings are the printings each Mana Pool address answers to.
@@ -127,7 +134,7 @@ func manapoolLinkPrintings() map[string]map[string]bool {
 	printings := map[string]map[string]bool{}
 	for _, uuid := range backend().GetUUIDs() {
 		co, err := backend().GetUUID(uuid)
-		if err != nil || co.Sealed || !manapoolNumbered(co) {
+		if err != nil || co.Sealed || !manapoolAddressed(co) {
 			continue
 		}
 		link := manapoolLinkFor(co)
@@ -180,7 +187,7 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 			}
 		}
 
-		if manapoolNumbered(co) {
+		if manapoolAddressed(co) {
 			link := manapoolLinkFor(co)
 			checkedMP++
 			reply := checkForLinks(backend(), discordGuildID(), link)
@@ -191,7 +198,8 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 				// files one name per number, so this does not fire here; it
 				// keeps the test honest against a datastore for a game that
 				// does - see openingName in redirect.go.
-				if openingName(printingsAt(backend(), co.SetCode, co.Number)) == "" {
+				sheet := co.Identifiers["derivedTokenPair"] == "true"
+				if !sheet && openingName(printingsAt(backend(), co.SetCode, co.Number)) == "" {
 					continue
 				}
 				t.Errorf("%s %s #%s: %s offered no printing", co.Name, co.SetCode, co.Number, link)

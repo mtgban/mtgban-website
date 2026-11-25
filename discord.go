@@ -16,6 +16,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 
 	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/magic"
 	"github.com/mtgban/go-mtgban/starcitygames"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
@@ -383,7 +384,11 @@ func manapoolCard(b *matcher.Backend, u *url.URL) *matcher.CardObject {
 		return nil
 	}
 
-	for _, card := range printingsAt(b, fields[1], fields[2]) {
+	cards := printingsAt(b, fields[1], fields[2])
+	if len(cards) == 0 {
+		cards = manapoolSheet(b, fields[1], fields[2])
+	}
+	for _, card := range cards {
 		co, err := b.GetUUID(card.UUID)
 		if err != nil {
 			continue
@@ -402,6 +407,33 @@ func manapoolCard(b *matcher.Backend, u *url.URL) *matcher.CardObject {
 			return nil
 		}
 		return co
+	}
+	return nil
+}
+
+// manapoolSheet names the two-sided token sheet a dashed number points at:
+// tm21/10-14 is Beast // Construct, whose faces the set numbers 10 and 14.
+// A face's own number can hold a dash, so each one is tried as the join.
+func manapoolSheet(b *matcher.Backend, set, number string) []matcher.Card {
+	for i := range number {
+		if number[i] != '-' {
+			continue
+		}
+		facesA := printingsAt(b, set, number[:i])
+		facesB := printingsAt(b, set, number[i+1:])
+		if len(facesA) == 0 || len(facesB) == 0 {
+			continue
+		}
+		id := magic.MatchTokenPairingByUUIDs(b, facesA[0].UUID, facesB[0].UUID, false)
+		uuid, err := b.MatchID(id)
+		if err != nil {
+			continue
+		}
+		co, err := b.GetUUID(uuid)
+		if err != nil {
+			continue
+		}
+		return []matcher.Card{co.Card}
 	}
 	return nil
 }
