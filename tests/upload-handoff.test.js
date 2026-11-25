@@ -40,6 +40,7 @@ function loadHandoff({origins = [SENDER], opener = {closed: false}, missingRoot 
         delete elements['handoff-form'];
         delete elements['handoff-rows'];
         delete elements['handoff-source'];
+        elements['handoff-return'] = {textContent: 'you will land right where you were'};
     }
 
     if (missingStatus) {
@@ -453,6 +454,13 @@ describe('a list in the fragment', () => {
         const {elements, submitted} = open({canUpload: false});
         expect(submitted).toEqual([]);
         expect(elements['handoff-guide'].hidden).toBe(true);
+    });
+
+    test('lost to a log in, it is asked for again', () => {
+        expect(open({canUpload: false}).elements['handoff-return'].textContent).toBe('follow the link here again');
+        // A window that opened the page still has its list to send
+        const {elements} = loadHandoff({canUpload: false});
+        expect(elements['handoff-return'].textContent).toBe('you will land right where you were');
     });
 
     test('not taken, it brings the guide back with no progress line to hide', () => {

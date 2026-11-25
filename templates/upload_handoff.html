@@ -8,8 +8,8 @@
 {{define "extra-css"}}<link rel="stylesheet" type="text/css" href="/css/handoff.css?hash={{.Hash}}">{{end}}
 
 {{define "extra-head"}}
-{{/* The login comes back here, where the card list the reader came with
-     is still waiting. */}}
+{{/* The login comes back here, where a window that opened the page still
+     has its card list to send. */}}
 {{if .PatreonLogin}}
 {{template "patreon-login-script" .}}
 {{end}}
@@ -41,8 +41,8 @@
         <p class="handoff-pitch">
             {{if .PatreonLogin}}Pricing a card list is for logged-in
             members. If you have an account, you may simply be logged out
-            here: log back in and you will land right where you were, list
-            and all.{{else}}Pricing a card list needs a tier that includes
+            here: log back in and <span id="handoff-return">you will land right
+            where you were, list and all</span>.{{else}}Pricing a card list needs a tier that includes
             the Uploader. Consider upgrading to unlock it, along with
             <a href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener">everything
             BAN has to offer</a>!{{end}}

@@ -187,7 +187,7 @@ func TestHandoffInvitesAReaderWithNoSignature(t *testing.T) {
 		PatreonURL:   "https://mtgban.com/auth",
 	})
 
-	for _, want := range []string{"getPatreonURL", "12345", "Log in"} {
+	for _, want := range []string{"getPatreonURL", "12345", "Log in", `id="handoff-return"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the invitation is missing %s", want)
 		}
