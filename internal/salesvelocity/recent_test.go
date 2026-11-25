@@ -270,7 +270,8 @@ func TestRecentQueryReadsOnlyNewStamps(t *testing.T) {
 
 func TestFullLoad(t *testing.T) {
 	b := &matcher.Backend{}
-	loaded := &RecentSnapshot{Full: recentNow.Add(-time.Hour), Backend: weak.Make(b)}
+	loaded := &RecentSnapshot{Pulled: recentNow, Full: recentNow.Add(-time.Hour), Backend: weak.Make(b)}
+	empty := &RecentSnapshot{Full: recentNow.Add(-time.Hour), Backend: weak.Make(b)}
 	cases := []struct {
 		name    string
 		current *RecentSnapshot
@@ -280,6 +281,7 @@ func TestFullLoad(t *testing.T) {
 	}{
 		{"none loaded", nil, b, recentNow, true},
 		{"same day", loaded, b, recentNow, false},
+		{"same day, none read", empty, b, recentNow, true},
 		{"a new day", loaded, b, recentNow.AddDate(0, 0, 1), true},
 		{"a new backend", loaded, &matcher.Backend{}, recentNow, true},
 	}

@@ -115,9 +115,9 @@ type recentRow struct {
 }
 
 // Load reads game's orders into a new snapshot: all of them when there is
-// none, the backend changed, or the last full load was another UTC day,
-// otherwise only those written since the last load. A failure keeps the last
-// snapshot for the next run to retry.
+// none or it read no order, the backend changed, or the last full load was
+// another UTC day, otherwise only those written since the last load. A
+// failure keeps the last snapshot for the next run to retry.
 func (s *RecentStore) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, game string, now time.Time) (result, problem string) {
 	if !s.loading.CompareAndSwap(false, true) {
 		return "", ""
@@ -164,10 +164,11 @@ func (s *RecentStore) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, 
 }
 
 // fullLoad reports whether a load reads every order rather than those
-// written since current: with none loaded, for a new backend, and once a day
-// so orders deleted from the table leave the snapshot.
+// written since current: with none loaded or no order read, which leaves no
+// stamp to read from, for a new backend, and once a day so orders deleted
+// from the table leave the snapshot.
 func fullLoad(current *RecentSnapshot, b *matcher.Backend, now time.Time) bool {
-	return current == nil || current.Backend != weak.Make(b) || !startOfDay(current.Full).Equal(startOfDay(now))
+	return current == nil || current.Pulled.IsZero() || current.Backend != weak.Make(b) || !startOfDay(current.Full).Equal(startOfDay(now))
 }
 
 // scanRecent reads game's orders stamped after since into rb one row at a

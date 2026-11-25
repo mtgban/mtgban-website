@@ -85,7 +85,8 @@ What exists:
      hours of the pull writing them and not a day late. The pull runs once
      a day, over a few hours, so the other loads find nothing and read one
      indexed range.
-   - A datastore reload and the first load of a day are full loads.
+   - A datastore reload, the first load of a day and one after a load that
+     read no order are full loads.
    - A failed load keeps the last snapshot and is retried three hours later.
    - The grades are the site's: TCGplayer's `Near Mint`, `Lightly Played`,
      `Moderately Played`, `Heavily Played` and `Damaged` become NM, SP, MP,
