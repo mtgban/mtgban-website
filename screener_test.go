@@ -461,11 +461,17 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 	// TCG-keyed rows resolve through the id map (needs the datastore)
 	skipWithoutDatastore(t)
 
-	// A token sheet's row resolves by its matcher id, not its alias uuid
-	sheet := "915356b7-202a-5619-b003-e613d245d5bb_tp_a1b995bd-aec0-5b7f-8db9-65b77d465558"
-	uuid, isFoil, ok = moverCardID(backend(), timeseries.MoverRow{MtgjsonUUID: "7ed91f61-e5a7-54fb-8b3f-d3fc604a2fc4", BanUUID: sheet, IsFoil: true})
+	// A token sheet's row still filed under the id the matcher gave it
+	// before resolves by its alias uuid, which is the sheet's id now
+	sheet := "7ed91f61-e5a7-54fb-8b3f-d3fc604a2fc4"
+	stored := "915356b7-202a-5619-b003-e613d245d5bb_tp_a1b995bd-aec0-5b7f-8db9-65b77d465558"
+	uuid, isFoil, ok = moverCardID(backend(), timeseries.MoverRow{MtgjsonUUID: sheet, BanUUID: stored, IsFoil: true})
 	if !ok || uuid != sheet || !isFoil {
 		t.Errorf("sheet row = %q/%v/%v, want %s/true/true", uuid, isFoil, ok, sheet)
+	}
+	_, err := backend().GetUUID(sheet)
+	if err != nil {
+		t.Errorf("the datastore does not hold the sheet %s: %v", sheet, err)
 	}
 
 	pid, want, wantFoil := productInBothFinishes(t)
