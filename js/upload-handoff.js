@@ -10,6 +10,11 @@
 // Every message is held against the origins the server named and against the
 // window that opened this one, so another frame on an allowed site cannot
 // answer in its place.
+//
+// A sender whose own Cross-Origin-Opener-Policy cuts it off from the windows
+// it opens cannot be heard that way. It puts the list in this page's fragment
+// instead, which no server sees, and is held against the same origins by the
+// referrer, which a page cannot forge for another site.
 
 (function () {
     "use strict";
@@ -22,11 +27,29 @@
         return;
     }
 
+    // linked is a list carried by the fragment, or null. The fragment is
+    // dropped as soon as it is read, so the list is neither kept in the
+    // history nor carried along by a log-in link.
+    function linkedList() {
+        var hash = window.location.hash;
+        var head = "#" + ROWS + "=";
+        if (hash.slice(0, head.length) !== head) {
+            return null;
+        }
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        try {
+            return JSON.parse(decodeURIComponent(hash.slice(head.length)));
+        } catch (err) {
+            return null;
+        }
+    }
+    var linked = linkedList();
+
     // Opened by another window, so a list is on its way. The guide is for a
     // page nobody handed anything to, and this reader - taken or turned
     // away - already has the one line above it that is about them.
     var opener = window.opener;
-    var handed = !!opener && !opener.closed;
+    var handed = (!!opener && !opener.closed) || !!linked;
     var guide = document.getElementById("handoff-guide");
     if (handed && guide) {
         guide.hidden = true;
@@ -177,18 +200,20 @@
     var taken = false;
 
     window.addEventListener("message", function (event) {
-        if (
-            taken ||
-            allowed.indexOf(event.origin) === -1 ||
-            event.source !== opener ||
-            !event.data ||
-            event.data.type !== ROWS
-        ) {
-            return;
+        if (event.source === opener && event.data && event.data.type === ROWS) {
+            take(event.data, event.origin);
         }
-        var list = listFrom(event.data);
+    });
+
+    // take submits the list data holds, when the origin that handed it over
+    // is an allowed one, and answers whether it did.
+    function take(data, origin) {
+        if (taken || allowed.indexOf(origin) === -1) {
+            return false;
+        }
+        var list = listFrom(data);
         if (!list) {
-            return;
+            return false;
         }
         taken = true;
 
@@ -198,10 +223,10 @@
         // when it belongs to the origin that handed them over: the page it
         // names has to be a page on the site that sent it, or it is not
         // carried at all. What it is called is the server's to decide.
-        if (source && typeof event.data.source === "string") {
+        if (source && typeof data.source === "string") {
             try {
-                if (new URL(event.data.source).origin === event.origin) {
-                    source.value = event.data.source;
+                if (new URL(data.source).origin === origin) {
+                    source.value = data.source;
                 }
             } catch (err) {
                 // Not a URL. The heading manages without one.
@@ -221,7 +246,26 @@
         }
 
         form.submit();
-    });
+        return true;
+    }
+
+    if (linked) {
+        var from = "";
+        try {
+            from = new URL(document.referrer).origin;
+        } catch (err) {
+            // No referrer, so nothing says who sent it.
+        }
+        if (!take(linked, from)) {
+            if (status) {
+                status.hidden = true;
+            }
+            if (guide) {
+                guide.hidden = false;
+            }
+        }
+        return;
+    }
 
     // Said once this is listening, so nothing is sent before there is
     // anywhere to put it.

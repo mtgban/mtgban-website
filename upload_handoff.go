@@ -19,8 +19,9 @@ import (
 // A site opening the page cannot post the list to /upload itself: the upload
 // needs the session, this cookie is same-site, and a request made from another
 // origin arrives without it. What it can do is open this page - a normal
-// top-level navigation, so the session comes along - and pass the rows to it
-// window to window. That keeps the shape of the upload form ours to change.
+// top-level navigation, so the session comes along - and pass the rows to it,
+// window to window or, where its opener policy forbids that, in the fragment.
+// That keeps the shape of the upload form ours to change.
 //
 // What an origin here is granted is narrow but real: it can cause a card list
 // of its choosing to be priced in the session of whoever opened the page, and
@@ -29,6 +30,10 @@ import (
 // origin decides what gets valued, not what it is worth. Nothing beyond that:
 // the page does not read the session, does not answer with what it holds, and
 // changes nothing that outlasts the request.
+//
+// Through the fragment, the referrer is all that is checked, so this is
+// granted to anyone who can place a link on such a site, not only to the site
+// itself.
 //
 // An entry that is not a bare https scheme and host is left out: one reached
 // over http could be anyone on the way, and one with a path would never equal
@@ -173,8 +178,8 @@ func uploadQuery(shared bool, hashes []string, textArea, handedFrom, remoteURL, 
 
 // UploadHandoff renders the page another site hands a card list to.
 //
-// It carries no list of its own. The rows arrive after it loads, from the
-// window that opened it, and the form is submitted from here - same origin,
+// It carries no list of its own. The rows come from the window that opened
+// it or from the fragment, and the form is submitted from here - same origin,
 // same session, an ordinary upload by the time it reaches the handler.
 //
 // This one is served without the signing middleware, so it is also the

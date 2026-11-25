@@ -10,7 +10,7 @@ const ROWS = 'mtgban-handoff-rows';
 // loadHandoff runs the script against a stand-in for the page it ships with,
 // and hands back what the test needs to drive it: the opener it talks to, the
 // listener it attached, and the elements it writes to.
-function loadHandoff({origins = [SENDER], opener = {closed: false}, missingRoot = false, canUpload = true} = {}) {
+function loadHandoff({origins = [SENDER], opener = {closed: false}, missingRoot = false, missingStatus = false, canUpload = true, hash = '', referrer = ''} = {}) {
     const sent = [];
     if (opener) {
         opener.postMessage = (message, target) => sent.push({message, target});
@@ -42,19 +42,27 @@ function loadHandoff({origins = [SENDER], opener = {closed: false}, missingRoot 
         delete elements['handoff-source'];
     }
 
+    if (missingStatus) {
+        delete elements['handoff-status'];
+    }
+
     let onMessage;
+    const replaced = [];
     const window = {
         opener,
+        location: {hash, pathname: '/upload/handoff', search: ''},
+        history: {replaceState: (state, title, url) => replaced.push(url)},
         addEventListener: (type, handler) => {
             if (type === 'message') onMessage = handler;
         },
     };
     const document = {
+        referrer,
         getElementById: (id) => (missingRoot && id === 'handoff' ? null : elements[id] || null),
     };
 
     new Function('window', 'document', source)(window, document);
-    return {sent, submitted, elements, deliver: (event) => onMessage && onMessage(event)};
+    return {sent, submitted, elements, replaced, deliver: (event) => onMessage && onMessage(event)};
 }
 
 // A message as the opener really sends it, with each part overridable so a
@@ -392,5 +400,69 @@ describe('the text hand-over', () => {
         });
 
         expect(elements['handoff-rows'].value).toBe('written');
+    });
+});
+
+describe('a list in the fragment', () => {
+    // For a sender whose Cross-Origin-Opener-Policy cuts it off from the
+    // window it opened: there is no opener, and no message can arrive.
+    const list = {text: '4 Rift Bolt\n', rows: 1, source: SENDER + '/lists/42'};
+    const hash = (data = list) => '#' + ROWS + '=' + encodeURIComponent(JSON.stringify(data));
+    const open = (over = {}) => loadHandoff(Object.assign({opener: null, hash: hash(), referrer: SENDER + '/'}, over));
+
+    test('is put in the form and sent', () => {
+        const {elements, submitted} = open();
+
+        expect(elements['handoff-rows'].value).toBe('4 Rift Bolt\n');
+        expect(elements['handoff-source'].value).toBe(SENDER + '/lists/42');
+        expect(elements['handoff-status-text'].textContent).toBe('Pricing 1 row…');
+        expect(elements['handoff-guide'].hidden).toBe(true);
+        expect(submitted).toEqual([true]);
+    });
+
+    test('is taken with an opener too, which is then not asked', () => {
+        const {sent, submitted} = open({opener: {closed: false}});
+        expect(submitted).toEqual([true]);
+        expect(sent).toEqual([]);
+    });
+
+    test('leaves the address at once, taken or not', () => {
+        for (const over of [{}, {referrer: 'https://evil.test/'}, {canUpload: false}, {hash: '#' + ROWS + '=%'}]) {
+            expect(open(over).replaced).toEqual(['/upload/handoff']);
+        }
+    });
+
+    for (const [desc, over] of [
+        ['another site\'s', {referrer: 'https://evil.test/'}],
+        ['one that only starts like an allowed site', {referrer: SENDER + '.evil.test/'}],
+        ['nobody\'s', {referrer: ''}],
+        ['one that does not decode', {hash: '#' + ROWS + '=%'}],
+        ['one that is not a list', {hash: '#' + ROWS + '=' + encodeURIComponent('"text"')}],
+        ['an empty list', {hash: hash({text: ' \n'})}],
+    ]) {
+        test(desc + ' is not taken, and the guide stays up', () => {
+            const {elements, submitted} = open(over);
+            expect(submitted).toEqual([]);
+            expect(elements['handoff-rows'].value).toBe('');
+            expect(elements['handoff-status'].hidden).toBe(true);
+            expect(elements['handoff-guide'].hidden).toBe(false);
+        });
+    }
+
+    test('is not taken by a page that cannot upload, which shows only why', () => {
+        const {elements, submitted} = open({canUpload: false});
+        expect(submitted).toEqual([]);
+        expect(elements['handoff-guide'].hidden).toBe(true);
+    });
+
+    test('not taken, it brings the guide back with no progress line to hide', () => {
+        const {elements} = open({referrer: 'https://evil.test/', missingStatus: true});
+        expect(elements['handoff-guide'].hidden).toBe(false);
+    });
+
+    test('any other fragment is left alone', () => {
+        const {replaced, submitted} = open({hash: '#elsewhere'});
+        expect(replaced).toEqual([]);
+        expect(submitted).toEqual([]);
     });
 });
