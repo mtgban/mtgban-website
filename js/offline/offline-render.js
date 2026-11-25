@@ -16,8 +16,8 @@
     }
 
     // sellerRow mirrors the URL-less seller branch (search.html:1150-1191).
-    function sellerRow(name, price, qty) {
-        return '<div class="price-row">' +
+    function sellerRow(name, price, qty, cond) {
+        return '<div class="price-row' + (cond ? ' cond-' + cond : '') + '">' +
             '<span class="store-cell"><a class="store-name dim">' + escapeHtml(name) + '</a></span>' +
             '<span class="price-right">' +
             priceSpan(price) +
@@ -72,11 +72,13 @@
             '</div>';
     }
 
+    // Only the sellers carry their condition: search-rows.css hides Poor by it.
     function condHeader(card, cond, selling) {
+        var classes = 'price-cond-header' + (selling ? '' : ' cond-' + cond);
         if (card.s) {
-            return '<div class="price-cond-header">' + (selling ? 'Sell to' : 'Purchase from') + '</div>';
+            return '<div class="' + classes + '">' + (selling ? 'Sell to' : 'Purchase from') + '</div>';
         }
-        return '<div class="price-cond-header">Condition: ' + cond + '</div>';
+        return '<div class="' + classes + '">Condition: ' + cond + '</div>';
     }
 
     // column wraps a side's rows as templates/partials/search-columns.html
@@ -146,7 +148,7 @@
             best = best || rows[0].price;
             rowsMain += condHeader(card, cond, false);
             rows.forEach(function (r) {
-                rowsMain += sellerRow(r.name, r.price, r.qty);
+                rowsMain += sellerRow(r.name, r.price, r.qty, cond);
             });
         });
 
