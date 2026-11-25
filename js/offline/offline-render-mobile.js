@@ -68,7 +68,7 @@
     function cardHTML(res, ctx, parts, i) {
         var sellers = root.OfflineRender.sellers(res, ctx);
         var buyers = root.OfflineRender.buyers(res, ctx);
-        var html = '<div class="m-card' + (res.card.s ? ' m-sealed' : '') + '">' + headerHTML(res, ctx);
+        var html = '<div class="m-card">' + headerHTML(res, ctx);
         if (sellers.any) html += edge(parts['edge-sellers'], sellers);
         if (buyers.any) html += edge(parts['edge-buyers'], buyers);
         html += '<div class="m-card-tools"></div>' + pictureHTML(res, ctx, parts.back, i);
