@@ -116,6 +116,32 @@ type SearchEntry struct {
 	// Grade is the entry's own condition, which an index row's INDEX
 	// bucket does not show.
 	Grade mtgban.Condition
+
+	// Slab is a graded copy's slab, nil for a raw one.
+	Slab *mtgban.Slab
+}
+
+// SlabName is what a graded row says of its slab: the grader, the score and
+// the label, or "Graded" where the store gives none. It is empty on a raw row.
+func (e SearchEntry) SlabName() string {
+	if e.Slab == nil {
+		return ""
+	}
+	// The wording of an unread slab tends to name its own grader
+	if e.Slab.Grader != "" && strings.Contains(strings.ToUpper(e.Slab.Label), e.Slab.Grader) {
+		return e.Slab.Label
+	}
+	var parts []string
+	if e.Slab.Grader != "" {
+		parts = append(parts, e.Slab.Grader)
+	}
+	if e.Slab.Score > 0 {
+		parts = append(parts, strconv.FormatFloat(e.Slab.Score, 'f', -1, 64))
+	}
+	if e.Slab.Label != "" {
+		parts = append(parts, e.Slab.Label)
+	}
+	return cmp.Or(strings.Join(parts, " "), "Graded")
 }
 
 // marketValue is what a buylist offer is worth on the market: its store
@@ -2340,6 +2366,7 @@ func searchSellers(p *prices, cardIDs []string, config SearchConfig) (foundSelle
 					ExtraValues: entry.ExtraValues,
 					Restricted:  restricted,
 					Grade:       entry.Conditions,
+					Slab:        entry.Slab,
 				}
 				if info.CreditMultiplier > 0 {
 					res.Credit = entry.Price / info.CreditMultiplier
