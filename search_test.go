@@ -411,3 +411,63 @@ func TestSearchSellersCarryTCGItemLow(t *testing.T) {
 		}
 	}
 }
+
+// TestSearchSellersCarrySlab keeps a graded entry's slab on its row, as the
+// text beside the store's name, and leaves a raw row without one.
+func TestSearchSellersCarrySlab(t *testing.T) {
+	now := time.Now()
+	for _, tc := range []struct {
+		slab *mtgban.Slab
+		want string
+	}{
+		{nil, ""},
+		{&mtgban.Slab{}, "Graded"},
+		{&mtgban.Slab{Grader: "PSA", Score: 10}, "PSA 10"},
+		{&mtgban.Slab{Grader: "BGS", Score: 9.5}, "BGS 9.5"},
+		{&mtgban.Slab{Grader: "CGC", Score: 10, Label: "Pristine"}, "CGC 10 Pristine"},
+		{&mtgban.Slab{Grader: "CGC", Label: "Less than 8"}, "CGC Less than 8"},
+		{&mtgban.Slab{Grader: "PSA", Label: "PSA Authentic"}, "PSA Authentic"},
+		{&mtgban.Slab{Grader: "CGC", Label: "cgc 8 signed"}, "cgc 8 signed"},
+		{&mtgban.Slab{Grader: "PSA", Label: "Graded by PSA, small dent"}, "Graded by PSA, small dent"},
+		{&mtgban.Slab{Label: "SGC 9"}, "SGC 9"},
+	} {
+		inv := mtgban.InventoryRecord{"card": {{Conditions: "NM", Price: 5, Slab: tc.slab}}}
+		withPrices(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Shop", Shorthand: "SHOP", InventoryTimestamp: &now})}, nil)
+		rows := searchSellers(currentPrices(), []string{"card"}, SearchConfig{})["card"]["NM"]
+		if len(rows) != 1 {
+			t.Fatalf("%+v: got %d rows, want 1", tc.slab, len(rows))
+		}
+		if got := rows[0].SlabName(); got != tc.want {
+			t.Errorf("%+v: got %q, want %q", tc.slab, got, tc.want)
+		}
+	}
+}
+
+// The seller rows name a graded copy's slab, and a raw or locked one shows
+// none.
+func TestSlabRendersBesideTheStore(t *testing.T) {
+	const id = "card"
+	slab := &mtgban.Slab{Grader: "CGC", Score: 8.5}
+	for _, mobile := range []bool{false, true} {
+		out := renderPage(t, "search.html", mobile, PageVars{
+			UserNav:  &NavElem{Short: "b"},
+			IsMobile: mobile,
+			SearchVars: SearchVars{
+				SearchRan: true,
+				AllKeys:   []string{id},
+				CondKeys:  []mtgban.Condition{"INDEX", "NM"},
+				FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{id: {"NM": {
+					{ScraperName: "Graded", Shorthand: "GRD", Price: 5, URL: "https://example.com/g", Slab: slab},
+					{ScraperName: "Raw", Shorthand: "RAW", Price: 4, URL: "https://example.com/r"},
+					{ScraperName: "Locked", Shorthand: "LCK", Price: 3, Slab: slab, Locked: true},
+				}}},
+				SearchQuery: "a card",
+			},
+			Metadata: map[string]GenericCard{id: {Name: "A Card", SetCode: "TST"}},
+		})
+		want := `<span class="slab-name" title="CGC 8.5">CGC 8.5</span>`
+		if n := strings.Count(out, want); n != 1 || strings.Count(out, "slab-name") != 1 {
+			t.Errorf("mobile=%v: the rows carry %d slabs, want the graded one's alone", mobile, n)
+		}
+	}
+}
