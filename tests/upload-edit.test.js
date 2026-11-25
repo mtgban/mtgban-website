@@ -362,6 +362,27 @@ test('a price set on a list sent from the backpack goes back to it', () => {
     expect(calls.rendered).toBe(1);
 });
 
+test('a price set on one of a card\'s lines goes back as the price of all its copies', () => {
+    const bolt = resultRow('Bolt', 'a', 'NM', 1, { price: '10' });
+    const bolt2 = resultRow('Bolt', 'a', 'NM', 1, { price: '4' });
+    const played = resultRow('Bolt', 'a', 'SP', 3, { price: '2' });
+    const blank = resultRow('Bolt', 'a', 'SP', 1);
+    const { calls, menu } = load({ results: [bolt, bolt2, played, blank], sentPack: 1 });
+    const set = (row, value) => {
+        btn(row, 'price').click();
+        menu().querySelector('.ures-edit-input').value = value;
+        menu().querySelector('.ures-edit-set').click();
+    };
+    set(bolt2, '5');
+    expect(calls.pack).toEqual([['paid', 'a', 7.5]]);
+    expect([bolt.dataset.price, bolt2.dataset.price]).toEqual(['10', '5']);
+
+    // Copies without a price take the one set, then the lines weigh by theirs
+    set(played, '3');
+    set(blank, '1');
+    expect(calls.pack.slice(1)).toEqual([['paid', 'a|SP', 3], ['paid', 'a|SP', 2.5]]);
+});
+
 test('a grade can be taken back to none, as a list line without one', () => {
     const bolt = resultRow('Bolt', 'a', 'SP', 1);
     const optBolt = optRow('a', 'SP', 1);
