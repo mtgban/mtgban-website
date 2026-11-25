@@ -1,4 +1,5 @@
-// Offline result renderer mirroring templates/search.html markup.
+// Offline result renderer mirroring the markup of templates/search.html and
+// its columns (templates/partials/search-columns.html).
 (function (root) {
     'use strict';
 
@@ -15,7 +16,7 @@
         return '<span class="price">n/a</span>';
     }
 
-    // sellerRow mirrors the URL-less seller branch (search.html:1150-1191).
+    // sellerRow mirrors result-sellers' URL-less branch.
     function sellerRow(name, price, qty, cond) {
         return '<div class="price-row' + (cond ? ' cond-' + cond : '') + '">' +
             '<span class="store-cell"><a class="store-name dim">' + escapeHtml(name) + '</a></span>' +
@@ -26,7 +27,7 @@
             '</div>';
     }
 
-    // indexRow mirrors the collapsed low/high reference row (search.html:1168-1183).
+    // indexRow mirrors result-sellers' collapsed low/high reference row.
     function indexRow(label, low, high) {
         return '<div class="price-row">' +
             '<span class="store-cell"><a class="store-name dim">' + escapeHtml(label) + '</a></span>' +
@@ -37,7 +38,7 @@
             '</div>';
     }
 
-    // sypBuyerRow mirrors the SYP-specific branch (search.html:1247).
+    // sypBuyerRow mirrors result-buyers' row for SYP, priced as a count.
     function sypBuyerRow(name, qty) {
         return '<div class="price-row">' +
             '<span class="store-cell"><a class="store-name dim">' + escapeHtml(name) + '</a></span>' +
@@ -57,7 +58,7 @@
         return (ratio > 0 && isNM) ? ratio.toFixed(2) + ' %' : '';
     }
 
-    // buyerRow mirrors the vendor branch (search.html:1216-1262).
+    // buyerRow mirrors a result-buyers row.
     function buyerRow(name, price, qty, ratio, isNM, extra) {
         var title = (ratio > 0 && isNM) ? ' title="Ratio: ' + ratio.toFixed(2) + '%"' : '';
         return '<div class="price-row"' + title + '>' +
@@ -121,7 +122,7 @@
             var label = storeName(ctx, s);
             idxRows.push({label: label, html: sellerRow(label, finishPrice(res.retail[s], card), 0)});
         });
-        // Alphabetical like the online collapse pass (search.go:674-678).
+        // Alphabetical like the online collapse pass (rebuildIndexRows).
         idxRows.sort(function (a, b) {
             return a.label.toLowerCase() < b.label.toLowerCase() ? -1 : 1;
         });
@@ -163,7 +164,7 @@
         });
 
         // Index (MetadataOnly) vendor rows come before condition headers,
-        // mirroring the INDEX group in search.go:1088 / search.html:1210-1213.
+        // mirroring result-buyers' INDEX group.
         var indexHtml = '';
         var indexShorts = shorts.filter(function (s) { return isIndex(ctx, s); });
         indexShorts.forEach(function (s) {
@@ -209,7 +210,7 @@
         return {html: column('Buyers', rowsMain), any: rowsMain !== '', best: best};
     }
 
-    // titleLine mirrors editionTitle (utils.go:170-209) from catalog fields.
+    // titleLine mirrors editionTitle (utils.go) from catalog fields.
     function titleLine(card, set) {
         var finish = card.e ? ' Etched' : card.f ? ' Foil' : '';
         var rarity = card.r ? card.r.charAt(0).toUpperCase() + card.r.slice(1) : '';
@@ -241,7 +242,7 @@
         var setQuery = mode + encodeURIComponent('s:' + card.set);
         var nameQuery = mode + encodeURIComponent('"' + card.n + '"');
 
-        // Products link mirrors search.html:991-993.
+        // Products link mirrors search.html's "Found in N products".
         var productsLink = '';
         if (card.p && card.p.length > 0) {
             var n = card.p.length;
