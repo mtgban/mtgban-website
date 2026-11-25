@@ -72,4 +72,6 @@ where it is: `<a>_tp_<b>_f` becomes `<uuid>_f`.
 
 It uses `uuid_generate_v5` from the `uuid-ossp` extension, installing it
 for the run and dropping it again where the database did not have it, so
-the role needs `CREATE` on the database. It is safe to repeat.
+the role needs `CREATE` on the database. It is safe to repeat, and is worth
+repeating the next day: a client with edits not yet synced when it ran merges
+its old ids back in, beside the new ones.

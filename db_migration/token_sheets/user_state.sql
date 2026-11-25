@@ -46,7 +46,7 @@ FROM (SELECT card_id AS t FROM alerts WHERE card_id LIKE '%\_tp\_%'
       SELECT rows FROM upload_shares WHERE rows LIKE '%\_tp\_%') stored,
      regexp_matches(stored.t, '([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})_tp_([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})', 'g') m;
 
-CREATE FUNCTION pg_temp.rekey(t text) RETURNS text LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION pg_temp.rekey(t text) RETURNS text LANGUAGE plpgsql AS $$
 DECLARE
     r record;
 BEGIN
@@ -79,7 +79,8 @@ WHERE favorites::text LIKE '%\_tp\_%' OR recents::text LIKE '%\_tp\_%' OR backpa
 DELETE FROM state_moves s USING user_state u
 WHERE s.email_hash = u.email_hash AND s.favorites = u.favorites::text
   AND s.recents = u.recents::text AND s.backpack = u.backpack::text;
--- A client holding the old version re-reads instead of writing old ids back.
+-- A client holding the old version re-reads before it writes; one with edits
+-- not yet synced merges its old ids back in (README.md).
 UPDATE user_state u SET favorites = s.favorites::jsonb, recents = s.recents::jsonb,
     backpack = s.backpack::jsonb, version = u.version + 1, updated_at = now()
 FROM state_moves s WHERE u.email_hash = s.email_hash;
