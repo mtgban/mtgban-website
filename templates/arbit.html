@@ -496,6 +496,7 @@
                         {{if not $save.HasNoConds}}
                             <td data-label="Cond">
                                 {{.InventoryEntry.Conditions}}
+                                {{with slab_name .InventoryEntry.Slab}}<span class="arb-slab" title="{{.}}">{{.}}</span>{{end}}
                             </td>
                         {{end}}
                         {{if not $save.HasNoQty}}
@@ -524,6 +525,7 @@
                                         {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .ReferenceEntry.Price}}
                                     {{end}}
                                     {{if and $.GlobalMode $.DirectStockNote (eq $scraperKey "TCGDirect")}}{{with direct_stock .CardID .ReferenceEntry.Conditions}}<span class="arb-direct-stock" title="{{$.DirectStockNote}}">{{.}} in stock</span>{{end}}{{end}}
+                                    {{with slab_name .ReferenceEntry.Slab}}<span class="arb-slab" title="{{.}}">{{.}}</span>{{end}}
                                 {{else}}
                                     {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .BuylistEntry.BuyPrice}}
                                 {{end}}

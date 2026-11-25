@@ -658,6 +658,19 @@ button.arb-filter-reset:disabled {
 /* TCGplayer Direct's stock beside its price on Global, as of a day's scrape */
 .arb-direct-stock { display: block; font-size: var(--text-sm); color: var(--text-dim); cursor: help; }
 
+/* A graded copy's slab, under the condition it counts as (or its price, on
+   Global); a seller's own label can be a sentence */
+.arb-slab {
+    display: block;
+    max-width: 16ch;
+    margin: 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+}
+
 /* Icon spans both rows on the left, name over edition on the right —
    replaces the old .card-info wrapper with a grid so the text column
    flexes with the available space (minmax 0..220px) */
@@ -788,6 +801,8 @@ button.arb-filter-reset:disabled {
 @media (max-width: 560px) {
     /* An INFO cell with no buylist facts takes no room on a card */
     .arb-table.phone-cards td:has(> .bl-info:only-child:empty) { display: none; }
+    /* A card's figures run on one line, so a slab follows its grade or price */
+    .arb-table.phone-cards .arb-slab { display: inline-block; vertical-align: bottom; }
     /* A chip past the edge has no scrollbar to show it, so they wrap */
     .arb-table.phone-cards > thead > tr { flex-wrap: wrap; overflow-x: visible; }
     .arb-table.phone-cards > thead > tr > th { padding: 4px 6px; }
