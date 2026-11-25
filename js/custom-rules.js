@@ -50,15 +50,99 @@
         container.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    function syncAdd(container) {
+    function rowsOf(container) {
+        return Array.prototype.slice.call(container.querySelectorAll('.custom-rule'));
+    }
+
+    // sync hides Add at the limit, and the grips with one rule to order.
+    function sync(container) {
+        var count = rowsOf(container).length;
         var add = container.querySelector('.custom-rules-add');
-        if (add) add.hidden = container.querySelectorAll('.custom-rule').length >= limit(container);
+        if (add) add.hidden = count >= limit(container);
+        container.querySelectorAll('.custom-rule-grip').forEach(function (g) { g.hidden = count < 2; });
     }
 
     function markRate(row) {
         var rate = field(row, 'rate');
         if (validRate(rate.value)) rate.removeAttribute('aria-invalid');
         else rate.setAttribute('aria-invalid', 'true');
+    }
+
+    // move puts rule from at to. The values move and the rows stay, since the
+    // first row is the one bound to its own cookies.
+    function move(container, from, to) {
+        var rows = rowsOf(container);
+        var rules = rows.map(values);
+        rules.splice(to, 0, rules.splice(from, 1)[0]);
+        rows.forEach(function (row, i) {
+            FIELDS.forEach(function (f, j) { field(row, f).value = rules[i][j]; });
+            markRate(row);
+        });
+    }
+
+    // rowAt is the index of the row at height y, the nearest past either end.
+    function rowAt(container, y) {
+        var at = 0;
+        rowsOf(container).forEach(function (row, i) {
+            if (field(row, 'rate').getBoundingClientRect().top <= y) at = i;
+        });
+        return at;
+    }
+
+    function moved(container) {
+        changed(container);
+        if (window.BAN && window.BAN.track) window.BAN.track('ui.settings.custom_rule', 'move');
+    }
+
+    // addGrip gives row a handle to drag it by, or to move it with the arrows.
+    function addGrip(container, row) {
+        var grip = document.createElement('button');
+        grip.type = 'button';
+        grip.className = 'custom-rule-grip';
+        grip.textContent = '⠿';
+        grip.title = 'Drag to reorder';
+        grip.setAttribute('aria-label', 'Move rule');
+        var start = -1;
+        var at = -1;
+        function end() {
+            if (at < 0) return;
+            rowsOf(container)[at].classList.remove('dragging');
+            var changedPlace = at !== start;
+            at = -1;
+            if (changedPlace) moved(container);
+        }
+        grip.addEventListener('pointerdown', function (e) {
+            if (e.button !== 0) return;
+            grip.setPointerCapture(e.pointerId);
+            start = at = rowsOf(container).indexOf(row);
+            row.classList.add('dragging');
+        });
+        grip.addEventListener('pointermove', function (e) {
+            if (at < 0) return;
+            var to = rowAt(container, e.clientY);
+            if (to === at) return;
+            var rows = rowsOf(container);
+            rows[at].classList.remove('dragging');
+            rows[to].classList.add('dragging');
+            move(container, at, to);
+            at = to;
+            field(rows[to], 'rate').scrollIntoView({ block: 'nearest' });
+        });
+        grip.addEventListener('pointerup', end);
+        grip.addEventListener('pointercancel', end);
+        grip.addEventListener('keydown', function (e) {
+            var step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+            if (!step) return;
+            e.preventDefault();
+            var rows = rowsOf(container);
+            var from = rows.indexOf(row);
+            var target = rows[from + step];
+            if (!target) return;
+            move(container, from, from + step);
+            target.querySelector('.custom-rule-grip').focus();
+            moved(container);
+        });
+        row.appendChild(grip);
     }
 
     // rowFrom copies the first rule's row, without the ids and cookies that
@@ -68,8 +152,10 @@
         var row = first.cloneNode(true);
         row.querySelectorAll('[id]').forEach(function (e) { e.removeAttribute('id'); });
         row.querySelectorAll('[data-cookie]').forEach(function (e) { e.removeAttribute('data-cookie'); });
+        row.querySelectorAll('.custom-rule-grip').forEach(function (g) { g.remove(); });
         FIELDS.forEach(function (f, i) { field(row, f).value = vals[i]; });
         markRate(row);
+        addGrip(container, row);
         var remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'custom-rule-remove';
@@ -79,7 +165,7 @@
         remove.setAttribute('data-track-value', 'remove');
         remove.addEventListener('click', function () {
             row.remove();
-            syncAdd(container);
+            sync(container);
             changed(container);
         });
         row.appendChild(remove);
@@ -91,14 +177,13 @@
         container.querySelectorAll('.custom-rule ~ .custom-rule').forEach(function (r) { r.remove(); });
         var add = container.querySelector('.custom-rules-add');
         rules.forEach(function (vals) { container.insertBefore(rowFrom(container, vals), add); });
-        syncAdd(container);
+        sync(container);
     }
 
     // The extra rows a save keeps: those at a valid rate, as the server
     // reads, with numbers written plainly, so no comma or colon gets in.
     function collect(container) {
-        var rows = Array.prototype.slice.call(container.querySelectorAll('.custom-rule')).slice(1);
-        return rows.map(values).filter(function (v) { return validRate(v[0]); }).map(function (v) {
+        return rowsOf(container).slice(1).map(values).filter(function (v) { return validRate(v[0]); }).map(function (v) {
             var min = Number(v[1]);
             v[0] = String(Number(v[0]));
             v[1] = v[1] !== '' && isFinite(min) ? String(min) : '';
@@ -113,11 +198,14 @@
         var add = container.querySelector('.custom-rules-add');
         if (add && !add.dataset.wired) {
             add.dataset.wired = '1';
+            var first = container.querySelector('.custom-rule');
+            addGrip(container, first);
+            first.addEventListener('input', function () { markRate(first); });
             add.addEventListener('click', function () {
                 var rows = container.querySelectorAll('.custom-rule');
                 if (rows.length >= limit(container)) return;
                 container.insertBefore(rowFrom(container, values(rows[rows.length - 1])), add);
-                syncAdd(container);
+                sync(container);
                 changed(container);
             });
         }
@@ -128,5 +216,5 @@
         };
     }
 
-    window.CustomBuylistRules = { MAX: MAX, parse: parse, format: format, collect: collect, render: render, binding: binding };
+    window.CustomBuylistRules = { MAX: MAX, parse: parse, format: format, collect: collect, move: move, rowAt: rowAt, render: render, binding: binding };
 })();
