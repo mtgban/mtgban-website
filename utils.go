@@ -856,13 +856,14 @@ func findInstanceID(p *prices, sellerName, cardID string, cond mtgban.Condition)
 // uuid2TCGSKU is the reverse of tcgskuparser.Resolve: it returns the TCGplayer SKU of
 // a card in a given condition, picking the inventory the product lives in.
 // Sources that carry no condition are assumed to be NM, the same way the
-// TCGplayer CSV export does. Returns "" when the card has no SKU on file.
+// TCGplayer CSV export does, and so is all sealed product, which has one SKU.
+// Returns "" when the card has no SKU on file.
 func uuid2TCGSKU(p *prices, cardID string, sealed bool, cond mtgban.Condition) string {
 	if cond == "" {
 		cond = "NM"
 	}
 	if sealed {
-		return findInstanceID(p, "TCGSealed", cardID, cond)
+		return findInstanceID(p, "TCGSealed", cardID, mtgban.NM)
 	}
 	return findInstanceID(p, "TCGPlayer", cardID, cond)
 }
