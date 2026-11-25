@@ -48,8 +48,12 @@ id and are still read by `ban:<n>`.
 
 It raises, changing nothing, when the map still lists a `_tp_` id (an export
 from an older build) or when another row already holds an id a row would
-take. It is safe to repeat. Afterwards a snapshot's completion notice
-reports `0 respelled`.
+take. It is safe to repeat.
+
+Then run a snapshot from each Magic instance's admin page rather than wait
+for the next one, up to 12 hours away: until its variant index is warmed
+again a site names the sheets by their old id, and the history API leaves
+them out. The snapshot's completion notice reports `0 respelled`.
 
 ## Running user_state.sql
 
