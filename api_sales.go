@@ -70,7 +70,8 @@ func (s *site) SalesPaneAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 // salesLink is TCGplayer's page for the card in its printing and the given
-// condition, "" for a card with no product id. The orders are English only.
+// condition, "" for a card with no product id. The orders are English only, and
+// a sealed product is listed in no condition.
 func salesLink(b *matcher.Backend, p *prices, cardID string, condition mtgban.Condition) string {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
@@ -79,6 +80,9 @@ func salesLink(b *matcher.Backend, p *prices, cardID string, condition mtgban.Co
 	productID, err := strconv.Atoi(findTCGproductID(b, p, cardID))
 	if err != nil {
 		return ""
+	}
+	if co.Sealed {
+		condition = ""
 	}
 	return tcgplayer.GenerateProductURL(productID, salesPrinting(co), Affiliates().Codes["TCG"], condition, "English", false)
 }

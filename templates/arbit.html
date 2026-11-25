@@ -449,6 +449,8 @@
                             <a href="javascript:sortBy('buy_price', '{{.Name}}')">
                                 {{if $.GlobalMode}}
                                     {{if $sealedSource}}{{index $.StoreNames $.ScraperShort}}{{else}}{{.Name}}{{end}}
+                                {{else if .MedianSale}}
+                                    Median Sale
                                 {{else}}
                                     Buy Price
                                 {{end}}
@@ -463,7 +465,7 @@
                         <th class="c"><a href="javascript:sortBy('profitability', '{{.Name}}')">Profit</a></th>
                         <th class="c"><a href="javascript:sortBy('diff', '{{.Name}}')">Diff</a></th>
                         <th class="c"><a href="javascript:sortBy('spread', '{{.Name}}')">Spread</a></th>
-                        {{if not $.GlobalMode}}
+                        {{if not (or $.GlobalMode .MedianSale)}}
                             <th class="c">Ratio</th>
                         {{end}}
                     {{end}}
@@ -514,7 +516,7 @@
                             {{end}}
                         </td>
                         {{if not $save.HasNoPrice}}
-                            <td class="m pc-key" data-label="{{if $.GlobalMode}}{{$refName}}{{else}}Buy Price{{end}}">
+                            <td class="m pc-key" data-label="{{if $.GlobalMode}}{{$refName}}{{else if $save.MedianSale}}Median Sale{{else}}Buy Price{{end}}">
                                 {{if eq .BuylistEntry.BuyPrice 0.0}}
                                     {{if and $.GlobalMode (ne .ReferenceEntry.URL "") (not $card.Sealed)}}
                                         <a class="arb-price-link buy ref" href="{{.ReferenceEntry.URL}}" target="_blank" rel="nofollow" title="Buy at {{$refName}}">{{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .ReferenceEntry.Price}}</a>
@@ -546,7 +548,7 @@
                             <td class="m {{if gt .Spread 0.0}}arb-spread-up{{else}}arb-spread-down{{end}}" data-label="Spread">
                                 {{printf "%.2f" (shown .Spread)}} %
                             </td>
-                            {{if not $.GlobalMode}}
+                            {{if not (or $.GlobalMode $save.MedianSale)}}
                                 <td class="m" data-label="Ratio">
                                     {{printf "%.2f" .BuylistEntry.PriceRatio}} %
                                 </td>

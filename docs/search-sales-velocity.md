@@ -318,6 +318,27 @@ heap, the same way the velocity's live test does:
 
     NEWSPAPER_LIVE=1 NEWSPAPER_LIVE_CONFIG=<absolute path> go test ./internal/salesvelocity -run TestRecentSalesLive -v
 
+### The median sale on Arbitrage
+
+Arbitrage, and neither Reverse nor Global, ends with a section selling at the
+median sale, `TCG Median Sale`, for a reader with `SearchSales`. Each row
+compares the store's price with the median of the card's order prices in the
+row's condition, per copy, before shipping and fees. The choices below were
+backtested on the stores' Magic prices, pricing each card without its newest
+order and checking the rows against that order:
+
+- **The median** over the average, which one stray sale moves though the two
+  do about as well. A lower percentile lists fewer cards and loses less, and a
+  higher one lists far more: at the 90th the rows lose money as a whole.
+- **No ceiling at the cheapest TCGplayer listing.** Holding the price to it
+  lists half as many cards and loses much less often, mostly by leaving out
+  cards whose price has dropped since the sales. A row here can be one of
+  those, so its newest sales are worth a look.
+- **Five orders at least, from the last 90 days, all of the up to 20 kept.** A
+  busy card's 20 can span a few days. The median moves little with any of
+  these; a price from the newest five alone did worse.
+- **Each order once**, so one bulk order does not set the price.
+
 ## Why not the most-searched cards first
 
 The ticket suggested filling in the most-searched cards first. One pass
