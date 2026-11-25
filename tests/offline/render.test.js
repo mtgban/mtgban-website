@@ -194,6 +194,15 @@ test('sealed product renders Purchase from / Sell to', () => {
     expect(html).toContain('<div class="price-cond-header">Sell to</div>');
 });
 
+test('a sealed result links to sealed searches, a single to plain ones', () => {
+    const links = (html) => [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+    const box = result({card: {uuid: 'uuid-box', n: 'NEO Box', num: '', r: '', set: 'NEO', f: false, e: false, s: true}});
+    expect(links(R.buildHTML([box], CTX))).toEqual([
+        '?sealed=1&q=s%3ANEO', '?sealed=1&q=%22NEO%20Box%22', '?sealed=1&q=s%3ANEO',
+    ]);
+    expect(links(R.buildHTML([result()], CTX))[0]).toBe('?q=s%3ANEO');
+});
+
 test('a set with a mark draws it on its keyrune icon', () => {
     const ctx = Object.assign({}, CTX, {sets: {NEO: {n: 'Kamigawa: Neon Dynasty Promos', k: 'neo', m: '★'}}});
     expect(R.buildHTML([result()], ctx)).toContain('class="ss ss-neo ss-rare ss-2x ss-fw result-set-icon" data-mark="★"');
