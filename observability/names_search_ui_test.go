@@ -122,18 +122,23 @@ func TestSearchUINames(t *testing.T) {
 }
 
 // What each name's rate is measured against, by the labels pageLabel gives
-// /search, /sealed, /search/shared, /sets and /.
+// /search, /sealed, /graded, /search/shared, /sets and /.
 func TestSearchUIPages(t *testing.T) {
 	// Every name not listed is on the search template; the landing panes never render on /sealed.
+	// /graded has no charts, exports, random card, buyers or sales.
 	other := map[string]string{
 		"ui.searchbar.submit": "*", "ui.autocomplete.pick": "*",
 		"ui.scope.toggle": "*", "ui.scope.apply": "*", "ui.scope.clear": "*", "ui.scope.chip": "*",
 		"ui.sealed.toc": "sealed", "ui.sealed.edition": "sealed",
 		"ui.sets": "sets", "ui.home": "home",
 		"ui.fav.merge": "search/shared", "ui.fav.shared_open": "search/shared",
-		"ui.recents": "search", "ui.fav.sort": "search", "ui.fav.csv": "search",
-		"ui.fav.chart": "search", "ui.fav.upload": "search", "ui.fav.share": "search",
-		"ui.search.key": "search,sealed,offline",
+		"ui.recents": "search,graded", "ui.fav.sort": "search,graded", "ui.fav.csv": "search,graded",
+		"ui.fav.chart": "search", "ui.fav.upload": "search,graded", "ui.fav.share": "search,graded",
+		"ui.search.key":         "search,sealed,graded,offline",
+		"ui.search.sort_locked": "search,sealed", "ui.search.chart_top": "search,sealed",
+		"ui.search.random": "search,sealed", "ui.search.buyers_mode": "search,sealed",
+		"ui.sidebar.export": "search,sealed", "ui.sidebar.upload": "search,sealed",
+		"ui.row.velocity": "search,sealed",
 	}
 	denoms := map[string]string{
 		"ui.mfilter.apply": "ui.mfilter.open", "ui.mchart.reset_zoom": "ui.mchart.open", "ui.mchart.gesture": "ui.mchart.open",
@@ -148,6 +153,9 @@ func TestSearchUIPages(t *testing.T) {
 		seen++
 		want, listed := other[n.Name]
 		if !listed {
+			want = "search,sealed,graded"
+		}
+		if strings.HasPrefix(n.Name, "ui.chart.") || strings.HasPrefix(n.Name, "ui.mchart.") {
 			want = "search,sealed"
 		}
 		if n.Page != want {
