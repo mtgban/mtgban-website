@@ -19,7 +19,7 @@ func saleOrders(now time.Time, cents ...uint32) []Order {
 
 // The median sale is the middle of the recent orders' prices, with a minimum
 // of orders, none of them old, each counted once.
-func TestMedianSale(t *testing.T) {
+func TestMedianSales(t *testing.T) {
 	now := recentNow
 	bulk := saleOrders(now, 1000, 900, 800, 700, 600)
 	bulk[0].Qty = 500
@@ -51,7 +51,7 @@ func TestMedianSale(t *testing.T) {
 	}
 	for _, tt := range tests {
 		kept := slices.Clone(tt.orders)
-		got := medianSale(tt.orders, now)
+		got := medianSales(tt.orders, now)
 		if got != tt.want {
 			t.Errorf("%s: %v, want %v", tt.name, got, tt.want)
 		}
@@ -61,9 +61,9 @@ func TestMedianSale(t *testing.T) {
 	}
 }
 
-// MedianSaleVendor prices each of the seller's cards at its median sale per grade,
+// MedianSalesVendor prices each of the seller's cards at its median sale per grade,
 // NM leading at no price where it has too few orders.
-func TestMedianSaleVendor(t *testing.T) {
+func TestMedianSalesVendor(t *testing.T) {
 	now := recentNow
 	graded := &Recent{}
 	graded.Grades[0] = saleOrders(now, 1250, 1250, 1250, 1250, 1250)
@@ -90,12 +90,12 @@ func TestMedianSaleVendor(t *testing.T) {
 	for _, id := range []string{"graded", "played", "box", "unsold"} {
 		stock[id] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 1}}
 	}
-	vendor := snap.MedianSaleVendor(mtgban.NewSellerFromInventory(stock, mtgban.ScraperInfo{SealedMode: true}), now)
+	vendor := snap.MedianSalesVendor(mtgban.NewSellerFromInventory(stock, mtgban.ScraperInfo{SealedMode: true}), now)
 	if vendor == nil {
 		t.Fatal("no vendor")
 	}
-	if vendor.Info().Shorthand != MedianSaleStore || !vendor.Info().SealedMode {
-		t.Errorf("info %+v, want %s trading the seller's side", vendor.Info(), MedianSaleStore)
+	if vendor.Info().Shorthand != MedianSalesStore || !vendor.Info().SealedMode {
+		t.Errorf("info %+v, want %s trading the seller's side", vendor.Info(), MedianSalesStore)
 	}
 	got := vendor.Buylist()
 	if len(got) != len(want) {
@@ -111,12 +111,12 @@ func TestMedianSaleVendor(t *testing.T) {
 	}
 
 	unsold := mtgban.InventoryRecord{"unsold": stock["unsold"]}
-	none := snap.MedianSaleVendor(mtgban.NewSellerFromInventory(unsold, mtgban.ScraperInfo{}), now)
+	none := snap.MedianSalesVendor(mtgban.NewSellerFromInventory(unsold, mtgban.ScraperInfo{}), now)
 	if none != nil {
 		t.Errorf("a vendor with nothing sold: %v", none.Buylist())
 	}
 	var empty *RecentSnapshot
-	none = empty.MedianSaleVendor(mtgban.NewSellerFromInventory(stock, mtgban.ScraperInfo{}), now)
+	none = empty.MedianSalesVendor(mtgban.NewSellerFromInventory(stock, mtgban.ScraperInfo{}), now)
 	if none != nil {
 		t.Errorf("a vendor before the first load: %v", none.Buylist())
 	}

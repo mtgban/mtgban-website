@@ -17,7 +17,7 @@ import (
 
 // The median sale is a section of Arbit's for a reader with SearchSales, and
 // of no other page's or reader's.
-func TestArbitMedianSale(t *testing.T) {
+func TestArbitMedianSales(t *testing.T) {
 	skipWithoutDatastore(t)
 	readyToRender(t)
 	signingEnabled(t, true)
@@ -87,7 +87,7 @@ func TestArbitMedianSale(t *testing.T) {
 	if !found {
 		t.Fatalf("no median sale section in the %d byte page", len(page))
 	}
-	for _, want := range []string{"TCG Median Sale", "Median Sale", "$ 40.00", "300.00 %", "tcgplayer.com/product/", "Condition=Lightly"} {
+	for _, want := range []string{"TCG Median Sales", "Median Sales", "$ 40.00", "300.00 %", "tcgplayer.com/product/", "Condition=Lightly"} {
 		if !strings.Contains(median, want) {
 			t.Errorf("the section lacks %q", want)
 		}
