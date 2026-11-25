@@ -96,6 +96,21 @@
         return true;
     }
 
+    // filled gives opts the sealed rate and minimum of the singles rule when it
+    // has none, and its singles rules the four fields the editor writes: what a
+    // settings save stores for the same custom buylist.
+    function filled(opts) {
+        var o = Object.assign({}, opts);
+        if (o.custombuylist === 'true' && !('customsealedrate' in o)) {
+            o.customsealedrate = o.customrate;
+            o.customsealedminprice = o.customminprice;
+        }
+        if (o.customrules) {
+            o.customrules = o.customrules.split(',').map(function (r) { return r.split(':').slice(0, 4).join(':'); }).join(',');
+        }
+        return o;
+    }
+
     // shown is a preset as this page can show it: the stores it offers, none
     // for a tier that cannot change them, and under forced retail the page's
     // own mode and seller picks. A list the preset lacks takes the page's ticks,
@@ -116,13 +131,14 @@
                 else delete o[k];
             });
         }
-        return canonical(o, ctx);
+        return filled(canonical(o, ctx));
     }
 
     // findMatch returns the first preset equal to opts, or preferId's when it is
     // equal too. With ctx, presets are compared as the page can show them.
     function findMatch(opts, presets, ctx, preferId) {
-        function same(p) { return p && p.opts && equal(opts, ctx ? shown(p.opts, opts, ctx) : p.opts); }
+        var cur = ctx ? filled(opts) : opts;
+        function same(p) { return p && p.opts && equal(cur, ctx ? shown(p.opts, opts, ctx) : p.opts); }
         for (var j = 0; preferId && j < presets.length; j++) {
             if (presets[j] && presets[j].id === preferId) {
                 if (same(presets[j])) return presets[j];
