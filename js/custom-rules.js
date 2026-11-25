@@ -129,11 +129,13 @@
     }
 
     // move puts rule from at to. The values move and the rows stay, since the
-    // first row is the one bound to its own cookies.
+    // first row is the one bound to its own cookies. Those read as a default
+    // when empty, so no minimum is written there as 0.
     function move(container, from, to) {
         var rows = rowsOf(container);
         var rules = rows.map(values);
         rules.splice(to, 0, rules.splice(from, 1)[0]);
+        rules[0][1] = rules[0][1] || '0';
         rows.forEach(function (row, i) { write(container, row, rules[i]); });
     }
 
@@ -257,6 +259,8 @@
         if (!container.dataset.wired) {
             container.dataset.wired = '1';
             wireProduct(container, first);
+            var min = field(first, 'min');
+            min.addEventListener('change', function () { min.value = min.value || '0'; });
         }
         if (add && !add.dataset.wired) {
             add.dataset.wired = '1';
