@@ -234,8 +234,10 @@
             badge = '<span class="result-badge foil">Foil</span>';
         }
 
-        var setQuery = '?q=' + encodeURIComponent('s:' + card.set);
-        var nameQuery = '?q=' + encodeURIComponent('"' + card.n + '"');
+        // Sealed's mode rides on the shell's own links.
+        var mode = card.s ? '?sealed=1&q=' : '?q=';
+        var setQuery = mode + encodeURIComponent('s:' + card.set);
+        var nameQuery = mode + encodeURIComponent('"' + card.n + '"');
 
         // Products link mirrors search.html:991-993.
         var productsLink = '';
