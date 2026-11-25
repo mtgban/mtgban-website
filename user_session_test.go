@@ -305,7 +305,7 @@ func TestLogOutEverywhereEndsEverySessionOfTheEmail(t *testing.T) {
 	rec := rig.accountFrom(req)
 	wantRedirect(t, rec, "/")
 	checkLogoutClears(t, rec, map[string]*http.Cookie{
-		signatureCookie: signatureCookieFor(req, signatureCookie, "x", time.Now()),
+		signatureCookie: signatureCookieFor(req, "x", time.Now()),
 		sessionCookie:   sessionCookieFor(req, "x", 1),
 	})
 	if rows := rig.rows(); len(rows) != 0 {
@@ -351,7 +351,7 @@ func TestLogOutEverywhereNamesTheReaderBySignatureCookieAlone(t *testing.T) {
 		if rows := rig.rows(); len(rows) != 1 {
 			t.Errorf("rows %+v, want the reader's session kept", rows)
 		}
-		if len(rec.Result().Cookies()) != 3 {
+		if len(rec.Result().Cookies()) != 2 {
 			t.Errorf("Set-Cookie %q, want this browser's cookies cleared all the same", rec.Header().Values("Set-Cookie"))
 		}
 	})
@@ -373,7 +373,7 @@ func TestLogOutEverywhereNamesTheReaderBySignatureCookieAlone(t *testing.T) {
 		if rows := sessionRowsOf(t, rig.db, userstate.HashEmail(stranger.Email)); len(rows) != 1 {
 			t.Errorf("%s: the stranger holds %d sessions, want their one", name, len(rows))
 		}
-		if len(rec.Result().Cookies()) != 3 {
+		if len(rec.Result().Cookies()) != 2 {
 			t.Errorf("%s: Set-Cookie %q, want this browser's cookies cleared all the same", name, rec.Header().Values("Set-Cookie"))
 		}
 	}
@@ -392,7 +392,7 @@ func TestLogOutEverywhereWithTheDatabaseDown(t *testing.T) {
 	rec := rig.accountFrom(req)
 	wantRedirect(t, rec, "/")
 	checkLogoutClears(t, rec, map[string]*http.Cookie{
-		signatureCookie: signatureCookieFor(req, signatureCookie, "x", time.Now()),
+		signatureCookie: signatureCookieFor(req, "x", time.Now()),
 		sessionCookie:   sessionCookieFor(req, "x", 1),
 	})
 	if !strings.Contains(rig.logged.String(), "DeletePatreonSessions") {

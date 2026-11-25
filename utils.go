@@ -56,7 +56,7 @@ func cookiePath(r *http.Request, cookieName string) string {
 	// route. A root cookie is also one SettingsValues never hands back to a script,
 	// which is what keeps these HttpOnly cookies out of it. The custom
 	// buylist is set up on /upload and priced into /search.
-	if cookieName == signatureCookie || cookieName == legacySignatureCookie || cookieName == sessionCookie || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "UploadCustom") {
+	if cookieName == signatureCookie || cookieName == sessionCookie || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "UploadCustom") {
 		return "/"
 	}
 	if r == nil || r.URL == nil {
@@ -1480,23 +1480,16 @@ func cookieDomain(r *http.Request) string {
 // site reads it. Scripts cannot read it; the page tells them what they need.
 const signatureCookie = "BAN_SIG"
 
-// legacySignatureCookie is the name BAN_SIG went by before. A reader's copy
-// lasts at most signatureCookieDays past the deploy that renamed it, so it is
-// read when BAN_SIG is absent or has run out, moved to BAN_SIG on first use
-// and cleared at logout. All three can go 31 days after that deploy:
-// 2026-11-23, for one on 2026-10-23.
-const legacySignatureCookie = "MTGBAN"
-
-// signatureCookieFor is the cookie called name holding value until expires,
+// signatureCookieFor is the signature cookie holding value until expires,
 // on the parent domain so any site reads it. Every set and clear of the
 // signature comes from here, since a browser drops a cookie only when name,
 // domain and path all match. Secure always: the sites run over HTTPS, and
 // Chrome and Firefox keep a Secure cookie on http://localhost too; Safari
 // does not, so a local run there needs https or another browser. Lax lets it
 // ride a top-level navigation from a link.
-func signatureCookieFor(r *http.Request, name, value string, expires time.Time) *http.Cookie {
+func signatureCookieFor(r *http.Request, value string, expires time.Time) *http.Cookie {
 	return &http.Cookie{
-		Name:     name,
+		Name:     signatureCookie,
 		Value:    value,
 		Domain:   cookieDomain(r),
 		Path:     "/",
@@ -1507,9 +1500,9 @@ func signatureCookieFor(r *http.Request, name, value string, expires time.Time) 
 	}
 }
 
-// clearSignatureCookie drops the signature cookie called name.
-func clearSignatureCookie(w http.ResponseWriter, r *http.Request, name string) {
-	cookie := signatureCookieFor(r, name, "", time.Time{})
+// clearSignatureCookie drops the signature cookie.
+func clearSignatureCookie(w http.ResponseWriter, r *http.Request) {
+	cookie := signatureCookieFor(r, "", time.Time{})
 	cookie.MaxAge = -1
 	http.SetCookie(w, cookie)
 }
@@ -1552,11 +1545,10 @@ func clearSessionCookie(w http.ResponseWriter, r *http.Request) {
 }
 
 // clearLoginCookies drops everything a login set: the session cookie and the
-// signature under both of its names.
+// signature.
 func clearLoginCookies(w http.ResponseWriter, r *http.Request) {
 	clearSessionCookie(w, r)
-	clearSignatureCookie(w, r, signatureCookie)
-	clearSignatureCookie(w, r, legacySignatureCookie)
+	clearSignatureCookie(w, r)
 }
 
 // isSecureRequest reports whether the request reached us over HTTPS,

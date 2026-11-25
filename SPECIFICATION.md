@@ -436,12 +436,9 @@ signature checks (`enforceAPISigning`) look up a per-user secret in
 `Config.APIUserSecrets` first, falling back to `BAN_SECRET` — page
 signatures always use `BAN_SECRET` only. It is stored in the `BAN_SIG`
 cookie (31 days, shared across the sites of its apex, `*.mtgban.com` or
-`*.ban.cards`, HttpOnly, `SameSite=Lax`,
-always written by `signatureCookieFor`) and/or passed as `?sig=`. A reader
-who still holds only the `MTGBAN` cookie it replaced is served from that and
-moved to `BAN_SIG` on their next page load (`migrateSignatureCookie`); that
-fallback is removed 31 days after the rename's deploy. A login also stores
-its Patreon refresh token in a `patreon_sessions` row of the `user_state`
+`*.ban.cards`, HttpOnly, `SameSite=Lax`, always written by
+`signatureCookieFor`) and/or passed as `?sig=`. A login also stores its
+Patreon refresh token in a `patreon_sessions` row of the `user_state`
 database, which the HttpOnly `BAN_SESSION` cookie names; logout deletes the
 row, and a daily job prunes those past `max_session_days` (ADR-0008).
 With `patreon_renewal.after_days` set, `signing` renews a cookie-borne

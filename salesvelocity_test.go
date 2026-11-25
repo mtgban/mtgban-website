@@ -747,7 +747,7 @@ func TestSearchGatesSalesVelocityByTier(t *testing.T) {
 	page := func(cookie string) string {
 		req := httptest.NewRequest(http.MethodGet, "/search?q=Counterspell", nil)
 		if cookie != "" {
-			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+			req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: cookie})
 		}
 		w := httptest.NewRecorder()
 		testSite.Search(w, req)
@@ -934,7 +934,7 @@ func TestSearchGatesVelocityFilterByTier(t *testing.T) {
 	render := func(query, cookie string, mobile bool) string {
 		req := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query), nil)
 		if cookie != "" {
-			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+			req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: cookie})
 		}
 		if mobile {
 			req.AddCookie(&http.Cookie{Name: "MobileView", Value: "true"})
@@ -1192,7 +1192,7 @@ func TestSearchGatesVelocitySortByTier(t *testing.T) {
 	lower := signedAs(t, fields(""), time.Now().Add(time.Hour))
 	page := func(target, cookie string) string {
 		req := httptest.NewRequest(http.MethodGet, target, nil)
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: cookie})
 		w := httptest.NewRecorder()
 		testSite.Search(w, req)
 		return w.Body.String()

@@ -547,15 +547,14 @@ func TestDimsSignatureAgreesWithVerifiedRequestSignature(t *testing.T) {
 	valid := signedAs(t, url.Values{"UserEmail": {"a@b.com"}, "UserTier": {"Legacy"}}, time.Now().Add(time.Hour))
 	other := signedAs(t, url.Values{"UserEmail": {"c@d.com"}, "UserTier": {"Vintage"}}, time.Now().Add(time.Hour))
 	expired := signedAs(t, url.Values{"UserEmail": {"a@b.com"}, "UserTier": {"Legacy"}}, time.Now().Add(-time.Hour))
-	type sigCase struct{ name, cookie, legacy, query string }
+	type sigCase struct{ name, cookie, query string }
 	cases := []sigCase{
 		{name: "cookie only", cookie: valid},
 		{name: "query only", query: valid},
 		{name: "both", cookie: valid, query: other},
 		{name: "expired cookie, valid query", cookie: expired, query: valid},
 		{name: "valid cookie, tampered query", cookie: valid, query: tampered(other)},
-		{name: "legacy cookie", legacy: valid},
-		{name: "expired cookie beside a legacy one", cookie: expired, legacy: other},
+		{name: "expired cookie", cookie: expired},
 		{name: "nothing"},
 	}
 	build := func(c sigCase) *http.Request {
@@ -566,9 +565,6 @@ func TestDimsSignatureAgreesWithVerifiedRequestSignature(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, target, nil)
 		if c.cookie != "" {
 			r.AddCookie(&http.Cookie{Name: signatureCookie, Value: c.cookie})
-		}
-		if c.legacy != "" {
-			r.AddCookie(&http.Cookie{Name: legacySignatureCookie, Value: c.legacy})
 		}
 		return r
 	}
