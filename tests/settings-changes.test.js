@@ -289,7 +289,7 @@ test('the drawer saves with no SettingsChanges loaded, and with no window.BAN', 
     const { BAN, calls } = fakeBAN();
     expect(runDrawer({ BAN, loaded: false }).get('SearchSealedContents')).toBe('contents');
     expect(calls).toEqual([]);
-    expect(runDrawer().get('SearchListingPriority')).toBe('stores');
+    expect(runDrawer().get('SearchListingPriority')).toBe('prices');
 });
 
 // modal runs settings.js with one store factors binding, the body loaded and the save button wired.
@@ -387,4 +387,12 @@ test('a report that throws still lets the modal save reload', async () => {
         delete window.BAN;
     }
     expect(reloads).toEqual([1]);
+});
+
+test("the phone's drawer opens on the listing priority an unsaved one sorts by", () => {
+    const page = read('templates/mobile/search.html');
+    const group = page.slice(page.indexOf('id="m-set-listing-priority"'));
+    const active = group.slice(0, group.indexOf('</div>')).match(/m-settings-pill active" data-val="(\w+)"/)[1];
+    const unsaved = read('observability/settings.go').match(/Name: "SearchListingPriority".*Default: "(\w+)"/)[1];
+    expect(active).toBe(unsaved);
 });

@@ -506,8 +506,8 @@
                 <a class="m-settings-locked-hint" href="https://www.patreon.com/MTGBAN" target="_blank" data-track="ui.row.locked" data-track-value="listing_priority">Join BAN to unlock sorting stores by price!</a>
                 {{else}}
                 <div class="m-settings-pills" id="m-set-listing-priority">
-                    <button type="button" class="m-settings-pill active" data-val="stores">By Store</button>
-                    <button type="button" class="m-settings-pill" data-val="prices">By Price</button>
+                    <button type="button" class="m-settings-pill" data-val="stores">By Store</button>
+                    <button type="button" class="m-settings-pill active" data-val="prices">By Price</button>
                     <button type="button" class="m-settings-pill" data-val="credit">By Credit</button>
                     <button type="button" class="m-settings-pill" data-val="market">By Market</button>
                 </div>
@@ -970,7 +970,7 @@ function writeDrawer(set) {
     // Listing Priority, absent while the server locks it to store order
     if (document.getElementById('m-set-listing-priority')) {
         var lpPill = document.querySelector('#m-set-listing-priority .m-settings-pill.active');
-        set('SearchListingPriority', lpPill ? lpPill.getAttribute('data-val') : 'stores');
+        set('SearchListingPriority', lpPill ? lpPill.getAttribute('data-val') : 'prices');
     }
 
     // Sealed Contents
