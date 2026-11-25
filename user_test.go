@@ -629,19 +629,13 @@ func TestUserFeaturesFollowTheGrants(t *testing.T) {
 	showNavs(t, "Alerts")
 	s := newSite()
 
-	desktop := featureLinks(userFeatures(s, signedParams("a@b.com", "Vintage", "Search", "Alerts"), false))
+	all := featureLinks(userFeatures(s, signedParams("a@b.com", "Vintage", "Search", "Alerts")))
 	want := []string{"/search", "/search", "/user?settings=1", "/alerts"}
-	if !slices.Equal(desktop, want) {
-		t.Fatalf("desktop %v, want %v", desktop, want)
+	if !slices.Equal(all, want) {
+		t.Fatalf("every grant %v, want %v", all, want)
 	}
 
-	mobile := featureLinks(userFeatures(s, signedParams("a@b.com", "Vintage", "Search", "Alerts"), true))
-	want = []string{"/search", "/search", "/alerts"}
-	if !slices.Equal(mobile, want) {
-		t.Fatalf("mobile %v, want %v", mobile, want)
-	}
-
-	noAlerts := featureLinks(userFeatures(s, signedParams("a@b.com", "Modern", "Search"), false))
+	noAlerts := featureLinks(userFeatures(s, signedParams("a@b.com", "Modern", "Search")))
 	want = []string{"/search", "/search", "/user?settings=1"}
 	if !slices.Equal(noAlerts, want) {
 		t.Fatalf("without Alerts %v, want %v", noAlerts, want)
@@ -649,11 +643,11 @@ func TestUserFeaturesFollowTheGrants(t *testing.T) {
 
 	unverified := signedParams("a@b.com", "Vintage", "Search", "Alerts")
 	unverified.Set("UserEmailUnverified", "true")
-	if slices.Contains(featureLinks(userFeatures(s, unverified, false)), "/alerts") {
+	if slices.Contains(featureLinks(userFeatures(s, unverified)), "/alerts") {
 		t.Fatal("unverified reader offered the alerts link")
 	}
 
-	if got := userFeatures(s, signedParams("", "", "Search", "Alerts"), false); got != nil {
+	if got := userFeatures(s, signedParams("", "", "Search", "Alerts")); got != nil {
 		t.Fatalf("anonymous reader got features %v", got)
 	}
 }
@@ -663,7 +657,7 @@ func TestUserVarsReadTheSignature(t *testing.T) {
 	s := newSite()
 	v := signedParams("a@b.com", "Legacy", "Search")
 	v.Set("UserEmailUnverified", "true")
-	got := s.userVars(context.Background(), v, false)
+	got := s.userVars(context.Background(), v)
 	if !got.SignedIn || got.Name != "Elmo" || got.Email != "a@b.com" || !got.Unverified || got.Tier != "Legacy" || got.TierKey != "legacy" {
 		t.Fatalf("%+v", got)
 	}
@@ -671,22 +665,22 @@ func TestUserVarsReadTheSignature(t *testing.T) {
 		t.Fatalf("unverified, Discord %+v", got.Discord)
 	}
 
-	verified := s.userVars(context.Background(), signedParams("a@b.com", "Legacy", "Search"), false)
+	verified := s.userVars(context.Background(), signedParams("a@b.com", "Legacy", "Search"))
 	if verified.Discord.State != "unavailable" {
 		t.Fatalf("no alerts store, Discord %+v", verified.Discord)
 	}
 
-	staff := s.userVars(context.Background(), signedParams("a@b.com", "Admin", "Search"), false)
+	staff := s.userVars(context.Background(), signedParams("a@b.com", "Admin", "Search"))
 	if staff.Tier != "Admin" || staff.TierKey != "" {
 		t.Fatalf("staff tier %q key %q", staff.Tier, staff.TierKey)
 	}
 
-	noTier := s.userVars(context.Background(), signedParams("a@b.com", "", "Search"), false)
+	noTier := s.userVars(context.Background(), signedParams("a@b.com", "", "Search"))
 	if noTier.Tier != "" || noTier.TierKey != "" || !noTier.SignedIn {
 		t.Fatalf("%+v", noTier)
 	}
 
-	anon := s.userVars(context.Background(), url.Values{}, false)
+	anon := s.userVars(context.Background(), url.Values{})
 	if anon.SignedIn || anon.Features != nil {
 		t.Fatalf("%+v", anon)
 	}
