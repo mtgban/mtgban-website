@@ -263,6 +263,38 @@ func tcgDecklistCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, con
 	return UUID2TCGCSV(b, p, w, ids, qtys, conds, nil)
 }
 
+// A sealed product is one sku, so every condition a file gives it is its row.
+func TestTCGCSVSealedConditions(t *testing.T) {
+	b, p := decklistCSVFixture(t)
+	ids := []string{"FIXTUREA-box", "FIXTUREA-box", "FIXTUREA-1"}
+	conds := []string{"SP", "NM", "SP"}
+	var buf bytes.Buffer
+	err := UUID2TCGCSV(b, p, csv.NewWriter(&buf), ids, nil, conds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, got, _ := strings.Cut(buf.String(), "\n")
+	want := "333,,,,,,,Unopened,0.00,0.00,99.99,0.00,,2,,99.99,,\n" +
+		"112,,,,,,,Lightly Played,1.30,0.00,1.25,0.50,,1,,1.30,,\n"
+	if got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+	if !slices.Equal(conds, []string{"SP", "NM", "SP"}) {
+		t.Errorf("the caller's conditions are now %v", conds)
+	}
+	// A condition past the ids is ignored
+	err = UUID2TCGCSV(b, p, csv.NewWriter(&buf), ids[:1], nil, conds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The prices export's sku column
+	sku := uuid2TCGSKU(p, "FIXTUREA-box", true, "SP")
+	if sku != "333" {
+		t.Errorf("an SP box has sku %q, want 333", sku)
+	}
+}
+
 // The TCGplayer export lists a row at the first price loaded for its card
 // and condition, in both price columns, and at the market price where none
 // finite and above zero was, leaving My Store Price blank.

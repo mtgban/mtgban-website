@@ -280,6 +280,19 @@ func mergeCSVRows(ids, qtys, conds []string, prices []float64) []csvRow {
 	return rows
 }
 
+// sealedAsNM is conds with NM for each sealed product of ids, the condition
+// TCGplayer's one sku of it is on file in.
+func sealedAsNM(b *matcher.Backend, ids, conds []string) []string {
+	out := slices.Clone(conds)
+	for i := range min(len(ids), len(out)) {
+		co, err := b.GetUUID(ids[i])
+		if err == nil && co.Sealed {
+			out[i] = string(mtgban.NM)
+		}
+	}
+	return out
+}
+
 // Convert a slice of ids (BAN uuids) to a list of TCG product SKUs on a CSV
 //
 // If present, qtys and conds need to be the same size of ids.
@@ -316,7 +329,7 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 		return err
 	}
 
-	for _, row := range mergeCSVRows(ids, qtys, conds, loaded) {
+	for _, row := range mergeCSVRows(ids, qtys, sealedAsNM(b, ids, conds), loaded) {
 		id, cond := row.id, row.cond
 		// The four TCG price columns, in the header's order
 		var prices [4]float64
