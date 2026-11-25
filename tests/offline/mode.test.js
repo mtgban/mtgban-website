@@ -117,6 +117,38 @@ test('the navbar toggle hides when offline mode goes off and is wired once', () 
     expect(btn.listeners).toEqual(['click']);
 });
 
+// Where a click on the toggle sends the page, with offline mode preferred or not.
+function toggledHref(pathname, search, preferred) {
+    let click;
+    let prefer = preferred;
+    const btn = { ...navToggle(), addEventListener: (type, fn) => { click = fn; } };
+    const location = { pathname, search, href: '' };
+    const OfflinePrefer = { KEY: 'offline_prefer', get: () => prefer, set: (on) => { prefer = on; } };
+    loadOfflineMode('true', { addEventListener: () => {}, OfflinePrefer }, {
+        localStorage: memoryStorage({ offline_mode: 'true' }), location, OfflinePrefer,
+    }, {
+        getElementById: (id) => (id === 'nav-offline-toggle' ? btn : null),
+    });
+    click();
+    return location.href;
+}
+
+test('the navbar toggle leaves offline mode for the page the shell stands in for', () => {
+    for (const [pathname, search, href] of [
+        ['/search', '?q=box', '/search?q=box'],
+        ['/sealed', '?q=box', '/sealed?q=box'],
+        ['/graded', '?q=box', '/graded?q=box'],
+        ['/offline', '?q=box&sealed=1', '/sealed?q=box'],
+    ]) {
+        expect(toggledHref(pathname, search, true)).toBe(href);
+    }
+});
+
+test('the navbar toggle enters offline mode with the query and the sealed mode', () => {
+    expect(toggledHref('/sealed', '?q=box', false)).toBe('/offline?q=box&sealed=1');
+    expect(toggledHref('/graded', '?q=box', false)).toBe('/offline?q=box');
+});
+
 // --- Storage line sync-status text ---
 
 test('syncStatusText reports last sync date when present', () => {

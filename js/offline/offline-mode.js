@@ -403,7 +403,8 @@
                 var parts = [qs, sealed ? 'sealed=1' : ''].filter(Boolean);
                 location.href = '/offline' + (parts.length ? '?' + parts.join('&') : '');
             } else {
-                location.href = (sealed ? '/sealed' : '/search') + (qs ? '?' + qs : '');
+                var page = location.pathname === '/graded' ? '/graded' : '/search';
+                location.href = (sealed ? '/sealed' : page) + (qs ? '?' + qs : '');
             }
         });
 
