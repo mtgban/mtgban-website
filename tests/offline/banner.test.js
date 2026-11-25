@@ -103,6 +103,7 @@ test('the exit link leads back to the page the shell stands in for', async () =>
         ['/sealed', '?q=box', '/sealed?q=box'],
         ['/offline', '?q=box&sealed=1', '/sealed?q=box'],
         ['/search', '?q=box', '/search?q=box'],
+        ['/graded', '?q=box', '/graded?q=box'],
     ]) {
         const h = makeHarness({}, { pathname, search });
         await h.flush();

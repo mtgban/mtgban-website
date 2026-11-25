@@ -113,9 +113,10 @@
             if (up) {
                 var q = new URLSearchParams(location.search).get('q');
                 var suffix = q ? '?q=' + encodeURIComponent(q) : '';
+                var page = location.pathname === '/graded' ? '/graded' : '/search';
                 var sealed = location.pathname === '/sealed' || new URLSearchParams(location.search).get('sealed') === '1';
                 backEl.textContent = 'Exit offline mode';
-                backEl.href = (sealed ? '/sealed' : '/search') + suffix;
+                backEl.href = (sealed ? '/sealed' : page) + suffix;
             }
             backEl.hidden = !up;
             if (settingsEl) settingsEl.style.display = up ? '' : 'none';
