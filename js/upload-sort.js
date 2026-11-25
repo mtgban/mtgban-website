@@ -63,6 +63,7 @@ function uresSortBy(th, repeated) {
         cell.removeAttribute('aria-sort');
     });
     th.setAttribute('aria-sort', descending ? 'descending' : 'ascending');
+    uresSaveSorts();
 }
 
 // Puts the table's rows in the column's order, col null for none: the
@@ -159,6 +160,7 @@ function uresRefresh() {
     ['results', 'opt'].forEach(function(area) {
         if (uresFormatChain(uresChains[area]) === before[area]) return;
         if (area === 'opt') uresStoreChains = new WeakMap();
+        uresSaveSorts();
         uresShowChain(area);
         uresAreaTables(area).forEach(uresResort);
         var menu = document.getElementById('sort-ties-' + area);
@@ -317,15 +319,90 @@ function uresShowChain(area) {
 // kept, replaces every store's own, and sorts the area's tables.
 function uresChainChanged(area, table) {
     (table ? [table] : uresAreaTables(area)).forEach(function(t) { uresPicked.add(t); });
+    if (!table) uresAreaPicked[area] = true;
     if (table) {
+        uresSaveSorts();
         uresShowChain(area);
         uresResort(table);
         return;
     }
     if (area === 'opt') uresStoreChains = new WeakMap();
     uresSaveChains();
+    uresSaveSorts();
     uresShowChain(area);
     uresAreaTables(area).forEach(uresResort);
+}
+
+// The header each table is sorted by and the orders picked from the menus
+// are kept in the tab's session, so a reload of the page (a store dropped or
+// added, the Reload button or the browser's) sorts the same way; a new list
+// starts unsorted.
+var UPLOAD_SORTS_SESSION = 'uploadSorts';
+
+// The areas whose order the reader picked from the menu on this page
+var uresAreaPicked = {};
+
+// A table's name across reloads: its store's section, or its kind and its
+// place among the results tables of that kind, several on an unpacked list.
+function uresTableKey(table) {
+    if (uresArea(table) === 'opt') return table.closest('.opt-store').id;
+    var kind = table.getAttribute('data-sort-table');
+    return 'results-' + kind + '-' + uresAreaTables('results').filter(function(t) {
+        return t.getAttribute('data-sort-table') === kind;
+    }).indexOf(table);
+}
+
+// A column's: its store, which a store added moves along, or its title.
+function uresColumnKey(th) {
+    var store = th.getAttribute('data-store');
+    return store ? 'store ' + store : 'title ' + th.textContent.trim();
+}
+
+function uresSortHeads(table) {
+    return Array.prototype.slice.call(table.tHead.rows[table.tHead.rows.length - 1].cells);
+}
+
+function uresSaveSorts() {
+    try {
+        var tables = {};
+        uresAreaTables('results').concat(uresAreaTables('opt')).forEach(function(table) {
+            var th = uresSortHeads(table).find(function(cell) { return cell.hasAttribute('aria-sort'); });
+            var own = uresStoreChains.get(table);
+            var sort = {};
+            if (th) {
+                sort.column = uresColumnKey(th);
+                sort.way = th.getAttribute('aria-sort');
+            }
+            if (own) sort.chain = uresFormatChain(own);
+            if (uresPicked.has(table)) sort.picked = true;
+            if (Object.keys(sort).length) tables[uresTableKey(table)] = sort;
+        });
+        sessionStorage.setItem(UPLOAD_SORTS_SESSION, JSON.stringify({areas: uresAreaPicked, tables: tables}));
+    } catch (e) {}
+}
+
+// Puts back the sorts kept from before the reload, and answers with the
+// tables they order.
+function uresRestoreSorts() {
+    var saved = null;
+    try {
+        if (window.BAN_UPLOAD_RELOAD) saved = JSON.parse(sessionStorage.getItem(UPLOAD_SORTS_SESSION) || 'null');
+        else sessionStorage.removeItem(UPLOAD_SORTS_SESSION);
+    } catch (e) {}
+    if (!saved || !saved.tables) return [];
+    uresAreaPicked = saved.areas || {};
+    return uresAreaTables('results').concat(uresAreaTables('opt')).filter(function(table) {
+        var sort = saved.tables[uresTableKey(table)] || {};
+        // A store new to the page follows the order picked for every store
+        var picked = sort.picked || uresAreaPicked[uresArea(table)];
+        if (picked) uresPicked.add(table);
+        if (typeof sort.chain === 'string') uresStoreChains.set(table, uresParseChain(sort.chain));
+        var th = sort.column && uresSortHeads(table).find(function(cell) {
+            return cell.getAttribute('data-sort-method') !== 'none' && uresColumnKey(cell) === sort.column;
+        });
+        if (th) th.setAttribute('aria-sort', sort.way === 'descending' ? 'descending' : 'ascending');
+        return th || picked;
+    });
 }
 
 // What a pick in the menu does to the area's order, or with table to an
@@ -428,6 +505,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 document.addEventListener('DOMContentLoaded', function() {
     uresLoadChains();
+    var restored = uresRestoreSorts();
     ['results', 'opt'].forEach(function(area) {
         var buttons = document.querySelectorAll('[data-sort-area="' + area + '"]');
         if (!buttons.length) return;
@@ -444,4 +522,5 @@ document.addEventListener('DOMContentLoaded', function() {
         uresShowChain(area);
         if (uresChains[area].length) uresAreaTables(area).forEach(uresResort);
     });
+    restored.forEach(uresResort);
 });

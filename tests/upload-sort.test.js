@@ -527,3 +527,135 @@ test('the Card column sorts by its text when no row has a value for the picked o
     uresSortBy(card);
     expect(idxs(t)).toEqual(['0', '2', '1']);
 });
+
+// The page before and after a reload: an optimizer table under its store's
+// id, and a tab session the two share.
+function storeTable(id, headers, rows) {
+    const t = table(headers, rows, [], 'opt-table');
+    t.closest = () => ({ id });
+    return t;
+}
+
+function header(title, attrs = {}) {
+    return Object.assign(element(attrs), { textContent: title, addEventListener: () => {} });
+}
+
+// A results table of a kind, as the template marks it
+function resultsTable(kind, headers, rows) {
+    return Object.assign(table(headers, rows), element({ 'data-sort-table': kind }));
+}
+
+function reloaded(tables, session, reload = true, local = storage()) {
+    const doc = page(tables);
+    const fns = new Function('document', 'localStorage', 'sessionStorage', 'window', source +
+        '\nreturn {uresSortBy, uresMenuAct};')(doc, local, session, { BAN_UPLOAD_RELOAD: reload });
+    doc.listeners.DOMContentLoaded.forEach((fn) => fn());
+    return fns;
+}
+
+function tabSession() {
+    const s = storage();
+    s.removeItem = (k) => { delete s.map[k]; };
+    return s;
+}
+
+const offers = () => [
+    optRow([cell('b'), cell('$ 5.00')], 0),
+    optRow([cell('a'), cell('$ 1.00')], 1),
+    optRow([cell('c'), cell('$ 3.00')], 2),
+];
+const optHeads = () => [header('Card'), header('Offer', { 'data-sort-method': 'number', 'data-sort-descending': 'true' })];
+
+test('a clicked header sorts its own table again after a reload, the same way round', () => {
+    const session = tabSession();
+    const heads = optHeads();
+    const { uresSortBy } = reloaded([storeTable('opt-SZ', heads, offers())], session, false);
+    uresSortBy(heads[1]);
+    uresSortBy(heads[1]);
+
+    // A store added ahead of it
+    const after = optHeads();
+    const ha = storeTable('opt-HA', optHeads(), offers());
+    const sz = storeTable('opt-SZ', after, offers());
+    reloaded([ha, sz], session);
+    expect(idxs(ha)).toEqual(['0', '1', '2']);
+    expect(idxs(sz)).toEqual(['1', '2', '0']);
+    expect(after[1].getAttribute('aria-sort')).toBe('ascending');
+});
+
+test('a new list starts unsorted and forgets the last one', () => {
+    const session = tabSession();
+    const heads = optHeads();
+    const { uresSortBy } = reloaded([storeTable('opt-SZ', heads, offers())], session, false);
+    uresSortBy(heads[1]);
+    const next = storeTable('opt-SZ', optHeads(), offers());
+    reloaded([next], session, false);
+    expect(idxs(next)).toEqual(['0', '1', '2']);
+    expect(session.map).toEqual({});
+});
+
+test("a results column is found by its store after another store's column is added", () => {
+    const session = tabSession();
+    const rows = (extra) => [['a', '9'], ['b', '2'], ['c', '5']].map(([h, v]) =>
+        row([cell(h)].concat(extra ? [cell('-', '')] : [], [cell('$ ' + v, v)]), h));
+    const col = (store, title) => header(title, { 'data-store': store, 'data-sort-method': 'number', 'data-sort-descending': '' });
+    const heads = [header('Card'), col('SCG', 'Star City Games')];
+    const { uresSortBy } = reloaded([resultsTable('singles', heads, rows())], session, false);
+    uresSortBy(heads[1]);
+
+    // Two stores carry a button to drop them, which one did not
+    const after = [header('Card'), col('CK', 'Card Kingdom×'), col('SCG', 'Star City Games×')];
+    const t = resultsTable('singles', after, rows(true));
+    reloaded([t], session);
+    expect(hashes(t)).toEqual(['a', 'c', 'b']);
+    expect(after.map((th) => th.getAttribute('aria-sort'))).toEqual([null, null, 'descending']);
+    // Its store dropped, the table is left as it came
+    const dropped = resultsTable('singles', [header('Card'), col('CK', 'Card Kingdom')], rows());
+    reloaded([dropped], session);
+    expect(hashes(dropped)).toEqual(['a', 'b', 'c']);
+});
+
+test("an order picked from the menu still leads over the setting's after a reload, in a store new to the page too", () => {
+    const session = tabSession();
+    const local = storage();
+    const rows = () => [
+        keyed('x', { lead: '1', release: '2026-09-29', name: 'b' }),
+        keyed('y', { lead: '2', release: '2026-05-12', name: 'a' }),
+        keyed('z', { lead: '3', release: '2026-06-16', name: 'c' }),
+    ];
+    const sz = storeTable('opt-SZ', optHeads(), rows());
+    const ck = storeTable('opt-CK', optHeads(), rows());
+    const { uresMenuAct } = reloaded([ck, sz], session, false, local);
+    uresMenuAct('opt', 'release', 'toggle');
+    // One store's own order, over the stores'
+    uresMenuAct('opt', 'release', 'dir', ck);
+
+    const after = ['opt-CK', 'opt-HA', 'opt-SZ'].map((id) => storeTable(id, optHeads(), rows()));
+    reloaded(after, session, true, local);
+    expect(after.map(hashes)).toEqual([['x', 'z', 'y'], ['y', 'z', 'x'], ['y', 'z', 'x']]);
+});
+
+test('a results table gone after a reload leaves its sort to no other', () => {
+    const session = tabSession();
+    const rows = () => [['a', '1'], ['b', '9'], ['c', '5']].map(([h, v]) => row([cell(h), cell('$ ' + v, v)], h));
+    const heads = () => [header('Card'), header('Your Price', { 'data-sort-method': 'number', 'data-sort-descending': '' })];
+    const before = ['singles', 'sealed', 'notfound'].map((kind) => resultsTable(kind, heads(), rows()));
+    const { uresSortBy } = reloaded(before, session, false);
+    uresSortBy(before[1].tHead.rows[0].cells[1]);
+    expect(hashes(before[1])).toEqual(['b', 'c', 'a']);
+
+    // Its sealed rows removed, then put back
+    const without = ['singles', 'notfound'].map((kind) => resultsTable(kind, heads(), rows()));
+    reloaded(without, session);
+    expect(without.map(hashes)).toEqual([['a', 'b', 'c'], ['a', 'b', 'c']]);
+    const back = ['singles', 'sealed', 'notfound'].map((kind) => resultsTable(kind, heads(), rows()));
+    reloaded(back, session);
+    expect(back.map(hashes)).toEqual([['a', 'b', 'c'], ['b', 'c', 'a'], ['a', 'b', 'c']]);
+});
+
+test('every results table says its kind', () => {
+    expect(html.match(/<table class="ures-table[^>]*>/g)).toEqual([
+        '<table class="ures-table phone-cards" data-sort-table="{{$kind}}">',
+        '<table class="ures-table phone-cards" data-sort-table="notfound">',
+    ]);
+});

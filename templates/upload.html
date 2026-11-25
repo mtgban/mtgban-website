@@ -543,7 +543,7 @@
 {{if eq .Noun "product"}}{{$kind = "sealed"}}{{$picked = .Root.EnabledSealedSellers}}{{end}}
 {{if and .Root.IsBuylist (eq $kind "singles")}}{{$picked = .Root.EnabledVendors}}{{end}}
 {{if and .Root.IsBuylist (eq $kind "sealed")}}{{$picked = .Root.EnabledSealedVendors}}{{end}}
-<table class="ures-table phone-cards">
+<table class="ures-table phone-cards" data-sort-table="{{$kind}}">
     <thead>
         <tr>
             <th style="width:380px;" data-sort-chain>Card <button type="button" class="sort-ties-btn" data-sort-area="results" title="Sort by card properties" aria-label="Sort by card properties">{{template "upload-icon" "arrow-down-wide-narrow"}}</button></th>
@@ -753,7 +753,7 @@
 {{end}}
 
 {{define "ures-notfound-table"}}
-<table class="ures-table phone-cards">
+<table class="ures-table phone-cards" data-sort-table="notfound">
     <thead>
         <tr>
             <th style="width:380px;" data-sort-method="text">Card</th>
@@ -1260,6 +1260,8 @@
 
     <!-- Tab switching script -->
     <script type="text/javascript" src="/js/upload-tabs.js?hash={{.Hash}}" defer></script>
+    {{/* Ahead of upload-optimizer.js, which scrolls to a moved row once sorted */}}
+    <script type="text/javascript" src="/js/upload-sort.js?hash={{.Hash}}" defer></script>
 
     {{if or .Optimized .FilteredOut .NotBought}}
     <script type="text/javascript" src="/js/load-lists.js?hash={{.Hash}}" defer></script>
@@ -1333,7 +1335,6 @@
     <script type="text/javascript" src="/js/upload-exports.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-edit.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-columns.js?hash={{.Hash}}" defer></script>
-    <script type="text/javascript" src="/js/upload-sort.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-share.js?hash={{.Hash}}" defer></script>
 
     <!-- Reload button (hidden until a pick, edit or remove is made) -->
