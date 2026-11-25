@@ -1303,7 +1303,7 @@ window.__BAN_GUIDE = {
                 table: [
                     { value: '200', short: 'Success. Still check the error field in the JSON.' },
                     { value: '401', short: 'Missing, malformed, revoked, or unknown key, or a suspended account.' },
-                    { value: '403', short: 'Key is valid but the plan lacks the game or the mode (retail, buylist, sealed). The body names which.' },
+                    { value: '403', short: 'Key is valid but the plan lacks the game or the mode (retail, buylist, sealed, graded). The body names which.' },
                     { value: '404', short: 'Unknown game or path.' },
                     { value: '405', short: 'A method other than GET.' },
                     { value: '429', short: 'Rate limit exceeded. Wait for Retry-After seconds and make fewer concurrent requests.' },

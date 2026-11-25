@@ -7,13 +7,14 @@
       "monthly": 19900,
       "store_scope": "explicit",
       "included_stores": 1,
-      "modes": ["retail", "buylist"],
+      "modes": ["retail", "buylist", "graded"],
       "icon": "sliders",
       "subtitle": "Entry level access",
       "bullets": [
         "Enjoy TCGplayer data in an easy to ingest format",
         "Add data from any store, the first one is on us",
-        "Pick any additional store available for a small fee"
+        "Pick any additional store available for a small fee",
+        "Includes the graded cards of the stores you pick"
       ],
       "caveats": ["No Sealed or EV data"]
     },
@@ -23,11 +24,11 @@
       "monthly": 49900,
       "store_scope": "BASE_ACCESS",
       "included_stores": 0,
-      "modes": ["retail", "buylist"],
+      "modes": ["retail", "buylist", "graded"],
       "icon": "globe",
       "subtitle": "Single region market overview",
       "bullets": [
-        "Singles prices from every US store available",
+        "Singles and graded prices from every US store available",
         "EU index prices from Cardmarket"
       ],
       "caveats": ["No Sealed or EV data"]
@@ -38,12 +39,12 @@
       "monthly": 79900,
       "store_scope": "ALL_ACCESS",
       "included_stores": 0,
-      "modes": ["retail", "buylist", "sealed", "newspaper"],
+      "modes": ["retail", "buylist", "sealed", "graded", "newspaper"],
       "icon": "crown",
       "subtitle": "One stop solution for all our data",
       "bullets": [
         "What you see on the website is what you get",
-        "Includes Singles, Sealed, and EV calculations",
+        "Includes Singles, Sealed, Graded, and EV calculations",
         "Real arbitrage: all available markets are added",
         "Priority support"
       ]
