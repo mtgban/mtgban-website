@@ -17,9 +17,7 @@ type variantMapRow struct {
 	BanUUID string
 }
 
-// variantMapRows lists every id the backend holds, sorted by matcher id:
-// b.UUIDs rather than GetUUIDs, which leaves out the two-sided token sheets
-// a snapshot prices.
+// variantMapRows lists every id the backend holds, sorted by matcher id.
 func variantMapRows(b *matcher.Backend) []variantMapRow {
 	rows := make([]variantMapRow, 0, len(b.UUIDs))
 	for _, co := range b.UUIDs {
