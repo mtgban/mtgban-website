@@ -665,6 +665,7 @@ button.arb-filter-reset:disabled {
     max-width: 16ch;
     margin: 0 auto;
     overflow: hidden;
+    overflow: clip visible;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--text-sm);
