@@ -203,7 +203,7 @@
             req.onsuccess = function() {
                 var cur = req.result;
                 if (!cur) return;
-                out.result.push({ key: cur.value.key, uuids: cur.value.uuids });
+                out.result.push(cur.value);
                 cur.continue();
             };
         });

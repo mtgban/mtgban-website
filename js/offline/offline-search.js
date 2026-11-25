@@ -87,8 +87,10 @@
                 if (rounds >= MAX_ROUNDS || (stale && stale())) return rows;
                 rounds++;
                 var batch = [];
-                for (; i < names.length && batch.length < BATCH; i++) {
-                    if (matches(names[i].key, needle, squashed)) batch.push(names[i]);
+                // Once through for the cards, and again for the token pairs
+                for (; i < 2 * names.length && batch.length < BATCH; i++) {
+                    var h = names[i % names.length];
+                    if (!!h.tp === (i >= names.length) && matches(h.key, needle, squashed)) batch.push(h);
                 }
                 if (!batch.length) return rows;
                 return Promise.all(batch.map(function (h) {

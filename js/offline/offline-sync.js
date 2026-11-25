@@ -232,7 +232,12 @@ async function rebuildCatalog(catalog) {
         if (!names[k]) names[k] = [];
         names[k].push(uuid);
     });
-    var nameRows = Object.keys(names).map(function(k) { return { key: k, uuids: names[k] }; });
+    // A name only token pairs carry is marked, for the suggestions to offer last
+    var nameRows = Object.keys(names).map(function(k) {
+        var row = { key: k, uuids: names[k] };
+        if (names[k].every(function(uuid) { return catalog.cards[uuid].tp; })) row.tp = true;
+        return row;
+    });
 
     await self.OfflineDB.clearCatalog();
     var CHUNK = 2000;
