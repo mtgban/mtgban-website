@@ -1584,7 +1584,8 @@ html:has(.ban-confirm-dialog-host:not([hidden]):not(.anchored)) { overflow: hidd
 
 .ban-confirm-modal {
     position: relative;
-    max-width: 24em;
+    box-sizing: border-box;
+    max-width: 26.75em;
     width: calc(100% - 3em);
     padding: 1.25em 1.3em 1.15em;
     background: var(--surface-2);
