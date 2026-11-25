@@ -91,8 +91,8 @@ test('body columns and condition grouping', () => {
     expect(html).toContain('data-set-code="NEO"');
     expect(html).toContain('<div class="result-col-header">Sellers</div>');
     expect(html).toContain('<div class="result-col-header">Buyers</div>');
-    expect(html).toContain('<div class="price-cond-header">Condition: NM</div>');
-    expect(html).toContain('<div class="price-cond-header">Condition: SP</div>');
+    expect(html).toContain('<div class="price-cond-header cond-NM">Condition: NM</div>');
+    expect(html).toContain('<div class="price-cond-header cond-SP">Condition: SP</div>');
     // NM group renders before SP.
     expect(html.indexOf('Condition: NM')).toBeLessThan(html.indexOf('Condition: SP'));
     expect(html).toContain('class="rows-index"');
@@ -190,7 +190,7 @@ test('sealed product renders Purchase from / Sell to', () => {
         buylist: {CK: {sealed: 70}},
     });
     const html = R.buildHTML([r], CTX);
-    expect(html).toContain('<div class="price-cond-header">Purchase from</div>');
+    expect(html).toContain('<div class="price-cond-header cond-NM">Purchase from</div>');
     expect(html).toContain('<div class="price-cond-header">Sell to</div>');
 });
 
@@ -201,6 +201,23 @@ test('a sealed result links to sealed searches, a single to plain ones', () => {
         '?sealed=1&q=s%3ANEO', '?sealed=1&q=%22NEO%20Box%22', '?sealed=1&q=s%3ANEO',
     ]);
     expect(links(R.buildHTML([result()], CTX))[0]).toBe('?q=s%3ANEO');
+});
+
+// css/search-rows.css hides Poor by these where NM and SP are listed too.
+test('seller headers and rows carry their condition, buyers none', () => {
+    const r = result({
+        retail: {
+            CK: {cond: 'NM', conditions: {NM: 30, SP: 25, PO: 5}, quantities: {NM: 4, SP: 2, PO: 1}},
+            TCGLow: {regular: 27.5},
+        },
+    });
+    const html = R.buildHTML([r], CTX);
+    for (const cond of ['NM', 'SP', 'PO']) {
+        expect(html).toContain('<div class="price-cond-header cond-' + cond + '">Condition: ' + cond + '</div>');
+        expect(html).toContain('<div class="price-row cond-' + cond + '">');
+    }
+    expect(html.match(/cond-(NM|SP|PO)/g).length).toBe(6);
+    expect(html.slice(html.indexOf('Buyers'))).not.toMatch(/cond-(NM|SP|PO)/);
 });
 
 test('a set with a mark draws it on its keyrune icon', () => {
