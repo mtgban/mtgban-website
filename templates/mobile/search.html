@@ -234,8 +234,8 @@
     <div class="m-results">
     {{range $i, $cardId := .AllKeys}}
         {{$card := (index $.Metadata $cardId)}}
-        <div class="m-card{{if $card.Sealed}} m-sealed{{end}}"{{if $card.RarityColor}} style="--rarity-color: {{$card.RarityColor}}"{{end}}>
-            {{/* Card header - tap to show image drawer */}}
+        <div class="m-card"{{if $card.RarityColor}} style="--rarity-color: {{$card.RarityColor}}"{{end}}>
+            {{/* Card header */}}
             <div class="m-card-header"
                  data-card-id="{{$cardId}}"
                  data-card-name="{{$card.Name}}"
@@ -273,8 +273,8 @@
                 </div>
             </div>
             <div class="m-actions-menu" data-card="{{$cardId}}">
-                {{/* In portrait the favorite + chart buttons collapse in here; in
-                     landscape they stay inline in the header and these are hidden. */}}
+                {{/* In landscape the favorite, backpack and chart buttons collapse
+                     in here; in portrait they sit under the picture. */}}
                 <button type="button" class="m-actions-item m-actions-fav fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.toggleFavorite && toggleFavorite(this); window.closeActionsMenus && closeActionsMenus();" data-track="ui.result.icon" data-track-value="star_add" data-track-scope="menu">
                     <i data-lucide="star"></i><span>Favorite</span>
                 </button>
@@ -370,7 +370,7 @@
                 {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); window.showChartDrawer && showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history" data-track="ui.result.icon" data-track-value="chart_view" data-track-scope="header"><i data-lucide="chart-line"></i></button>{{end}}
             </div>
 
-            {{/* Inline card image - hidden in portrait, visible in landscape */}}
+            {{/* The card picture: its own column in portrait, beside the lists in landscape */}}
             <img class="m-card-img-landscape{{if $card.HasContentWarning}} content-warning{{end}}" data-set="{{$card.SetCode}}" data-date="{{$card.Date}}" data-name="{{$card.Name}}"{{if $card.Sealed}} data-sealed{{end}} src="{{$card.FullImageURL}}" loading="{{if lt $i 2}}eager{{else}}lazy{{end}}" alt="{{$card.Name}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed');this.removeAttribute('data-track')" data-track="ui.result.image" data-track-value="reveal_warning"{{end}}>
 
             {{/* Sellers panel */}}
