@@ -103,6 +103,41 @@ func TestSettingsKeysLeaveOutAPIOnlyStores(t *testing.T) {
 	}
 }
 
+// The upload stores come by the name shown, any case and overrides included,
+// whatever order they loaded in.
+func TestUploadStoreListsAlphabetical(t *testing.T) {
+	info := func(name, shorthand string, sealed bool) mtgban.ScraperInfo {
+		return mtgban.ScraperInfo{Name: name, Shorthand: shorthand, SealedMode: sealed}
+	}
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info("MTGSeattle", "MS", false)),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info("Mana Pool", "MP", false)),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info("TCG Direct", "TCGDirect", false)),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info("TCG Player", "TCGPlayer", false)),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info("MTGSeattle", "MSSealed", true)),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info("Mana Pool", "MPSealed", true)),
+	}, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, info("MTG Mint Card", "MMC", false)),
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, info("Manaleak", "ML", false)),
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, info("MTG Mint Card", "MMCSealed", true)),
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, info("Manaleak", "MLSealed", true)),
+	})
+	withConfigCopy(t)
+	Config().ScraperConfig.NameOverride = map[string]string{"TCG Direct": "TCGplayer Direct", "TCG Player": "TCGplayer"}
+
+	singlesSellers, sealedSellers, singlesVendors, sealedVendors := uploadStoreLists(currentPrices(), "")
+	for name, c := range map[string]struct{ got, want []string }{
+		"singles sellers": {singlesSellers, []string{"MP", "MS", "TCGPlayer", "TCGDirect"}},
+		"sealed sellers":  {sealedSellers, []string{"MPSealed", "MSSealed"}},
+		"singles vendors": {singlesVendors, []string{"ML", "MMC"}},
+		"sealed vendors":  {sealedVendors, []string{"MLSealed", "MMCSealed"}},
+	} {
+		if !slices.Equal(c.got, c.want) {
+			t.Errorf("%s = %v, want %v", name, c.got, c.want)
+		}
+	}
+}
+
 // The Global grid lists the sellers the Global page compares against,
 // since those are what its cookie hides, and only the probe list's.
 func TestGlobalVendorKeysListTheProbeSellers(t *testing.T) {

@@ -126,3 +126,17 @@ test('a move to Not bought goes with the others', () => {
     expect(calls.track).toEqual(['ui.optimizer:row_move']);
     expect(packOptMoves([picked], 'true')).toBe('buylist\na\tNM\t-');
 });
+
+test('an added store takes its place by name, and a dragged order stays', () => {
+    const source = optimizer.match(/function addByName\([\s\S]*?\n}/)[0];
+    const window = { BAN_OPT_STORE_NAMES: { CK: 'Card Kingdom', MP: 'Mana Pool', MS: 'MTGSeattle', SCG: 'Star City Games' } };
+    const addByName = new Function('window', source + '\nreturn addByName;')(window);
+    const added = (list, key) => { addByName(list, key); return list; };
+    expect(added(['MS', 'SCG'], 'CK')).toEqual(['CK', 'MS', 'SCG']);
+    expect(added(['CK', 'MS'], 'MP')).toEqual(['CK', 'MP', 'MS']);
+    expect(added(['CK', 'MS'], 'SCG')).toEqual(['CK', 'MS', 'SCG']);
+    expect(added([], 'CK')).toEqual(['CK']);
+    expect(added(['SCG', 'CK', 'MS'], 'MP')).toEqual(['SCG', 'CK', 'MP', 'MS']);
+    expect(added(['CK', 'SCG', 'MP'], 'MS')).toEqual(['CK', 'SCG', 'MP', 'MS']);
+    expect(added(['SCG', 'MS', 'MP'], 'CK')).toEqual(['SCG', 'MS', 'CK', 'MP']);
+});

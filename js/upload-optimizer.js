@@ -315,15 +315,33 @@ function dropOptStore(button) {
     resubmitOptStores(picked.stores.filter(keep), picked.sealed.filter(keep));
 }
 
+// addByName puts a store in the list after the one its name follows, in the
+// order uploadStoreLists keeps, or ahead of the one that follows its own; the
+// rest, dragged or not, keep their order.
+function addByName(list, key) {
+    var names = window.BAN_OPT_STORE_NAMES || {};
+    var name = function(k) { return (names[k] || k).toLowerCase(); };
+    var before = null, after = null;
+    list.forEach(function(k) {
+        if (name(k) > name(key)) {
+            if (after === null || name(k) < name(after)) after = k;
+        } else if (before === null || name(k) >= name(before)) {
+            before = k;
+        }
+    });
+    var at = before !== null ? list.indexOf(before) + 1 : after !== null ? list.indexOf(after) : 0;
+    list.splice(at, 0, key);
+}
+
 // addOptStore prices the list again with the store picked from the menu.
 function addOptStore(select) {
     var option = select.options[select.selectedIndex];
     if (!option || !option.value) return;
     var picked = optStores();
     if (option.hasAttribute('data-sealed')) {
-        picked.sealed.push(option.value);
+        addByName(picked.sealed, option.value);
     } else {
-        picked.stores.push(option.value);
+        addByName(picked.stores, option.value);
     }
     if (window.BAN && window.BAN.track) window.BAN.track('ui.optimizer', 'store_add');
     resubmitOptStores(picked.stores, picked.sealed);
