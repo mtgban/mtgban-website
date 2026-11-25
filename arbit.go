@@ -369,7 +369,7 @@ type Arbitrage struct {
 	HasNoArbit bool
 
 	// The section sells at the median sale, which has no buylist's ratio
-	MedianSale bool
+	MedianSales bool
 
 	// List of cardId:marketPrice that might not have the best prices
 	SussyList map[string]float64
@@ -932,9 +932,9 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 		}
 
 		if cmp.RecentSales != nil {
-			medianSale := cmp.RecentSales.MedianSaleVendor(source.(mtgban.Seller), start)
-			if medianSale != nil {
-				scrapers = append(scrapers, medianSale)
+			medianSales := cmp.RecentSales.MedianSalesVendor(source.(mtgban.Seller), start)
+			if medianSales != nil {
+				scrapers = append(scrapers, medianSales)
 			}
 		}
 	}
@@ -1039,7 +1039,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 			}
 		}
 		// What a product sold for owes nothing to its simulated contents
-		simulated := scraper.Info().SealedMode && scraper.Info().Shorthand != salesvelocity.MedianSaleStore
+		simulated := scraper.Info().SealedMode && scraper.Info().Shorthand != salesvelocity.MedianSalesStore
 		if !applied["stable"] && simulated {
 			sussy = map[string]float64{}
 
@@ -1089,9 +1089,9 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 		if isCustom {
 			entry.RuleTip = customBuylistTips(p, cmp.CustomBuylist, scraper.Info().SealedMode)
 		}
-		if scraper.Info().Shorthand == salesvelocity.MedianSaleStore {
-			entry.RuleTip = salesvelocity.MedianSaleTip
-			entry.MedianSale = true
+		if scraper.Info().Shorthand == salesvelocity.MedianSalesStore {
+			entry.RuleTip = salesvelocity.MedianSalesTip
+			entry.MedianSales = true
 			// The rows are this request's own copies
 			for i := range arbit {
 				arbit[i].BuylistEntry.URL = salesLink(b, p, arbit[i].CardID, arbit[i].InventoryEntry.Conditions)

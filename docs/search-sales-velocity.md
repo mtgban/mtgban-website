@@ -321,7 +321,7 @@ heap, the same way the velocity's live test does:
 ### The median sale on Arbitrage
 
 Arbitrage, and neither Reverse nor Global, ends with a section selling at the
-median sale, `TCG Median Sale`, for a reader with `SearchSales`. Each row
+median sale, `TCG Median Sales`, for a reader with `SearchSales`. Each row
 compares the store's price with the median of the card's order prices in the
 row's condition, per copy, before shipping and fees. The choices below were
 backtested on the stores' Magic prices, pricing each card without its newest
