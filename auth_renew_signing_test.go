@@ -248,7 +248,7 @@ func TestSigningRenewalLogsOutAReaderWhoPledgesNothing(t *testing.T) {
 		t.Errorf("reached %v, page offers the logged-out message and the login: %v", got.reached, strings.Contains(body, html.EscapeString(ErrMsgExpired)))
 	}
 	checkLogoutClears(t, got.rec, map[string]*http.Cookie{
-		signatureCookie: signatureCookieFor(req, signatureCookie, "x", time.Now()),
+		signatureCookie: signatureCookieFor(req, "x", time.Now()),
 		sessionCookie:   sessionCookieFor(req, "x", 1),
 	})
 	rows := rig.rows()
@@ -533,7 +533,7 @@ func TestSigningGraceLeavesTodaysBehaviourWhereItCannotRenew(t *testing.T) {
 			t.Errorf("reached %v, want the logged-out page", got.reached)
 		}
 		checkLogoutClears(t, got.rec, map[string]*http.Cookie{
-			signatureCookie: signatureCookieFor(req, signatureCookie, "x", time.Now()),
+			signatureCookie: signatureCookieFor(req, "x", time.Now()),
 			sessionCookie:   sessionCookieFor(req, "x", 1),
 		})
 		rows := rig.rows()

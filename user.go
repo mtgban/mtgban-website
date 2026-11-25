@@ -493,7 +493,7 @@ func (s *site) writeAccountAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	values, signed := signatureIsValid(cookieSignature(r))
+	values, signed := signatureIsValid(readCookie(r, signatureCookie))
 	email := ""
 	if signed {
 		email = values.Get("UserEmail")

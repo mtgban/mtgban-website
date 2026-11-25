@@ -25,7 +25,6 @@ func TestCookiePath(t *testing.T) {
 		{"UploadOptimizerOpts", "/upload", "/upload"},
 		{"UploadCustomRate", "/upload", "/"},
 		{"BAN_SIG", "/auth", "/"},
-		{"MTGBAN", "/auth", "/"},
 		{"BAN_SESSION", "/auth", "/"},
 		{"SearchListingPriority", "/sealed", "/"},
 		{"Unknown", "/", "/"},
@@ -248,30 +247,26 @@ func TestSignatureCookieHeaders(t *testing.T) {
 			req := cookieTestRequest(tc.target, tc.proto)
 
 			recorder := httptest.NewRecorder()
-			http.SetCookie(recorder, signatureCookieFor(req, signatureCookie, "sig", expires))
+			http.SetCookie(recorder, signatureCookieFor(req, "sig", expires))
 			got := recorder.Header().Values("Set-Cookie")
 			if len(got) != 1 || got[0] != tc.wantSet {
 				t.Errorf("set Set-Cookie = %q, want %q", got, tc.wantSet)
 			}
 			set := recorder.Result().Cookies()
 
-			wantLegacy := strings.Replace(tc.wantClear, signatureCookie+"=", legacySignatureCookie+"=", 1)
-			for name, want := range map[string]string{signatureCookie: tc.wantClear, legacySignatureCookie: wantLegacy} {
-				recorder = httptest.NewRecorder()
-				clearSignatureCookie(recorder, req, name)
-				got = recorder.Header().Values("Set-Cookie")
-				if len(got) != 1 || got[0] != want {
-					t.Errorf("clear %s Set-Cookie = %q, want %q", name, got, want)
-				}
-				cleared := recorder.Result().Cookies()
-				if len(cleared) != 1 || cleared[0].Name != name || cleared[0].MaxAge != -1 {
-					t.Errorf("clear parsed as %v, want %s with MaxAge -1", cleared, name)
-					continue
-				}
-				// A browser drops a cookie only when Domain and Path match
-				if len(set) != 1 || cleared[0].Domain != set[0].Domain || cleared[0].Path != set[0].Path {
-					t.Errorf("clear of %s scoped %q %q, the set %v", name, cleared[0].Domain, cleared[0].Path, set)
-				}
+			recorder = httptest.NewRecorder()
+			clearSignatureCookie(recorder, req)
+			got = recorder.Header().Values("Set-Cookie")
+			if len(got) != 1 || got[0] != tc.wantClear {
+				t.Errorf("clear Set-Cookie = %q, want %q", got, tc.wantClear)
+			}
+			cleared := recorder.Result().Cookies()
+			if len(cleared) != 1 || cleared[0].Name != signatureCookie || cleared[0].MaxAge != -1 {
+				t.Fatalf("clear parsed as %v, want %s with MaxAge -1", cleared, signatureCookie)
+			}
+			// A browser drops a cookie only when Domain and Path match
+			if len(set) != 1 || cleared[0].Domain != set[0].Domain || cleared[0].Path != set[0].Path {
+				t.Errorf("clear scoped %q %q, the set %v", cleared[0].Domain, cleared[0].Path, set)
 			}
 		})
 	}

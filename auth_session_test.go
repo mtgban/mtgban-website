@@ -374,15 +374,15 @@ func TestLogoutDeletesTheSession(t *testing.T) {
 	checkLogoutClears(t, rec, set)
 }
 
-// checkLogoutClears expects the logout to drop each cookie a login set, and
-// the legacy signature cookie, by the name, domain and path that set it.
+// checkLogoutClears expects the logout to drop each cookie a login set, by
+// the name, domain and path that set it.
 func checkLogoutClears(t *testing.T, rec *httptest.ResponseRecorder, set map[string]*http.Cookie) {
 	t.Helper()
 	cleared := setCookies(rec)
-	if len(rec.Result().Cookies()) != 3 {
-		t.Errorf("cookies %v, want a clear each for %s, %s and %s", rec.Header()["Set-Cookie"], signatureCookie, sessionCookie, legacySignatureCookie)
+	if len(rec.Result().Cookies()) != 2 {
+		t.Errorf("cookies %v, want a clear each for %s and %s", rec.Header()["Set-Cookie"], signatureCookie, sessionCookie)
 	}
-	for _, name := range []string{signatureCookie, sessionCookie, legacySignatureCookie} {
+	for _, name := range []string{signatureCookie, sessionCookie} {
 		dropped := cleared[name]
 		if dropped == nil {
 			t.Errorf("no clear for %s in %v", name, rec.Header()["Set-Cookie"])
@@ -391,10 +391,7 @@ func checkLogoutClears(t *testing.T, rec *httptest.ResponseRecorder, set map[str
 		if dropped.MaxAge >= 0 || dropped.Value != "" {
 			t.Errorf("%s clear %+v does not drop the cookie", name, dropped)
 		}
-		want := set[signatureCookie]
-		if name == sessionCookie {
-			want = set[sessionCookie]
-		}
+		want := set[name]
 		if dropped.Domain != want.Domain || dropped.Path != want.Path || dropped.Secure != want.Secure || dropped.HttpOnly != want.HttpOnly || dropped.SameSite != want.SameSite {
 			t.Errorf("%s clear %+v does not match what set it, %+v", name, dropped, want)
 		}

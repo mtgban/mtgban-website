@@ -259,11 +259,10 @@ func TestSettingsValuesAnswersThisPathsCookies(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet,
-		"/arbit/settings-values?name=ArbitVendorsList&name=GlobalVendorsList&name=BAN_SESSION&name=BAN_SIG&name=MTGBAN&name=SearchSellersList", nil)
+		"/arbit/settings-values?name=ArbitVendorsList&name=GlobalVendorsList&name=BAN_SESSION&name=BAN_SIG&name=SearchSellersList", nil)
 	req.AddCookie(&http.Cookie{Name: "ArbitVendorsList", Value: "CK,SCG,"})
 	req.AddCookie(&http.Cookie{Name: "BAN_SESSION", Value: "id"})
 	req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: "sig"})
-	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: "sig"})
 	req.AddCookie(&http.Cookie{Name: "SearchSellersList", Value: "TCG,"})
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -292,7 +291,7 @@ func TestSettingsValuesNeverAnswerTheLoginCookies(t *testing.T) {
 	for _, nav := range ExtraNavs {
 		s.mountNav(mux, nav)
 	}
-	login := []string{signatureCookie, legacySignatureCookie, sessionCookie}
+	login := []string{signatureCookie, sessionCookie}
 	query := url.Values{"name": login}
 	served := 0
 	for _, nav := range ExtraNavs {

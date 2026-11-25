@@ -45,7 +45,6 @@ var methodCookieReaders = map[string]string{
 // Cookies the server names that hold no reader choice, each with why.
 var notSettingCookies = map[string]string{
 	"BAN_SIG":     "the signed access cookie",
-	"MTGBAN":      "the legacy signed access cookie",
 	"BAN_SESSION": "the Patreon session handle",
 	"BAN_HANDOFF": "the API handoff token",
 }

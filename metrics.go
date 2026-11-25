@@ -80,7 +80,7 @@ func dimsValues(r *http.Request) (string, url.Values) {
 	if r.Form != nil {
 		formSig = r.Form.Get("sig")
 	}
-	sig := cookieSignature(r)
+	sig := readCookie(r, signatureCookie)
 	if sig == "" {
 		sig = formSig
 	}
