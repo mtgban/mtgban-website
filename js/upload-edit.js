@@ -282,6 +282,7 @@
     // against when the page reloads.
     function setPrice(rows, p) {
         var pack = window.Backpack && window.Backpack.sentPack ? window.Backpack.sentPack() : 0;
+        var conds = [];
         rows.forEach(function(tr) {
             remember(tr);
             tr.dataset.price = String(p);
@@ -299,7 +300,18 @@
                 ob.textContent = p.toFixed(2);
                 ob.classList.add('edited');
             });
-            if (pack && window.ListStorage) window.Backpack.setPaid(window.ListStorage.backpackKey({id: tr.dataset.hash, cond: tr.dataset.cond || '', pack: pack}), p);
+            if (conds.indexOf(tr.dataset.cond || '') < 0) conds.push(tr.dataset.cond || '');
+        });
+        // The backpack holds one entry for the card in a grade, its price that of every copy
+        if (pack && window.ListStorage) conds.forEach(function(cond) {
+            var held = Array.prototype.filter.call(document.querySelectorAll('.ures-table tr[data-hash]'), function(x) {
+                return x.dataset.hash === rows[0].dataset.hash && (x.dataset.cond || '') === cond;
+            });
+            var paid = p;
+            if (held.every(price)) {
+                paid = held.reduce(function(sum, tr) { return sum + price(tr) * (parseInt(tr.dataset.qtys, 10) || 1); }, 0) / copies(held);
+            }
+            window.Backpack.setPaid(window.ListStorage.backpackKey({id: rows[0].dataset.hash, cond: cond, pack: pack}), paid);
         });
         if (pack && window.renderBackpack) window.renderBackpack();
     }
