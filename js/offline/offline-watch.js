@@ -6,8 +6,11 @@
     'use strict';
 
     function buildOfflineHref(pathname, search) {
-        var q = pathname === '/search' ? new URLSearchParams(search).get('q') : null;
-        return q ? '/offline?q=' + encodeURIComponent(q) : '/offline';
+        var sealed = pathname === '/sealed';
+        var hasQuery = pathname === '/search' || pathname === '/graded' || sealed;
+        var q = hasQuery ? new URLSearchParams(search).get('q') : null;
+        var parts = [q ? 'q=' + encodeURIComponent(q) : '', sealed ? 'sealed=1' : ''].filter(Boolean);
+        return '/offline' + (parts.length ? '?' + parts.join('&') : '');
     }
 
     self.OfflineWatch = { buildOfflineHref: buildOfflineHref };
