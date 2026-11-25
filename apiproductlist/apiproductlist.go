@@ -45,7 +45,7 @@ const ModeNewspaper = "newspaper"
 const ModeHistory = "history"
 
 // Modes are the API modes a package or add-on may grant, and the order a package must list them in.
-var Modes = []string{"retail", "buylist", "sealed", ModeNewspaper, ModeHistory}
+var Modes = []string{"retail", "buylist", "sealed", "graded", ModeNewspaper, ModeHistory}
 
 // Currencies are the currencies Stripe is seeded in.
 var Currencies = []string{"usd"}

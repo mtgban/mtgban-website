@@ -54,9 +54,9 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	// The 500 tier is BASE_ACCESS per issue 230; the 800 tier adds sealed and
 	// every region; history is its own package, with a lookback and no stores.
 	want := []wantPackage{
-		{"starter", 19900, StoreScopeExplicit, 1, []string{"retail", "buylist"}, 0, []string{"No Sealed or EV data"}},
-		{"all_stores", 49900, StoreScopeBase, 0, []string{"retail", "buylist"}, 0, []string{"No Sealed or EV data"}},
-		{"all_data", 79900, StoreScopeAll, 0, []string{"retail", "buylist", "sealed", "newspaper"}, 0, nil},
+		{"starter", 19900, StoreScopeExplicit, 1, []string{"retail", "buylist", "graded"}, 0, []string{"No Sealed or EV data"}},
+		{"all_stores", 49900, StoreScopeBase, 0, []string{"retail", "buylist", "graded"}, 0, []string{"No Sealed or EV data"}},
+		{"all_data", 79900, StoreScopeAll, 0, []string{"retail", "buylist", "sealed", "graded", "newspaper"}, 0, nil},
 		{"history", 30000, "", 0, []string{"history"}, 365, nil},
 	}
 	if len(c.Packages) != len(want) {
