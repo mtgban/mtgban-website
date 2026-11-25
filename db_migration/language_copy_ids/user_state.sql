@@ -39,7 +39,7 @@ FROM alert_moves am WHERE a.id = am.id;
 
 -- user_state and upload_shares hold ids inside text the server does not
 -- parse; an id is replaced only whole, since one can prefix another.
-CREATE FUNCTION pg_temp.rekey(t text) RETURNS text LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION pg_temp.rekey(t text) RETURNS text LANGUAGE plpgsql AS $$
 DECLARE
     r record;
 BEGIN
@@ -61,7 +61,8 @@ WHERE favorites::text ~ '_(jpn|ita)' OR recents::text ~ '_(jpn|ita)' OR backpack
 DELETE FROM state_moves s USING user_state u
 WHERE s.email_hash = u.email_hash AND s.favorites = u.favorites::text
   AND s.recents = u.recents::text AND s.backpack = u.backpack::text;
--- A client holding the old version re-reads instead of writing old ids back.
+-- A client holding the old version re-reads before it writes; one with edits
+-- not yet synced merges its old ids back in (README.md).
 UPDATE user_state u SET favorites = s.favorites::jsonb, recents = s.recents::jsonb,
     backpack = s.backpack::jsonb, version = u.version + 1, updated_at = now()
 FROM state_moves s WHERE u.email_hash = s.email_hash;
