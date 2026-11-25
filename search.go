@@ -121,25 +121,31 @@ type SearchEntry struct {
 	Slab *mtgban.Slab
 }
 
-// SlabName is what a graded row says of its slab: the grader, the score and
-// the label, or "Graded" where the store gives none. It is empty on a raw row.
+// SlabName is what the row says of its slab, empty on a raw row.
 func (e SearchEntry) SlabName() string {
-	if e.Slab == nil {
+	return slabName(e.Slab)
+}
+
+// slabName is what a graded copy's row says of its slab: the grader, the score
+// and the label, or "Graded" where the store gives none. A raw copy, which has
+// no slab, has no name.
+func slabName(slab *mtgban.Slab) string {
+	if slab == nil {
 		return ""
 	}
 	// The wording of an unread slab tends to name its own grader
-	if e.Slab.Grader != "" && strings.Contains(strings.ToUpper(e.Slab.Label), e.Slab.Grader) {
-		return e.Slab.Label
+	if slab.Grader != "" && strings.Contains(strings.ToUpper(slab.Label), slab.Grader) {
+		return slab.Label
 	}
 	var parts []string
-	if e.Slab.Grader != "" {
-		parts = append(parts, e.Slab.Grader)
+	if slab.Grader != "" {
+		parts = append(parts, slab.Grader)
 	}
-	if e.Slab.Score > 0 {
-		parts = append(parts, strconv.FormatFloat(e.Slab.Score, 'f', -1, 64))
+	if slab.Score > 0 {
+		parts = append(parts, strconv.FormatFloat(slab.Score, 'f', -1, 64))
 	}
-	if e.Slab.Label != "" {
-		parts = append(parts, e.Slab.Label)
+	if slab.Label != "" {
+		parts = append(parts, slab.Label)
 	}
 	return cmp.Or(strings.Join(parts, " "), "Graded")
 }

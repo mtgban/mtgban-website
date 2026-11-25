@@ -372,6 +372,7 @@ var funcMap = template.FuncMap{
 		return b.String()
 	},
 	"storeLabel": storeLabel,
+	"slab_name":  slabName,
 	"slice_has": func(s []string, p string) bool {
 		return slices.Contains(s, p)
 	},

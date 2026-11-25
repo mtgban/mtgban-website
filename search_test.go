@@ -471,3 +471,57 @@ func TestSlabRendersBesideTheStore(t *testing.T) {
 		}
 	}
 }
+
+// The arbitrage pages name a graded copy's slab, under its condition for the
+// copy sold and under its price for the one compared with.
+func TestArbitNamesTheSlab(t *testing.T) {
+	skipWithoutDatastore(t)
+	cardID := somePlainCardUUIDs(t, 1)[0]
+	// DevMode so render reads templates from disk, and opens every source
+	withSigMode(t, true, false)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	for _, name := range []string{"Arbitrage", "Global"} {
+		if LogPages[name] == nil {
+			LogPages[name] = log.New(io.Discard, "", 0)
+			t.Cleanup(func() { delete(LogPages, name) })
+		}
+	}
+	stock := func(shorthand string, price float64, slab *mtgban.Slab) mtgban.Seller {
+		return mtgban.NewSellerFromInventory(mtgban.InventoryRecord{cardID: {{Conditions: "NM", Price: price, Quantity: 2, URL: "u", Slab: slab}}},
+			mtgban.ScraperInfo{Name: shorthand, Shorthand: shorthand, GradedMode: slab != nil})
+	}
+	withPrices(t, []mtgban.Seller{
+		stock("RAW", 10, nil),
+		stock("SLAB", 40, &mtgban.Slab{Grader: "PSA", Score: 9}),
+	}, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{cardID: {{Conditions: "NM", BuyPrice: 100, Quantity: 2, URL: "u"}}},
+			mtgban.ScraperInfo{Name: "BUY", Shorthand: "BUY"}),
+	})
+	withConfigCopy(t)
+	Config().Stores.GlobalAllowList = []string{"RAW"}
+	Config().Stores.GlobalProbeList = []string{"SLAB"}
+
+	const slab = `<span class="arb-slab" title="PSA 9">PSA 9</span>`
+	for _, page := range []struct {
+		target string
+		serve  func(http.ResponseWriter, *http.Request)
+		want   int
+	}{
+		{"/arbit?source=RAW", testSite.Arbit, 0},
+		{"/arbit?source=SLAB", testSite.Arbit, 1},
+		{"/reverse?source=BUY", testSite.Reverse, 1},
+		{"/global?source=RAW&legit=0", testSite.Global, 1},
+	} {
+		rec := httptest.NewRecorder()
+		page.serve(rec, httptest.NewRequest(http.MethodGet, page.target, nil))
+		body := rec.Body.String()
+		if !strings.Contains(body, `data-arb-id="`+cardID+`"`) {
+			t.Errorf("%s: the card is not listed", page.target)
+		}
+		if n := strings.Count(body, slab); n != page.want {
+			t.Errorf("%s: %d rows name the slab, want %d", page.target, n, page.want)
+		}
+	}
+}
