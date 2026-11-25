@@ -1153,7 +1153,7 @@ func SimplePrice2CSV(b *matcher.Backend, p *prices, w *csv.Writer, pm map[string
 
 	allScraperNames := make([]string, len(allScrapers))
 	for i, key := range allScrapers {
-		name := p.scraperName(key)
+		name := p.listedName(key)
 		if name == "" {
 			name = key
 		}

@@ -86,6 +86,7 @@ func newSite() *site {
 		Sellers:      func() []mtgban.Seller { return s.prices().sellers },
 		Vendors:      func() []mtgban.Vendor { return s.prices().vendors },
 		HiddenStores: requestBlocklists,
+		SellerName:   func(info mtgban.ScraperInfo) string { return gradedName(info, info.Name) },
 	}
 
 	s.offline = offlineapi.NewService(offlineapi.Deps{

@@ -687,7 +687,7 @@ func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *matcher.Backen
 
 	sell, buy := "Sell", "Buy"
 	if m.Global {
-		sell, buy = p.scraperName(sourceShort), "Store"
+		sell, buy = p.listedName(sourceShort), "Store"
 		if m.Sealed {
 			sell, buy = buy, sell
 		}
