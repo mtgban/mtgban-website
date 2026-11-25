@@ -725,8 +725,8 @@ func TestMagicIDAltCopy(t *testing.T) {
 
 // TestMagicAliasesAreUnique pins that no two printings share an alias, which
 // variants_mtg_uk holds unique: the second one to be priced would be refused
-// as respelled on every snapshot. A two-sided token sheet's id starts with one
-// face's uuid, so it is the case to watch.
+// as respelled on every snapshot. A two-sided token sheet has a uuid the
+// matcher derives from its faces, so it is the case to watch.
 func TestMagicAliasesAreUnique(t *testing.T) {
 	skipWithoutDatastore(t)
 	t.Parallel()
