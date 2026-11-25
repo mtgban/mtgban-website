@@ -1,10 +1,12 @@
 package suggest
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -31,6 +33,10 @@ type Names struct {
 	// Closing the spaces on both sides gives them one.
 	singlesSquashed []nameEntry
 	sealedSquashed  []nameEntry
+
+	// The single names SplitPairs sets apart, matched after the others.
+	pairs         []nameEntry
+	pairsSquashed []nameEntry
 }
 
 // squash closes up the spaces in an already-folded name, so that where one
@@ -73,16 +79,40 @@ func Fold(name string) string {
 	return sb.String()
 }
 
+// SplitPairs returns b's single names in two, each in the datastore's order:
+// the cards', and those only a pairing of two token faces carries. A face
+// pairs with dozens of others, so "Goblin // ..." alone would fill the rows
+// a reader typing "goblin" has for the cards.
+func SplitPairs(b *matcher.Backend) (names, pairs []string) {
+	for _, name := range b.Names(matcher.NameFormCanonical, false) {
+		uuids := b.Hashes[matcher.Normalize(name)]
+		card := slices.ContainsFunc(uuids, func(uuid string) bool {
+			co, err := b.GetUUID(uuid)
+			return err == nil && co.Identifiers["derivedTokenPair"] != "true"
+		})
+		if card || len(uuids) == 0 {
+			names = append(names, name)
+		} else {
+			pairs = append(pairs, name)
+		}
+	}
+	return names, pairs
+}
+
 // NewNames builds the two sorted views each side is looked up in, from one
-// datastore's canonical single and sealed names.
-func NewNames(singles, sealed []string) *Names {
+// datastore's canonical single and sealed names, the singles as SplitPairs
+// returns them.
+func NewNames(singles, pairs, sealed []string) *Names {
 	byFold, bySquashed := buildNameEntries(singles)
+	pairsByFold, pairsBySquashed := buildNameEntries(pairs)
 	sealedByFold, sealedBySquashed := buildNameEntries(sealed)
 	return &Names{
 		singles:         byFold,
 		singlesSquashed: bySquashed,
 		sealed:          sealedByFold,
 		sealedSquashed:  sealedBySquashed,
+		pairs:           pairsByFold,
+		pairsSquashed:   pairsBySquashed,
 	}
 }
 
@@ -123,7 +153,7 @@ const maxSuggestions = 30
 // standing in for a failed first: the two disagree in both directions, since
 // a typed space has to reach a hyphen in the name and a typed hyphen has to
 // reach a space. Names already found keep the place the folded search gave
-// them.
+// them. The token pairs a single prefix reaches come after every other name.
 func (n *Names) Matches(folded string, sealed bool) []string {
 	byFold, bySquashed := n.singles, n.singlesSquashed
 	if sealed {
@@ -132,7 +162,12 @@ func (n *Names) Matches(folded string, sealed bool) []string {
 
 	seen := make(map[string]bool, maxSuggestions)
 	out := appendPrefixMatches(nil, byFold, folded, seen, func(e nameEntry) string { return e.folded })
-	return appendPrefixMatches(out, bySquashed, squash(folded), seen, func(e nameEntry) string { return e.squashed })
+	out = appendPrefixMatches(out, bySquashed, squash(folded), seen, func(e nameEntry) string { return e.squashed })
+	if sealed {
+		return out
+	}
+	out = appendPrefixMatches(out, n.pairs, folded, seen, func(e nameEntry) string { return e.folded })
+	return appendPrefixMatches(out, n.pairsSquashed, squash(folded), seen, func(e nameEntry) string { return e.squashed })
 }
 
 // appendPrefixMatches collects the names whose key starts with prefix, from

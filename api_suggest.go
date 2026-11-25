@@ -21,7 +21,10 @@ func (s *site) SuggestAPI(w http.ResponseWriter, r *http.Request) {
 
 	if r.FormValue("all") == "true" {
 		observeScoped(r, scope, "suggest.fetch", "all")
-		AllNames := ds.backend.Names(matcher.NameFormCanonical, sealed)
+		AllNames := ds.singles
+		if sealed {
+			AllNames = ds.backend.Names(matcher.NameFormCanonical, true)
+		}
 		// An empty pool means the datastore isn't (fully) loaded; make sure
 		// no cache holds on to the degraded answer
 		if len(AllNames) == 0 {

@@ -2,6 +2,7 @@ package suggest
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"testing"
 )
@@ -36,7 +37,7 @@ func TestMatchesFoldedNames(t *testing.T) {
 		"Fire // Ice",
 		"Lim-Dûl's Vault",
 		"Lightning Bolt",
-	}, nil)
+	}, nil, nil)
 
 	for _, tt := range []struct {
 		typed string
@@ -71,7 +72,7 @@ func TestMatchesReachAJoiningHyphenFromEitherSpelling(t *testing.T) {
 		"3-Hump Lacooda",
 		"Fire // Ice",
 		"Lightning Bolt",
-	}, nil)
+	}, nil, nil)
 
 	for _, tt := range []struct {
 		typed string
@@ -105,7 +106,7 @@ func TestMatchesReachAJoiningHyphenFromEitherSpelling(t *testing.T) {
 // A name found by both folds is offered once, in the place the folded search
 // gave it, rather than twice.
 func TestMatchesOfferANameFoundTwiceOnlyOnce(t *testing.T) {
-	snap := NewNames([]string{"Blue-Eyed Silver Zombie", "Blue Eyed Rival"}, nil)
+	snap := NewNames([]string{"Blue-Eyed Silver Zombie", "Blue Eyed Rival"}, nil, nil)
 
 	got := snap.Matches(Fold("blueeyed"), false)
 	want := []string{"Blue Eyed Rival", "Blue-Eyed Silver Zombie"}
@@ -126,9 +127,27 @@ func TestMatchesCapTheAnswer(t *testing.T) {
 	for i := range names {
 		names[i] = fmt.Sprintf("Same Prefix %02d", i)
 	}
-	snap := NewNames(names, nil)
+	snap := NewNames(names, nil, nil)
 	matches := snap.Matches(Fold("same prefix"), false)
 	if len(matches) != maxSuggestions {
 		t.Errorf("got %d matches, want the %d cap", len(matches), maxSuggestions)
+	}
+}
+
+// A pair of token faces is offered after every card, however many of them
+// the prefix reaches first.
+func TestMatchesPutPairsLast(t *testing.T) {
+	cards := []string{"Goblin", "Goblin Guide", "Goblin Warchief"}
+	var pairs []string
+	for i := range 2 * maxSuggestions {
+		pairs = append(pairs, fmt.Sprintf("Goblin // Army %d", i))
+	}
+	got := NewNames(cards, pairs, nil).Matches("goblin", false)
+	if len(got) != maxSuggestions || !slices.Equal(got[:len(cards)], cards) {
+		t.Errorf("matched %v, want %v first and pairs to the cap", got, cards)
+	}
+	got = NewNames(cards, pairs, nil).Matches("goblin army 7", false)
+	if !slices.Equal(got, []string{"Goblin // Army 7"}) {
+		t.Errorf("matched %v, want the pair typed", got)
 	}
 }

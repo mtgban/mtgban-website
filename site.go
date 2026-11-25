@@ -233,11 +233,13 @@ func (s *site) backend() *matcher.Backend {
 // empty snapshots.
 func (s *site) newDatastore(b *matcher.Backend, loadedAt time.Time) *datastore {
 	sources := newSourcesSnapshot(b)
+	names, pairs := suggest.SplitPairs(b)
 	return &datastore{
 		backend:  b,
 		numbers:  newNumbersSnapshot(b),
 		sources:  sources,
-		names:    suggest.NewNames(b.Names(matcher.NameFormCanonical, false), b.Names(matcher.NameFormCanonical, true)),
+		names:    suggest.NewNames(names, pairs, b.Names(matcher.NameFormCanonical, true)),
+		singles:  slices.Concat(names, pairs),
 		editions: newEditionsSnapshot(b),
 		palette:  s.palette.NewSnapshot(b),
 		finishes: v2FinishList(b),

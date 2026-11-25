@@ -3,8 +3,12 @@ package main
 import (
 	"encoding/json"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/mtgban-website/internal/suggest"
 )
 
 // End to end through the handler against the real datastore, the way the
@@ -90,5 +94,31 @@ func TestOpenSearchDescribesTheRequestsHost(t *testing.T) {
 	OpenSearchDesc(w, req)
 	if body := w.Body.String(); !strings.Contains(body, "https://lorcana.mtgban.com/search?q={searchTerms}") || !strings.Contains(body, "Lorcana prices") {
 		t.Errorf("a Lorcana deployment on an untrusted host describes:\n%s", body)
+	}
+}
+
+// Every single name is served, the token pairs after the cards, and the rows
+// the search box draws for "goblin" are cards.
+func TestSuggestAPIListsTokenPairsLast(t *testing.T) {
+	skipWithoutDatastore(t)
+	w := httptest.NewRecorder()
+	testSite.SuggestAPI(w, httptest.NewRequest("GET", "/api/suggest?all=true", nil))
+	var names []string
+	err := json.Unmarshal(w.Body.Bytes(), &names)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cards, pairs := suggest.SplitPairs(backend())
+	if len(pairs) == 0 || !slices.Equal(names, slices.Concat(cards, pairs)) {
+		t.Errorf("served %d names, want %d cards and then %d pairs", len(names), len(cards), len(pairs))
+	}
+	all := backend().Names(matcher.NameFormCanonical, false)
+	if len(names) != len(all) {
+		t.Errorf("served %d names, want the datastore's %d", len(names), len(all))
+	}
+	for _, name := range testSite.datastore().names.Matches("goblin", false) {
+		if slices.Contains(pairs, name) {
+			t.Errorf("goblin offers %q before its cards run out", name)
+		}
 	}
 }
