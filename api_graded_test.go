@@ -104,6 +104,8 @@ func TestAPIKeepsSlabsToGraded(t *testing.T) {
 		{"/api/v2/stores.json?filter=singles", true, false},
 		{"/api/v2/stores.json?filter=graded", false, true},
 		{"/api/v2/retail.json", true, false},
+		{"/api/v2/singles.json", true, false},
+		{"/api/v2/singles/" + cardID + ".csv", false, false},
 		{"/api/v2/retail/" + cardID + ".json", true, false},
 		{"/api/v2/retail/" + cardID + ".json?vendor=SLABSHOP", false, false},
 		{"/api/v2/search/retail/" + cardID + ".json", true, false},

@@ -342,6 +342,7 @@ func TestPriceAPIv2EveryEndpoint(t *testing.T) {
 		{"retail/" + co.SetCode + ".json", true, false},
 		{"buylist/" + co.SetCode + ".json", false, true},
 		{"all/" + co.SetCode + ".json", true, true},
+		{"singles/" + co.SetCode + ".json", true, true},
 		{"retail/" + regular + ".json", true, false},
 		{"buylist/" + regular + ".json", false, true},
 		{"sealed/" + sealedCo.SetCode + ".json", false, false},
@@ -803,6 +804,43 @@ func TestPriceAPIIndexByCondition(t *testing.T) {
 			}
 			check("v2 retail", wireOf(t, sellerPricesV2(t, b, "mkm", stores, "", cards, "", false)), tc.v2Retail)
 			check("v2 buylist", wireOf(t, vendorPricesV2(t, b, "mkm", stores, "", cards, "", false)), tc.v2Buy)
+		}
+	}
+}
+
+// all is an alias of singles, which v1 does not have, and both refuse a full
+// dump without a signature.
+func TestPriceAPIv2AllIsSingles(t *testing.T) {
+	cardID := gradedAPIStores(t)
+	withSigMode(t, true, false)
+	mux := gradedAPIMux()
+	prices := func(target string) string {
+		body := getBody(mux, 1, target)
+		_, after, found := strings.Cut(body, `"retail":`)
+		if !found {
+			t.Fatalf("%s answers no retail: %s", target, body)
+		}
+		return after
+	}
+	for _, under := range []string{".json", "/" + cardID + ".json"} {
+		got, want := prices("/api/v2/singles"+under), prices("/api/v2/all"+under)
+		if got != want || !strings.Contains(got, `"buylist":`) {
+			t.Errorf("singles%s:\n got %s\nwant %s", under, got, want)
+		}
+	}
+
+	for _, under := range []string{".json", "/" + cardID + ".json"} {
+		body := getBody(mux, 1, "/api/mtgban/singles"+under)
+		if !strings.Contains(body, "Not found") {
+			t.Errorf("v1 answers singles%s: %s", under, body)
+		}
+	}
+
+	signingEnabled(t, true)
+	for _, name := range []string{"singles", "all"} {
+		body := getBody(mux, 2, "/api/v2/"+name+".json")
+		if !strings.Contains(body, "missing signature") {
+			t.Errorf("%s: a full dump without a signature answers %s", name, body)
 		}
 	}
 }
