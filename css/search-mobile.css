@@ -203,6 +203,11 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
         background-position: left top, right top;
     }
 
+    /* Upright the lists scroll under nothing: the bar is at the foot */
+    .m-landing .m-sealed-section {
+        scroll-margin-top: 0;
+    }
+
     .m-landing .m-landing-lists {
         flex: 1;
         min-height: 0;
@@ -623,14 +628,6 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     display: block;
 }
 
-
-/* Log in reads as the secondary action next to the solid Join button. */
-.m-locked-btn-login {
-    background: transparent;
-    color: var(--dodgerblue);
-    border: 1px solid var(--dodgerblue);
-    padding: calc(0.3em - 1px) calc(0.75em - 1px);
-}
 
 /* Pagination: the page count stays centred on the first and last page */
 .m-pagination {

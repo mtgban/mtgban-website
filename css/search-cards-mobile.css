@@ -147,6 +147,24 @@ html:has(.m-landing) {
         border-right: 0;
         border-radius: var(--card-radius, var(--radius-lg));
     }
+
+    /* A card no one lists shows its picture too, the words beside it */
+    .m-layout-cards .m-card:not(:has(.m-tab-panel)) {
+        display: grid;
+        grid-template-columns: auto 1fr;
+    }
+
+    .m-layout-cards .m-card:not(:has(.m-tab-panel)) > .m-card-header {
+        grid-column: 1 / -1;
+    }
+
+    .m-layout-cards .m-card:not(:has(.m-tab-panel)) > .m-card-img-landscape {
+        display: block;
+        width: calc(175px - 1em);
+        height: auto;
+        margin: 0.5em;
+        border-radius: var(--card-radius, var(--radius-lg));
+    }
 }
 
 /* The panes name their lists, a list heading in portrait and the panel
