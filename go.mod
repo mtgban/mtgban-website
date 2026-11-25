@@ -9,7 +9,6 @@ require (
 	github.com/PuerkitoBio/goquery v1.14.0
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/danielgtaylor/unistyle v0.0.0-20190218054314-fff153823f5f
-	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
@@ -75,6 +74,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/s2a-go v0.1.11 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.25 // indirect
 	github.com/googleapis/gax-go/v2 v2.27.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20240701034025-d67f41855da4 // indirect
