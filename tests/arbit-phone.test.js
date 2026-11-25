@@ -30,3 +30,10 @@ test('the stacked pickers line up and fit their row', () => {
     expect(block).toMatch(/\.arb-current-store \.arb-store-select,\n\s+#arbPresetSelect \{ flex: 1 1 0; width: 0; min-width: 0; \}/);
     expect(block).not.toMatch(/\.arb-current-store \{ justify-content: center;/);
 });
+
+// The sort chips scroll with no scrollbar to say so in phone-cards.css; here
+// they wrap, so none is out of sight.
+test('the sort chips wrap on phones', () => {
+    const css = read('css/arbit.css');
+    expect(css).toMatch(/@media \(max-width: 560px\) \{[^@]*\.arb-table\.phone-cards > thead > tr \{ flex-wrap: wrap; overflow-x: visible; \}/);
+});
