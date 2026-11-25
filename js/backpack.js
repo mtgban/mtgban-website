@@ -1514,7 +1514,9 @@
         }
         var cost = text("optgroup");
         cost.setAttribute("label", "Price paid");
-        cost.appendChild(option("$", e.paid ? "$ " + e.paid.toFixed(2) : "Set price", "What each copy cost"));
+        var paid = option("$", paidLabel(e), "What each copy cost");
+        paid.setAttribute("class", "backpack-cond-paid");
+        cost.appendChild(paid);
         sel.appendChild(cost);
         sel.value = e.cond;
         sel.addEventListener("change", function () {
@@ -1559,6 +1561,15 @@
         return text("div", "backpack-row-price", "NM $ " + got.v.toFixed(2) + (got.store ? " · " + got.store : ""));
     }
 
+    // paidLabel is the price paid as the dropdown offers to change it.
+    function paidLabel(e) {
+        return e.paid ? "$ " + e.paid.toFixed(2) : "Set price";
+    }
+
+    // The field askPaid has open, and whether the list was due a redraw
+    // meanwhile, which would take the field with what is typed in it.
+    var asking = null, redraw = false;
+
     // paidLine is what each copy of the row's card cost, or null.
     function paidLine(e) {
         if (!e.paid) return null;
@@ -1569,7 +1580,7 @@
 
     // askPaid swaps the row's price paid for a field: Enter or leaving it
     // saves, blank taking the price away, and Escape keeps the price. Then
-    // done, told whether a key ended it, redraws the row.
+    // done, given the field and told whether a key ended it, redraws the row.
     function askPaid(e, body, done) {
         var was = body.querySelector(".backpack-row-paid");
         var field = document.createElement("input");
@@ -1585,10 +1596,11 @@
         var finish = function (save, byKey) {
             if (over) return;
             over = true;
+            asking = null;
             // A number field reads as blank while it holds no number
             if (field.validity && field.validity.badInput) save = false;
             if (save && setPaid(key(e), field.value) && window.BAN && window.BAN.track) window.BAN.track("ui.backpack.card", "paid");
-            done(byKey);
+            done(field, byKey);
         };
         field.addEventListener("keydown", function (ev) {
             if (ev.key !== "Enter" && ev.key !== "Escape") return;
@@ -1599,6 +1611,7 @@
         });
         field.addEventListener("blur", function () { finish(true, false); });
         if (was) was.replaceWith(field); else body.appendChild(field);
+        asking = field;
         field.focus();
         if (field.select) field.select();
     }
@@ -1670,12 +1683,21 @@
             if (focused) focusCtl(key(e), ".backpack-plus");
         });
         var editPaid = function () {
-            askPaid(e, body, function (byKey) {
-                // This row alone: redrawing the list would take the control
-                // a click is leaving the field for
+            askPaid(e, body, function (field, byKey) {
                 var cur = live().filter(function (x) { return key(x) === key(e); })[0];
-                if (!cur || r.parentNode !== listEl) return;
-                r.replaceWith(row(cur, held, others, price));
+                if (redraw) {
+                    redraw = false;
+                    renderPanel();
+                } else if (!cur || r.parentNode !== listEl) {
+                    return;
+                } else {
+                    // The price alone: redrawing more would take the control
+                    // a click is leaving the field for
+                    e.paid = cur.paid;
+                    var line = paidLine(e);
+                    if (line) field.replaceWith(line); else field.remove();
+                    r.querySelector(".backpack-cond-paid").textContent = paidLabel(e);
+                }
                 undoBtn.disabled = undoSteps().length === 0;
                 if (byKey) focusCtl(key(e), ".backpack-cond");
             });
@@ -1883,6 +1905,10 @@
 
     function renderPanel() {
         if (!panel) return;
+        if (asking && document.activeElement === asking) {
+            redraw = true;
+            return;
+        }
         var s = sortPref();
         var entries = viewOrder(ordered(), s);
         // Removing a focused row lays the list out empty, which scrolls it
