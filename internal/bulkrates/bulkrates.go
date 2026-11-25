@@ -163,10 +163,15 @@ func (r *Rates) magic(co *matcher.CardObject) (Tier, bool) {
 	default:
 		return Tier{}, false
 	}
+	// Mystery Booster 2's playtest cards are CMB1's and CMB2's kind, whose
+	// sets are Un-sets to the datastore
+	if co.SetCode == "MB2" && co.HasPromoType("playtest") {
+		return Tier{}, false
+	}
 
 	if co.IsPromo {
-		// Book promos are refused
-		if co.SetCode == "PHPR" {
+		// Book promos and Unstable's are refused
+		if co.SetCode == "PHPR" || co.SetCode == "PUST" {
 			return Tier{}, false
 		}
 		return magicPromo, true
