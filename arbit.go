@@ -633,8 +633,8 @@ func (v *customBuylistVendor) Info() mtgban.ScraperInfo      { return v.info }
 func (v *customBuylistVendor) Buylist() mtgban.BuylistRecord { return v.buylist }
 
 // newCustomBuylistVendor prices the cards seller sells by the first rule
-// that pays for each, against the sealed references when seller trades
-// sealed, or nil when no rule's reference is loaded.
+// that pays for each, the sealed rules when seller trades sealed, or nil
+// when none of them has its reference loaded.
 func newCustomBuylistVendor(b *matcher.Backend, p *prices, rules []customBuylistRule, seller mtgban.Seller) *customBuylistVendor {
 	sealed := seller.Info().SealedMode
 	shorthand := customStore
@@ -642,12 +642,8 @@ func newCustomBuylistVendor(b *matcher.Backend, p *prices, rules []customBuylist
 		shorthand = customSealedStore
 	}
 	refs := slices.DeleteFunc(customBuylistRefs(p, rules), func(ref customBuylistRef) bool {
-		refName := ref.rule.seller
-		if sealed {
-			refName = ref.rule.sealedSeller
-		}
-		_, err := p.sellerInventory(refName)
-		return err != nil
+		_, err := p.sellerInventory(ref.rule.seller)
+		return err != nil || ref.rule.sealed != sealed
 	})
 	if len(refs) == 0 {
 		return nil
@@ -663,11 +659,7 @@ func newCustomBuylistVendor(b *matcher.Backend, p *prices, rules []customBuylist
 		for _, ref := range refs {
 			// An index files its one price under whatever grade its scraper
 			// uses, so it buys at NM only
-			isIndex := ref.isIndex
-			if sealed {
-				isIndex = slices.Contains(UploadIndexComparePriceList, ref.rule.sealedSeller)
-			}
-			entries := customBuylistEntries(ref.reference(cardID, sealed), ref.rule, isIndex)
+			entries := customBuylistEntries(ref.reference(cardID), ref.rule, ref.isIndex)
 			if len(entries) > 0 {
 				buylist[cardID] = entries
 				break

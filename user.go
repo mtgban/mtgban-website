@@ -243,10 +243,10 @@ func aclFlagPerk(flag, value string) (TierPerk, bool) {
 	case "UploadCustom":
 		return on("Import custom searches")
 	case "UploadCustomMax":
-		// As many as customBuylistRulesMax lets the tier use
+		// As many of each kind as customBuylistRulesMax lets the tier use
 		n = min(n, maxCustomBuylistRules)
 		if n > 0 {
-			return perk("Up to "+plural(n, "custom buylist rule"), "Custom buylist rules", strconv.Itoa(n))
+			return perk("Up to "+plural(n, "custom buylist rule")+" each for singles and sealed", "Custom buylist rules", strconv.Itoa(n))
 		}
 	case "UploadPublish":
 		return on("Publish an upload as a store")

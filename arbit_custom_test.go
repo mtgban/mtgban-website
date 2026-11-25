@@ -75,7 +75,8 @@ func TestCustomBuylistEntries(t *testing.T) {
 
 // TestNewCustomBuylistVendor pins what the vendor is priced off: the sealed
 // reference for a sealed source, the skipped sets for singles only, the index
-// rule for the reference in use, and no vendor without a loaded reference.
+// rule for an index reference, and no vendor without a rule of the source's
+// kind whose reference is loaded.
 func TestNewCustomBuylistVendor(t *testing.T) {
 	cardID := firstPlainCard(t)
 	var skippedID, sealedID string
@@ -123,29 +124,39 @@ func TestNewCustomBuylistVendor(t *testing.T) {
 	}{
 		{
 			name:      "singles off the retail reference, skipped sets dropped",
-			rule:      customBuylistRule{rate: 0.5, seller: "REF", sealedSeller: "REFSealed"},
+			rule:      customBuylistRule{rate: 0.5, seller: "REF"},
 			source:    singles,
 			shorthand: customStore,
 			want:      map[string]int{cardID: 2},
 		},
 		{
 			name:      "an index reference buys at NM only",
-			rule:      customBuylistRule{rate: 0.5, seller: "TCGLow", sealedSeller: "REFSealed"},
+			rule:      customBuylistRule{rate: 0.5, seller: "TCGLow"},
 			source:    singles,
 			shorthand: customStore,
 			want:      map[string]int{cardID: 1},
 		},
 		{
 			name:      "sealed off the sealed reference, skipped sets kept",
-			rule:      customBuylistRule{rate: 0.5, seller: "TCGLow", sealedSeller: "REFSealed"},
+			rule:      customBuylistRule{rate: 0.5, seller: "REFSealed", sealed: true},
 			source:    sealed,
 			shorthand: customSealedStore,
 			want:      map[string]int{sealedID: 2},
 		},
 		{
 			name:   "no reference loaded",
-			rule:   customBuylistRule{rate: 0.5, seller: "REF", sealedSeller: "GONE"},
+			rule:   customBuylistRule{rate: 0.5, seller: "GONE", sealed: true},
 			source: sealed,
+		},
+		{
+			name:   "a singles rule for a sealed source",
+			rule:   customBuylistRule{rate: 0.5, seller: "REFSealed"},
+			source: sealed,
+		},
+		{
+			name:   "a sealed rule for a singles source",
+			rule:   customBuylistRule{rate: 0.5, seller: "REF", sealed: true},
+			source: singles,
 		},
 	}
 	for _, tt := range tests {

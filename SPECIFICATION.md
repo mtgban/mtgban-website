@@ -619,8 +619,8 @@ override; phone UA detection via `mileusna/useragent`).
   `searchParallelNG()` runs seller and vendor scans in
   parallel goroutines, applying store/price/entry filter chains → optional
   custom-buylist injection (priced by the first of the reader's rules that
-  applies; a tier keeps `UploadCustomMax` rules, one where it sets none,
-  ten at most) → post-filters → sort (chrono/hybrid/alpha/
+  applies; a tier keeps `UploadCustomMax` singles rules and as many
+  sealed ones, one of each where it sets none, ten at most) → post-filters → sort (chrono/hybrid/alpha/
   number/retail/buylist/velocity, backwards under `-sort:`, plus `odds` — a `variable:` search only, by each
   card's `dropOdds()` expected count, ascending) → `Paginate()`
   (utils.go) against the named constants `MaxSearchResults` (100/page)

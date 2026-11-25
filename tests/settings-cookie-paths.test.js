@@ -84,6 +84,7 @@ function bodyFixture() {
             el('input', { id: 'opt-margin', type: 'text', value: '10' }),
             el('div', { id: 'settings-upload-checks' }, ['lowval', 'highval'].map(k => el('input', { type: 'checkbox', 'data-misc': k }))),
             el('select', { 'data-cookie': 'UploadCustomBuyer', value: 'TCGLow' }),
+            el('input', { id: 'opt-customsealedrate', type: 'text', value: '0.8', 'data-unset': 'UploadCustomRate' }),
         ]),
         el('section', { class: 'settings-pane', 'data-tab': 'arbit', 'data-path': '/arbit' }, [
             el('div', { id: 'settings-arbit-vendors-singles', 'data-skip-cookie': 'ArbitVendorsList' }, [checkbox('CK'), checkbox('SCG')]),
@@ -172,6 +173,16 @@ test('a tab opened on another page loads the values its own page reads', async (
     expect(m.find('input[name="SCG"]').checked).toBe(true);
     expect(m.find('#opt-margin').value).toBe('15');
     expect(m.find('select').value).toBe('CKBuylist');
+});
+
+test('a field with a data-unset cookie loads that one until its own is set', async () => {
+    const rate = async (cookie) => {
+        const m = await openModal({ pathname: '/search', cookie, values: { '/arbit': {}, '/upload': {} } });
+        return m.find('#opt-customsealedrate').value;
+    };
+    expect(await rate('UploadCustomRate=0.5')).toBe('0.5');
+    expect(await rate('UploadCustomRate=0.5; UploadCustomSealedRate=0.7')).toBe('0.7');
+    expect(await rate('')).toBe('0.8');
 });
 
 test('saving on another page writes each cookie where its page reads it', async () => {

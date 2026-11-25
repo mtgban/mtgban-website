@@ -2457,26 +2457,25 @@ func customBuylistSkips(b *matcher.Backend, co *matcher.CardObject, releasedBy t
 	return EntryRule{SkipSets: customBuylistSkipSets, SkipOversized: true, ReleasedBy: releasedBy}.skips(b, co)
 }
 
-// customBuylistRule is one rule of the reader's custom buylist as the
-// upload settings save it: the reference sellers' prices at a rate, from a
-// minimum price.
-// With a fallback set, a price index fills in the grades the singles
-// reference does not price, and another sealed seller the products the
+// customBuylistRule is one rule of the reader's custom buylist, for singles
+// or for sealed, as the upload settings save it: the reference seller's
+// prices at a rate, from a minimum price.
+// With a fallback set, a price index fills in the grades a singles
+// reference does not price, and another sealed seller the products a
 // sealed reference does not.
 type customBuylistRule struct {
-	rate, minPrice           float64
-	seller, sealedSeller     string
-	fallback, sealedFallback string
+	rate, minPrice   float64
+	seller, fallback string
+	sealed           bool
 }
 
-// maxCustomBuylistRules caps the chain whatever a tier's UploadCustomMax
-// says: the six UploadCustom cookies hold the first rule, UploadCustomRules
-// the rest.
+// maxCustomBuylistRules caps the singles chain and the sealed one each,
+// whatever a tier's UploadCustomMax says.
 const maxCustomBuylistRules = 10
 
 // customBuylistRulesMax is how many custom buylist rules a verified sig
-// allows: its UploadCustomMax, one where it sets none, and every rule in
-// dev without signing.
+// allows for singles, and as many again for sealed: its UploadCustomMax,
+// one where it sets none, and every rule in dev without signing.
 func customBuylistRulesMax(sig string) int {
 	if DevMode && !SigCheck {
 		return maxCustomBuylistRules
@@ -2489,32 +2488,49 @@ func customBuylistRulesMax(sig string) int {
 }
 
 // readCustomBuylistRules reads the reader's custom buylist rules in the
-// order they apply, as many as their tier allows, none when the custom
-// buylist is off.
+// order they apply, the singles ones and then the sealed ones, as many of
+// each as their tier allows, none when the custom buylist is off.
 func readCustomBuylistRules(r *http.Request) []customBuylistRule {
 	customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
 	if !slices.Contains(customOpts, "enabled") {
 		return nil
 	}
 
-	first := [6]string{
+	singles := [4]string{
 		readCookie(r, "UploadCustomRate"),
 		readCookie(r, "UploadCustomMinPrice"),
 		readCookie(r, "UploadCustomBuyer"),
 		readCookie(r, "UploadCustomSinglesFallback"),
+	}
+	sealed := [4]string{
+		readCookie(r, "UploadCustomSealedRate"),
+		readCookie(r, "UploadCustomSealedMinPrice"),
 		readCookie(r, "UploadCustomSealedBuyer"),
 		readCookie(r, "UploadCustomSealedFallback"),
 	}
-	return parseCustomBuylistRules(first, readCookie(r, "UploadCustomRules"), customBuylistRulesMax(verifiedSignature(r)))
+	limit := customBuylistRulesMax(verifiedSignature(r))
+	return slices.Concat(
+		parseCustomBuylistRules(singles, readCookie(r, "UploadCustomRules"), limit, false),
+		parseCustomBuylistRules(sealedFirstRule(singles, sealed), readCookie(r, "UploadCustomSealedRules"), limit, true),
+	)
 }
 
-// parseCustomBuylistRules is the chain, up to limit rules: the first rule,
-// then those extra holds, each "rate:min:seller:fallback:sealed:sealedfallback",
-// joined by commas. A rule at no valid rate is dropped, and so is an item
-// that is not six fields.
-func parseCustomBuylistRules(first [6]string, extra string, limit int) []customBuylistRule {
+// sealedFirstRule is the first sealed rule's settings, at the first singles
+// rule's rate and minimum price where it has no rate of its own.
+func sealedFirstRule(singles, sealed [4]string) [4]string {
+	if sealed[0] == "" {
+		sealed[0], sealed[1] = singles[0], singles[1]
+	}
+	return sealed
+}
+
+// parseCustomBuylistRules is the singles chain, or the sealed one, up to
+// limit rules: the first rule, then those extra holds, each
+// "rate:min:seller:fallback", joined by commas. A rule at no valid rate is
+// dropped, and so is an item short of four fields; any further are ignored.
+func parseCustomBuylistRules(first [4]string, extra string, limit int, sealed bool) []customBuylistRule {
 	var rules []customBuylistRule
-	rule, ok := newCustomBuylistRule(first)
+	rule, ok := newCustomBuylistRule(first, sealed)
 	if ok {
 		rules = append(rules, rule)
 	}
@@ -2525,13 +2541,13 @@ func parseCustomBuylistRules(first [6]string, extra string, limit int) []customB
 		if len(rules) == limit {
 			break
 		}
-		var fields [6]string
+		var fields [4]string
 		parts := strings.Split(item, ":")
-		if len(parts) != len(fields) {
+		if len(parts) < len(fields) {
 			continue
 		}
 		copy(fields[:], parts)
-		rule, ok := newCustomBuylistRule(fields)
+		rule, ok := newCustomBuylistRule(fields, sealed)
 		if ok {
 			rules = append(rules, rule)
 		}
@@ -2539,89 +2555,73 @@ func parseCustomBuylistRules(first [6]string, extra string, limit int) []customB
 	return rules
 }
 
-// newCustomBuylistRule is the rule its rate, minimum price, singles
-// reference and fallback, and sealed reference and fallback spell, false
-// at no valid rate.
-func newCustomBuylistRule(fields [6]string) (customBuylistRule, bool) {
+// newCustomBuylistRule is the singles or sealed rule its rate, minimum
+// price, reference and fallback spell, false at no valid rate.
+func newCustomBuylistRule(fields [4]string, sealed bool) (customBuylistRule, bool) {
 	rate := customBuylistSetting(fields[0])
 	if rate == 0 {
 		return customBuylistRule{}, false
 	}
 	return customBuylistRule{
-		rate:           rate,
-		minPrice:       customBuylistSetting(fields[1]),
-		seller:         fields[2],
-		fallback:       fields[3],
-		sealedSeller:   fields[4],
-		sealedFallback: fields[5],
+		rate:     rate,
+		minPrice: customBuylistSetting(fields[1]),
+		seller:   fields[2],
+		fallback: fields[3],
+		sealed:   sealed,
 	}, true
 }
 
 // customBuylistRef is one rule with the inventories it prices off, looked
 // up once a request.
 type customBuylistRef struct {
-	rule                     customBuylistRule
-	singles, sealed          mtgban.InventoryRecord
-	fallback, sealedFallback mtgban.InventoryRecord
-	isIndex                  bool
+	rule                customBuylistRule
+	inventory, fallback mtgban.InventoryRecord
+	isIndex             bool
 }
 
 // customBuylistRefs looks up what each rule prices off.
 func customBuylistRefs(p *prices, rules []customBuylistRule) []customBuylistRef {
 	refs := make([]customBuylistRef, 0, len(rules))
 	for _, rule := range rules {
-		singles, _ := p.sellerInventory(rule.seller)
-		sealed, _ := p.sellerInventory(rule.sealedSeller)
+		inventory, _ := p.sellerInventory(rule.seller)
 		refs = append(refs, customBuylistRef{
-			rule:           rule,
-			singles:        singles,
-			sealed:         sealed,
-			fallback:       customBuylistFallback(p, rule.fallback),
-			sealedFallback: customBuylistSealedFallback(p, rule.sealedFallback),
-			isIndex:        slices.Contains(UploadIndexComparePriceList, rule.seller),
+			rule:      rule,
+			inventory: inventory,
+			fallback:  customBuylistFallback(p, rule),
+			isIndex:   slices.Contains(UploadIndexComparePriceList, rule.seller),
 		})
 	}
 	return refs
 }
 
-// reference is what the rule prices one card, or a sealed product, off.
-func (ref customBuylistRef) reference(cardID string, sealed bool) []mtgban.InventoryEntry {
-	if sealed {
-		return customBuylistReference(ref.sealed[cardID], ref.sealedFallback[cardID], true)
-	}
-	return customBuylistReference(ref.singles[cardID], ref.fallback[cardID], ref.isIndex)
+// reference is what the rule prices one card or sealed product off.
+func (ref customBuylistRef) reference(cardID string) []mtgban.InventoryEntry {
+	return customBuylistReference(ref.inventory[cardID], ref.fallback[cardID], ref.isIndex || ref.rule.sealed)
 }
 
-// customBuylistTips spells each rule naming a reference for the side, one
-// line each, for a column or section that any of them may have priced.
+// customBuylistTips spells each singles or sealed rule naming a reference,
+// one line each, for a column or section that any of them may have priced.
 func customBuylistTips(p *prices, rules []customBuylistRule, sealed bool) string {
 	var lines []string
 	for _, rule := range rules {
-		reference := rule.seller
-		if sealed {
-			reference = rule.sealedSeller
-		}
-		if reference != "" {
-			lines = append(lines, rule.tip(p, sealed))
+		if rule.sealed == sealed && rule.seller != "" {
+			lines = append(lines, rule.tip(p))
 		}
 	}
 	return strings.Join(lines, "\n")
 }
 
 // customBuylistFallback is the inventory of the fallback a rule names, nil
-// when it names no price index.
-func customBuylistFallback(p *prices, name string) mtgban.InventoryRecord {
-	if !slices.Contains(UploadIndexComparePriceList, name) {
-		return nil
+// when it names no price index, or for a sealed rule no sealed seller.
+func customBuylistFallback(p *prices, rule customBuylistRule) mtgban.InventoryRecord {
+	if !rule.sealed {
+		if !slices.Contains(UploadIndexComparePriceList, rule.fallback) {
+			return nil
+		}
+		inventory, _ := p.sellerInventory(rule.fallback)
+		return inventory
 	}
-	inventory, _ := p.sellerInventory(name)
-	return inventory
-}
-
-// customBuylistSealedFallback is the inventory of the sealed fallback a rule
-// names, nil when it names no sealed seller.
-func customBuylistSealedFallback(p *prices, name string) mtgban.InventoryRecord {
-	seller, found := p.index.sellerFold[strings.ToLower(name)]
+	seller, found := p.index.sellerFold[strings.ToLower(rule.fallback)]
 	if !found || !seller.Info().SealedMode {
 		return nil
 	}
@@ -2684,18 +2684,12 @@ func customBuylistSetting(s string) float64 {
 	return v
 }
 
-// tip spells the rule on one line for a tooltip, for a card or, when sealed,
-// a sealed product: 80% of CK (or TCG Low) if ≥ $7.00.
-func (rule customBuylistRule) tip(p *prices, sealed bool) string {
-	reference, fallback := rule.seller, rule.fallback
-	applies := customBuylistFallback(p, fallback) != nil
-	if sealed {
-		reference, fallback = rule.sealedSeller, rule.sealedFallback
-		applies = customBuylistSealedFallback(p, fallback) != nil
-	}
-	tip := fmt.Sprintf("%.4g%% of %s", rule.rate*100, customBuylistTipName(p, reference))
-	if applies && fallback != reference {
-		tip += " (or " + customBuylistTipName(p, fallback) + ")"
+// tip spells the rule on one line for a tooltip:
+// 80% of CK (or TCG Low) if ≥ $7.00.
+func (rule customBuylistRule) tip(p *prices) string {
+	tip := fmt.Sprintf("%.4g%% of %s", rule.rate*100, customBuylistTipName(p, rule.seller))
+	if rule.fallback != rule.seller && customBuylistFallback(p, rule) != nil {
+		tip += " (or " + customBuylistTipName(p, rule.fallback) + ")"
 	}
 	if rule.minPrice > 0 {
 		tip += fmt.Sprintf(" if ≥ $%.2f", rule.minPrice)
@@ -2720,23 +2714,19 @@ func searchCustomBuylist(b *matcher.Backend, p *prices, r *http.Request, cardIDs
 	if len(offers) == 0 {
 		return
 	}
-	tips := make([][2]string, len(rules))
+	tips := make([]string, len(rules))
 	for i, rule := range rules {
-		tips[i] = [2]string{rule.tip(p, false), rule.tip(p, true)}
+		tips[i] = rule.tip(p)
 	}
 	for _, offer := range offers {
 		if foundVendors[offer.cardID] == nil {
 			foundVendors[offer.cardID] = map[mtgban.Condition][]SearchEntry{}
 		}
-		tip := tips[offer.rule][0]
-		if offer.sealed {
-			tip = tips[offer.rule][1]
-		}
 		foundVendors[offer.cardID][offer.condition] = append(foundVendors[offer.cardID][offer.condition], SearchEntry{
 			ScraperName: "Custom Buylist",
 			Shorthand:   "CUSTOM",
 			Price:       offer.price,
-			RuleTip:     tip,
+			RuleTip:     tips[offer.rule],
 		})
 	}
 }
@@ -2747,12 +2737,11 @@ type customOffer struct {
 	cardID    string
 	condition mtgban.Condition
 	price     float64
-	sealed    bool
 	rule      uint8
 }
 
 // customBuylistOffers prices cardIDs off the reference seller inventories
-// by the first rule that applies to each, each card once: a price at every
+// by the first rule of its kind that applies to each, each card once: a price at every
 // condition the reference lists, or at INDEX when the reference is a price
 // index, which has one meaningful price. A rule applies when its reference
 // has a best price, at least the rule's minimum.
@@ -2773,7 +2762,10 @@ func customBuylistOffers(b *matcher.Backend, p *prices, rules []customBuylistRul
 		}
 
 		for i, ref := range refs {
-			entries := ref.reference(cardID, co.Sealed)
+			if ref.rule.sealed != co.Sealed {
+				continue
+			}
+			entries := ref.reference(cardID)
 			// The rule applies to the first priced listing, as upload reads it
 			first := slices.IndexFunc(entries, func(e mtgban.InventoryEntry) bool { return !unpriced(e.Price) })
 			if first < 0 || entries[first].Price < ref.rule.minPrice {
@@ -2788,7 +2780,7 @@ func customBuylistOffers(b *matcher.Backend, p *prices, rules []customBuylistRul
 				if !ref.isIndex {
 					condition = entry.Conditions
 				}
-				offers = append(offers, customOffer{cardID: cardID, condition: condition, price: entry.Price * ref.rule.rate, sealed: co.Sealed, rule: uint8(i)})
+				offers = append(offers, customOffer{cardID: cardID, condition: condition, price: entry.Price * ref.rule.rate, rule: uint8(i)})
 			}
 			break
 		}

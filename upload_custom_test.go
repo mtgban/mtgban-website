@@ -286,7 +286,7 @@ func TestUploadCustomBuylistChain(t *testing.T) {
 		"customseller":   {"ZZA"},
 		"customrate":     {"0.5"},
 		"customminprice": {"15"},
-		"customrules":    {"0.25:0:ZZB:::"},
+		"customrules":    {"0.25:0:ZZB:"},
 	}
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

@@ -48,5 +48,8 @@ function syncUploadOptionsFromSettings() {
         add('customfallback',       getCookie('UploadCustomSinglesFallback')       || '');
         add('customsealedfallback', getCookie('UploadCustomSealedFallback') || '');
         add('customrules',          getCookie('UploadCustomRules')          || '');
+        add('customsealedrate',     getCookie('UploadCustomSealedRate')     || '');
+        add('customsealedminprice', getCookie('UploadCustomSealedMinPrice') || '');
+        add('customsealedrules',    getCookie('UploadCustomSealedRules')    || '');
     }
 }
