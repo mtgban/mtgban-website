@@ -958,7 +958,8 @@ orders in memory, for a signature carrying `SearchSales`, ADR-0009),
 site's `/search/export/`, `SearchExport`).
 
 `/api/v2/` (version "2", `PriceAPIv2`, `api_banprice_v2.go`) serves the same
-endpoints, options and access as v1, and v1's CSV. Its JSON prices are
+endpoints, options and access as v1, and v1's CSV, and names v1's `all`
+`singles`, keeping `all` as its alias. Its JSON prices are
 `{id: {finish: {store: [{condition, price, qty, available}]}}}`
 (`banprice.V2`): the finish is the card's `FinishSlug` (`sealed` for sealed
 product), and a store's list has one entry per condition, best first

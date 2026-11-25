@@ -1233,7 +1233,7 @@ window.__BAN_GUIDE = {
                 table: [
                     { value: 'sets.json', short: 'Set codes with data. filter=sealed or filter=singles narrows the list.' },
                     { value: 'stores.json', short: 'Store tags used as keys in price objects, in a stable order. filter=sealed or filter=singles narrows it; tag=names returns full store names instead.' },
-                    { value: 'retail/{SET}.json', short: 'Retail prices for one edition. buylist/{SET}.json for buylist, all/{SET}.json for both.' },
+                    { value: 'retail/{SET}.json', short: 'Retail prices for one edition. buylist/{SET}.json for buylist, singles/{SET}.json for both (version 2; all/{SET}.json in either).' },
                     { value: 'sealed/{SET}.json', short: 'Sealed product prices, retail and buylist in one call.' },
                     { value: 'graded/{SET}.json', short: 'Graded card (slab) prices by grade, version 2 only. Also graded/{id} and search/retail/graded.' },
                     { value: 'retail/{id}.json', short: 'One card, regular and foil prices. The id can be a BAN id, MTGJSON UUID, Scryfall id, or TCGplayer product id. buylist/{id}.json for buylist.' },

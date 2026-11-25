@@ -207,6 +207,13 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	}
 	// kind is the endpoint the path names, ahead of any set or id under it.
 	kind, _, _ := strings.Cut(strings.TrimSuffix(strings.TrimSuffix(urlPath, ".json"), ".csv"), "/")
+	// all is an alias of singles, and the one name v1 has for it
+	switch {
+	case kind == "all":
+		kind = "singles"
+	case kind == "singles" && version != APIVersionV2:
+		kind = ""
+	}
 	isFullDump := !strings.Contains(urlPath, "/")
 
 	// Endpoint for retrieving the set codes
@@ -271,7 +278,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	if sig == "" && storesOpt == "" {
 		storesOpt = strings.Join(Config().Stores.APIDemoStores, ",")
 		// Disable a few endpoints for this specific mode
-		if isFullDump && (kind == "all" || kind == "retail" || kind == "buylist") {
+		if isFullDump && (kind == "singles" || kind == "retail" || kind == "buylist") {
 			observeScoped(r, observability.APIFamily(r.URL.Path), "api.refuse", "no_key")
 			out.Error = "Invalid endpoint or missing signature"
 			json.NewEncoder(w).Encode(&out)
@@ -357,7 +364,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		return
 	}
 
-	if kind != "retail" && kind != "buylist" && kind != "all" && kind != "sealed" && !isGraded {
+	if kind != "retail" && kind != "buylist" && kind != "singles" && kind != "sealed" && !isGraded {
 		out.Error = "Not found"
 		json.NewEncoder(w).Encode(&out)
 		return
@@ -434,7 +441,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	}
 
 	// Only filtered output can have csv encoding, and only for retail or buylist requests
-	checkCSVoutput := (filterByEdition == "" && filterByHash == nil && filterByFinish == "") || kind == "all" || isGraded
+	checkCSVoutput := (filterByEdition == "" && filterByHash == nil && filterByFinish == "") || kind == "singles" || isGraded
 	if strings.HasSuffix(urlPath, ".csv") && checkCSVoutput {
 		out.Error = "Invalid request"
 		json.NewEncoder(w).Encode(&out)
@@ -472,7 +479,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	if isGraded && canAccessMode(enabledModes, "graded") {
 		retailV2 = gradedSectionV2(b, p, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish)
 	}
-	if ((kind == "retail" || kind == "all") && canRetail) || isSealed {
+	if ((kind == "retail" || kind == "singles") && canRetail) || isSealed {
 		dumpType += "retail"
 		if isV2 {
 			retailV2 = sellerSectionV2(b, p, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish, isSealed)
@@ -480,7 +487,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 			out.Retail = getSellerPrices(b, p, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}
 	}
-	if ((kind == "buylist" || kind == "all") && canBuylist) || isSealed {
+	if ((kind == "buylist" || kind == "singles") && canBuylist) || isSealed {
 		dumpType += "buylist"
 		if isV2 {
 			buylistV2 = vendorSectionV2(b, p, idOpt, enabledVendors, filterByEdition, filterByHash, filterByFinish, isSealed)

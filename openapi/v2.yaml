@@ -64,12 +64,14 @@ paths:
       description: >-
         setOrId is a set code for an edition snapshot, or a card id
         (BAN, MTGJSON, Scryfall, or TCGplayer) for a single card.
-        Replace .json with .csv for the version 1 CSV.
+        singles is retail and buylist in one call, and all its alias; graded
+        is retail alone. Replace .json with .csv for the version 1 CSV, but
+        for singles and graded.
       parameters:
         - name: mode
           in: path
           required: true
-          schema: { type: string, enum: [retail, buylist, all, sealed] }
+          schema: { type: string, enum: [retail, buylist, singles, all, sealed, graded] }
         - name: setOrId
           in: path
           required: true
@@ -86,22 +88,6 @@ paths:
       summary: Prices for every graded card (slab)
       description: JSON only, and retail only
       parameters:
-        - $ref: "#/components/parameters/id"
-        - $ref: "#/components/parameters/vendor"
-        - $ref: "#/components/parameters/finish"
-      responses:
-        "200": { $ref: "#/components/responses/Prices" }
-        default: { $ref: "#/components/responses/Error" }
-
-  /graded/{setOrId}.json:
-    get:
-      summary: Prices for one edition's or one card's slabs
-      description: JSON only, and retail only. setOrId is as above
-      parameters:
-        - name: setOrId
-          in: path
-          required: true
-          schema: { type: string }
         - $ref: "#/components/parameters/id"
         - $ref: "#/components/parameters/vendor"
         - $ref: "#/components/parameters/finish"
