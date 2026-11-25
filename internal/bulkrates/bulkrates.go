@@ -91,6 +91,16 @@ var (
 // flag for it; TSR's are only its retro-frame cards.
 var timeshifted = []string{"TSB", "H1R", "H2R", "TSR"}
 
+// organizedPlay are the Pokemon sets the notes keep off the shelf: "Exclude
+// Play! Pokemon Prize Pack Cards" and "Excludes Pokemon League and Organized
+// Play promos".
+var organizedPlay = []string{
+	"G22880",  // Prize Pack Series Cards
+	"PR-1539", // League & Championship Cards
+	"PPP",     // Professor Program Promos
+	"G24529",  // Player Placement Trainer Promos
+}
+
 // Rates prices cards at the bulk shelf of the backend's game.
 type Rates struct {
 	b *matcher.Backend
@@ -267,6 +277,9 @@ func yugioh(co *matcher.CardObject) (Tier, bool) {
 }
 
 func pokemon(co *matcher.CardObject) (Tier, bool) {
+	if slices.Contains(organizedPlay, co.SetCode) {
+		return Tier{}, false
+	}
 	if co.IsPromo || co.Rarity == "promo" {
 		return pokemonPromo, true
 	}
@@ -290,6 +303,11 @@ func pokemon(co *matcher.CardObject) (Tier, bool) {
 	switch co.Rarity {
 	case "holorare":
 		return pokemonHoloRare, true
+	case "prismrare", "radiantrare", "acespecrare":
+		// World Championship decks print theirs without the foil
+		if co.Finish == "holofoil" {
+			return pokemonHoloRare, true
+		}
 	case "rare":
 		return pokemonRare, true
 	case "common", "uncommon":

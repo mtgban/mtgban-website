@@ -120,6 +120,17 @@ func TestBulkOffersGames(t *testing.T) {
 			{"001-005_162268", "Bulk Promos"},
 			{"017_645286_reverseholofoil", "Bulk Reverse Foil Basic Energy"},
 			{"017_645286", ""}, // basic energy
+			// Holo Rare names these three rarities
+			{"58-156_157675_holofoil", "Bulk Holo Rare"},  // Giratina Prism Star
+			{"027-189_272227_holofoil", "Bulk Holo Rare"}, // Radiant Heatran
+			{"141-162_542654_holofoil", "Bulk Holo Rare"}, // Awakening Drum, ACE SPEC
+			{"157-162_637518", ""},                        // Prime Catcher, World Championship deck
+			// Refused: Prize Pack cards and organized play's promos
+			{"003-142_619138", ""},          // Ledian, rare
+			{"020-159_513804_holofoil", ""}, // Radiant Charizard
+			{"002-146_185033", ""},          // Dragonite, League & Championship
+			{"105-109_176625", ""},          // Fighting Energy, Professor Program
+			{"662992", ""},                  // No. 3 Trainer
 		},
 	} {
 		t.Run(string(game), func(t *testing.T) {
