@@ -152,11 +152,12 @@ func TestBuildOrdersUnmatched(t *testing.T) {
 	}
 }
 
-// TestShortCondition abbreviates TCGplayer's grades and leaves the rest as sent.
+// TestShortCondition abbreviates TCGplayer's grades, drops a sealed product's
+// and leaves the rest as sent.
 func TestShortCondition(t *testing.T) {
 	for in, want := range map[string]string{
 		"Near Mint": "NM", "Lightly Played": "LP", "Moderately Played": "MP",
-		"Heavily Played": "HP", "Damaged": "DMG", "Unopened": "Unopened", "": "",
+		"Heavily Played": "HP", "Damaged": "DMG", "Unopened": "", "Other": "Other", "": "",
 	} {
 		if got := shortCondition(in); got != want {
 			t.Errorf("%q: got %q, want %q", in, got, want)
@@ -514,8 +515,6 @@ func TestText(t *testing.T) {
 			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$12.34 LP · Oct 11"},
 		{"a price with no condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 12.34}, 30, "", "2.3/day",
 			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$12.34 · Oct 11"},
-		{"a price and an unabbreviated condition", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 89.99, LastCondition: "Unopened"}, 30, "", "2.3/day",
-			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$89.99 Unopened · Oct 11"},
 		{"a price under a dollar", Sales{Copies: 69, Orders: 31, Days: 18, LastSale: last, LastPrice: 0.5}, 30, "", "2.3/day",
 			"|copies|69|days|18/30\n|orders|31\n\n|last sale|$0.50 · Oct 11"},
 		{"zero with a price", Sales{LastSale: time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC), LastPrice: 12.34, LastCondition: "LP"}, 30, "", "0/day",

@@ -60,8 +60,8 @@ name says what the details count, so they have no heading; the other pages'
 tooltip adds `Sold on TCGplayer, last 30 days` (`salesvelocity.Heading`).
 
 The price is the item's, per copy, without shipping. Conditions print as NM,
-LP, MP, HP and DMG, any other as TCGplayer sends it. With no order on record
-the lines show the date alone.
+LP, MP, HP and DMG, any other as TCGplayer sends it, and a sealed product's
+Unopened not at all. With no order on record the lines show the date alone.
 
 The row is a `<details>` on both layouts, showing the rate and opening on a
 click or tap to the details, so a phone reads what a desktop reads. A phone

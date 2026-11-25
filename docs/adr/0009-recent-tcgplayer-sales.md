@@ -118,7 +118,8 @@ What exists:
 7. **Sales shows each condition's 5 newest orders**, under `Condition: NM`
    headers, newest first.
    - Each header carries the condition's average price per copy over every
-     order kept, weighted by copies.
+     order kept, weighted by copies. A sealed product's header is the
+     average alone, since it only sells unopened.
    - A row is the source (TCGplayer's logo and name, linked to the card's
      product page in that condition and printing), the date
      (white, centred: `2026-11-19`, the minute in its tooltip), and the

@@ -255,6 +255,30 @@ func TestSalesPaneLinks(t *testing.T) {
 	}
 }
 
+// A sealed product's header is its average alone: it only sells unopened.
+func TestSalesPaneSealed(t *testing.T) {
+	tmpl, err := salesPaneTemplate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	groups := []salesvelocity.Group{{
+		Grade: "Unopened", Avg: "120.00",
+		Shown: []salesvelocity.Line{{Date: "2026-11-19", Source: "TCGplayer", Price: "120.00"}},
+	}}
+	var buf strings.Builder
+	err = tmpl.ExecuteTemplate(&buf, "sales-pane", groups)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "Unopened") || strings.Contains(out, "Condition") {
+		t.Errorf("a sealed pane names its condition:\n%s", out)
+	}
+	if !strings.Contains(out, "avg <b>$ 120.00</b>") {
+		t.Errorf("a sealed pane lacks its average:\n%s", out)
+	}
+}
+
 // TestSalesLink covers the printing, condition and language a sales row's
 // link asks TCGplayer for.
 func TestSalesLink(t *testing.T) {
