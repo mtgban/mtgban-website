@@ -104,6 +104,7 @@ test('the row under the pointer is found by height, the ends taking what is past
 // An editor of one rule, with just enough of the DOM for binding to wire it.
 // Given kinds, its rows have a product and a kind select too.
 function editor(vals, kinds) {
+    const isA = (c, sel) => c.className.split(' ').includes(sel.slice(1));
     const node = (className) => ({
         className, dataset: {}, attrs: {}, children: [], listeners: {}, hidden: false, focused: 0,
         setAttribute(k, v) { this.attrs[k] = v; },
@@ -130,9 +131,9 @@ function editor(vals, kinds) {
         if (kinds) ['product', 'kind'].forEach((f) => { fields[f] = select('UploadCustomSealed' + f); });
         row.querySelector = (sel) => {
             const m = sel.match(/data-field="([^"]+)"/);
-            return m ? fields[m[1]] : row.children.find((c) => '.' + c.className === sel);
+            return m ? fields[m[1]] : row.children.find((c) => isA(c, sel));
         };
-        row.querySelectorAll = (sel) => row.children.filter((c) => '.' + c.className === sel);
+        row.querySelectorAll = (sel) => row.children.filter((c) => isA(c, sel));
         row.cloneNode = () => {
             const copy = makeRow(FIELDS.map((f) => fields[f].value));
             row.children.forEach((c) => copy.appendChild(node(c.className)));
@@ -189,7 +190,7 @@ test('grips show from two rules, and the arrows move a rule as far as the ends',
     expect(tracked).toEqual([['ui.settings.custom_rule', 'move']]);
 
     // Back to one rule, nothing is left to order
-    ed.rows[1].children.find((c) => c.className === 'custom-rule-remove').fire('click');
+    ed.rows[1].querySelector('.custom-rule-remove').fire('click');
     expect(grips().map((g) => g.hidden)).toEqual([true]);
 });
 

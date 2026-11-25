@@ -169,7 +169,7 @@
                     {{end}}{{end}}
                 </select></label>
             </div>
-            {{if gt .UploadCustomRulesMax 1}}<button type="button" class="custom-rules-add" data-track="ui.settings.custom_rule" data-track-value="add" title="A card the rules above leave unpriced, or price under their minimum, is priced by the next">Add singles rule</button>{{end}}
+            {{if gt .UploadCustomRulesMax 1}}<button type="button" class="settings-btn custom-rules-add" data-track="ui.settings.custom_rule" data-track-value="add" title="A card the rules above leave unpriced, or price under their minimum, is priced by the next">Add singles rule</button>{{end}}
         </div>
         <div class="custom-rules" id="settings-custom-sealed-rules" data-rules="UploadCustomSealedRules" data-max="{{.UploadCustomRulesMax}}"{{if .UploadSealedKinds}} data-kinds="{{.UploadSealedKinds}}"{{end}}>
             <div class="custom-rules-head" aria-hidden="true">
@@ -196,7 +196,7 @@
                 <label class="custom-rule-field"><span>Kind</span><select id="opt-customsealedkind" data-cookie="UploadCustomSealedKind" data-field="kind" aria-label="Kind of product (sealed)" title="The only kind of product the rule prices, the rest going on to the next rule"><option value="">Any</option></select></label>
                 {{end}}
             </div>
-            {{if gt .UploadCustomRulesMax 1}}<button type="button" class="custom-rules-add" data-track="ui.settings.custom_rule" data-track-value="add" title="A product the rules above leave unpriced, or price under their minimum, is priced by the next">Add sealed rule</button>{{end}}
+            {{if gt .UploadCustomRulesMax 1}}<button type="button" class="settings-btn custom-rules-add" data-track="ui.settings.custom_rule" data-track-value="add" title="A product the rules above leave unpriced, or price under their minimum, is priced by the next">Add sealed rule</button>{{end}}
         </div>
         {{else}}
         <p class="section-desc">

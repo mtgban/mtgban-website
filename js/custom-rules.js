@@ -155,7 +155,7 @@
     function addGrip(container, row) {
         var grip = document.createElement('button');
         grip.type = 'button';
-        grip.className = 'custom-rule-grip';
+        grip.className = 'settings-btn custom-rule-grip';
         grip.textContent = '⠿';
         grip.title = 'Drag to reorder';
         grip.setAttribute('aria-label', 'Move rule');
@@ -215,7 +215,7 @@
         addGrip(container, row);
         var remove = document.createElement('button');
         remove.type = 'button';
-        remove.className = 'custom-rule-remove';
+        remove.className = 'settings-btn custom-rule-remove';
         remove.textContent = '×';
         remove.setAttribute('aria-label', 'Remove rule');
         remove.setAttribute('data-track', 'ui.settings.custom_rule');
