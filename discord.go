@@ -949,8 +949,8 @@ func (s *site) discordCommand(session *discordgo.Session, m *discordgo.MessageCr
 		cardIDs, _ := searchAndFilter(ds, p, config)
 		foundSellers, foundVendors := searchParallel(p, cardIDs, config)
 
-		searchRes.ResultsIndex = ProcessEmbedSearchResultsSellers(b, foundSellers, true)
-		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(b, foundSellers, false)
+		searchRes.ResultsIndex = ProcessEmbedSearchResultsSellers(b, p, foundSellers, true)
+		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(b, p, foundSellers, false)
 		searchRes.ResultsVendors = ProcessEmbedSearchResultsVendors(b, foundVendors)
 
 		ogFields = embed.FormatSearchResult(externalURL(nil), searchRes)

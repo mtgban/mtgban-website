@@ -671,7 +671,8 @@ func banPricesFromRows(b *matcher.Backend, p *prices, cardIDs []string, found ma
 	} else {
 		names = map[string]string{}
 		for _, seller := range p.sellers {
-			names[seller.Info().Shorthand] = seller.Info().Name
+			info := seller.Info()
+			names[info.Shorthand] = gradedName(info, info.Name)
 		}
 	}
 
@@ -825,7 +826,7 @@ func getSellerPrices(b *matcher.Backend, p *prices, mode string, enabledStores [
 		var sellerTag string
 		switch tagName {
 		case "names":
-			sellerTag = seller.Info().Name
+			sellerTag = gradedName(seller.Info(), seller.Info().Name)
 		default:
 			sellerTag = seller.Info().Shorthand
 		}

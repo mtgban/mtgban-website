@@ -33,7 +33,7 @@ func searchEntries2embed(results []SearchEntry, grades map[string]mtgban.Conditi
 			continue
 		}
 		var grade string
-		if cond := grades[entry.ScraperName]; cond != "" && cond != mtgban.NM {
+		if cond := grades[entry.Shorthand]; cond != "" && cond != mtgban.NM {
 			grade = string(cond)
 		}
 		out = append(out, embed.Entry{
@@ -64,15 +64,15 @@ func firstEmbedCard(b *matcher.Backend, found map[string]map[mtgban.Condition][]
 }
 
 // Retrieve cards from Sellers using the very first result
-func ProcessEmbedSearchResultsSellers(b *matcher.Backend, foundSellers map[string]map[mtgban.Condition][]SearchEntry, index bool) []embed.Entry {
+func ProcessEmbedSearchResultsSellers(b *matcher.Backend, p *prices, foundSellers map[string]map[mtgban.Condition][]SearchEntry, index bool) []embed.Entry {
 	if len(foundSellers) == 0 {
 		return nil
 	}
-	return EmbedSellerEntries(foundSellers, firstEmbedCard(b, foundSellers), index)
+	return EmbedSellerEntries(p, foundSellers, firstEmbedCard(b, foundSellers), index)
 }
 
 // EmbedSellerEntries picks the offers an embed shows for one named card.
-func EmbedSellerEntries(foundSellers map[string]map[mtgban.Condition][]SearchEntry, cardID string, index bool) []embed.Entry {
+func EmbedSellerEntries(p *prices, foundSellers map[string]map[mtgban.Condition][]SearchEntry, cardID string, index bool) []embed.Entry {
 	var results []SearchEntry
 	var founders map[string]mtgban.Condition
 
@@ -103,11 +103,14 @@ func EmbedSellerEntries(foundSellers map[string]map[mtgban.Condition][]SearchEnt
 			// Loop through the results, keep track of the processed
 			// elements in the map (and skip lower condition ones)
 			for _, result := range foundResults {
-				_, found := founders[result.ScraperName]
+				_, found := founders[result.Shorthand]
 				if found {
 					continue
 				}
-				founders[result.ScraperName] = cond
+				founders[result.Shorthand] = cond
+				// A seller of slabs can share its store's name
+				info, _ := p.scraperInfo(result.Shorthand)
+				result.ScraperName = gradedName(info, result.ScraperName)
 				results = append(results, result)
 			}
 		}

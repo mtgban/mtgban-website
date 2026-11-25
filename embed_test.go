@@ -30,7 +30,7 @@ func TestSearchEntries2embedNilOnNoResults(t *testing.T) {
 // A grade travels beside the store name, so shortening the name to fit its
 // column cannot cut it off.
 func TestEmbedSellerEntriesGrade(t *testing.T) {
-	out := EmbedSellerEntries(map[string]map[mtgban.Condition][]SearchEntry{
+	out := EmbedSellerEntries(currentPrices(), map[string]map[mtgban.Condition][]SearchEntry{
 		"abcd": {
 			"NM": {{ScraperName: "Card Kingdom", Shorthand: "CK", Price: 10}},
 			"SP": {
@@ -45,5 +45,33 @@ func TestEmbedSellerEntriesGrade(t *testing.T) {
 	}
 	if !slices.Equal(out, want) {
 		t.Errorf("got %+v, want %+v", out, want)
+	}
+}
+
+// A seller of slabs sharing its store's name neither hides the store's raw
+// offer nor passes for it.
+func TestEmbedSellerEntriesKeepsARawOfferBesideASlab(t *testing.T) {
+	s := gradedTwins(t)
+	slab := &mtgban.Slab{Grader: "PSA", Score: 9}
+	found := map[string]map[mtgban.Condition][]SearchEntry{
+		"abcd": {
+			"NM": {
+				{ScraperName: "Other Store Graded", Shorthand: "ZZOTHER", Price: 300, Slab: slab},
+				{ScraperName: "Same Store", Shorthand: "ZZSLAB", Price: 400, Slab: slab},
+			},
+			"SP": {{ScraperName: "Same Store", Shorthand: "ZZSAME", Price: 8}},
+		},
+	}
+	out := EmbedSellerEntries(s.prices(), found, "abcd", false)
+	want := []embed.Entry{
+		{ScraperName: "Other Store Graded", Shorthand: "ZZOTHER", Price: 300},
+		{ScraperName: "Same Store (Graded)", Shorthand: "ZZSLAB", Price: 400},
+		{ScraperName: "Same Store", Shorthand: "ZZSAME", Price: 8, Grade: "SP"},
+	}
+	if !slices.Equal(out, want) {
+		t.Errorf("got %+v, want %+v", out, want)
+	}
+	if found["abcd"]["NM"][1].ScraperName != "Same Store" {
+		t.Error("the page's own row was renamed")
 	}
 }
