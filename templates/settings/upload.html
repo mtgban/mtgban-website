@@ -141,13 +141,13 @@
                 <span>Enable the custom buylist</span>
             </label>
         </div>
-        <div class="custom-rules" id="settings-custom-rules" data-max="{{.UploadCustomRulesMax}}">
+        <div class="custom-rules" id="settings-custom-rules" data-rules="UploadCustomRules" data-max="{{.UploadCustomRulesMax}}">
             <div class="custom-rules-head" aria-hidden="true">
-                <span>Buy rate</span><span>Minimum price</span><span>Singles reference</span><span>Fallback</span><span>Sealed reference</span><span>Fallback</span>
+                <span>Buy rate</span><span>Minimum price</span><span>Singles reference</span><span>Fallback</span>
             </div>
             <div class="custom-rule">
-                <label class="custom-rule-field"><span>Buy rate</span><input type="text" id="opt-customrate" value="0.8" class="settings-inline-num" data-field="rate" aria-label="Buy rate"></label>
-                <label class="custom-rule-field"><span>Minimum price</span><input type="text" id="opt-customminprice" value="7" class="settings-inline-num" data-field="min" aria-label="Minimum price ($)"></label>
+                <label class="custom-rule-field"><span>Buy rate</span><input type="text" id="opt-customrate" value="0.8" class="settings-inline-num" data-field="rate" aria-label="Buy rate (singles)"></label>
+                <label class="custom-rule-field"><span>Minimum price</span><input type="text" id="opt-customminprice" value="7" class="settings-inline-num" data-field="min" aria-label="Minimum price ($, singles)"></label>
                 <label class="custom-rule-field"><span>Singles reference</span>
                 <select id="opt-customseller" data-cookie="UploadCustomBuyer" data-field="seller" aria-label="Reference seller (singles)">
                     <optgroup label="Index">
@@ -168,21 +168,31 @@
                     <option value="{{.}}">{{$name}}</option>
                     {{end}}{{end}}
                 </select></label>
+            </div>
+            {{if gt .UploadCustomRulesMax 1}}<button type="button" class="custom-rules-add" data-track="ui.settings.custom_rule" data-track-value="add" title="A card the rules above leave unpriced, or price under their minimum, is priced by the next">Add singles rule</button>{{end}}
+        </div>
+        <div class="custom-rules" id="settings-custom-sealed-rules" data-rules="UploadCustomSealedRules" data-max="{{.UploadCustomRulesMax}}">
+            <div class="custom-rules-head" aria-hidden="true">
+                <span>Buy rate</span><span>Minimum price</span><span>Sealed reference</span><span>Fallback</span>
+            </div>
+            <div class="custom-rule">
+                <label class="custom-rule-field"><span>Buy rate</span><input type="text" id="opt-customsealedrate" value="0.8" class="settings-inline-num" data-field="rate" data-unset="UploadCustomRate" aria-label="Buy rate (sealed)"></label>
+                <label class="custom-rule-field"><span>Minimum price</span><input type="text" id="opt-customsealedminprice" value="7" class="settings-inline-num" data-field="min" data-unset="UploadCustomMinPrice" aria-label="Minimum price ($, sealed)"></label>
                 <label class="custom-rule-field"><span>Sealed reference</span>
-                <select id="opt-customsealedseller" data-cookie="UploadCustomSealedBuyer" data-field="sealed" aria-label="Reference seller (sealed)">
+                <select id="opt-customsealedseller" data-cookie="UploadCustomSealedBuyer" data-field="seller" aria-label="Reference seller (sealed)">
                     {{range $.UploadSealedSellerKeys}}{{$name := index $.StoreNames .}}{{if $name}}
                     <option value="{{.}}" {{if eq . "TCGSealed"}}selected{{end}}>{{$name}}</option>
                     {{end}}{{end}}
                 </select></label>
                 <label class="custom-rule-field"><span>Fallback</span>
-                <select id="opt-customsealedfallback" data-cookie="UploadCustomSealedFallback" data-field="sealedfallback" aria-label="Sealed fallback" title="A product the reference seller has no price for pays the buy rate on the fallback seller's price">
+                <select id="opt-customsealedfallback" data-cookie="UploadCustomSealedFallback" data-field="fallback" aria-label="Sealed fallback" title="A product the reference seller has no price for pays the buy rate on the fallback seller's price">
                     <option value="">None</option>
                     {{range $.UploadSealedSellerKeys}}{{$name := index $.StoreNames .}}{{if $name}}
                     <option value="{{.}}">{{$name}}</option>
                     {{end}}{{end}}
                 </select></label>
             </div>
-            {{if gt .UploadCustomRulesMax 1}}<button type="button" class="custom-rules-add" data-track="ui.settings.custom_rule" data-track-value="add" title="A card the rules above leave unpriced, or price under their minimum, is priced by the next">Add rule</button>{{end}}
+            {{if gt .UploadCustomRulesMax 1}}<button type="button" class="custom-rules-add" data-track="ui.settings.custom_rule" data-track-value="add" title="A product the rules above leave unpriced, or price under their minimum, is priced by the next">Add sealed rule</button>{{end}}
         </div>
         {{else}}
         <p class="section-desc">

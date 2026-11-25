@@ -1,14 +1,13 @@
-// The custom buylist's rules after the first: rows drawn from the first
-// rule's, kept in the UploadCustomRules cookie as
-// rate:min:seller:fallback:sealed:sealedfallback items joined by commas.
+// The custom buylist's rules after the first, for singles or for sealed:
+// rows drawn from the first rule's, kept in the cookie the container's
+// data-rules names as rate:min:seller:fallback items joined by commas.
 // The first rule's fields keep their own cookies.
 (function () {
     'use strict';
 
-    var COOKIE = 'UploadCustomRules';
     // The most a tier can set, as maxCustomBuylistRules in search.go
     var MAX = 10;
-    var FIELDS = ['rate', 'min', 'seller', 'fallback', 'sealed', 'sealedfallback'];
+    var FIELDS = ['rate', 'min', 'seller', 'fallback'];
 
     function validRate(v) {
         var n = Number(v);
@@ -22,15 +21,15 @@
         return n >= 1 ? Math.min(n, MAX) : 1;
     }
 
-    // parse reads the cookie into rules of six strings, as many as follow
-    // the first within max, dropping what the server drops: an item that is
-    // not six fields or has no valid rate.
+    // parse reads the cookie into rules of four strings, as many as follow
+    // the first within max, dropping what the server drops: an item short of
+    // four fields or with no valid rate.
     function parse(raw, max) {
         var out = [];
         String(raw || '').split(',').forEach(function (item) {
             var parts = item.split(':');
-            if (parts.length !== FIELDS.length || !validRate(parts[0])) return;
-            if (out.length < max - 1) out.push(parts);
+            if (parts.length < FIELDS.length || !validRate(parts[0])) return;
+            if (out.length < max - 1) out.push(parts.slice(0, FIELDS.length));
         });
         return out;
     }
@@ -110,6 +109,7 @@
     // binding is what settings.js wires: load draws, save writes, serialize
     // feeds the dirty check. Add copies the last row, the usual next tier.
     function binding(container) {
+        var cookie = container.getAttribute('data-rules');
         var add = container.querySelector('.custom-rules-add');
         if (add && !add.dataset.wired) {
             add.dataset.wired = '1';
@@ -122,9 +122,9 @@
             });
         }
         return {
-            load: function () { render(container, parse(getCookie(COOKIE), limit(container))); },
-            save: function () { setCookie(COOKIE, format(collect(container)), 1000); },
-            serialize: function () { return COOKIE + '=' + format(collect(container)); },
+            load: function () { render(container, parse(getCookie(cookie), limit(container))); },
+            save: function () { setCookie(cookie, format(collect(container)), 1000); },
+            serialize: function () { return cookie + '=' + format(collect(container)); },
         };
     }
 

@@ -77,6 +77,7 @@ const COOKIE_INDIRECT = {
         }
         return out;
     },
+    'js/custom-rules.js': () => [...read('templates/settings/upload.html').matchAll(/data-rules="([^"]+)"/g)].map((m) => m[1]),
     'js/arbit-filters.js': () => {
         const block = read('js/arbit-filters.js').match(/GROUPS = \{([^}]*)\}/);
         return quoted(block ? block[1] : '');
@@ -94,7 +95,7 @@ const LOCAL_INDIRECT = {
     'js/user-state.js': () => [],
 };
 // Unreadable write sites per file today: a new one fails until its names are added above.
-const COOKIE_INDIRECT_SITES = { 'js/cookies.js': 3, 'js/settings.js': 9, 'js/arbit-filters.js': 1, 'js/upload-presets.js': 4, 'js/upload-tabs.js': 1, 'templates/mobile/search.html': 1 };
+const COOKIE_INDIRECT_SITES = { 'js/cookies.js': 3, 'js/settings.js': 9, 'js/custom-rules.js': 1, 'js/arbit-filters.js': 1, 'js/upload-presets.js': 4, 'js/upload-tabs.js': 1, 'templates/mobile/search.html': 1 };
 const LOCAL_INDIRECT_SITES = { 'js/chartopts.js': 1, 'js/command-palette.js': 1, 'js/list-storage.js': 1, 'js/offline/offline-mode.js': 1, 'js/user-state.js': 2 };
 
 // Runs one collector over sources; an indirect write in a file with no entry is an error.
@@ -135,7 +136,7 @@ const cookies = collect(SOURCES, [COOKIE_CALL, COOKIE_ASSIGN], COOKIE_INDIRECT, 
 const locals = collect(SOURCES, [LOCAL_WRITE], LOCAL_INDIRECT, null);
 
 test('the registry reads as the tests expect', () => {
-    expect(entries.length).toBe(108);
+    expect(entries.length).toBe(111);
     expect(notSettings.size).toBe(11);
 });
 

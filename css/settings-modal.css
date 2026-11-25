@@ -647,13 +647,17 @@ body.settings-open {
     width: 14em;
     min-width: 0;
 }
-/* Custom buylist rules: one row a rule under one row of column names */
+/* Custom buylist rules, singles then sealed: one row a rule under one row
+   of column names */
 .custom-rules {
     display: grid;
-    grid-template-columns: 4.5em 6em repeat(4, minmax(0, 11em)) 1.75em;
+    grid-template-columns: 4.5em 6em repeat(2, minmax(0, 14em)) 1.75em;
     gap: 0.5em;
     align-items: center;
     justify-content: start;
+}
+.custom-rules + .custom-rules {
+    margin-top: 1.25em;
 }
 .custom-rules-head,
 .custom-rule,
@@ -689,9 +693,8 @@ body.settings-open {
     grid-column: 1 / span 2;
     justify-self: start;
 }
-/* No room for a row on a phone: each rule takes three, rate and minimum,
-   then the singles reference and fallback, then the sealed ones, each
-   field under its own name */
+/* No room for a row on a phone: each rule takes two, rate and minimum, then
+   the reference and fallback, each field under its own name */
 @media (max-width: 720px) {
     .custom-rules {
         grid-template-columns: repeat(2, minmax(0, 1fr)) 1.75em;

@@ -76,6 +76,8 @@
             'opt-maxqty': 'UploadMaxQty',
             'opt-customminprice': 'UploadCustomMinPrice',
             'opt-customrate': 'UploadCustomRate',
+            'opt-customsealedminprice': 'UploadCustomSealedMinPrice',
+            'opt-customsealedrate': 'UploadCustomSealedRate',
         },
         editions: {
             // sleep
@@ -257,7 +259,11 @@
         if (!el) return;
         const owner = claim(cookieName, el);
         addBinding({
-            load: function () { el.value = readSetting(cookieName) || el.defaultValue || ''; },
+            load: function () {
+                // data-unset names the cookie whose value an unset one takes
+                const unset = el.dataset.unset;
+                el.value = readSetting(cookieName) || (unset && readSetting(unset)) || el.defaultValue || '';
+            },
             save: function () { writeSetting(cookieName, el.value, owner); },
             serialize: function () { return cookieName + '=' + el.value; },
         });
@@ -342,6 +348,7 @@
         Object.entries(BINDINGS.orders || {}).forEach(function (e) { bindOrder(e[0], e[1]); });
         bindStoreFactors('settings-store-factors');
         bindCustomRules('settings-custom-rules');
+        bindCustomRules('settings-custom-sealed-rules');
         Object.entries(BINDINGS.misc || {}).forEach(function (e) {
             const defaults = (BINDINGS.miscDefaults || {})[e[0]];
             bindMiscBitmap(e[0], e[1], defaults);

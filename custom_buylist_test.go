@@ -358,7 +358,8 @@ func TestCustomBuylistFallbackFollowsTheSetting(t *testing.T) {
 
 // A product the sealed reference does not price takes the sealed fallback's
 // price on search and arbit, and one it does price keeps it. A fallback that
-// sells no sealed prices nothing.
+// sells no sealed prices nothing. Search files each under its listing's
+// condition, the singles rule's price index aside.
 func TestCustomBuylistSealedFallback(t *testing.T) {
 	sealedIDs := backend().GetSealedUUIDs()
 	if len(sealedIDs) < 2 {
@@ -390,7 +391,7 @@ func TestCustomBuylistSealedFallback(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "/search", nil)
 			for name, value := range map[string]string{
 				"UploadCustomOpts": "enabled", "UploadCustomRate": "0.5",
-				"UploadCustomSealedBuyer": "REFSealed", "UploadCustomSealedFallback": tt.fallback,
+				"UploadCustomBuyer": "TCGLow", "UploadCustomSealedBuyer": "REFSealed", "UploadCustomSealedFallback": tt.fallback,
 			} {
 				r.AddCookie(&http.Cookie{Name: name, Value: value})
 			}
@@ -398,6 +399,9 @@ func TestCustomBuylistSealedFallback(t *testing.T) {
 			prices := map[string]float64{}
 			for _, offer := range customBuylistOffers(backend(), currentPrices(), readCustomBuylistRules(r), []string{listed, missing}) {
 				prices[offer.cardID] = offer.price
+				if offer.condition != mtgban.NM {
+					t.Errorf("search files %s under %s, want its listing's NM", offer.cardID, offer.condition)
+				}
 			}
 			if prices[listed] != 5 || prices[missing] != tt.wantMissing {
 				t.Errorf("search pays %v and %v, want 5 and %v", prices[listed], prices[missing], tt.wantMissing)
@@ -432,10 +436,9 @@ func TestCustomBuylistRuleTip(t *testing.T) {
 	}, []mtgban.Vendor{})
 
 	for _, tt := range []struct {
-		name   string
-		rule   customBuylistRule
-		sealed bool
-		want   string
+		name string
+		rule customBuylistRule
+		want string
 	}{
 		{
 			name: "the rate alone",
@@ -468,20 +471,18 @@ func TestCustomBuylistRuleTip(t *testing.T) {
 			want: "50% of TCG Low",
 		},
 		{
-			name:   "sealed has its own reference and fallback",
-			rule:   customBuylistRule{rate: 0.5, minPrice: 20, seller: "REF", sealedSeller: "REFSealed", fallback: "TCGLow", sealedFallback: "ALTSealed"},
-			sealed: true,
-			want:   "50% of REFSealed (or ALTSealed) if ≥ $20.00",
+			name: "a sealed rule, with another sealed seller behind it",
+			rule: customBuylistRule{rate: 0.5, minPrice: 20, seller: "REFSealed", fallback: "ALTSealed", sealed: true},
+			want: "50% of REFSealed (or ALTSealed) if ≥ $20.00",
 		},
 		{
-			name:   "a sealed fallback that sells no sealed is not applied",
-			rule:   customBuylistRule{rate: 0.5, seller: "REF", sealedSeller: "REFSealed", fallback: "TCGLow", sealedFallback: "REF"},
-			sealed: true,
-			want:   "50% of REFSealed",
+			name: "a sealed fallback that sells no sealed is not applied",
+			rule: customBuylistRule{rate: 0.5, seller: "REFSealed", fallback: "REF", sealed: true},
+			want: "50% of REFSealed",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.rule.tip(currentPrices(), tt.sealed); got != tt.want {
+			if got := tt.rule.tip(currentPrices()); got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
@@ -529,37 +530,134 @@ func TestSearchSpellsTheCustomBuylistRule(t *testing.T) {
 	}
 }
 
-// The rules after the first come from one cookie, rate:min:seller:fallback:
-// sealed:sealedfallback items joined by commas: an item that is not six
-// fields or has no valid rate is dropped alone, and the chain stops at the
-// tier's limit.
+// The rules after the first come from one cookie a kind, rate:min:seller:
+// fallback items joined by commas: an item short of four fields or with no
+// valid rate is dropped alone, fields past the fourth are ignored, and the
+// chain stops at the tier's limit.
 func TestParseCustomBuylistRules(t *testing.T) {
-	first := [6]string{"0.8", "7", "CK", "TCGLow", "TCGSealed", ""}
-	one := customBuylistRule{rate: 0.8, minPrice: 7, seller: "CK", fallback: "TCGLow", sealedSeller: "TCGSealed"}
-	two := customBuylistRule{rate: 0.6, minPrice: 2, seller: "TCGLow", sealedSeller: "TCGSealed"}
+	first := [4]string{"0.8", "7", "CK", "TCGLow"}
+	one := customBuylistRule{rate: 0.8, minPrice: 7, seller: "CK", fallback: "TCGLow"}
+	two := customBuylistRule{rate: 0.6, minPrice: 2, seller: "TCGLow"}
 	for _, tt := range []struct {
 		name  string
-		first [6]string
+		first [4]string
 		extra string
 		limit int
 		want  []customBuylistRule
 	}{
 		{"the first rule alone", first, "", 5, []customBuylistRule{one}},
-		{"a second rule", first, "0.6:2:TCGLow::TCGSealed:", 5, []customBuylistRule{one, two}},
-		{"a bad first rate keeps the rest", [6]string{"NaN"}, "0.6:2:TCGLow::TCGSealed:", 5, []customBuylistRule{two}},
-		{"a bad rate drops its item", first, "half:2:TCGLow::TCGSealed:,0.6:2:TCGLow::TCGSealed:", 5, []customBuylistRule{one, two}},
-		{"a short item is dropped", first, "0.6:2:TCGLow,0.6:2:TCGLow::TCGSealed:", 5, []customBuylistRule{one, two}},
-		{"a long item is dropped", first, "0.6:2:TCGLow::TCGSealed::x", 5, []customBuylistRule{one}},
-		{"as many as the limit", first, strings.Repeat("0.6:2:TCGLow::TCGSealed:,", 6), 5, []customBuylistRule{one, two, two, two, two}},
-		{"a limit of one keeps the first", first, "0.6:2:TCGLow::TCGSealed:", 1, []customBuylistRule{one}},
-		{"a limit of one takes an extra for a bad first", [6]string{"NaN"}, "0.6:2:TCGLow::TCGSealed:,0.6:2:TCGLow::TCGSealed:", 1, []customBuylistRule{two}},
-		{"ten at most", first, strings.Repeat("0.6:2:TCGLow::TCGSealed:,", 12), maxCustomBuylistRules, append([]customBuylistRule{one}, slices.Repeat([]customBuylistRule{two}, 9)...)},
-		{"none", [6]string{}, "", 5, nil},
+		{"a second rule", first, "0.6:2:TCGLow:", 5, []customBuylistRule{one, two}},
+		{"a bad first rate keeps the rest", [4]string{"NaN"}, "0.6:2:TCGLow:", 5, []customBuylistRule{two}},
+		{"a bad rate drops its item", first, "half:2:TCGLow:,0.6:2:TCGLow:", 5, []customBuylistRule{one, two}},
+		{"a short item is dropped", first, "0.6:2:TCGLow,0.6:2:TCGLow:", 5, []customBuylistRule{one, two}},
+		{"a long item keeps its first four", first, "0.6:2:TCGLow::TCGSealed:", 5, []customBuylistRule{one, two}},
+		{"as many as the limit", first, strings.Repeat("0.6:2:TCGLow:,", 6), 5, []customBuylistRule{one, two, two, two, two}},
+		{"a limit of one keeps the first", first, "0.6:2:TCGLow:", 1, []customBuylistRule{one}},
+		{"a limit of one takes an extra for a bad first", [4]string{"NaN"}, "0.6:2:TCGLow:,0.6:2:TCGLow:", 1, []customBuylistRule{two}},
+		{"ten at most", first, strings.Repeat("0.6:2:TCGLow:,", 12), maxCustomBuylistRules, append([]customBuylistRule{one}, slices.Repeat([]customBuylistRule{two}, 9)...)},
+		{"none", [4]string{}, "", 5, nil},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got := parseCustomBuylistRules(tt.first, tt.extra, tt.limit)
+			got := parseCustomBuylistRules(tt.first, tt.extra, tt.limit, false)
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("got %+v, want %+v", got, tt.want)
+			}
+			for i := range got {
+				got[i].sealed = true
+			}
+			sealed := parseCustomBuylistRules(tt.first, tt.extra, tt.limit, true)
+			if !slices.Equal(sealed, got) {
+				t.Errorf("got sealed %+v, want %+v", sealed, got)
+			}
+		})
+	}
+}
+
+// Singles and sealed have chains of their own on search, upload and arbit,
+// each up to the tier's limit, and the first sealed rule takes the singles
+// rate and minimum only where it has no rate of its own.
+func TestCustomBuylistReadsSinglesAndSealedApart(t *testing.T) {
+	sealedRules := func(rules ...customBuylistRule) []customBuylistRule {
+		for i := range rules {
+			rules[i].sealed = true
+		}
+		return rules
+	}
+	one := customBuylistRule{rate: 0.8, minPrice: 7, seller: "CK"}
+	for _, tt := range []struct {
+		name  string
+		limit string
+		set   map[string]string
+		want  []customBuylistRule
+	}{
+		{
+			name:  "one of each at a limit of one",
+			limit: "1",
+			set: map[string]string{
+				"UploadCustomRules":      "0.6:2:TCGLow:",
+				"UploadCustomSealedRate": "0.5", "UploadCustomSealedMinPrice": "40", "UploadCustomSealedRules": "0.4:20:SS:",
+			},
+			want: append([]customBuylistRule{one}, sealedRules(customBuylistRule{rate: 0.5, minPrice: 40, seller: "SS"})...),
+		},
+		{
+			name:  "two of each at a limit of two",
+			limit: "2",
+			set: map[string]string{
+				"UploadCustomRules":      "0.6:2:TCGLow:,0.5:1:TCGLow:",
+				"UploadCustomSealedRate": "0.5", "UploadCustomSealedRules": "0.4:20:SS:,0.3:10:SS:",
+			},
+			want: append([]customBuylistRule{one, {rate: 0.6, minPrice: 2, seller: "TCGLow"}},
+				sealedRules(customBuylistRule{rate: 0.5, seller: "SS"}, customBuylistRule{rate: 0.4, minPrice: 20, seller: "SS"})...),
+		},
+		{
+			name: "no sealed rate takes the singles rate and minimum",
+			want: append([]customBuylistRule{one}, sealedRules(customBuylistRule{rate: 0.8, minPrice: 7, seller: "SS"})...),
+		},
+		{
+			name: "a bad sealed rate drops the sealed rule alone",
+			set:  map[string]string{"UploadCustomSealedRate": "0"},
+			want: []customBuylistRule{one},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			set := map[string]string{
+				"UploadCustomRate": "0.8", "UploadCustomMinPrice": "7",
+				"UploadCustomBuyer": "CK", "UploadCustomSealedBuyer": "SS",
+			}
+			maps.Copy(set, tt.set)
+
+			r := httptest.NewRequest(http.MethodGet, "/search", nil)
+			form := url.Values{"custombuylist": {"true"}}
+			post := httptest.NewRequest(http.MethodPost, "/upload", nil)
+			sig := &http.Cookie{Name: signatureCookie, Value: testSig(map[string]string{"UploadCustomMax": tt.limit})}
+			r.AddCookie(sig)
+			r.AddCookie(&http.Cookie{Name: "UploadCustomOpts", Value: "enabled"})
+			post.AddCookie(sig)
+			fields := map[string]string{
+				"UploadCustomRate": "customrate", "UploadCustomMinPrice": "customminprice", "UploadCustomBuyer": "customseller",
+				"UploadCustomRules": "customrules", "UploadCustomSealedRate": "customsealedrate",
+				"UploadCustomSealedMinPrice": "customsealedminprice", "UploadCustomSealedBuyer": "customsealedseller",
+				"UploadCustomSealedRules": "customsealedrules",
+			}
+			for cookie, field := range fields {
+				if set[cookie] != "" {
+					r.AddCookie(&http.Cookie{Name: cookie, Value: set[cookie]})
+				}
+				form.Set(field, set[cookie])
+			}
+			post.Form = form
+
+			got := readCustomBuylistRules(r)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("the cookies read %+v, want %+v", got, tt.want)
+			}
+			got = uploadCustomBuylistRules(post)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("the form reads %+v, want %+v", got, tt.want)
+			}
+			got = uploadCustomBuylistRules(r)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("upload reads %+v off the cookies, want %+v", got, tt.want)
 			}
 		})
 	}
@@ -606,7 +704,7 @@ func TestCustomBuylistChain(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/search", nil)
 	for name, value := range map[string]string{
 		"UploadCustomOpts": "enabled", "UploadCustomRate": "0.8", "UploadCustomMinPrice": "20",
-		"UploadCustomBuyer": "REF", "UploadCustomRules": "0.5:5:TCGLow:::",
+		"UploadCustomBuyer": "REF", "UploadCustomRules": "0.5:5:TCGLow:",
 		signatureCookie: testSig(map[string]string{"UploadCustomMax": "5"}),
 	} {
 		r.AddCookie(&http.Cookie{Name: name, Value: value})
@@ -656,8 +754,9 @@ func TestCustomBuylistChain(t *testing.T) {
 	}
 }
 
-// A tier gets as many rules as its UploadCustomMax, one where it sets none,
-// and never more than maxCustomBuylistRules; dev without signing gets them all.
+// A tier gets as many rules of each kind as its UploadCustomMax, one where it
+// sets none, and never more than maxCustomBuylistRules; dev without signing
+// gets them all.
 func TestCustomBuylistRulesMax(t *testing.T) {
 	for _, tt := range []struct {
 		value string
@@ -682,17 +781,18 @@ func TestCustomBuylistRulesMax(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/search", nil)
 	for name, value := range map[string]string{
 		"UploadCustomOpts": "enabled", "UploadCustomRate": "0.8", "UploadCustomBuyer": "REF",
-		"UploadCustomRules": "0.6:2:REF:::,0.5:1:REF:::",
+		"UploadCustomRules": "0.6:2:REF:,0.5:1:REF:",
 		signatureCookie:     testSig(map[string]string{"UploadCustomMax": "2"}),
 	} {
 		r.AddCookie(&http.Cookie{Name: name, Value: value})
 	}
-	got := len(readCustomBuylistRules(r))
+	isSealed := func(rule customBuylistRule) bool { return rule.sealed }
+	got := len(slices.DeleteFunc(readCustomBuylistRules(r), isSealed))
 	if got != 2 {
 		t.Errorf("a tier of two reads %d rules", got)
 	}
 	withSigMode(t, true, false)
-	got = len(readCustomBuylistRules(r))
+	got = len(slices.DeleteFunc(readCustomBuylistRules(r), isSealed))
 	if got != 3 {
 		t.Errorf("dev without signing reads %d rules, want every one", got)
 	}

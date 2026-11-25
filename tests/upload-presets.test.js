@@ -695,19 +695,33 @@ test('a tombstone outlives other writes for 30 days, then goes', () => {
 });
 
 test('the custom buylist rules after the first travel with a preset only when set', () => {
-    const rules = '0.6:2:TCGLow::TCGSealed:';
-    const on = { UploadCustomOpts: 'enabled,', UploadCustomRules: rules };
+    const set = {
+        customrules: ['UploadCustomRules', '0.6:2:TCGLow:'],
+        customsealedrules: ['UploadCustomSealedRules', '0.4:20:TCGSealed:'],
+        customsealedrate: ['UploadCustomSealedRate', '0.5'],
+        customsealedminprice: ['UploadCustomSealedMinPrice', '40'],
+    };
+    const on = { UploadCustomOpts: 'enabled,' };
+    const opts = { mode: 'true', tab: 'singles', custombuylist: 'true', stores: [] };
+    for (const [key, [cookie, value]] of Object.entries(set)) {
+        on[cookie] = value;
+        opts[key] = value;
+    }
     const { P } = loadPresets();
-    expect(P.fromState({ mode: 'true', tab: 'singles' }, n => on[n] ?? null).customrules).toBe(rules);
+    const saved = P.fromState({ mode: 'true', tab: 'singles' }, n => on[n] ?? null);
     const none = P.fromState({ mode: 'true', tab: 'singles' }, n => ({ UploadCustomOpts: 'enabled,' })[n] ?? null);
-    expect(none.customrules).toBeUndefined();
 
     const doc = fakeDoc({ mode: 'true', tab: 'singles' });
     const win = { reloadSelect() {}, selectTab() {} };
     const applied = loadPresets({ win });
-    applied.P.apply({ id: 'p', name: 'n', opts: applied.P.canonical({ mode: 'true', tab: 'singles', custombuylist: 'true', customrules: rules, stores: [] }) }, doc);
-    expect(applied.cookies.UploadCustomRules).toBe(rules);
-    // A preset saved with one rule leaves one rule
+    applied.P.apply({ id: 'p', name: 'n', opts: applied.P.canonical(opts) }, doc);
+    const withRules = { ...applied.cookies };
+    // A preset saved without them leaves one rule, sealed at the singles' rate
     applied.P.apply({ id: 'q', name: 'n', opts: applied.P.canonical({ mode: 'true', tab: 'singles', custombuylist: 'true', stores: [] }) }, doc);
-    expect(applied.cookies.UploadCustomRules).toBe('');
+    for (const [key, [cookie, value]] of Object.entries(set)) {
+        expect(saved[key]).toBe(value);
+        expect(none[key]).toBeUndefined();
+        expect(withRules[cookie]).toBe(value);
+        expect(applied.cookies[cookie]).toBe('');
+    }
 });

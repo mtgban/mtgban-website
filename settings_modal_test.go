@@ -399,6 +399,7 @@ func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 			`id="settings-search-listing"`, // unlocked for a signed reader
 			`id="opt-customseller"`,        // the custom rule's controls
 			`id="opt-customfallback"`,
+			`id="opt-customsealedrate"`,
 			`id="opt-customsealedfallback"`,
 			`id="offline-img-editions-picker"`,
 			`id="sleep-editions-picker"`,
@@ -607,8 +608,8 @@ func TestSettingsModalCarriesStoreFactorOptions(t *testing.T) {
 	t.Errorf("data-stores does not carry ZZFACT:\n%s", gridCells(body, "settings-store-factors"))
 }
 
-// The custom buylist editor carries the reader's rule allowance, and a tier
-// of one rule gets no Add rule button.
+// The custom buylist editors, singles and sealed, each carry the reader's
+// rule allowance, and a tier of one rule gets no Add rule button on either.
 func TestSettingsBodyDrawsCustomRulesMax(t *testing.T) {
 	baseName, files := settingsBodyFiles()
 	tmpl, err := tmplparse.ParseFiles(baseName, files, funcMap)
@@ -625,10 +626,10 @@ func TestSettingsBodyDrawsCustomRulesMax(t *testing.T) {
 		return buf.String()
 	}
 	one, five := render(1), render(5)
-	if !strings.Contains(one, `data-max="1"`) || strings.Contains(one, `class="custom-rules-add"`) {
+	if strings.Count(one, `data-max="1"`) != 2 || strings.Contains(one, `class="custom-rules-add"`) {
 		t.Error("a tier of one rule is offered more")
 	}
-	if !strings.Contains(five, `data-max="5"`) || !strings.Contains(five, `class="custom-rules-add"`) {
-		t.Error("a tier of five rules has no Add rule")
+	if strings.Count(five, `data-max="5"`) != 2 || strings.Count(five, `class="custom-rules-add"`) != 2 {
+		t.Error("a tier of five rules has no Add rule for each kind")
 	}
 }

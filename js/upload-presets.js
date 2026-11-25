@@ -15,10 +15,14 @@
         ['customseller', 'UploadCustomBuyer', 'TCGLow'], ['customsealedseller', 'UploadCustomSealedBuyer', 'TCGSealed'],
         ['customminprice', 'UploadCustomMinPrice', '7'], ['customrate', 'UploadCustomRate', '0.8'],
     ];
-    // A fallback, or the rules after the first, is in a preset only when
-    // set, None being no key.
-    var FALLBACKS = [['customfallback', 'UploadCustomSinglesFallback'], ['customsealedfallback', 'UploadCustomSealedFallback'], ['customrules', 'UploadCustomRules']];
-    var NUMERIC = ['percspread', 'percspreadmax', 'minval', 'maxval', 'margin', 'custompercmax', 'multiplier', 'maxqty', 'customminprice', 'customrate'];
+    // A fallback, the sealed rule's own rate and minimum, or the rules after
+    // the first, are in a preset only when set, None being no key.
+    var OPTIONAL = [
+        ['customfallback', 'UploadCustomSinglesFallback'], ['customsealedfallback', 'UploadCustomSealedFallback'],
+        ['customsealedrate', 'UploadCustomSealedRate'], ['customsealedminprice', 'UploadCustomSealedMinPrice'],
+        ['customrules', 'UploadCustomRules'], ['customsealedrules', 'UploadCustomSealedRules'],
+    ];
+    var NUMERIC = ['percspread', 'percspreadmax', 'minval', 'maxval', 'margin', 'custompercmax', 'multiplier', 'maxqty', 'customminprice', 'customrate', 'customsealedminprice', 'customsealedrate'];
     var STORE_LISTS = ['stores', 'sealed_stores', 'index_stores', 'sealed_index_stores'];
     var OPTION_DEFAULTS = {};
     TEXTS.concat(CUSTOM).forEach(function (t) { OPTION_DEFAULTS[t[0]] = t[2]; });
@@ -66,7 +70,7 @@
         if (splitList(cookies('UploadCustomOpts')).indexOf('enabled') >= 0) {
             o.custombuylist = 'true';
             CUSTOM.forEach(function (t) { o[t[0]] = cookies(t[1]) || t[2]; });
-            FALLBACKS.forEach(function (t) { if (cookies(t[1])) o[t[0]] = cookies(t[1]); });
+            OPTIONAL.forEach(function (t) { if (cookies(t[1])) o[t[0]] = cookies(t[1]); });
         }
         if (ctx && ctx.canChangeStores) {
             STORE_LISTS.forEach(function (k) { o[k] = (state[k] || []).slice(); });
@@ -263,7 +267,7 @@
         if (opts.custombuylist === 'true') {
             setCookie('UploadCustomOpts', 'enabled,', 1000);
             CUSTOM.forEach(function (t) { setCookie(t[1], opts[t[0]] == null ? t[2] : opts[t[0]], 1000); });
-            FALLBACKS.forEach(function (t) { setCookie(t[1], opts[t[0]] || '', 1000); });
+            OPTIONAL.forEach(function (t) { setCookie(t[1], opts[t[0]] || '', 1000); });
         } else {
             setCookie('UploadCustomOpts', '', 1000);
         }
