@@ -107,3 +107,8 @@ test('the stores button counts the visible grid', () => {
     change({ target: { closest: () => ({}) } });
     expect(count.textContent).toBe('3 of 26');
 });
+
+// The cog and its word broke apart at the end of a line.
+test('the settings link stays on one line', () => {
+    expect(css).toMatch(/\n\.upload-share-link \{[^}]*white-space: nowrap;/);
+});

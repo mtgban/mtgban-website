@@ -921,6 +921,7 @@
     text-decoration: none;
     cursor: pointer;
     font-weight: 500;
+    white-space: nowrap;
 }
 .upload-share-link:hover {
     text-decoration: underline;
