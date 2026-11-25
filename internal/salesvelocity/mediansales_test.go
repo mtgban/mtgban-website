@@ -1,10 +1,12 @@
 package salesvelocity
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
@@ -61,8 +63,9 @@ func TestMedianSales(t *testing.T) {
 	}
 }
 
-// MedianSalesVendor prices each of the seller's cards at its median sale per grade,
-// NM leading at no price where it has too few orders.
+// MedianSalesVendor prices each of the seller's cards at its median sale per
+// grade the seller lists, NM leading at no price where it lists none or has
+// too few orders.
 func TestMedianSalesVendor(t *testing.T) {
 	now := recentNow
 	graded := &Recent{}
@@ -75,20 +78,35 @@ func TestMedianSalesVendor(t *testing.T) {
 	box.Grades[5] = saleOrders(now, 12000, 12000, 12000, 12000, 12000)
 	snap := &RecentSnapshot{Cards: map[string]*Recent{
 		"graded": graded, "played": played, "box": box, "unlisted": graded,
+		"graded NM": graded, "graded MP": graded, "played NM": played,
 	}}
 
 	bl := func(grade mtgban.Condition, price float64) mtgban.BuylistEntry {
 		return mtgban.BuylistEntry{Conditions: grade, BuyPrice: price}
 	}
 	want := map[string][]mtgban.BuylistEntry{
-		"graded": {bl("NM", 12.50), bl("MP", 3.34)},
-		"played": {bl("NM", 0), bl("SP", 5)},
-		"box":    {bl("NM", 120)},
+		"graded":    {bl("NM", 12.50), bl("MP", 3.34)},
+		"graded NM": {bl("NM", 12.50)},
+		"graded MP": {bl("NM", 0), bl("MP", 3.34)},
+		"played":    {bl("NM", 0), bl("SP", 5)},
+		"box":       {bl("NM", 120)},
 	}
 
-	stock := mtgban.InventoryRecord{}
-	for _, id := range []string{"graded", "played", "box", "unsold"} {
-		stock[id] = []mtgban.InventoryEntry{{Conditions: "NM", Price: 1}}
+	listed := func(grades ...mtgban.Condition) []mtgban.InventoryEntry {
+		var entries []mtgban.InventoryEntry
+		for _, grade := range grades {
+			entries = append(entries, mtgban.InventoryEntry{Conditions: grade, Price: 1})
+		}
+		return entries
+	}
+	stock := mtgban.InventoryRecord{
+		"graded":    listed("NM", "SP", "MP", "HP", "PO"),
+		"graded NM": listed("NM"),
+		"graded MP": listed("MP", "MP"),
+		"played":    listed("SP"),
+		"played NM": listed("NM"),
+		"box":       listed("NM"),
+		"unsold":    listed("NM"),
 	}
 	vendor := snap.MedianSalesVendor(mtgban.NewSellerFromInventory(stock, mtgban.ScraperInfo{SealedMode: true}), now)
 	if vendor == nil {
@@ -120,4 +138,54 @@ func TestMedianSalesVendor(t *testing.T) {
 	if none != nil {
 		t.Errorf("a vendor before the first load: %v", none.Buylist())
 	}
+}
+
+// Arbit reads a vendor's price in the grade of the copy alone, so the prices
+// of the listed grades draw every row those of all the grades draw.
+func TestMedianSalesArbitRows(t *testing.T) {
+	now := recentNow
+	b := &matcher.Backend{UUIDs: map[string]*matcher.CardObject{}}
+	snap := &RecentSnapshot{Cards: map[string]*Recent{}}
+	stock, everyGrade := mtgban.InventoryRecord{}, mtgban.InventoryRecord{}
+	// A card for each set of grades sold and each set of grades listed
+	for sold := range 32 {
+		for listed := range 32 {
+			id := fmt.Sprintf("%05b %05b", sold, listed)
+			r := &Recent{}
+			for i := range 5 {
+				entry := mtgban.InventoryEntry{Conditions: mtgban.Condition(Grades[i]), Price: 1, Quantity: 1}
+				everyGrade[id] = append(everyGrade[id], entry)
+				if listed&(1<<i) != 0 {
+					stock[id] = append(stock[id], entry)
+				}
+				if sold&(1<<i) != 0 {
+					cents := uint32(1000 - 100*i)
+					r.Grades[i] = saleOrders(now, cents, cents, cents, cents, cents)
+				}
+			}
+			snap.Cards[id] = r
+			b.UUIDs[id] = &matcher.CardObject{}
+		}
+	}
+
+	seller := mtgban.NewSellerFromInventory(stock, mtgban.ScraperInfo{})
+	got := medianSalesRows(b, snap.MedianSalesVendor(seller, now), seller)
+	want := medianSalesRows(b, snap.MedianSalesVendor(mtgban.NewSellerFromInventory(everyGrade, mtgban.ScraperInfo{}), now), seller)
+	// Each of the 5 grades is both sold and listed on a quarter of the cards
+	if len(want) != 5*1024/4 {
+		t.Fatalf("%d rows, want %d", len(want), 5*1024/4)
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("%d rows from the listed grades, %d from every grade, or they differ", len(got), len(want))
+	}
+}
+
+// medianSalesRows are the rows of seller against vendor, one line each.
+func medianSalesRows(b *matcher.Backend, vendor mtgban.Vendor, seller mtgban.Seller) []string {
+	var rows []string
+	for _, row := range mtgban.Arbit(b, &mtgban.ArbitOpts{}, vendor, seller) {
+		rows = append(rows, fmt.Sprintf("%+v", row))
+	}
+	slices.Sort(rows)
+	return rows
 }
