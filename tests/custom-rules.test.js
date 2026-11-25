@@ -16,7 +16,7 @@ const FIELDS = ['rate', 'min', 'seller', 'fallback'];
 // A row whose fields hold vals, as querySelector('[data-field="x"]') finds them.
 function fakeRow(vals) {
     const fields = {};
-    FIELDS.forEach((f, i) => { fields[f] = { value: vals[i] }; });
+    FIELDS.forEach((f, i) => { fields[f] = { value: vals[i], addEventListener() {} }; });
     return { querySelector: (sel) => fields[sel.match(/data-field="([^"]+)"/)[1]] };
 }
 
@@ -83,7 +83,7 @@ function liveRows(list) {
 
 test('a move reorders the values over the same rows, the first included', () => {
     const { R } = load();
-    const rules = [['0.8', '7', 'CK', 'TCGLow'], ['0.6', '2', 'TCGLow', ''], ['bad', '', 'SCG', '']];
+    const rules = [['0.8', '7', 'CK', 'TCGLow'], ['0.6', '2', 'TCGLow', ''], ['bad', '1', 'SCG', '']];
     const rows = liveRows(rules);
     const container = { querySelectorAll: () => rows };
     const now = () => rows.map((r) => FIELDS.map((f) => r.fields[f].value));
@@ -93,6 +93,24 @@ test('a move reorders the values over the same rows, the first included', () => 
     expect(now()).toEqual([rules[2], rules[1], rules[0]]);
     // A bad rate is marked where it lands and nowhere else
     expect(rows.map((r) => 'aria-invalid' in r.fields.rate.attrs)).toEqual([true, false, false]);
+});
+
+test('a rule with no minimum becomes the first with one of 0', () => {
+    const { R } = load();
+    const rows = liveRows([['0.8', '7', 'CK', ''], ['0.6', '', 'TCGLow', '']]);
+    R.move({ querySelectorAll: () => rows }, 1, 0);
+    expect(rows.map((r) => r.fields.min.value)).toEqual(['0', '7']);
+});
+
+test('the first rule with its minimum cleared takes 0', () => {
+    const ed = editor(['0.8', '7', 'CK', '']);
+    load({}, ed.document).R.binding(ed.container).load();
+    const min = ed.rows[0].querySelector('[data-field="min"]');
+    min.fire('change');
+    expect(min.value).toBe('7');
+    min.value = '';
+    min.fire('change');
+    expect(min.value).toBe('0');
 });
 
 test('the row under the pointer is found by height, the ends taking what is past them', () => {
