@@ -221,12 +221,11 @@
         const sel = document.querySelector('#settings-modal select[data-cookie="' + cookieName + '"]');
         if (!sel) return;
         const owner = claim(cookieName, sel);
+        const initial = sel.value;
         addBinding({
-            // Keep the markup's default selection when the cookie is not set
-            load: function () {
-                const val = readSetting(cookieName);
-                if (val) sel.value = val;
-            },
+            // The markup's default selection when the cookie is not set, also
+            // after a discarded pick
+            load: function () { sel.value = readSetting(cookieName) || initial; },
             save: function () { writeSetting(cookieName, sel.value, owner); },
             serialize: function () { return cookieName + '=' + sel.value; },
         });

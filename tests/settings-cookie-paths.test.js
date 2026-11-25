@@ -185,6 +185,17 @@ test('a field with a data-unset cookie loads that one until its own is set', asy
     expect(await rate('')).toBe('0.8');
 });
 
+test('reopening after a discard puts an unset select back on its default', async () => {
+    const m = await openModal({ pathname: '/search', cookie: '', values: { '/arbit': {}, '/upload': {} } });
+    const buyer = m.find('[data-cookie="UploadCustomBuyer"]');
+    buyer.value = 'CK';
+    m.window.closeSettings();
+    m.window.openSettings('upload');
+    expect(buyer.value).toBe('TCGLow');
+    await m.save();
+    expect(m.writes.find(w => w.startsWith('UploadCustomBuyer=') && !w.startsWith('UploadCustomBuyer=;'))).toStartWith('UploadCustomBuyer=TCGLow;');
+});
+
 test('saving on another page writes each cookie where its page reads it', async () => {
     const m = await openModal({
         pathname: '/search',
