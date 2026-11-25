@@ -1308,6 +1308,28 @@ describe('the price paid', () => {
         expect(panel.querySelector('.backpack-row-paid').textContent).toBe('Paid $ 5.00');
     });
 
+    test('a redraw waits for the field, and the row keeps the control a click leaves it for', () => {
+        const p = page({ store: [entry('uuid-1'), entry('uuid-2')] });
+        const panel = open(p);
+        const field = edit(panel, '1');
+        p.window.Backpack.setQty('uuid-2', 4);
+        p.window.renderBackpack();
+        expect(panel.querySelector('.backpack-paid-field')).toBe(field);
+        expect(paid(p)[0][3]).toBe(undefined);
+        field.value = '15';
+        press(field, 'Enter');
+        expect(paid(p)).toEqual([['uuid-1', 'NM', 1, 15], ['uuid-2', 'NM', 4, undefined]]);
+        expect(panel.querySelector('.backpack-row-paid').textContent).toBe('Paid $ 15.00');
+        expect(panel.querySelectorAll('.backpack-qty')[1].textContent).toBe('4');
+        expect(p.document.activeElement).toBe(panel.querySelector('.backpack-cond'));
+
+        const plus = panel.querySelector('.backpack-plus');
+        leave(edit(panel, '20'));
+        expect(panel.querySelector('.backpack-plus')).toBe(plus);
+        plus.click();
+        expect(paid(p)[0]).toEqual(['uuid-1', 'NM', 2, 20]);
+    });
+
     test('a stored or typed price that is none counts as none', () => {
         const store = ['x', -2, 0, null, 1e9, '3.5m'].map((v, i) => entry('uuid-' + i, { paid: v }));
         expect(page({ store }).window.Backpack.read().map((e) => e.paid)).toEqual([undefined, undefined, undefined, undefined, undefined, undefined]);
