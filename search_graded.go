@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
@@ -153,4 +154,109 @@ func groupBySlab(found map[string]map[mtgban.Condition][]SearchEntry, byPrice bo
 		keys = append(keys, otherSlabs)
 	}
 	return keys
+}
+
+// slabShowcaseSize is how many slabs the Graded page's landing shows, and how
+// many cards each graded store puts forward for it.
+const slabShowcaseSize = 24
+
+// showcaseSlab is a slab the Graded page's landing can show: the dearest a
+// graded store lists of one card, every entry of an inventory being a copy
+// in stock.
+type showcaseSlab struct {
+	cardID    string
+	shorthand string
+	entry     mtgban.InventoryEntry
+}
+
+// slabShowcase is what the graded stores among sellers put forward for the
+// Graded page's landing, dearest first: each store's slabShowcaseSize dearest
+// cards in stock, so a reader who hides some stores still fills the carousel
+// from the others.
+func slabShowcase(sellers []mtgban.Seller) []showcaseSlab {
+	var out []showcaseSlab
+	for _, seller := range sellers {
+		info := seller.Info()
+		if !info.GradedMode {
+			continue
+		}
+		var dearest []showcaseSlab
+		for cardID, entries := range seller.Inventory() {
+			best := -1
+			for i, entry := range entries {
+				if entry.Price > 0 && (best < 0 || entry.Price > entries[best].Price) {
+					best = i
+				}
+			}
+			if best >= 0 {
+				dearest = append(dearest, showcaseSlab{cardID, info.Shorthand, entries[best]})
+			}
+		}
+		slices.SortFunc(dearest, compareShowcase)
+		out = append(out, dearest[:min(len(dearest), slabShowcaseSize)]...)
+	}
+	slices.SortFunc(out, compareShowcase)
+	return out
+}
+
+// compareShowcase orders slabs dearest first, the same way on every load.
+func compareShowcase(a, b showcaseSlab) int {
+	return cmp.Or(
+		cmp.Compare(b.entry.Price, a.entry.Price),
+		strings.Compare(a.cardID, b.cardID),
+		strings.Compare(a.shorthand, b.shorthand),
+	)
+}
+
+// slabShowcaseFor is the showcase over sellers, carried across from prev, as
+// mkmIDsFor carries its map, where the graded stores are the same ones.
+func slabShowcaseFor(prev *prices, sellers []mtgban.Seller) []showcaseSlab {
+	raw := func(seller mtgban.Seller) bool { return !seller.Info().GradedMode }
+	if prev != nil && slices.Equal(slices.DeleteFunc(slices.Clone(prev.sellers), raw), slices.DeleteFunc(slices.Clone(sellers), raw)) {
+		return prev.showcase
+	}
+	return slabShowcase(sellers)
+}
+
+// fillSlabShowcase puts the Graded page's landing carousel on the page the
+// way a search puts its results: the dearest slabs in stock at the stores the
+// reader sees, one per card and under its grade, locked or left out where a
+// search would lock or leave out that store.
+func fillSlabShowcase(pageVars *PageVars, b *matcher.Backend, p *prices, blocked []string) {
+	affiliates := Affiliates().List
+	hide := Config().SearchHideNonAffiliates
+	pageVars.FoundSellers = map[string]map[mtgban.Condition][]SearchEntry{}
+	pageVars.Metadata = cardMetadata{}
+	hidden := false
+	for _, slab := range p.showcase {
+		if len(pageVars.AllKeys) == slabShowcaseSize {
+			break
+		}
+		_, shown := pageVars.FoundSellers[slab.cardID]
+		if shown || slices.Contains(blocked, slab.shorthand) {
+			continue
+		}
+		locked := pageVars.ListingLocked && !slices.Contains(affiliates, slab.shorthand)
+		if locked && hide {
+			hidden = true
+			continue
+		}
+		group, _ := slabGroup(slab.entry.Slab)
+		pageVars.FoundSellers[slab.cardID] = map[mtgban.Condition][]SearchEntry{
+			group: {{
+				ScraperName: p.scraperName(slab.shorthand),
+				Shorthand:   slab.shorthand,
+				Price:       slab.entry.Price,
+				URL:         slab.entry.URL,
+				Grade:       slab.entry.Conditions,
+				Slab:        slab.entry.Slab,
+				Locked:      locked,
+			}},
+		}
+		pageVars.AllKeys = append(pageVars.AllKeys, slab.cardID)
+		pageVars.Metadata.add(b, p, slab.cardID, false)
+	}
+	if hidden && len(pageVars.AllKeys) == 0 {
+		pageVars.Notices = append(pageVars.Notices, SlabsLockedMessage)
+	}
 }

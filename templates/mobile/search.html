@@ -3,6 +3,7 @@
     <link rel="stylesheet" type="text/css" href="/css/alerts.css?hash={{.Hash}}">{{end}}
     <link rel="stylesheet" type="text/css" href="/css/search-rows.css?hash={{.Hash}}">
     {{if not .SearchRan}}<link rel="stylesheet" type="text/css" href="/css/search-landing.css?hash={{.Hash}}">{{end}}
+    {{if and .IsGraded (not .SearchRan)}}<link rel="stylesheet" type="text/css" href="/css/carousel.css?hash={{.Hash}}">{{end}}
     <link rel="stylesheet" type="text/css" href="/css/search-mobile.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/search-cards-mobile.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
@@ -93,11 +94,15 @@
     {{/* Toast notification */}}
     <div class="m-toast" id="m-fav-toast"></div>
 
+    {{if .IsGraded}}
+    {{template "slab-showcase" .}}
+    {{else}}
     {{/* Recent searches and favorites, from localStorage, above the bar */}}
     <div class="m-landing-lists">
         <div class="landing-pane landing-pane-recent" id="m-recent-searches"></div>
         <div id="m-favorites"></div>
     </div>
+    {{end}}
 </div>
 {{end}}
 
