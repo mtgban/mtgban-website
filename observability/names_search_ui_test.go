@@ -136,7 +136,7 @@ func TestSearchUIPages(t *testing.T) {
 		"ui.fav.chart": "search", "ui.fav.upload": "search,graded", "ui.fav.share": "search,graded",
 		"ui.search.key":         "search,sealed,graded,offline",
 		"ui.search.sort_locked": "search,sealed", "ui.search.chart_top": "search,sealed",
-		"ui.search.random": "search,sealed", "ui.search.buyers_mode": "search,sealed",
+		"ui.search.random": "search,sealed,graded", "ui.search.buyers_mode": "search,sealed",
 		"ui.sidebar.export": "search,sealed", "ui.sidebar.upload": "search,sealed",
 		"ui.row.velocity": "search,sealed,graded",
 	}

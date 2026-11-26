@@ -285,6 +285,19 @@ func (s *site) RandomSearch(w http.ResponseWriter, r *http.Request) {
 	localRedirect(w, r, "/search", v)
 }
 
+// RandomGradedSearch opens the Graded page on a card a graded store the
+// reader sees lists, their own store choices included, so it always lands on
+// slabs.
+func (s *site) RandomGradedSearch(w http.ResponseWriter, r *http.Request) {
+	retail, _, _ := getSearchBlocklists(r, verifiedSignature(r))
+	uuid := randomGradedUUID(s.prices(), retail)
+
+	observe(r, "redirect.random", "graded")
+	v := r.URL.Query()
+	v.Set("q", uuid)
+	localRedirect(w, r, "/graded", v)
+}
+
 func (s *site) RandomSealedSearch(w http.ResponseWriter, r *http.Request) {
 	uuid := randomUUID(s.backend(), true)
 

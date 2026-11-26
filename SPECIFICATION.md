@@ -594,8 +594,8 @@ the preference settings its daily snapshot reads
 `/go/{store}/{hash}` short form defaulting to retail (redirect.go), resolved
 via mtgjson UUID or an external id (scryfall/tcg product id); `/card/<set>/
 <number>/<finish>` and `/sealed/<set>/<slug>` inbound-only redirects into
-`/search`/`/sealed` (`CardRedirect`/`SealedRedirect`, redirect.go); `/random`
-and `/randomsealed`; `/discord`; `/toggle-mobile` (cookie-based mobile
+`/search`/`/sealed` (`CardRedirect`/`SealedRedirect`, redirect.go); `/random`,
+`/randomsealed` and `/randomgraded`; `/discord`; `/toggle-mobile` (cookie-based mobile
 override; phone UA detection via `mileusna/useragent`).
 
 ## 5. Major subsystems
@@ -719,8 +719,10 @@ override; phone UA detection via `mileusna/useragent`).
   none of the raw copies' sales: for a signature carrying `SearchSales`, the
   slabs' Sales Velocity row (`gradedVelocity`), then each listed grade's
   newest eBay and Fanatics sales, drawn as the Sales pane draws the recent
-  orders (`gradedSales`, both from `gradedSalesStore`; ADR-0012). Charts, alerts, exports, the random card and the price, buylist
-  and velocity sorts are all of raw copies, and left off.
+  orders (`gradedSales`, both from `gradedSalesStore`; ADR-0012). Charts,
+  alerts, exports and the price, buylist and velocity sorts are all of raw
+  copies, and left off; its random card (`/randomgraded`) is one a graded
+  store the reader sees lists, their `SearchSellersList` choices included.
 
 ### 5.2 Upload (`upload.go`)
 
