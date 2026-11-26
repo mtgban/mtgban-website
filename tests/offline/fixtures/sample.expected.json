@@ -81,6 +81,23 @@
         }
       }
     },
+    "uuid-0007": {
+      "CKG": {
+        "cond": "NM",
+        "conditions": {
+          "NM|CGC 10 Pristine": 95.5,
+          "NM|PSA 9": 40
+        },
+        "qty": 1,
+        "qtyEtched": 0,
+        "qtyFoil": 0,
+        "qtySealed": 0,
+        "quantities": {
+          "NM|PSA 9": 1
+        },
+        "regular": 40
+      }
+    },
     "uuid-sealed-box": {
       "CK": {
         "qty": 0,
