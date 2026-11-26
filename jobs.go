@@ -23,8 +23,6 @@ const (
 	jobGradedSales     = "Graded sales"
 	jobNewspaperSales  = "Newspaper sales"
 	jobOffline         = "Offline refresh"
-	jobTCGCSVPrices    = "TCGCSV prices"
-	jobTCGCSVProducts  = "TCGCSV products"
 	jobCheckpoints     = "Checkpoints"
 	jobStaleness       = "Staleness check"
 	jobAlerts          = "Alert evaluation"
@@ -156,20 +154,6 @@ func (s *site) scheduleCrons() *cron.Cron {
 
 	// Backstop refresh; reloads normally drive this via RequestRefresh.
 	c.AddFunc("20 */12 * * *", recovered("cron RequestRefresh", s.offline.RequestRefresh))
-
-	// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
-	// The job gates on tcgcsv's last-updated, so it no-ops until there's a
-	// newer snapshot regardless of the exact fire time. Registered only when
-	// the ingestion service came up: without a configured game or a price DB
-	// every fire would fail, posting a recurring spurious failure to the
-	// notification channel. Deployments that run cmd/tcgcsvd on its own can
-	// leave tcgcsv_config out here and let the crons stay unregistered; the
-	// standalone process takes the same cross-process crawl lock either way.
-	if TCGCSVService != nil {
-		addJob("0 21 * * *", jobTCGCSVPrices, stashTCGCSVPrices)
-		// Product metadata changes rarely; refresh the catalog weekly.
-		addJob("0 22 * * 1", jobTCGCSVProducts, stashTCGCSVProducts)
-	}
 
 	// Refresh the chart checkpoints. Magic reads its ban markers from a
 	// document published outside this project, so a B&R announcement only

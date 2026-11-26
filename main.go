@@ -150,6 +150,7 @@ type ConfigType struct {
 	// through Infrastructure(), never directly.
 	infrastructure.Config
 
+	// read by cmd/tcgcsvd only; kept so the admin editor accepts configs that carry it
 	TCGCSVConfig *tcgcsv.Config   `json:"tcgcsv_config"`
 	APIGateway   APIGatewayConfig `json:"api_gateway"`
 
@@ -522,14 +523,6 @@ func (s *site) openDBs() (err error) {
 		if err != nil {
 			return fmt.Errorf("error opening the timeseries SQL client: %w", err)
 		}
-		// Best-effort: create the tcg_products table if it's missing, only when
-		// TCGCSV ingestion is configured. Non-fatal so a read-only or
-		// unprivileged DB user can't block startup; ingestion re-checks it.
-		if Config().TCGCSVConfig != nil {
-			if serr := PricesArchiveDB.EnsureTCGProductsSchema(context.Background()); serr != nil {
-				log.Println("warning: could not ensure tcg_products schema:", serr)
-			}
-		}
 		// Make sure price_dates and the current and next month's price
 		// partitions exist ahead of any write. Writes-only.
 		if serr := PricesArchiveDB.EnsurePriceDatesSchema(context.Background()); serr != nil {
@@ -677,15 +670,6 @@ func main() {
 	alertsSend := flag.Bool("alerts-send", false, "Deliver alert DMs and mail in dev mode")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 
-	var maintenance tcgcsvMaintenance
-	flag.BoolVar(&maintenance.backfill, "tcgcsv-backfill", false, "Backfill the long prices table from tcgcsv archives, then exit (archives are withdrawn upstream: stores the current snapshot instead when the range covers it)")
-	flag.StringVar(&maintenance.backfillOptions.From, "tcgcsv-from", "", "Backfill start date YYYY-MM-DD (default: earliest archive, 2024-02-08; an explicit date fetches the whole range, bypassing the resume cursor)")
-	flag.StringVar(&maintenance.backfillOptions.To, "tcgcsv-to", "", "Backfill end date YYYY-MM-DD (default: today)")
-	flag.BoolVar(&maintenance.backfillOptions.Force, "tcgcsv-force", false, "Re-ingest dates already stored (ignore the resume cursor)")
-	flag.StringVar(&maintenance.backfillOptions.Categories, "tcgcsv-categories", "", "Restrict the backfill to these TCGplayer category ids, comma-separated (default: every configured game)")
-	flag.BoolVar(&maintenance.daily, "tcgcsv-daily", false, "Run the daily tcgcsv ingest once, then exit")
-	flag.BoolVar(&maintenance.products, "tcgcsv-products", false, "Sync the tcgcsv product catalog once, then exit")
-
 	flag.Parse()
 
 	// Initial state
@@ -732,10 +716,6 @@ func main() {
 	Sessions = sessionstore.New(sessionHooks(s))
 	s.alertsSend = *alertsSend
 
-	if maintenance.backfill || maintenance.daily || maintenance.products {
-		s.runTCGCSVMaintenance(maintenance)
-	}
-
 	// Before the evaluator or any route can read them.
 	s.loadAlertMail()
 
@@ -768,13 +748,6 @@ func main() {
 	// Pick up access table / grant saves made by the peer deployments
 	// sharing the price database.
 	startAccessReloadListener()
-
-	// tcgcsv ingestion is optional: a deployment with no configured games or no
-	// price database simply doesn't get the crons or the admin button.
-	err = initTCGCSVService(s)
-	if err != nil {
-		log.Println("tcgcsv ingestion disabled:", err)
-	}
 
 	err = reloadCheckpoints()
 	if err != nil {

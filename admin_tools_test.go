@@ -210,8 +210,8 @@ func adminRequest(method string, form url.Values) *http.Request {
 
 // withInertAdminTools gives the admin tools a site and a config on which
 // running each one leaves a message and changes nothing: every file they
-// read is missing, a stash is already running, no tcgcsv ingest is set up,
-// and a restart is counted rather than made. The count is returned.
+// read is missing, a stash is already running, and a restart is counted
+// rather than made. The count is returned.
 func withInertAdminTools(t *testing.T) (*site, *atomic.Int32) {
 	t.Helper()
 	withSigMode(t, true, false)
@@ -223,10 +223,10 @@ func withInertAdminTools(t *testing.T) (*site, *atomic.Int32) {
 	Config().sourcePath = filepath.Join(dir, "config.json")
 	Config().DatastorePath = filepath.Join(dir, "datastore.json.xz")
 
-	savedConfigBucket, savedDataBucket, savedTCGCSV := ConfigBucket, DataBucket, TCGCSVService
+	savedConfigBucket, savedDataBucket := ConfigBucket, DataBucket
 	savedStashing, savedRestart := stashingInProgress.Load(), restartServer
 	restarts := &atomic.Int32{}
-	ConfigBucket, DataBucket, TCGCSVService = &simplecloud.FileBucket{}, &simplecloud.FileBucket{}, nil
+	ConfigBucket, DataBucket = &simplecloud.FileBucket{}, &simplecloud.FileBucket{}
 	stashingInProgress.Store(true)
 	restartServer = func() { restarts.Add(1) }
 
@@ -235,7 +235,7 @@ func withInertAdminTools(t *testing.T) (*site, *atomic.Int32) {
 		for deadline := time.Now().Add(10 * time.Second); s.reloads.Status().Running && time.Now().Before(deadline); {
 			time.Sleep(10 * time.Millisecond)
 		}
-		ConfigBucket, DataBucket, TCGCSVService = savedConfigBucket, savedDataBucket, savedTCGCSV
+		ConfigBucket, DataBucket = savedConfigBucket, savedDataBucket
 		stashingInProgress.Store(savedStashing)
 		restartServer = savedRestart
 	})
@@ -243,7 +243,7 @@ func withInertAdminTools(t *testing.T) (*site, *atomic.Int32) {
 }
 
 // Every admin action that changes state - a restart, a reload, a dispatch,
-// a stash, an ingest, a new key - runs only from a same-site POST's body, so
+// a stash, a new key - runs only from a same-site POST's body, so
 // a link an admin is sent to cannot start one.
 func TestAdminActionsRunOnlyFromASameSitePost(t *testing.T) {
 	s, restarts := withInertAdminTools(t)
@@ -262,7 +262,6 @@ func TestAdminActionsRunOnlyFromASameSitePost(t *testing.T) {
 		{url.Values{"tool": {"checkpoints"}}, "msg", "checkpoints"},
 		{url.Values{"tool": {"snapshot"}}, "msg", "Stashing is already in progress"},
 		{url.Values{"tool": {"metricsfold"}}, "msg", "Metrics jobs are not enabled"},
-		{url.Values{"tool": {"tcgcsv"}}, "msg", "Ingesting latest TCGCSV prices"},
 		{url.Values{"tool": {"server"}}, "msg", "Restarting the server"},
 		{url.Values{"tool": {"newKey"}, "user": {"ops@example.com"}, "duration": {"30"}}, "", "New key: "},
 		{url.Values{"tool": {"demokey"}}, "", "New key: "},
@@ -417,6 +416,28 @@ func TestAdminViewsAnswerAGet(t *testing.T) {
 	}
 }
 
+// The tcgcsv ingest runs from its workflow: the site offers no button for
+// it, and a posted tool=tcgcsv is an unknown tool, answered with the page.
+func TestAdminHasNoTCGCSVTool(t *testing.T) {
+	s, _ := withInertAdminTools(t)
+	req := adminRequest(http.MethodPost, url.Values{"tool": {"tcgcsv"}})
+	req.Header.Set("Origin", "https://mtgban.com")
+	rec := httptest.NewRecorder()
+	s.Admin(rec, req)
+	if rec.Code != http.StatusOK || rec.Header().Get("Location") != "" {
+		t.Errorf("tool=tcgcsv answered %d to %q, want the page", rec.Code, rec.Header().Get("Location"))
+	}
+	if strings.Contains(rec.Body.String(), "Ingesting latest TCGCSV prices") {
+		t.Error("tool=tcgcsv still starts an ingest")
+	}
+	for _, mobile := range []bool{false, true} {
+		out := renderPage(t, "admin.html", mobile, PageVars{UserNav: &NavElem{Short: "b"}})
+		if strings.Contains(out, `name="tool" value="tcgcsv"`) {
+			t.Errorf("mobile %v: the admin page still has a tcgcsv button", mobile)
+		}
+	}
+}
+
 // The server actions are buttons posting a form, on both layouts, and none
 // is a link.
 func TestAdminServerActionsPost(t *testing.T) {
@@ -425,7 +446,7 @@ func TestAdminServerActionsPost(t *testing.T) {
 		if strings.Contains(out, `href="?tool=`) {
 			t.Errorf("mobile %v: a server action is still a link", mobile)
 		}
-		for _, tool := range []string{"datastore", "config", "checkpoints", "snapshot", "metricsfold", "tcgcsv", "server", "newKey", "demokey"} {
+		for _, tool := range []string{"datastore", "config", "checkpoints", "snapshot", "metricsfold", "server", "newKey", "demokey"} {
 			if !strings.Contains(out, `name="tool" value="`+tool+`"`) {
 				t.Errorf("mobile %v: no %s button or field", mobile, tool)
 			}

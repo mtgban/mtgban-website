@@ -60,14 +60,9 @@ default `AllPrintings.json.xz`), `-acl` (access-table path override),
 read the scraper dumps from; see §2.3), `-dev` (hot-reload templates,
 relaxed auth), `-sig` (force signature checks in dev), `-noload`,
 `-stores` (comma-separated stores to load at startup; see §2.3), `-nonews`,
-`-log` (default `logs/`), and a `tcgcsv-*` family — `-tcgcsv-backfill`,
-`-tcgcsv-daily`, `-tcgcsv-products` each run one ingest job (the first two
-into the long `prices` table, the last into `tcg_products`) and exit without
-starting the web server (the same jobs `cmd/tcgcsvd` runs as its own
-process); `-tcgcsv-from`/
-`-tcgcsv-to`/`-tcgcsv-force`/`-tcgcsv-categories` tune the backfill, which
-since tcgcsv withdrew its archives stores the current snapshot in their
-place (`docs/tcgcsv-archive-withdrawal.md`). There is
+and `-log` (default `logs/`). The server has no tcgcsv flags: the ingest
+runs as `cmd/tcgcsvd` from `.github/workflows/tcgcsvd.yml`
+(`tcgcsvd/README.md`). There is
 no `-offline` flag any more — the old "run without B2, load prices from
 another BAN instance's API" mode is gone (see §2.3).
 
@@ -84,14 +79,10 @@ Boot sequence (`main()`):
    datasets (§2.4). `loadRarityBadges()` (no-op for the default game).
 2. `s := newSite()` (site.go) — the site the routes and jobs are bound to,
    with its palette and offline services; pure, no I/O.
-3. If any `-tcgcsv-*` job flag is set, `s.runTCGCSVMaintenance()`
-   (tcgcsv_service.go): `openDBs()`, `initTCGCSVService(s)`, run the
-   requested job, `os.Exit(0)` — the datastore and price data are never
-   loaded and `ListenAndServe` never runs.
-4. Otherwise: `loadKeyOverrides()`, create `LogDir`, load Google credentials,
+3. `loadKeyOverrides()`, create `LogDir`, load Google credentials,
    `openDBs()` → `PricesArchiveDB` (PostgreSQL, `timeseries` package, price
-   history for charts, which the TCGCSV ingest writes too, plus
-   `tcg_products` when it is configured), `NewNewspaperDB` (PostgreSQL),
+   history for charts, which the tcgcsv workflow writes too),
+   `NewNewspaperDB` (PostgreSQL),
    `UserStateDB` (cross-device sync, only if `user_state_config` is set), and
    `ObservabilityDB` (usage telemetry, only if `observability_config` + an
    instance name are set, and with it, when the feature tables are ready,
@@ -100,11 +91,10 @@ Boot sequence (`main()`):
    `Infrastructure()` (§2.4). Then `startAccessReloadListener()` (picks up
    saves of the ACL, grants, affiliates, datasets and infrastructure files
    made by peer deployments sharing the price DB, recovering a reload that
-   panics so it keeps listening), `initTCGCSVService(s)`
-   (non-fatal if unconfigured), `reloadCheckpoints()`,
+   panics so it keeps listening), `reloadCheckpoints()`,
    `s.offline.LoadPersisted()`, then the production template cache
    build (`buildTemplateCache()`) — see §7.
-5. `s.reloads.Start("startup", Config.DatastorePath, ...)` runs
+4. `s.reloads.Start("startup", Config.DatastorePath, ...)` runs
    `s.loadDatastore(Config.DatastorePath)` in the background through the
    same single-flight tracker an admin/API reload uses (`internal/dsreload`):
    a reload requested before this finishes is queued to run once it ends
@@ -119,19 +109,19 @@ Boot sequence (`main()`):
    `s.refreshPopularSearches()` as further goroutines, which the
    tracker's recover does not reach: each runs under `tracked()`
    (recover.go), which recovers it.
-6. Unless `-noload` (`SkipPrices`): `s.startScraperLoad()` (load.go) opens
+5. Unless `-noload` (`SkipPrices`): `s.startScraperLoad()` (load.go) opens
    the dumps bucket (`openDumpsBucket()`, or with `-dumps <dir>` a
    `simplecloud.FileBucket{Root: dir}` in its place; either is kept as
    `DataBucket` for reloads), then on a goroutine runs `loadScrapersNG()`
    on it with the stores to load (`-stores` when it names any, else
    `scraper_config.stores`), then `s.runSealedAnalysis()`,
    `warmVariantCacheIfEnabled()`, `s.offline.RefreshManifest()`.
-7. `s.offline.StartRefresher(recovered)` — one goroutine that every
+6. `s.offline.StartRefresher(recovered)`: one goroutine that every
    runtime manifest refresh funnels through, batched to at most one per
    `refreshWindow` (10 minutes) from the first request, each run through
    `recovered()` (recover.go), so a refresh that panics is reported and the
    loop serves the next one.
-8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, `s.startCrons()` in
+7. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, `s.startCrons()` in
    jobs.go). The
    library runs each on a bare goroutine, so each is registered through
    `addJob`, which runs it under `tracked()` (recover.go): a panic is
@@ -188,8 +178,6 @@ Boot sequence (`main()`):
    - `0 * * * *` - `checkStaleness()` (staleness.go): the Discord alarm below
    - `0 * * * *` - `checkJobHealth()` (jobs.go): the same alarm for the
      background jobs, below; under `recovered()`, not a job itself
-   - when tcgcsv ingestion is configured: `0 21 * * *` —
-     `stashTCGCSVPrices()`; `0 22 * * 1` — `stashTCGCSVProducts()`
    - `20 * * * *` - `s.refreshPopularSearches()`, where the observability
      database is set
    - `15 5 * * *` - `prunePatreonSessions()`, with a user-state database:
@@ -201,7 +189,7 @@ Boot sequence (`main()`):
      minutes into days, `50 0 * * *` the stored-state counts (with a
      user-state database), `30 4 * * *` the `events` roll-up, each under an
      advisory lock (`docs/feature-metrics.md`)
-9. `s.setupDiscord()`, then handlers are registered and `http.Server`
+8. `s.setupDiscord()`, then handlers are registered and `http.Server`
    `ListenAndServe`s on `Config.Port` (default `:8080`, no TLS — assumes
    reverse proxy); graceful shutdown on SIGINT/SIGTERM: 5 s for the
    listener, then Discord's cleanup (4 s), the script error buffer (1 s),
@@ -272,8 +260,8 @@ logging it and dropping the connection. Off the serving goroutines, these
 recover and report the same way under a `source job:` line: the cron jobs
 and each batched offline refresh through `recovered()`; the Discord
 handlers and the `$$` lookup's fetch, the newspaper refresh and the
-TCGplayer listings load a datastore load starts, the goroutines the admin page's `update`, `snapshot` and
-`tcgcsv` actions start, the scraper reloads a key-overrides save starts,
+TCGplayer listings load a datastore load starts, the goroutines the admin page's `update` and `snapshot`
+actions start, the scraper reloads a key-overrides save starts,
 the startup run of `s.refreshCKSignals()`, and each access-listener
 reload through `recoverJob()`. A deploy through
 `update` that fails, by an error or a recovered panic, leaves the old
@@ -382,7 +370,8 @@ One JSON file per deployment, from a local path or `b2://` (§2.1), decoded
 into `ConfigType` and published whole through `liveConfig` (§2.2). Beside
 its own keys (`game`, `port`, `datastore_path`, `scraper_config`,
 `stores`, `discord`, `api_user_secrets`,
-`tcgcsv_config`, `api_gateway` and the rest), it names by path the files
+`tcgcsv_config`, which only `cmd/tcgcsvd` reads, `api_gateway` and the
+rest), it names by path the files
 kept beside it, which deployments may share. `loadCommonConfig()` (common.go) reads each at
 startup and again on a config reload (`?tool=config`) or a config-editor
 save, and each has an admin tab that edits it (§5.9):
@@ -1126,8 +1115,10 @@ id may re-key it to a key no other provider holds (`buildHistoryKeys`,
 published with the chart registry). The JSON shape is card id, finish,
 store key, then `{dates, prices}` oldest first; `meta.latest` is the
 newest day. Responses are public-cacheable with an ETag to the next
-archive write (00:00 and 12:00, and 21:00 off Magic), a minute for the
-half hour after each, and `no-store` while this process writes; errors
+archive write (00:00 and 12:00, and off Magic the daily runs of
+`.github/workflows/tcgcsvd.yml` at 03:00, 21:00 and 23:00 UTC), a minute for
+30 minutes after the snapshot hours and 90 after the workflow's, and
+`no-store` while this process writes; errors
 are JSON with real statuses. The mode is `history`, a package of its own
 in `apiproductlist` with `lookback_days` and no store scope, which the
 plans page shows only with `api_gateway.show_history_package`.
@@ -1174,8 +1165,7 @@ log download or redirect to the CI log (`?logs=`), and the `tool`
 family (`adminTools`), the dashboard's server actions and admin tools:
 `datastore` (`s.startDatastoreReload`), `config` (reload
 config plus the files it names, §2.4), `checkpoints`
-(chart checkpoints), `snapshot` (stash into timeseries), `tcgcsv` (TCGCSV
-price ingestion), `server` (process exit only), `newKey`/`demokey` (API-key
+(chart checkpoints), `snapshot` (stash into timeseries), `server` (process exit only), `newKey`/`demokey` (API-key
 generation, `user` and `duration`). Every
 command but `logs` changes state, so it runs only from a POST
 (below; the dashboard's buttons and the scraper names are small forms).
@@ -1294,7 +1284,7 @@ staleness alarm's map and messages, from 15 minutes after startup.
 | `fuzzy/` | Edit-distance string similarity (adjacent swaps count once) powering "did you mean" suggestions |
 | `observability/` | Postgres page-visit recorder backing the admin usage dashboard, plus the search-votes table behind the popular-searches ranking, and the feature metrics: the registry of names and settings, the minute counter, the script error buffer and the feature tables (`docs/feature-metrics.md`) |
 | `tcgcsv/` | Client for tcgcsv.com's category→group→product/price hierarchy, used to ingest non-Magic prices. The daily-archive reader stays here but every date answers 403 upstream; `ErrArchiveUnavailable` is how callers learn that |
-| `tcgcsvd/` | tcgcsv ingest service: library + `cmd/tcgcsvd` binary. Daily/products/backfill jobs take a cross-process Postgres advisory lock so a standalone process and the website's own crons never crawl tcgcsv.com at once (`tcgcsvd/README.md`). With the archives withdrawn, the per-group daily price files are the only source and backfill falls back to the current snapshot (`docs/tcgcsv-archive-withdrawal.md`) |
+| `tcgcsvd/` | tcgcsv ingest service: library + `cmd/tcgcsvd` binary. Run by `.github/workflows/tcgcsvd.yml`, never by the site. Daily/products/backfill jobs take a cross-process Postgres advisory lock so two runs never crawl tcgcsv.com at once (`tcgcsvd/README.md`). With the archives withdrawn, the per-group daily price files are the only source and backfill falls back to the current snapshot (`docs/tcgcsv-archive-withdrawal.md`) |
 | `userstate/` | Postgres-backed cross-device sync of per-user favorites/recents/prefs/backpack (`/api/userstate/`), keyed by a hash of the login email; a PUT or PATCH body may come with `Content-Encoding: gzip`, held to 1 MB as sent and 8 MB unpacked; also the upload share rows (`upload_shares`), minted by `POST /api/upload/share` and reopened by `/upload?share=`, kept seven days; a reader gets the rows without the owner's notes column. The `favorites_shares` table holds each owner's one live favorites share link per game, made, shown and revoked through `/api/userstate/share`. The `invites` and `invite_redemptions` tables hold the admin's invite links and each acceptance of them, who minted each and from where, pruned 90 days after an invite expires or is revoked (ADR-0011). Startup adds the `backpack` column only when it is missing, and adding it needs the table owner, so a deployment whose app role does not own `user_state` runs `addBackpackSQL`'s statement (`userstate/schema.go`) as the owner before deploying |
 | `cmd/` | Just `cmd/tcgcsvd/main.go` — a thin CLI over the `tcgcsvd` package (`-daily`/`-products`/`-backfill`/`-games`) |
 | `internal/` | Packages only this module imports: `invites` (an invite link's code, the bounds of what an admin may mint, which tiers, pages and options an invite may sign, and its state), `dailycap` (the fixed-size sketches capping what one client address adds to the feature metrics a UTC day), `alerts` (price alerts: the model, its Postgres store on the userstate pool, the debounced evaluator, the Discord DM and the `/api/alerts/` JSON API; `docs/adr/0005-price-alerts.md`), `jobs` (what each background job last did, for the admin dashboard and the staleness alarm), `infrastructure` (the shared infrastructure file's settings), `metricsreport` (the admin Metrics section's rules, its digest and the cache of its queries), `dsreload` (single-flight datastore reload that queues one request behind a running one, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `pledge` (a Patreon login's identity lookup and the site tier its pledge or grant entitles; `Auth` calls it), `poke` (the readers Patreon's webhook or a grant edit poked and the moment the access table last changed, each rounded up to the second, and the signatures re-signed since; a signature issued before either renews or is re-signed on its next request, §3.2), `siteorigin` (the public origin a request reached the site at behind the proxy, and whether a host is the site's own), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `mkmidparser` (Cardmarket product id → the card it names, for uploads that carry one), `tcgskuparser` (TCGplayer SKU → the card it names and the condition it encodes, for uploads that carry one), `sessionstore` (an admin's upload published as a store for the running process), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `salesvelocity` (TCGplayer's copies sold a day per card and its recent orders per grade, from the newspaper's sales table, the last loads, the median sale Arbitrage compares with, and the check on the pull behind them; and the slabs' eBay and Fanatics sales from the newspaper's pokemonpricetracker pull, filtered, for the Graded page, ADR-0012), `bulkrates` (the rates of Cool Stuff Inc's bulk shelf and the cards it refuses, per game), `suggest` (the names the browser's suggestion bar offers through OpenSearch, and "did you mean" hints for empty search results), `uploadtie` (which store wins an upload row when several offer its best price, by the reader's tie rule), `uploadsort` (each printing's card-property sort keys, written on the upload's rows), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps), `xlsread` (the cell text of a legacy .xls upload, BIFF8 or BIFF5, with every allocation bounded by the file's size; `xlstest` writes small .xls files for the tests), `storeorder` (the order a buylist store's invoice lists cards in, for Card Kingdom, ABU Games, Cool Stuff Inc and MTG Mint Card, read from the store's own fields on an offer; an optimizer table sorts by it), `natcmp` (a string compare that reads digit runs by value; the collector-number sort and `storeorder` use it), `phyrexian` (respells a Phyrexian name from the fan encoding MTGJSON carries to the official orthography the Phyrexian font draws, see §7) |

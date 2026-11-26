@@ -94,19 +94,17 @@ Steps 8 to 10 run inside the hold, a window in which nothing writes
   Platform apps (Lorcana, One Piece, Flesh and Blood, Riftbound, and
   Gundam and Palworld once they have one);
 - the sealed analysis (`30 */12 * * *`), 30 minutes after each stash;
-- `cmd/tcgcsvd`, daily at 21:00 UTC (prices) and Mondays at 22:00 UTC
-  (products), and the same two crons inside the site itself on any
-  deployment whose config sets `tcgcsv_config` (`startCrons` in
-  `jobs.go`);
-- the admin page's Take Snapshot and Ingest TCGCSV Prices buttons
-  (`tool=snapshot` and `tool=tcgcsv` in `admin.go`), on any deployment;
-- any `-tcgcsv-daily`, `-tcgcsv-products` or `-tcgcsv-backfill` run from
-  a command line.
+- `cmd/tcgcsvd`, run by `.github/workflows/tcgcsvd.yml` at its daily
+  and weekly crons, or by hand from that workflow or a command line (its
+  03:15 run falls inside the hold below, so disable the workflow for it);
+- the admin page's Take Snapshot button (`tool=snapshot` in `admin.go`),
+  on any deployment.
 
-The hold is a schedule, not a switch: nothing is stopped. It is the window
-from 02:00 to 10:00 UTC, which holds none of the cron starts, but the
-00:00 stash on Magic writes until about 05:00 and its sealed analysis
-after, so the hold begins once the admin dashboard of every deployment
+The hold is mostly a schedule: the one thing stopped is the tcgcsvd
+workflow, disabled for the window and re-enabled after it. It is the
+window from 02:00 to 10:00 UTC, which holds none of the sites' cron
+starts, but the 00:00 stash on Magic writes until about 05:00 and its
+sealed analysis after, so the hold begins once the admin dashboard of every deployment
 shows them idle, not at 02:00. Inside it, press no admin button and run
 no ingest by hand. The buylist aggregates, the CK signals, the screener
 and the charts only read, and run as usual. The times assume each
@@ -155,7 +153,8 @@ made the movers three times slower on `prices_v2`, and no slower after.
 The census (step 1) and `08_verify.sql` (step 11) each read whole tables
 for hours, holding ACCESS SHARE on `prices` all the while. A writer's
 partition create waits behind it and fails under its 5 s `lock_timeout`, so
-run neither on the first day of a month nor across the 21:00 UTC ingest.
+run neither on the first day of a month nor across the tcgcsvd workflow's
+daily runs (21:15, 23:15 and 03:15 UTC).
 
 Start no new game's ingest between the census and the swap if it can be
 avoided. If a category appears in `variants` meanwhile, the copy or the
@@ -321,8 +320,10 @@ keep child foreign keys named `prices_v2_*_fk` while later ones get
 ## The restart after the swap
 
 Right after the commit, restart the sites on the Magic, Pokemon and
-Yu-Gi-Oh droplets and `cmd/tcgcsvd`; the App Platform apps restart at
-their next deploy or by hand. Their chart and history reads are prepared
+Yu-Gi-Oh droplets and re-enable the tcgcsvd workflow (`cmd/tcgcsvd` is a
+one-shot run, so there is nothing to restart; run the workflow by hand if
+the hold cost a day); the App Platform apps restart at their next deploy
+or by hand. Their chart and history reads are prepared
 statements (`stmtHGetAllLong`, `stmtHGetAllByBanID`,
 `stmtHGetAllByBanIDs`), and the restart has them
 planned afresh on the new table. In the rehearsal a statement prepared
@@ -354,15 +355,17 @@ psql -v since=2026-10-22 -v swap=2026-11-02 -f 08_verify.sql
 `since` is step 6's, `swap` the day of the swap. Read-only, in one
 REPEATABLE READ transaction so every section reads the same snapshot, with
 a 4 h `statement_timeout` (it counts both tables whole, so off-peak, not
-on the first day of a month and not across the 21:00 UTC ingest). After
+on the first day of a month and not across the tcgcsvd workflow's daily
+runs at 21:15, 23:15 and 03:15 UTC). After
 the swap the writers reach only `prices`, so it reads in three bands:
 
 - `since <= date < swap`: per provider, the rows and the latest day in
   `prices` and `prices_old`, and `missing`, the rows of `prices_old` whose
   key `prices` lacks. `prices_covers` must be true on every provider:
   none is missing. More rows in `prices` is normal: a writer resumed
-  after the hold can still file a day before the swap (the 21:00 UTC
-  ingest files the day of tcgcsv's last refresh, the day before when it
+  after the hold can still file a day before the swap (the tcgcsvd
+  workflow's daily runs, at 21:15, 23:15 and 03:15 UTC, file the day of
+  tcgcsv's last refresh, the day before when it
   is late; a stale store's stash its own scrape date), and the check goes
   by key so those rows cannot hide a missing one. A false means a row the
   catch-ups missed, so look before the drop, and consider the rollback.
@@ -536,7 +539,7 @@ Run it in two or three sessions with `limit`: after the 00:00 stash and
 its analysis show idle on the admin dashboards (about 05:30 UTC) until
 before the 12:00 stash, or after the 12:00 stash, which also writes until
 about 17:00, and its analysis show idle (about 17:30 UTC) until before
-the 21:00 UTC ingest.
+the tcgcsvd workflow's daily runs (21:15, 23:15 and 03:15 UTC).
 
 It ends with a report, every field read after each session:
 

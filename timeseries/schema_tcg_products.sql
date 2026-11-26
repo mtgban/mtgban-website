@@ -3,7 +3,7 @@
 -- variant's product_id can be resolved to a real card. Sourced from
 -- tcgcsv's live products endpoints (archives carry prices only).
 --
--- Applied idempotently at startup by (*Client).EnsureTCGProductsSchema.
+-- Applied idempotently by (*Client).EnsureTCGProductsSchema before each product sync.
 create table if not exists public.tcg_products (
     product_id  integer not null,
     category_id integer not null,

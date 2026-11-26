@@ -462,17 +462,6 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, p *prices, pag
 		v.Set("msg", foldMetricsNow())
 		redirect = true
 
-	case "tcgcsv":
-		v = url.Values{}
-		v.Set("msg", "Ingesting latest TCGCSV prices in the background...")
-		redirect = true
-
-		if IsTCGCSVStashing() {
-			v.Set("msg", "TCGCSV ingestion is already in progress")
-		} else {
-			go tracked(jobTCGCSVPrices, stashTCGCSVPrices)()
-		}
-
 	case "server":
 		v = url.Values{}
 		v.Set("msg", "Restarting the server...")

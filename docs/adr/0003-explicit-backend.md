@@ -68,7 +68,7 @@ make an exact-number search scan, `/api/suggest` answer 204 and the palette
 lists no-store.
 
 Page handlers are methods on `*site`, and so are the crons that read the
-datastore, the Discord message handler and the tcgcsv report.
+datastore and the Discord message handler.
 `NavElem.Handle` holds a method expression (`(*site).Search`), so the page
 registry stays static data built in `init()`, bound to the site by `main()`.
 
