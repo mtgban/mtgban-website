@@ -103,7 +103,7 @@ func TestPriceParityRetail(t *testing.T) {
 	config := parseSearchOptionsNG(backend(), currentPrices(), regular, nil, nil, nil)
 	found := searchSellers(currentPrices(), cardIDs, config)
 
-	api := getSellerPrices(backend(), currentPrices(), "", []string{"PARITYA", "PARITYIDX"}, "", cardIDs, "", true, true, false, "")
+	api := getSellerPrices(backend(), currentPrices(), "", "", []string{"PARITYA", "PARITYIDX"}, "", cardIDs, "", true, true, false, "")
 
 	// Parity: the search row per condition and the API conditions map must
 	// carry the same numbers.
@@ -193,7 +193,7 @@ func TestPriceParityBuylist(t *testing.T) {
 	config := parseSearchOptionsNG(backend(), currentPrices(), regular, nil, nil, nil)
 	found := searchVendors(currentPrices(), cardIDs, config)
 
-	api := getVendorPrices(backend(), currentPrices(), "", []string{"PARITYV"}, "", cardIDs, "", true, true, false, "")
+	api := getVendorPrices(backend(), currentPrices(), "", "", []string{"PARITYV"}, "", cardIDs, "", true, true, false, "")
 
 	// Parity: raw buylist prices must match; the credit multiplier is a
 	// search-side display value layered on the same base number.
@@ -265,13 +265,13 @@ func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
 		regular: {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitCount}}},
 		foil:    {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitExpectedCount}}},
 	}
-	out := banPricesFromRows(backend(), currentPrices(), []string{regular, foil}, found, "name", "shorthands", true, false, true)
+	out := banPricesFromRows(backend(), currentPrices(), []string{regular, foil}, found, "name", "", "shorthands", true, false, true)
 
 	coRegular, err := backend().GetUUID(regular)
 	if err != nil {
 		t.Fatal(err)
 	}
-	idRegular := getIDFromMode(backend(), currentPrices(), "name", coRegular)
+	idRegular := getIDFromMode(backend(), currentPrices(), "name", "", coRegular)
 	if got := out[idRegular]["FAKEIDX"].Qty; got != 12 {
 		t.Errorf("a want-count row summed to %v, want 12", got)
 	}
@@ -280,7 +280,7 @@ func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	idFoil := getIDFromMode(backend(), currentPrices(), "name", coFoil)
+	idFoil := getIDFromMode(backend(), currentPrices(), "name", "", coFoil)
 	if got := out[idFoil]["FAKEIDX"].QtyFoil; got != 0 {
 		t.Errorf("an average-count row summed to %v, want 0 - it is not a want", got)
 	}
@@ -301,7 +301,7 @@ func TestFinishPredicateParity(t *testing.T) {
 	stores := []string{"PARITYA", "PARITYIDX"}
 
 	// Funnel path (hash filter): finish=foil keeps only the foil printing
-	api := getSellerPrices(backend(), currentPrices(), "", stores, "", cardIDs, "foil", false, false, false, "")
+	api := getSellerPrices(backend(), currentPrices(), "", "", stores, "", cardIDs, "foil", false, false, false, "")
 	if _, found := api[regular]; found {
 		t.Error("regular printing should be dropped by finish=foil")
 	}
@@ -310,7 +310,7 @@ func TestFinishPredicateParity(t *testing.T) {
 	}
 
 	// Full dump path: the same predicate through EntryRule.Finish
-	api = getSellerPrices(backend(), currentPrices(), "", stores, "", nil, "foil", false, false, false, "")
+	api = getSellerPrices(backend(), currentPrices(), "", "", stores, "", nil, "foil", false, false, false, "")
 	if _, found := api[regular]; found {
 		t.Error("regular printing should be dropped by finish=foil in a full dump")
 	}
@@ -351,7 +351,7 @@ func TestSearchDownloadFilters(t *testing.T) {
 	config := SearchConfig{StoreFilters: []FilterStoreElem{{
 		Name: "seller", Values: []string{"paritya"}, OnlyForSeller: true,
 	}}}
-	api := banPricesFromRows(backend(), currentPrices(), cardIDs, searchSellers(currentPrices(), cardIDs, config), "", "", true, true, false)
+	api := banPricesFromRows(backend(), currentPrices(), cardIDs, searchSellers(currentPrices(), cardIDs, config), "", "", "", true, true, false)
 	if _, found := api[regular]["PARITYIDX"]; found {
 		t.Error("seller filter should exclude PARITYIDX from the output")
 	}
@@ -364,7 +364,7 @@ func TestSearchDownloadFilters(t *testing.T) {
 	config = SearchConfig{EntryFilters: []FilterEntryElem{{
 		Name: "condition", Values: []string{"NM"}, OnlyForVendor: true,
 	}}}
-	bl := banPricesFromRows(backend(), currentPrices(), cardIDs, searchVendors(currentPrices(), cardIDs, config), "", "", true, true, true)
+	bl := banPricesFromRows(backend(), currentPrices(), cardIDs, searchVendors(currentPrices(), cardIDs, config), "", "", "", true, true, true)
 	if got := bl[regular]["PARITYV"].Conditions.Get("NM"); got != 5 {
 		t.Errorf("conditions[NM] = %v, want 5", got)
 	}
@@ -411,10 +411,10 @@ func TestZeroPricedListings(t *testing.T) {
 	}
 
 	t.Run("funnel path", func(t *testing.T) {
-		check(t, getSellerPrices(backend(), currentPrices(), "", []string{"ZEROA"}, "", []string{regular}, "", true, true, false, ""))
+		check(t, getSellerPrices(backend(), currentPrices(), "", "", []string{"ZEROA"}, "", []string{regular}, "", true, true, false, ""))
 	})
 	t.Run("full dump path", func(t *testing.T) {
-		check(t, getSellerPrices(backend(), currentPrices(), "", []string{"ZEROA"}, "", nil, "", true, true, false, ""))
+		check(t, getSellerPrices(backend(), currentPrices(), "", "", []string{"ZEROA"}, "", nil, "", true, true, false, ""))
 	})
 }
 
@@ -456,8 +456,8 @@ func TestGradesKeepTheBestPriceAndTheTotal(t *testing.T) {
 		hash []string
 	}{{"funnel path", ids}, {"full dump path", nil}} {
 		t.Run(tc.name, func(t *testing.T) {
-			retail := getSellerPrices(backend(), currentPrices(), "", []string{"GRADEA"}, "", tc.hash, "", true, true, false, "")
-			buylist := getVendorPrices(backend(), currentPrices(), "", []string{"GRADEV"}, "", tc.hash, "", true, true, false, "")
+			retail := getSellerPrices(backend(), currentPrices(), "", "", []string{"GRADEA"}, "", tc.hash, "", true, true, false, "")
+			buylist := getVendorPrices(backend(), currentPrices(), "", "", []string{"GRADEV"}, "", tc.hash, "", true, true, false, "")
 			for _, card := range cards {
 				sell, buy := retail[card.id]["GRADEA"], buylist[card.id]["GRADEV"]
 				if sell == nil || buy == nil {

@@ -48,7 +48,7 @@ func TestCustomBuylistSkipsSets(t *testing.T) {
 	rule := EntryRule{SkipSets: customBuylistSkipSets, Rate: 0.5}
 	priced := func(id string) bool {
 		out := map[string]map[string]*BanPrice{}
-		processEntry(backend(), currentPrices(), out, []mtgban.InventoryEntry{{Conditions: "NM", Price: 10}}, "", id, "CUSTOM", false, false, false, rule)
+		processEntry(backend(), currentPrices(), out, []mtgban.InventoryEntry{{Conditions: "NM", Price: 10}}, "", "", id, "CUSTOM", false, false, false, rule)
 		return out[id]["CUSTOM"] != nil
 	}
 	for code, id := range skipped {
@@ -167,7 +167,7 @@ func TestCustomBuylistSkipsUnreleased(t *testing.T) {
 		priced := func(releasedBy time.Time) bool {
 			out := map[string]map[string]*BanPrice{}
 			rule := EntryRule{ReleasedBy: releasedBy, Rate: 0.5}
-			processEntry(backend(), currentPrices(), out, []mtgban.InventoryEntry{{Conditions: "NM", Price: 10}}, "", id, "CUSTOM", false, false, false, rule)
+			processEntry(backend(), currentPrices(), out, []mtgban.InventoryEntry{{Conditions: "NM", Price: 10}}, "", "", id, "CUSTOM", false, false, false, rule)
 			return out[id]["CUSTOM"] != nil
 		}
 		if !priced(released) || priced(before) {
@@ -190,7 +190,7 @@ func TestCustomBuylistSkipsUndated(t *testing.T) {
 		t.Error("undated card priced by the custom buylist")
 	}
 	out := map[string]map[string]*BanPrice{}
-	processEntry(b, currentPrices(), out, []mtgban.InventoryEntry{{Conditions: "NM", Price: 10}}, "", co.UUID, "CUSTOM", false, false, false, EntryRule{ReleasedBy: releasedBy})
+	processEntry(b, currentPrices(), out, []mtgban.InventoryEntry{{Conditions: "NM", Price: 10}}, "", "", co.UUID, "CUSTOM", false, false, false, EntryRule{ReleasedBy: releasedBy})
 	if out[co.UUID]["CUSTOM"] != nil {
 		t.Error("undated card priced on upload by the custom buylist")
 	}

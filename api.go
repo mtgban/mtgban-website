@@ -743,6 +743,15 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 		json.NewEncoder(w).Encode(&out)
 		return
 	}
+	lang, err := apiLanguage(r.FormValue("language"))
+	if err != nil {
+		if isV2JSON {
+			out.Meta.Version = APIVersionV2
+		}
+		out.Error = err.Error()
+		json.NewEncoder(w).Encode(&out)
+		return
+	}
 	explicitID := idOpt != ""
 	if !explicitID {
 		idOpt = "scryfall"
@@ -857,12 +866,12 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 			cfg.StoreFilters = demoFilter("seller", true)
 		}
 		if isGraded {
-			retailV2 = gradedSearchV2(b, p, idOpt, allKeys, cfg)
+			retailV2 = gradedSearchV2(b, p, idOpt, lang, allKeys, cfg)
 		} else if isV2JSON {
-			retailV2 = sellerSearchV2(b, p, idOpt, allKeys, cfg, isSealed)
+			retailV2 = sellerSearchV2(b, p, idOpt, lang, allKeys, cfg, isSealed)
 		} else {
 			foundSellers = searchSellers(p, allKeys, cfg)
-			out.Retail = banPricesFromRows(b, p, allKeys, foundSellers, idOpt, tagName, true, true, false)
+			out.Retail = banPricesFromRows(b, p, allKeys, foundSellers, idOpt, lang, tagName, true, true, false)
 		}
 	}
 	if isBuylist && canBuylist {
@@ -871,10 +880,10 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 			cfg.StoreFilters = demoFilter("vendor", false)
 		}
 		if isV2JSON {
-			buylistV2 = vendorSearchV2(b, p, idOpt, allKeys, cfg, isSealed)
+			buylistV2 = vendorSearchV2(b, p, idOpt, lang, allKeys, cfg, isSealed)
 		} else {
 			foundVendors = searchVendors(p, allKeys, cfg)
-			out.Buylist = banPricesFromRows(b, p, allKeys, foundVendors, idOpt, tagName, true, true, true)
+			out.Buylist = banPricesFromRows(b, p, allKeys, foundVendors, idOpt, lang, tagName, true, true, true)
 		}
 	}
 
@@ -915,9 +924,9 @@ func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datasto
 	}
 	var results map[string]map[string]*BanPrice
 	if retail {
-		results = banPricesFromRows(b, p, result.keys, result.sellers, "", tagName, true, true, false)
+		results = banPricesFromRows(b, p, result.keys, result.sellers, "", "", tagName, true, true, false)
 	} else if buylist {
-		results = banPricesFromRows(b, p, result.keys, result.vendors, "", tagName, true, true, true)
+		results = banPricesFromRows(b, p, result.keys, result.vendors, "", "", tagName, true, true, true)
 	}
 
 	err := BanPrice2CSV(b, p, w, results, result.keys)

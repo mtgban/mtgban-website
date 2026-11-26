@@ -210,7 +210,7 @@ func TestPricesByNameKeepAGradedStoreApart(t *testing.T) {
 	s := gradedTwins(t)
 	stores := []string{"ZZSAME", "ZZSLAB", "ZZOTHER"}
 	for where, hashes := range map[string][]string{"full dump": nil, "by hash": {"FIXTUREA-1"}} {
-		got := getSellerPrices(s.backend(), s.prices(), "", stores, "", hashes, "", false, false, false, "names")["FIXTUREA-1"]
+		got := getSellerPrices(s.backend(), s.prices(), "", "", stores, "", hashes, "", false, false, false, "names")["FIXTUREA-1"]
 		for name, want := range map[string]float64{"Same Store": 100, "Same Store (Graded)": 400, "Other Store Graded": 300} {
 			if got[name] == nil || got[name].Regular != want {
 				t.Errorf("%s: %q holds %+v, want %v", where, name, got[name], want)

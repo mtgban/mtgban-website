@@ -1258,7 +1258,7 @@ window.__BAN_GUIDE = {
             icon: 'sliders-horizontal',
             summary: 'Output ids, quantities, conditions, single vendors, finish, and store names',
             snippets: ['id=tcg', 'qty=true', 'conds=true', 'vendor=CK', 'finish=foil', 'tag=names'],
-            keywords: ['api', 'query', 'parameter', 'option', 'id', 'tcg', 'scryfall', 'mtgjson', 'quantity', 'qty', 'conditions', 'conds', 'vendor', 'finish', 'tag', 'filter', 'scope'],
+            keywords: ['api', 'query', 'parameter', 'option', 'id', 'tcg', 'scryfall', 'mtgjson', 'quantity', 'qty', 'conditions', 'conds', 'vendor', 'finish', 'language', 'tag', 'filter', 'scope'],
             content: {
                 table: [
                     { value: 'id=tcg', short: 'Key card objects by another id system: tcg (TCGplayer product id), scryfall, mtgjson, mkm (Cardmarket), ck (Card Kingdom), or mtgban (the default). ck and mtgban list foil and regular under separate ids.' },
@@ -1266,6 +1266,7 @@ window.__BAN_GUIDE = {
                     { value: 'conds=true', short: 'Add a conditions dictionary with a price per condition (NM, SP, MP, HP, PO, with _foil and _etched variants). With qty=true a quantities dictionary is added too.' },
                     { value: 'vendor=CK,SCG', short: 'Limit the response to the listed store tags. With a single store, condition prices are always included.' },
                     { value: 'finish=foil', short: 'Keep one finish only: foil, nonfoil, or etched. Singles only.' },
+                    { value: 'language=de', short: 'With id=scryfall or id=mtgjson, answer an id a card shares with its copy printed in another language (Legends and its Italian copy, for one) with the copy, named by code or by name. Without it the card itself answers; other ids list each copy under its own.' },
                     { value: 'tag=names', short: 'Use full store names as keys instead of tags. stores.json?tag=names gives the mapping.' },
                     { value: 'filter=sealed', short: 'On sets.json and stores.json, keep only entries with sealed data; filter=singles keeps singles.' },
                     { value: 'scope=', short: 'On search endpoints, the same scope filters as the search page.' }

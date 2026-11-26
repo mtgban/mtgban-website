@@ -377,6 +377,12 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		json.NewEncoder(w).Encode(&out)
 		return
 	}
+	lang, err := apiLanguage(r.FormValue("language"))
+	if err != nil {
+		out.Error = err.Error()
+		json.NewEncoder(w).Encode(&out)
+		return
+	}
 	qty, _ := strconv.ParseBool(r.FormValue("qty"))
 	conds, _ := strconv.ParseBool(r.FormValue("conds"))
 	// Both options apply where v1's output is served: v1, and v2's CSV.
@@ -477,22 +483,22 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	var retailV2, buylistV2 *v2Section
 
 	if isGraded && canAccessMode(enabledModes, "graded") {
-		retailV2 = gradedSectionV2(b, p, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish)
+		retailV2 = gradedSectionV2(b, p, idOpt, lang, enabledSellers, filterByEdition, filterByHash, filterByFinish)
 	}
 	if ((kind == "retail" || kind == "singles") && canRetail) || isSealed {
 		dumpType += "retail"
 		if isV2 {
-			retailV2 = sellerSectionV2(b, p, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish, isSealed)
+			retailV2 = sellerSectionV2(b, p, idOpt, lang, enabledSellers, filterByEdition, filterByHash, filterByFinish, isSealed)
 		} else {
-			out.Retail = getSellerPrices(b, p, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+			out.Retail = getSellerPrices(b, p, idOpt, lang, enabledSellers, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}
 	}
 	if ((kind == "buylist" || kind == "singles") && canBuylist) || isSealed {
 		dumpType += "buylist"
 		if isV2 {
-			buylistV2 = vendorSectionV2(b, p, idOpt, enabledVendors, filterByEdition, filterByHash, filterByFinish, isSealed)
+			buylistV2 = vendorSectionV2(b, p, idOpt, lang, enabledVendors, filterByEdition, filterByHash, filterByFinish, isSealed)
 		} else {
-			out.Buylist = getVendorPrices(b, p, idOpt, enabledVendors, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+			out.Buylist = getVendorPrices(b, p, idOpt, lang, enabledVendors, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}
 	}
 
@@ -568,17 +574,23 @@ func finishUUIDs(b *matcher.Backend, id string) []string {
 // former func-value call both allocated a closure per call and forced the
 // freshly copied CardObject to escape to the heap, dominating full-dump
 // allocations.
-func getIDFromMode(b *matcher.Backend, p *prices, mode string, co *matcher.CardObject) string {
+func getIDFromMode(b *matcher.Backend, p *prices, mode, lang string, co *matcher.CardObject) string {
 	switch mode {
 	case "tcg":
 		return findTCGproductID(b, p, co.UUID)
 	case "scryfall":
-		return co.Identifiers["scryfallId"]
+		if !languageCopySet(co.SetCode) {
+			return co.Identifiers["scryfallId"]
+		}
+		return languageID(b, matcher.IDSpaceScryfall, "scryfallId", lang, co)
 	case "mtgjson":
 		if co.Sealed {
 			return co.UUID
 		}
-		return co.Identifiers["mtgjsonId"]
+		if !languageCopySet(co.SetCode) {
+			return co.Identifiers["mtgjsonId"]
+		}
+		return languageID(b, matcher.IDSpaceMTGJSON, "mtgjsonId", lang, co)
 	case "name":
 		if co.Sealed {
 			return co.Name
@@ -598,6 +610,84 @@ func getIDFromMode(b *matcher.Backend, p *prices, mode string, co *matcher.CardO
 		return co.Identifiers["cardKingdomId"]
 	}
 	return co.UUID
+}
+
+// languageCopySet reports whether go-mtgban builds copies of another set's
+// cards in set, in another language, or builds them of set's cards: a copy
+// keeps its card's mtgjson and scryfall ids. Telling a copy costs lookups no
+// other card should pay, so the check stops at these sets; go-mtgban should
+// mark a copy itself in a later release, and this list can go then.
+func languageCopySet(set string) bool {
+	switch set {
+	case "4BBES", "4BBKO", "4BBPT", "4BBZHT", "4EDALT", "DRKITA", "FBBDE",
+		"FBBFR", "FWB", "FWBDE", "FWBFR", "LEGITA", "RENDE",
+		"3ED", "4BB", "4ED", "DRK", "FBB", "LEG", "REN":
+		return true
+	}
+	return false
+}
+
+// languageID is co's id in space, read from its field, or "" where another
+// card answers it for a request in lang: a copy of another set's card in
+// another language shares its original's id, which the original answers
+// unless lang names the copy's language. co is a card of a languageCopySet
+// set; any other answers its own id.
+func languageID(b *matcher.Backend, space matcher.IDSpace, field, lang string, co *matcher.CardObject) string {
+	id := co.Identifiers[field]
+	if originalOf(b, space, id, co) != nil {
+		if lang == "" || !strings.EqualFold(co.Language, lang) {
+			return ""
+		}
+		return id
+	}
+	if lang != "" && hasCopyIn(b, field, id, lang, co) {
+		return ""
+	}
+	return id
+}
+
+// hasCopyIn reports whether a card of another set in lang shares co's id.
+func hasCopyIn(b *matcher.Backend, field, id, lang string, co *matcher.CardObject) bool {
+	for _, uuid := range b.Hashes[matcher.Normalize(co.Name)] {
+		other, err := b.GetUUID(uuid)
+		if err == nil && other.SetCode != co.SetCode && other.Identifiers[field] == id && strings.EqualFold(other.Language, lang) {
+			return true
+		}
+	}
+	return false
+}
+
+// apiLanguage is the language a request names, by code or by name, as the
+// matcher tags printings; English is none, and an unknown one an error.
+func apiLanguage(v string) (string, error) {
+	if v == "" {
+		return "", nil
+	}
+	if tag, found := matcher.LanguageCode2LanguageTag[strings.ToLower(v)]; found {
+		return tag, nil
+	}
+	for tag, code := range matcher.LanguageTag2LanguageCode {
+		if strings.EqualFold(tag, v) {
+			return matcher.LanguageCode2LanguageTag[code], nil
+		}
+	}
+	return "", fmt.Errorf("unknown language %q", v)
+}
+
+// originalOf returns the card of another set that id names in space, which co
+// carries as a copy of that card in another language, or nil when the id is
+// co's own. Sets are compared because a finish filed as a card of its own
+// shares its id with a card of the same set.
+func originalOf(b *matcher.Backend, space matcher.IDSpace, id string, co *matcher.CardObject) *matcher.CardObject {
+	uuid := b.ConvertID(space, id)
+	if uuid == "" || uuid == co.UUID {
+		return nil
+	}
+	original, err := b.GetUUID(uuid)
+	if err != nil || original.SetCode == co.SetCode {
+		return nil
+	}
+	return original
 }
 
 // resolveEditionFilter turns an edition filter into the uuid list to walk:
@@ -661,7 +751,7 @@ func apiSearchConfig(b *matcher.Backend, uuids, enabledStores []string, filterBy
 // zero base price drops the store; each grade keeps its best price and its
 // total copies, through setGrade like the entry loop. INDEX rows are
 // filed by the condition their entry carries.
-func banPricesFromRows(b *matcher.Backend, p *prices, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
+func banPricesFromRows(b *matcher.Backend, p *prices, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, lang, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
 	// Rows carry neither MetadataOnly (the vendor qty rule needs it: sealed
 	// metadata vendors keep their grade bucket, so INDEX membership is not
 	// a reliable proxy) nor the raw scraper name (SearchEntry.ScraperName
@@ -693,7 +783,7 @@ func banPricesFromRows(b *matcher.Backend, p *prices, cardIDs []string, found ma
 		if err != nil {
 			continue
 		}
-		id := getIDFromMode(b, p, idMode, co)
+		id := getIDFromMode(b, p, idMode, lang, co)
 		if id == "" {
 			continue
 		}
@@ -786,7 +876,7 @@ func banPricesFromRows(b *matcher.Backend, p *prices, cardIDs []string, found ma
 	return out
 }
 
-func getSellerPrices(b *matcher.Backend, p *prices, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
+func getSellerPrices(b *matcher.Backend, p *prices, mode, lang string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 
 	// Filtered requests funnel through the shared search gathering: resolve
@@ -802,7 +892,7 @@ func getSellerPrices(b *matcher.Backend, p *prices, mode string, enabledStores [
 		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
 		cardIDs := filterUUIDs(b, p, config.UUIDs, config.CardFilters)
-		return banPricesFromRows(b, p, cardIDs, searchSellers(p, cardIDs, config), mode, tagName, qty, conds, false)
+		return banPricesFromRows(b, p, cardIDs, searchSellers(p, cardIDs, config), mode, lang, tagName, qty, conds, false)
 	}
 
 	var finishFilter []string
@@ -843,7 +933,7 @@ func getSellerPrices(b *matcher.Backend, p *prices, mode string, enabledStores [
 			Finish: finishFilter,
 		}
 		for cardID := range inventory {
-			processEntry(b, p, out, inventory[cardID], mode, cardID, sellerTag, shouldQty, conds, shouldBaseCond, rule)
+			processEntry(b, p, out, inventory[cardID], mode, lang, cardID, sellerTag, shouldQty, conds, shouldBaseCond, rule)
 		}
 	}
 
@@ -867,7 +957,7 @@ type EntryRule struct {
 	Rate     float64
 }
 
-func processEntry[T mtgban.GenericEntry](b *matcher.Backend, p *prices, out map[string]map[string]*BanPrice, entries []T, idMode, cardID, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
+func processEntry[T mtgban.GenericEntry](b *matcher.Backend, p *prices, out map[string]map[string]*BanPrice, entries []T, idMode, lang, cardID, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
 	// Unpriced listings (zero, or a NaN) are ignored throughout, matching the
 	// search walk the filtered endpoints ride (shouldSkipPrice drops them
 	// before they become rows): the base price is the first priced entry, and
@@ -889,7 +979,7 @@ func processEntry[T mtgban.GenericEntry](b *matcher.Backend, p *prices, out map[
 	if err != nil {
 		return
 	}
-	id := getIDFromMode(b, p, idMode, co)
+	id := getIDFromMode(b, p, idMode, lang, co)
 	if id == "" {
 		return
 	}
@@ -1060,7 +1150,7 @@ func setGrade(price *BanPrice, condTag string, value float64, quantity int, buy,
 	}
 }
 
-func getVendorPrices(b *matcher.Backend, p *prices, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
+func getVendorPrices(b *matcher.Backend, p *prices, mode, lang string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 
 	// Filtered requests funnel through the shared search gathering, exactly
@@ -1070,7 +1160,7 @@ func getVendorPrices(b *matcher.Backend, p *prices, mode string, enabledStores [
 		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
 		cardIDs := filterUUIDs(b, p, config.UUIDs, config.CardFilters)
-		return banPricesFromRows(b, p, cardIDs, searchVendors(p, cardIDs, config), mode, tagName, qty, conds, true)
+		return banPricesFromRows(b, p, cardIDs, searchVendors(p, cardIDs, config), mode, lang, tagName, qty, conds, true)
 	}
 
 	var finishFilter []string
@@ -1109,7 +1199,7 @@ func getVendorPrices(b *matcher.Backend, p *prices, mode string, enabledStores [
 			Finish: finishFilter,
 		}
 		for cardID := range buylist {
-			processEntry(b, p, out, buylist[cardID], mode, cardID, vendorTag, shouldQty, conds, shouldBaseCond, rule)
+			processEntry(b, p, out, buylist[cardID], mode, lang, cardID, vendorTag, shouldQty, conds, shouldBaseCond, rule)
 		}
 	}
 
