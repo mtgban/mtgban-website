@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/palette"
 )
@@ -126,5 +127,20 @@ func TestGuideBeforeTheFirstLoad(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "window.__BAN_PROMOS = [];") {
 		t.Error("page lacks an empty promo list")
+	}
+}
+
+// Graded sales come from Pokemon's eBay and Fanatics sales alone, so only the
+// Pokemon guide says the Graded page shows them.
+func TestGuideNamesGradedSalesOnlyOnPokemon(t *testing.T) {
+	withSigMode(t, true, false)
+	withConfigCopy(t)
+	for game, want := range map[matcher.Game]bool{matcher.GamePokemon: true, matcher.GameMagic: false, matcher.GameLorcana: false} {
+		Config().Game = game
+		rec := httptest.NewRecorder()
+		newSite().Guide(rec, httptest.NewRequest(http.MethodGet, "/guide", nil))
+		if strings.Contains(rec.Body.String(), "Fanatics Collect") != want {
+			t.Errorf("%s: the guide names graded sales: %v, want %v", game, !want, want)
+		}
 	}
 }
