@@ -163,6 +163,30 @@
         if (window.renderBackpack) window.renderBackpack();
     }
 
+    // syncCond takes a grade edit back to the backpack the list was sent
+    // from. While other lines of the card stay in the old grade, the entry
+    // splits: each grade takes the copies of its lines on the page and the
+    // price their priced copies average.
+    function syncCond(id, was, cond) {
+        var pack = window.Backpack && window.Backpack.sentPack ? window.Backpack.sentPack() : 0;
+        if (!pack || !window.ListStorage) return;
+        var held = function(c) {
+            return Array.prototype.filter.call(document.querySelectorAll('.ures-table tr[data-hash]'), function(x) {
+                return x.dataset.hash === id && (x.dataset.cond || '') === c;
+            });
+        };
+        if (!held(was).length) return syncPack(id, was, cond, 0);
+        var paid = function(rows) {
+            var priced = rows.filter(price);
+            return priced.length ? priced.reduce(function(sum, tr) { return sum + price(tr) * (parseInt(tr.dataset.qtys, 10) || 1); }, 0) / copies(priced) : '';
+        };
+        var key = window.ListStorage.backpackKey({id: id, cond: was, pack: pack});
+        // With no room for the new grade the entry moves whole, as before
+        var split = window.Backpack.split(key, copies(held(was)), paid(held(was)), cond || 'NM', copies(held(cond)), paid(held(cond)));
+        if (!split) return syncPack(id, was, cond, 0);
+        if (window.renderBackpack) window.renderBackpack();
+    }
+
     // remember keeps what a row came with, before its first edit.
     function remember(tr) {
         if ('origCond' in tr.dataset) return;
@@ -212,7 +236,7 @@
                 b.parentNode.dataset.sort = rank;
             }
             mark(tr);
-            syncPack(tr.dataset.hash, was, cond, 0);
+            syncCond(tr.dataset.hash, was, cond);
         });
     }
 
