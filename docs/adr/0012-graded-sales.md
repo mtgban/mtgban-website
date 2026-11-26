@@ -86,12 +86,14 @@ lists the card in, in the page's order. Both need a signature carrying
 - Of the 1.60M sales since September 2025, the filters drop about 2.5%
   (2026-11-26): 32,268 of other graders, 45 lots, 217 against a guessed
   printing, 1,887 naming another number, 3,562 on 16 catch-all cards and
-  1,419 unmatched; none in another language. Fourteen Japanese products in
-  the source's catalog (Red's Pikachu, the Ash vs Team Rocket Deck Kit) are
-  not in the datastore, so their sales match no card. The number check costs some sound
-  sales whose seller mistyped the total, the price of catching look-alikes;
-  a look-alike whose title carries no number still gets through, as does a
-  lot that only says "bundle".
+  1,419 unmatched; none in another language. Nearly all the unmatched are
+  on ids TCGplayer has deleted, which the datastore, built from its
+  catalog, does not have: Japanese products it moved to Pokemon Japan
+  under new ids (Red's Pikachu, the Ash vs Team Rocket Deck Kit) and
+  duplicates it merged into another product (Charcadet 022, Jolteon 169).
+  The number check costs some sound sales whose seller mistyped the total,
+  the price of catching look-alikes; a look-alike whose title carries no
+  number still gets through, as does a lot that only says "bundle".
 - The snapshot holds about 67 MB on the Pokemon site, read in about 30 s.
   The listing titles are read for the filters and not kept: they would add
   62 MB.
