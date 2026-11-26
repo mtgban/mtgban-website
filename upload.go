@@ -1790,11 +1790,6 @@ func writeTCGplayerCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, upl
 		ids = append(ids, uploadedData[i].CardID)
 		qtys = append(qtys, fmt.Sprintf("%d", qty))
 		conds = append(conds, string(uploadedData[i].OriginalCondition))
-		// The file's market price is not a price to list at
-		if uploadedData[i].PriceIsMarket {
-			loaded = append(loaded, 0)
-			continue
-		}
 		loaded = append(loaded, uploadedData[i].OriginalPrice)
 	}
 

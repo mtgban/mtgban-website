@@ -323,8 +323,8 @@ func TestTCGCSVRoundTripsItsPrice(t *testing.T) {
 }
 
 // A row loaded at its file's market price, which the page posts back with
-// an "m", is exported as one with no price of its own.
-func TestTCGCSVLeavesOutTheFilesMarketPrice(t *testing.T) {
+// an "m", is exported at that price like any other loaded one.
+func TestTCGCSVWritesTheFilesMarketPrice(t *testing.T) {
 	b, p := decklistCSVFixture(t)
 	ids := []string{"FIXTUREA-1", "FIXTUREA-1"}
 	uploadedData, err := loadHashes(ids, nil, []string{"NM", "SP"}, []string{"9.99m", "9.99"}, nil, nil, nil)
@@ -343,10 +343,9 @@ func TestTCGCSVLeavesOutTheFilesMarketPrice(t *testing.T) {
 	if len(records) != 3 {
 		t.Fatalf("got %d records, want a header and 2 rows", len(records))
 	}
-	for i, want := range [][2]string{{"", "1.60"}, {"9.99", "9.99"}} {
-		row := records[i+1]
-		if row[14] != want[0] || row[15] != want[1] {
-			t.Errorf("%s: My Store Price %q, TCG Marketplace Price %q, want %q", row[7], row[14], row[15], want)
+	for _, row := range records[1:] {
+		if row[14] != "9.99" || row[15] != "9.99" {
+			t.Errorf("%s: My Store Price %q, TCG Marketplace Price %q, want 9.99 in both", row[7], row[14], row[15])
 		}
 	}
 }
