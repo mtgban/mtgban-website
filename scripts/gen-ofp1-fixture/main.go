@@ -42,6 +42,11 @@ func samplePayload() *offline.SetPayload {
 			"uuid-0006": {
 				"TCGLow": {Quantities: map[string]int{"NM": 7}},
 			},
+			"uuid-0007": {
+				"CKG": {Regular: 40, Cond: "NM", Qty: 1,
+					Conditions: map[string]float64{"NM|PSA 9": 40, "NM|CGC 10 Pristine": 95.5},
+					Quantities: map[string]int{"NM|PSA 9": 1}},
+			},
 			"uuid-sealed-box": {
 				"CK": {Sealed: 129.99, QtySealed: 3},
 			},

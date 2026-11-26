@@ -354,7 +354,11 @@ read, or its workflow state's names.
   this writing none of the committed `config*.json` set either key, so on
   every environment those files describe, offline mode's manifest load and
   image bucket-auth are unconfigured no-ops until a deployment supplies the
-  bucket paths out-of-band.
+  bucket paths out-of-band. A graded store's prices are filed under each
+  slab's own tag, the condition it folds to, a bar and the slab's name
+  (`NM|PSA 9`, `addSlabTags`), and the offline page lists them under that
+  condition, as the search does; the per-set fingerprint hashes the slab, so
+  a regraded copy is a change to its set.
 - **Checkpoints** (`checkpoints.go`): curated chart annotations (bans,
   releases, reprints) that a game other than Magic loads from
   the document `checkpoints_path` names (B2 or file; with no path, nothing

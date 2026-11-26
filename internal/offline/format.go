@@ -9,7 +9,8 @@
 //	str set code
 //	uv  snapshot unix seconds
 //	uv  store count, then that many str (sorted shorthands; entries index into this)
-//	uv  tag count, then that many str (sorted condition tags, e.g. "NM", "SP_foil")
+//	uv  tag count, then that many str (sorted condition tags, e.g. "NM", "SP_foil",
+//	    or a slab's "NM|PSA 9": the condition it folds to, a bar and its name)
 //	section retail, then section buylist:
 //	  uv uuid count
 //	  per uuid (sorted):
