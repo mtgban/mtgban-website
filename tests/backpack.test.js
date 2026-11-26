@@ -1280,35 +1280,48 @@ describe('the condition dropdown', () => {
 
 describe('the price paid', () => {
     const open = (p) => { p.nav.click(); return ids['backpack-panel']; };
-    const pick = (sel, v) => { sel.value = v; (sel.listeners.change || []).forEach((fn) => fn()); };
     const press = (n, key) => { const ev = { key, stopped: false, preventDefault() {}, stopPropagation() { this.stopped = true; } }; n.listeners.keydown.forEach((fn) => fn(ev)); return ev; };
     const leave = (n) => n.listeners.blur.forEach((fn) => fn());
     const paid = (p) => p.stored().filter((e) => !e.del).map((e) => [e.id, e.cond, e.qty, e.paid]).sort();
     const entry = (id, extra) => Object.assign({ id, name: id, cond: 'NM', pack: 1, qty: 1, t: 1, m: 1 }, extra);
-    // edit picks the first row's price from its dropdown and types v.
-    const edit = (panel, v) => { pick(panel.querySelector('.backpack-cond'), '$'); const f = panel.querySelector('.backpack-paid-field'); f.value = v; return f; };
+    // edit opens the first row's price from its line and types v.
+    const edit = (panel, v) => { panel.querySelector('.backpack-row-paid').click(); const f = panel.querySelector('.backpack-paid-field'); f.value = v; return f; };
 
-    test('the dropdown sets it on that entry, redrawing the row and keeping focus there', () => {
+    test('the line sets it on that entry, redrawing the row and keeping focus there', () => {
         const p = page({ store: [entry('uuid-1', { t: 5 }), entry('uuid-2')] });
         const panel = open(p);
         const other = panel.querySelectorAll('.backpack-row')[1];
-        expect(panel.querySelector('.backpack-row-paid')).toBe(null);
+        const line = panel.querySelector('.backpack-row-paid');
+        expect([line.tag, line.getAttribute('class'), line.getAttribute('aria-label')]).toEqual(['button', 'backpack-row-paid none', 'Paid (unknown)']);
+        // n/a stands in for "(unknown)" where a narrow phone has no room
+        expect(line.children.map((n) => [n.getAttribute('class'), n.textContent])).toEqual([[null, 'Paid '], ['backpack-paid-long', '(unknown)'], ['backpack-paid-short', 'n/a']]);
+        expect(panel.querySelector('.backpack-cond').children.some((o) => o.value === '$')).toBe(false);
         const field = edit(panel, '4.256');
         expect(p.document.activeElement).toBe(field);
+        expect(panel.querySelector('.backpack-row').querySelector('.backpack-row-paid')).toBe(null);
         press(field, 'Enter');
         expect(paid(p)).toEqual([['uuid-1', 'NM', 1, 4.26], ['uuid-2', 'NM', 1, undefined]]);
         expect(p.stored()[0].m).toBeGreaterThan(1);
         expect(panel.querySelector('.backpack-row-paid').textContent).toBe('Paid $ 4.26');
-        expect(panel.querySelector('.backpack-cond').value).toBe('NM');
-        expect(p.document.activeElement).toBe(panel.querySelector('.backpack-cond'));
+        expect([panel.querySelector('.backpack-row-paid').getAttribute('class'), panel.querySelector('.backpack-row-paid').getAttribute('aria-label')]).toEqual(['backpack-row-paid', null]);
+        expect(p.document.activeElement).toBe(panel.querySelector('.backpack-row-paid'));
         expect(panel.querySelectorAll('.backpack-row')[1]).toBe(other);
         expect(p.tracked).toContainEqual(['ui.backpack.card', 'paid']);
-        // The dropdown names the price, and the field starts from it
-        const opt = panel.querySelector('.backpack-cond').children.filter((o) => o.tag === 'optgroup').pop().children[0];
-        expect([opt.value, opt.textContent]).toEqual(['$', '$ 4.26']);
-        pick(panel.querySelector('.backpack-cond'), '$');
+        // The field starts from the price
+        panel.querySelector('.backpack-row-paid').click();
         expect(panel.querySelector('.backpack-paid-field').value).toBe('4.26');
-        expect(panel.querySelector('.backpack-row-paid')).toBe(null);
+    });
+
+    test.each([false, true])('it follows the grade and count, field and all (mobile %p)', (mobile) => {
+        const p = page({ mobile, store: [entry('uuid-1', { paid: 2 })] });
+        const panel = open(p);
+        const ctl = panel.querySelector('.backpack-row-ctl');
+        expect(ctl.children.map((n) => n.getAttribute('class'))).toEqual(['backpack-cond', 'backpack-minus', 'backpack-qty', 'backpack-plus', 'backpack-row-paid']);
+        const field = edit(panel, '3');
+        expect(field.parentNode.parentNode).toBe(ctl);
+        press(field, 'Enter');
+        expect(paid(p)[0][3]).toBe(3);
+        expect(ctl.children[4].textContent).toBe('Paid $ 3.00');
     });
 
     test('Escape keeps it, leaving the field saves it, a blank one takes it away and Undo brings it back', () => {
@@ -1322,7 +1335,7 @@ describe('the price paid', () => {
         expect(ids['backpack-undo'].disabled).toBe(false);
         leave(edit(panel, ''));
         expect(paid(p)[0][3]).toBe(undefined);
-        expect(panel.querySelector('.backpack-row-paid')).toBe(null);
+        expect(panel.querySelector('.backpack-row-paid').getAttribute('aria-label')).toBe('Paid (unknown)');
         ids['backpack-undo'].click();
         expect(paid(p)[0][3]).toBe(5);
         expect(panel.querySelector('.backpack-row-paid').textContent).toBe('Paid $ 5.00');
@@ -1341,7 +1354,7 @@ describe('the price paid', () => {
         expect(paid(p)).toEqual([['uuid-1', 'NM', 1, 15], ['uuid-2', 'NM', 4, undefined]]);
         expect(panel.querySelector('.backpack-row-paid').textContent).toBe('Paid $ 15.00');
         expect(panel.querySelectorAll('.backpack-qty')[1].textContent).toBe('4');
-        expect(p.document.activeElement).toBe(panel.querySelector('.backpack-cond'));
+        expect(p.document.activeElement).toBe(panel.querySelector('.backpack-row-paid'));
 
         const plus = panel.querySelector('.backpack-plus');
         leave(edit(panel, '20'));
