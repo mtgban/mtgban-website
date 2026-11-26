@@ -53,12 +53,27 @@ func gradedSearch(config *SearchConfig) {
 }
 
 // gradedSales is each card's Last Sold groups, as the Sales pane draws them:
-// the sales of the grades a store lists it in, in the page's order of grades.
-func gradedSales(snap *salesvelocity.GradedSnapshot, found map[string]map[mtgban.Condition][]SearchEntry, keys []mtgban.Condition) map[string][]salesvelocity.Group {
+// the sales of the grades a store lists it in, in the page's order of grades,
+// or of every grade it sold in where no store lists it.
+func gradedSales(snap *salesvelocity.GradedSnapshot, found map[string]map[mtgban.Condition][]SearchEntry, cardIDs []string, keys []mtgban.Condition) map[string][]salesvelocity.Group {
 	out := map[string][]salesvelocity.Group{}
-	for cardID, listed := range found {
+	for _, cardID := range cardIDs {
 		sales := snap.For(cardID)
-		if sales == nil {
+		if sales == nil || out[cardID] != nil {
+			continue
+		}
+		listed := found[cardID]
+		if len(listed) == 0 {
+			var sold []mtgban.Slab
+			for slab := range sales.Grades {
+				if slab.Grader != "" {
+					sold = append(sold, slab)
+				}
+			}
+			slices.SortFunc(sold, slabOrder)
+			for _, slab := range sold {
+				out[cardID] = append(out[cardID], sales.Grades[slab].Group(slabName(&slab)))
+			}
 			continue
 		}
 		byGrade := map[mtgban.Condition]*salesvelocity.GradeSales{}
@@ -95,6 +110,33 @@ func gradedVelocity(m cardMetadata, snap *salesvelocity.GradedSnapshot, keys []s
 		card.VelocityPace, card.VelocityNote, card.VelocityRising = salesvelocity.PaceNone, "", false
 		m[cardID] = card
 	}
+}
+
+// slabOrder orders slabs as the Graded page lists them: by grader, best score
+// first, its labels above the plain score and one with no score below them all.
+func slabOrder(x, y mtgban.Slab) int {
+	return cmp.Or(
+		cmp.Compare(slices.Index(slabGraders, x.Grader), slices.Index(slabGraders, y.Grader)),
+		cmp.Compare(y.Score, x.Score),
+		cmp.Compare(slabLabelRank(x.Label), slabLabelRank(y.Label)),
+		strings.Compare(x.Label, y.Label),
+	)
+}
+
+// gradedKeys is the cards the Graded page lists of keys: those a graded store
+// offers, and those a slab of sold, where sold is not nil.
+func gradedKeys(stores *postStores, keys []string, sold *salesvelocity.GradedSnapshot) []string {
+	offered := stores.offered(keys)
+	if sold == nil {
+		return offered
+	}
+	kept := map[string]bool{}
+	for _, cardID := range offered {
+		kept[cardID] = true
+	}
+	return slices.DeleteFunc(slices.Clone(keys), func(cardID string) bool {
+		return !kept[cardID] && sold.For(cardID) == nil
+	})
 }
 
 // slabGroup is the group a slab is listed under, on the Graded page and in
@@ -142,13 +184,7 @@ func groupBySlab(found map[string]map[mtgban.Condition][]SearchEntry, byPrice bo
 		keys = append(keys, group)
 	}
 	slices.SortFunc(keys, func(a, b mtgban.Condition) int {
-		x, y := slabs[a], slabs[b]
-		return cmp.Or(
-			cmp.Compare(slices.Index(slabGraders, x.Grader), slices.Index(slabGraders, y.Grader)),
-			cmp.Compare(y.Score, x.Score),
-			cmp.Compare(slabLabelRank(x.Label), slabLabelRank(y.Label)),
-			strings.Compare(x.Label, y.Label),
-		)
+		return slabOrder(slabs[a], slabs[b])
 	})
 	if other {
 		keys = append(keys, otherSlabs)

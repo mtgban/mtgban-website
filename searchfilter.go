@@ -89,6 +89,9 @@ type SearchConfig struct {
 
 	// Search the sellers of slabs alone, and list only the cards they offer
 	GradedOnly bool
+	// GradedSales keeps a card GradedOnly would leave out where a slab of it
+	// sold; nil for a reader who may not see the slabs' sales
+	GradedSales *salesvelocity.GradedSnapshot
 
 	// Append the reader's custom buylist, set by a handler that has checked
 	// the reader's signature
@@ -132,6 +135,8 @@ type FilterElem struct {
 
 	// Sales is what a velocity filter judges cards by, set by unlockVelocity.
 	Sales *salesvelocity.Snapshot
+	// Graded is what is:lastsold judges cards by, set by unlockLastSold.
+	Graded *salesvelocity.GradedSnapshot
 }
 
 type FilterStoreElem struct {
@@ -1571,6 +1576,11 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 		case "is", "not":
 			if option == "not" {
 				negate = !negate
+			}
+			// It reads the slabs' sales, which only some readers may see.
+			if strings.EqualFold(code, "lastsold") {
+				filters = append(filters, FilterElem{Name: lockedLastSold, Negate: negate})
+				continue
 			}
 			filters = append(filters, FilterElem{
 				Name:   "is",
@@ -3176,9 +3186,11 @@ func shouldSkipCard(b *matcher.Backend, p *prices, co *matcher.CardObject, filte
 
 		var res bool
 		switch filters[i].Name {
-		case "locked_velocity_greater_than", "locked_velocity_less_than":
+		case "locked_velocity_greater_than", "locked_velocity_less_than", lockedLastSold:
 			// Nothing, negated too.
 			return true
+		case "lastsold":
+			res = filters[i].Graded.For(co.UUID) == nil
 		case "name_regexp", "edition_regexp", "number_regexp":
 			res = cardFilterRegexp(filters[i].Name, filters[i].Regexp, co)
 		case "pool":

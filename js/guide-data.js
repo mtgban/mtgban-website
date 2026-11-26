@@ -573,6 +573,7 @@ window.__BAN_GUIDE = {
                     { value: 'wcd', short: 'World Championship Deck card' },
                     { value: 'commander', short: 'Commander deck card (from a sealed product)' },
                     { value: 'productless', short: 'Not found in any tracked product' },
+                    { value: 'lastsold', short: 'Graded page: a slab of it sold, for tiers with Last Sold' },
                     { value: 'gamechanger / gc', short: 'Game Changer (Commander bracket)' },
                     { value: 'ampersand', short: 'Forgotten Realms ampersand (&) treatment' },
                     { value: 'fullart / fa', short: 'Full-art card' },

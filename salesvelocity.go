@@ -171,9 +171,14 @@ func cardFilterVelocityLessThan(sales *salesvelocity.Snapshot, limit float64, co
 	return v.PerDay(salesvelocity.Window) >= limit
 }
 
-// A velocity filter parses locked and a locked one matches nothing, so no way
-// into the parser reveals which cards sell without having read the reader's tier.
-const lockedFilterPrefix = "locked_"
+// A velocity filter or is:lastsold parses locked and a locked one matches
+// nothing, so no way into the parser reveals which cards sell without having
+// read the reader's tier.
+const (
+	lockedFilterPrefix = "locked_"
+	lockedVelocityName = lockedFilterPrefix + "velocity_"
+	lockedLastSold     = lockedFilterPrefix + "lastsold"
+)
 
 // unlockVelocity opens a query's velocity filters, those in its pools too, for
 // a handler that checked the reader's signature, to judge cards by sales.
@@ -182,18 +187,45 @@ func unlockVelocity(filters []FilterElem, sales *salesvelocity.Snapshot) {
 		if filters[i].Pool != nil {
 			unlockVelocity(filters[i].Pool.CardFilters, sales)
 		}
-		filters[i].Name = strings.TrimPrefix(filters[i].Name, lockedFilterPrefix)
+		if strings.HasPrefix(filters[i].Name, lockedVelocityName) {
+			filters[i].Name = strings.TrimPrefix(filters[i].Name, lockedFilterPrefix)
+		}
 		filters[i].Sales = sales
+	}
+}
+
+// unlockLastSold opens a query's is:lastsold filters, those in its pools too,
+// for the Graded page of a reader who may see the slabs' sales.
+func unlockLastSold(filters []FilterElem, sales *salesvelocity.GradedSnapshot) {
+	for i := range filters {
+		if filters[i].Pool != nil {
+			unlockLastSold(filters[i].Pool.CardFilters, sales)
+		}
+		if filters[i].Name == lockedLastSold {
+			filters[i].Name = "lastsold"
+			filters[i].Graded = sales
+		}
 	}
 }
 
 // lockedVelocity reports whether a query holds a velocity filter still locked.
 func lockedVelocity(filters []FilterElem) bool {
+	return lockedFilter(filters, func(name string) bool { return strings.HasPrefix(name, lockedVelocityName) })
+}
+
+// lockedLastSoldFilter reports whether a query holds is:lastsold still locked.
+func lockedLastSoldFilter(filters []FilterElem) bool {
+	return lockedFilter(filters, func(name string) bool { return name == lockedLastSold })
+}
+
+// lockedFilter reports whether a query, its pools included, holds a filter
+// whose name is one locked says is.
+func lockedFilter(filters []FilterElem, locked func(string) bool) bool {
 	for i := range filters {
-		if strings.HasPrefix(filters[i].Name, lockedFilterPrefix) {
+		if locked(filters[i].Name) {
 			return true
 		}
-		if filters[i].Pool != nil && lockedVelocity(filters[i].Pool.CardFilters) {
+		if filters[i].Pool != nil && lockedFilter(filters[i].Pool.CardFilters, locked) {
 			return true
 		}
 	}

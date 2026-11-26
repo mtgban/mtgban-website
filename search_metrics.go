@@ -55,7 +55,8 @@ var searchViewCookies = []struct {
 	{"SearchSealedContents", []string{"contents", "decklist", "variable"}},
 }
 
-// isCanonical maps each value cardFilterIs has a case for to the name search.is stores.
+// isCanonical maps each value cardFilterIs has a case for, and lastsold, to the
+// name search.is stores.
 var isCanonical = map[string]string{
 	"foil":        "foil",
 	"nonfoil":     "nonfoil",
@@ -80,6 +81,7 @@ var isCanonical = map[string]string{
 	"ampersand":   "ampersand",
 	"p9":          "p9",
 	"altfoil":     "altfoil",
+	"lastsold":    "lastsold",
 	"oversized":   "oversize",
 	"fa":          "fullart",
 	"gc":          "gamechanger",
