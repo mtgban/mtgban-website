@@ -748,6 +748,9 @@ type SearchVars struct {
 	// The Graded page's Last Sold column, per card: its listed grades' sales,
 	// drawn as the Sales pane draws the recent orders.
 	GradedSales map[string][]salesvelocity.Group
+	// HasGradedSales says the game has any graded sales on record, so a
+	// reader without them is offered a tier only where there are some.
+	HasGradedSales bool
 	// VelocityNotice says a velocity filter needs a higher tier, for the phone's
 	// empty page, which quotes the query instead of listing the notices.
 	VelocityNotice string
@@ -989,9 +992,10 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		}
 		pageVars.CondKeys = groupBySlab(result.sellers, byPrice)
 		pageVars.Embed.RetailLabel, pageVars.Embed.BuylistLabel = "", ""
+		graded := gradedSalesStore.Snapshot()
+		pageVars.HasGradedSales = graded != nil && len(graded.Cards) > 0
 		pageVars.CanSales = canSeeSales(sig)
 		if pageVars.CanSales {
-			graded := gradedSalesStore.Snapshot()
 			pageVars.GradedSales = gradedSales(graded, result.sellers, pageVars.CondKeys)
 			gradedVelocity(pageVars.Metadata, graded, shown.keys)
 		}

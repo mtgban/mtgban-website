@@ -105,7 +105,8 @@ func TestGradedPage(t *testing.T) {
 		testSite.Search(rec, req)
 		return rec.Body.String()
 	}
-	for _, agent := range []string{"", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148"} {
+	agents := []string{"", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148"}
+	for _, agent := range agents {
 		body := serve("/graded", agent)
 		for _, want := range []string{row("SLABSHOP"), ">PSA 9</div>", "Last Sold", "No sales on record", card(0)} {
 			if !strings.Contains(body, want) {
@@ -131,6 +132,19 @@ func TestGradedPage(t *testing.T) {
 		}
 		if agent != "" && !strings.Contains(body, `role="region" aria-label="Buyers"`) {
 			t.Errorf("search, %q: the Buyers panel is not named", agent)
+		}
+	}
+
+	// With no graded sales on record, a reader without the sales is offered
+	// no tier for them.
+	previous := gradedSalesStore.Snapshot()
+	t.Cleanup(func() { gradedSalesStore.Publish(previous) })
+	gradedSalesStore.Publish(&salesvelocity.GradedSnapshot{})
+	withSigMode(t, true, true)
+	for _, agent := range agents {
+		body := serve("/graded", agent)
+		if strings.Contains(body, `data-track-value="sales_upsell"`) || !strings.Contains(body, "No sales on record") {
+			t.Errorf("graded, %q: an upsell for sales that do not exist", agent)
 		}
 	}
 }

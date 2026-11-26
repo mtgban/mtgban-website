@@ -177,7 +177,7 @@
     {{if $page.CanSales}}
         {{if $card.Velocity}}{{template "sales-velocity" dict "Card" $card "Open" $page.VelocityOpen}}{{end}}
         <div class="sales-pane">{{template "sales-pane" (index $page.GradedSales $cardId)}}</div>
-    {{else if $page.ShowUpsell}}
+    {{else if and $page.ShowUpsell $page.HasGradedSales}}
         <a class="sales-velocity-upsell" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener" data-track="ui.row.locked" data-track-value="sales_upsell">Increase your tier to unlock graded sales</a>
     {{else}}
         <div class="no-offers"><i>No sales on record</i></div>
