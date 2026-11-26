@@ -1,0 +1,116 @@
+{{define "admin-invites"}}
+{{with .Invites}}
+{{if .Off}}
+<div class="admin-msg">{{.Off}}</div>
+{{else}}
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>New invite</h2>
+    </div>
+    <form method="POST" action="admin?page=invites" class="admin-invite-form" id="admin-invite-form">
+        <input type="hidden" name="inviteAction" value="mint">
+        <div class="admin-invite-fields">
+            <label>Tier
+                <select name="inviteTier">
+                    {{range .Tiers}}<option value="{{.}}">{{.}}</option>{{end}}
+                </select>
+            </label>
+            <label>Uses
+                <input type="number" name="inviteUses" min="1" max="{{.MaxUses}}" value="1" required>
+            </label>
+            <label>Open for
+                <select name="inviteOpenFor">
+                    {{range .OpenForChoices}}<option value="{{.Hours}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+                </select>
+            </label>
+            <label>Access, days
+                <input type="number" name="inviteAccess" min="1" max="{{.MaxAccessDays}}" value="{{.DefaultAccess}}" required>
+            </label>
+            <label class="admin-invite-note">Note
+                <input type="text" name="inviteNote" maxlength="{{.MaxNote}}" placeholder="who it is for">
+            </label>
+        </div>
+        <fieldset class="admin-invite-features">
+            <legend>Features on top of the tier</legend>
+            {{range .Features}}
+            {{$page := .Page}}
+            <div class="admin-invite-feature" data-page="{{.Page}}">
+                <label class="admin-invite-page"><input type="checkbox" name="invitePage" value="{{.Page}}"> {{.Page}}</label>
+                {{range .Options}}
+                <label class="admin-invite-option">{{.}}
+                    <input type="text" name="inviteOption.{{$page}}.{{.}}" data-option="{{.}}" class="admin-mono">
+                </label>
+                {{end}}
+            </div>
+            {{end}}
+            <p class="admin-dim">An invite names nobody, so options acting on a member's saved state, such as alerts and the backpack, do nothing for it.</p>
+        </fieldset>
+        <button type="submit" class="admin-invite-mint" data-track="ui.admin.invites" data-track-value="mint">Mint invite</button>
+    </form>
+</div>
+
+{{if .Failed}}
+<div class="admin-msg">The invites query failed; see the log. What is below may be missing a part.</div>
+{{end}}
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Invites</h2>
+        <span class="count">{{len .Rows}} invites</span>
+    </div>
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table admin-invites">
+        <thead><tr><th>Minted</th><th>Note</th><th>Grants</th><th class="num">Uses</th><th>Open until</th><th>Last access ends</th><th>State</th><th>Link</th><th></th></tr></thead>
+        <tbody>
+        {{range .Rows}}
+            <tr class="admin-invite-row{{if ne .State "open"}} admin-invite-closed{{end}}">
+                <td class="admin-mono">
+                    <time class="admin-localtime" datetime="{{.CreatedAt.UTC.Format "2006-01-02T15:04:05Z"}}">{{.CreatedAt.Format "2006-01-02 15:04"}}</time>
+                    <br><span class="admin-dim">{{.CreatedBy}}</span>
+                    <br><span class="admin-dim" title="{{.CreatedUA}}">{{.CreatedIP}} on {{.CreatedSite}} ({{.Game}})</span>
+                </td>
+                <td>{{.Note}}</td>
+                <td>{{.Tier}}, {{.AccessDays}} {{if eq .AccessDays 1}}day{{else}}days{{end}}{{range .Features}}<br><span class="admin-dim">+ {{.}}</span>{{end}}</td>
+                <td class="num admin-mono">
+                    {{if .Redemptions}}
+                    <details>
+                        <summary>{{.Uses}} / {{.MaxUses}}</summary>
+                        <ul class="admin-invite-redemptions">
+                        {{range .Redemptions}}
+                            <li title="{{.UA}}"><time class="admin-localtime" datetime="{{.RedeemedAt.UTC.Format "2006-01-02T15:04:05Z"}}">{{.RedeemedAt.Format "2006-01-02 15:04"}}</time> &middot; {{.IP}} on {{.Site}}{{if .SignedIn}} &middot; signed in{{end}}</li>
+                        {{end}}
+                        </ul>
+                    </details>
+                    {{else}}{{.Uses}} / {{.MaxUses}}{{end}}
+                </td>
+                <td class="admin-mono"><time class="admin-localtime" datetime="{{.OpenUntil.UTC.Format "2006-01-02T15:04:05Z"}}">{{.OpenUntil.Format "2006-01-02 15:04"}}</time></td>
+                <td class="admin-mono"><time class="admin-localtime" datetime="{{.LastAccessEnds.UTC.Format "2006-01-02T15:04:05Z"}}">{{.LastAccessEnds.Format "2006-01-02 15:04"}}</time></td>
+                <td>{{.State}}{{if .RevokedBy}}<br><span class="admin-dim">by {{.RevokedBy}}</span>{{end}}</td>
+                <td class="admin-invite-link">
+                    {{if eq .State "open"}}
+                    <input type="text" readonly value="{{.URL}}" class="admin-mono" aria-label="Invite link">
+                    <button type="button" data-invite-copy="{{.URL}}" data-track="ui.admin.invites" data-track-value="copy">Copy</button>
+                    {{end}}
+                </td>
+                <td>
+                    {{if not .RevokedBy}}
+                    <form method="POST" action="admin?page=invites" onsubmit="return confirm('Revoke this invite? Access already given lasts until it ends.')">
+                        <input type="hidden" name="inviteAction" value="revoke">
+                        <input type="hidden" name="inviteCode" value="{{.Code}}">
+                        <button type="submit" class="admin-grant-remove" title="Revoke" data-track="ui.admin.invites" data-track-value="revoke">✕</button>
+                    </form>
+                    {{end}}
+                </td>
+            </tr>
+        {{else}}
+            <tr><td colspan="9" class="admin-usage-empty">No invites yet</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+</div>
+<script>window.BAN_INVITES = { tiers: {{.TierValues}} };</script>
+<script type="text/javascript" src="/js/admin-invites.js?hash={{$.Hash}}" defer></script>
+{{end}}
+{{end}}
+{{end}}

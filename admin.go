@@ -85,6 +85,7 @@ type AdminVars struct {
 	UsageStats  *UsageDashboard
 	SearchStats *SearchesDashboard
 	AlertStats  *AlertsAdminDashboard
+	Invites     *InvitesAdminView
 	Metrics     *MetricsView
 	// MetricsOff says why the Metrics section has no store, when it has none.
 	MetricsOff string
@@ -157,20 +158,15 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	if msg != "" {
 		pageVars.InfoMessage = msg
 	}
-	// What the result is, said in a word the page can print beside it. The
-	// token is matched rather than shown, so the label is this code's to
-	// write and not something a query string can put on the page.
-	switch r.FormValue("html") {
-	case "invite":
-		pageVars.SelectableField = true
-		pageVars.SelectableLabel = "Invite link"
-	}
-
 	if s.adminActions(w, r, p, &pageVars) {
 		return
 	}
 
 	if s.adminTools(w, r, p, &pageVars) {
+		return
+	}
+
+	if s.adminInviteActions(w, r, inviteAdminStoreOf()) {
 		return
 	}
 
@@ -248,6 +244,10 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		if store := s.alerts.Store(); store != nil {
 			pageVars.AlertStats = loadAlertsDashboard(r.Context(), store, string(Config().Game))
 		}
+	}
+	// The Invites tab reads the invites table the same way.
+	if page == "invites" {
+		pageVars.Invites = loadInvitesView(r, inviteAdminStoreOf())
 	}
 	// The Metrics section reads the feature tables the same way.
 	if page == "metrics" {
@@ -399,16 +399,12 @@ var restartServer = func() {
 }
 
 // adminTools runs the server action or admin tool the request names, if
-// any, and reports whether it answered with a redirect. Every tool but
-// invite changes something, so it is named in a POST's body; an invite
-// link is minted for the admin's own page and saved nowhere, so a GET's
-// query can ask for one. A new API key is put on the page the POST
-// answers rather than in a redirect, so no URL, history or log holds it.
+// any, and reports whether it answered with a redirect. Every tool changes
+// something, so it is named in a POST's body. A new API key is put on the
+// page the POST answers rather than in a redirect, so no URL, history or
+// log holds it.
 func (s *site) adminTools(w http.ResponseWriter, r *http.Request, p *prices, pageVars *PageVars) bool {
 	tool := r.PostFormValue("tool")
-	if r.FormValue("tool") == "invite" {
-		tool = "invite"
-	}
 	redirect := false
 	var v url.Values
 	switch tool {
@@ -519,26 +515,6 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, p *prices, pag
 		pageVars.SelectableField = true
 		pageVars.SelectableLabel = "New key"
 
-	case "invite":
-		v = url.Values{}
-		redirect = true
-
-		tier := r.FormValue("tier")
-
-		// How long the link is good for, in days. A request that names no
-		// duration - an old bookmark, a hand-written URL - gets the length a
-		// login gets, which is what this tool handed out before it could be
-		// asked for anything else.
-		duration := DefaultSignatureDuration
-		days, err := strconv.Atoi(r.FormValue("duration"))
-		if err == nil && days > 0 {
-			// No longer than the cookie that will hold it
-			duration = time.Duration(min(days, signatureCookieDays)) * 24 * time.Hour
-		}
-		msg := absoluteURL(r, "/?sig="+sign(tier, nil, nil, duration))
-
-		v.Set("msg", msg)
-		v.Set("html", "invite")
 	}
 	if redirect {
 		localRedirect(w, r, r.URL.Path, v)

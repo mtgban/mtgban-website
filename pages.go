@@ -752,9 +752,10 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	if !isMobile && name == "admin.html" {
 		files = append(files, "templates/partials/admin-usage.html", "templates/partials/admin-searches.html", "templates/partials/admin-alerts.html")
 	}
-	// The metrics section's partials, desktop and mobile alike
+	// The metrics and invites sections' partials, desktop and mobile alike
 	if name == "admin.html" {
 		files = append(files,
+			"templates/partials/admin-invites.html",
 			"templates/partials/admin-metrics.html",
 			"templates/partials/admin-metrics-overview.html",
 			"templates/partials/admin-metrics-remove.html",

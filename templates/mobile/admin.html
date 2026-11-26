@@ -3,6 +3,7 @@
 
 {{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/admin-mobile.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/admin-invites.css?hash={{.Hash}}">
 {{end}}
 
 {{define "title"}}{{.Title}}{{end}}
@@ -55,6 +56,16 @@
         {{end}}
     </div>
 
+    {{/* Invites: the desktop partial */}}
+    <div class="m-admin-section">
+        <h2>Invites</h2>
+        {{if eq .Page "invites"}}
+            {{template "admin-invites" .}}
+        {{else}}
+            <a class="m-admin-tool-btn" href="?page=invites">Open invites</a>
+        {{end}}
+    </div>
+
     {{/* Server Actions */}}
     <div class="m-admin-section">
         <h2>Server Actions</h2>
@@ -97,28 +108,6 @@
     {{/* Admin Tools */}}
     <div class="m-admin-section">
         <h2>Admin Tools</h2>
-
-        {{/* Both halves before there is anything to mint - see the desktop
-             template for why either select submits once the other is set. */}}
-        <div class="m-admin-tool">
-            <label>Create Invite Link</label>
-            <form action="admin" method="GET">
-                <input type="hidden" name="tool" value="invite"/>
-                <select name="tier" onchange="if (this.form.tier.value &amp;&amp; this.form.duration.value) { this.form.submit() }">
-                    <option disabled selected value="">Choose tier...</option>
-                    {{range .Tiers}}
-                        <option value="{{.}}">{{.}}</option>
-                    {{end}}
-                </select>
-                <select name="duration" onchange="if (this.form.tier.value &amp;&amp; this.form.duration.value) { this.form.submit() }">
-                    <option disabled selected value="">Expires in...</option>
-                    <option value="1">One day</option>
-                    <option value="7">One week</option>
-                    <option value="15">Two weeks</option>
-                    <option value="30">One month</option>
-                </select>
-            </form>
-        </div>
 
         <div class="m-admin-tool">
             <label>Generate API Key</label>
