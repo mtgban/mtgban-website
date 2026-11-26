@@ -266,6 +266,9 @@
                                 <div class="sidebar-products-list" id="products"></div>
                             </div>
                         {{end}}
+                        {{if .IsGraded}}
+                            <div class="sidebar-velocity" id="sidebarVelocity"></div>
+                        {{end}}
                         {{if .Alternative}}
                             <a class="sidebar-action warning" href="/search?chart={{.Alternative}}" data-track="ui.sidebar.link" data-track-value="switch_foil">Switch Foil/Non-Foil</a>
                         {{end}}
@@ -428,6 +431,7 @@
                                 <template class="result-hover">
                                     <div class="hover-printings">{{trusted_html (index $.Printings $cardId)}}</div>
                                     <div class="hover-products">{{trusted_html $card.Products}}</div>
+                                    {{if and $.IsGraded $.CanSales $card.Velocity}}<div class="hover-velocity">{{template "sales-velocity" dict "Card" $card "Fixed" true}}</div>{{end}}
                                 </template>
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}" aria-label="{{$card.Edition}}" data-track="ui.result.link" data-track-value="set_icon">
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 32 "Class" "result-set-icon"}}

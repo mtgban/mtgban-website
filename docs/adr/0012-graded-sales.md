@@ -71,11 +71,14 @@ follow and the rest fold away, each row linking to its listing. A best offer
 is marked and left out of the average: eBay shows its ask, not the price
 paid. Nothing reads the source's summary table.
 
-Last Sold opens with the Sales Velocity row raw cards head Buyers with,
-counted from these sales over the same 30 days: the rate is slabs sold a
-day, and its drawer the sales and days with one, eBay's and Fanatics's
-shares, and the last sale with its grade. Then it lists the grades a store
-lists the card in, in the page's order. Both need a signature carrying
+The Sales Velocity row raw cards head Buyers with is counted from these
+sales over the same 30 days: the rate is slabs sold a day, and its drawer
+the sales and days with one, eBay's and Fanatics's shares, and the last
+sale with its grade. On desktop it sits in the sidebar, in place of the
+products a card comes in, which no slab does, and follows the card on show;
+where the sidebar is hidden, below 900px wide and on the phone, it opens
+Last Sold. Last Sold lists the grades a store lists the card in, in the
+page's order. Both need a signature carrying
 `SearchSales`; a reader without one gets an upsell where the card has
 either, and "No sales on record" where it has neither.
 

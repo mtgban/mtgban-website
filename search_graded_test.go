@@ -249,12 +249,26 @@ func TestGradedPageLastSold(t *testing.T) {
 		t.Error("Last Sold says there are no sales, or heads a grade as a condition")
 	}
 
+	// The velocity sits in the sidebar, where the products a card comes in
+	// are listed elsewhere, and heads the sales only where that is hidden.
+	var sidebar string
+	if hover := strings.Index(body, `<div class="hover-velocity">`); hover >= 0 {
+		sidebar, _, _ = strings.Cut(body[hover:], "</template>")
+	}
+	if !strings.Contains(body, `id="sidebarVelocity"`) ||
+		!strings.Contains(sidebar, `<div class="sales-velocity sales-velocity-fixed">`) ||
+		!strings.Contains(sidebar, `<span class="store-name dim">Sales Velocity</span>`) || strings.Contains(sidebar, "<details") ||
+		!strings.Contains(body, `<div class="graded-velocity-col">`) || strings.Contains(body, `id="productsCard"`) {
+		t.Error("the sidebar does not carry the velocity, always open, in place of the products")
+	}
+
 	// Without the sales, the column says how to get them.
 	withSigMode(t, true, true)
 	rec = httptest.NewRecorder()
 	testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/graded?q="+cards[0], nil))
 	body = rec.Body.String()
-	if strings.Contains(body, "ebay.com/itm/111") || strings.Contains(body, ">0.1/day<") || strings.Contains(body, "$515.00 PSA 9") || !strings.Contains(body, `data-track-value="sales_upsell"`) {
+	if strings.Contains(body, "ebay.com/itm/111") || strings.Contains(body, ">0.1/day<") || strings.Contains(body, "$515.00 PSA 9") ||
+		strings.Contains(body, `<div class="hover-velocity">`) || !strings.Contains(body, `data-track-value="sales_upsell"`) {
 		t.Error("a reader without the sales sees them or their velocity, or no upsell")
 	}
 

@@ -720,10 +720,13 @@ override; phone UA detection via `mileusna/useragent`).
   under their slabs' grades (`groupBySlab`: "PSA 10", "CGC 10 Pristine",
   a grader's unscored labels, then the other slabs) in place of the
   conditions. The Buyers column is Last Sold, which shows no buylist and
-  none of the raw copies' sales: for a signature carrying `SearchSales`, the
-  slabs' Sales Velocity row (`gradedVelocity`), then each listed grade's
-  newest eBay and Fanatics sales, drawn as the Sales pane draws the recent
-  orders (`gradedSales`, both from `gradedSalesStore`; ADR-0012). Charts,
+  none of the raw copies' sales: for a signature carrying `SearchSales`,
+  each listed grade's newest eBay and Fanatics sales, drawn as the Sales pane
+  draws the recent orders (`gradedSales`), under the slabs' Sales Velocity
+  row (`gradedVelocity`, both from `gradedSalesStore`; ADR-0012). On desktop
+  that row is in the sidebar in place of Available In, which no slab has,
+  and follows the card on show; below 900px and on the phone it heads Last
+  Sold. Charts,
   alerts, exports and the price, buylist and velocity sorts are all of raw
   copies, and left off; its random card (`/randomgraded`) is one a graded
   store the reader sees lists, their `SearchSellersList` choices included.

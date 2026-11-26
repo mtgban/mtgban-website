@@ -805,7 +805,8 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// for a query, so it keeps its own empty state either way.
 	scopeOnly := query == "" && scopeApplies(pinnedConfig) && !isSetsPage
 
-	pageVars.HasAvailable = len(b.GetSealedUUIDs()) > 0
+	// No slab is sealed in a product, so the Graded page lists none.
+	pageVars.HasAvailable = !pageVars.IsGraded && len(b.GetSealedUUIDs()) > 0
 	_, pageVars.OfflineModeAllowed = offlineModeAllowed(r)
 	// Only the mobile page lists the stores in its own settings drawer; the
 	// desktop modal asks /api/settings/modal for them when it opens.

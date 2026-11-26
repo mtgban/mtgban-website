@@ -848,6 +848,24 @@ body:has(.search-layout) {
     border-radius: var(--radius-sm, 6px);
     overflow: hidden;
 }
+
+/* The Graded page's Sales Velocity, where the other pages list the products
+   a card comes in: no slab comes in one. Empty for a card with no sales. */
+.sidebar-velocity {
+    background: var(--search-surface-1);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    border-radius: var(--radius-sm, 6px);
+    padding: 2px 12px;
+}
+.sidebar-velocity:empty {
+    display: none;
+}
+/* Shown in the sidebar, so not again above the sales. */
+@media (min-width: 901px) {
+    body:not(.mobile) .graded-velocity-col {
+        display: none;
+    }
+}
 .sidebar-products-title {
     /* A button, so it is reachable by keyboard wherever it does something.
        Everything below the first four lines is undoing what a button brings
