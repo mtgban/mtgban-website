@@ -131,7 +131,9 @@ func newSite() *site {
 					buylist[id][store] = entry
 				}
 			}
-			return banprice2offline(set.Code, time.Now().UTC(), retail, buylist), nil
+			payload := banprice2offline(set.Code, time.Now().UTC(), retail, buylist)
+			addSlabTags(b, p, set.Code, sellers, payload.Retail)
+			return payload, nil
 		},
 
 		EnabledStores: func() (sellers, vendors []string) {

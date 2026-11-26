@@ -3,6 +3,7 @@ package offlineapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/offline"
 )
 
@@ -45,7 +47,7 @@ func (s *Service) computeFingerprints(b *matcher.Backend) map[string]string {
 		shorthand := seller.Info().Shorthand
 		for uuid, entries := range seller.Inventory() {
 			for _, e := range entries {
-				add(shorthand, uuid, string(e.Conditions), e.Price, e.Quantity)
+				add(shorthand, uuid, slabTag(e), e.Price, e.Quantity)
 			}
 		}
 	}
@@ -63,6 +65,15 @@ func (s *Service) computeFingerprints(b *matcher.Backend) map[string]string {
 		out[code] = strconv.FormatUint(f.Sum(), 16)
 	}
 	return out
+}
+
+// slabTag is the tag a listing is hashed under: its condition, and for a slab
+// its grader, score and label, so a set changes when a slab is regraded.
+func slabTag(e mtgban.InventoryEntry) string {
+	if e.Slab == nil {
+		return string(e.Conditions)
+	}
+	return fmt.Sprintf("%s|%s|%g|%s", e.Conditions, e.Slab.Grader, e.Slab.Score, e.Slab.Label)
 }
 
 // refreshManifest recomputes fingerprints and bumps versions for changed sets,
