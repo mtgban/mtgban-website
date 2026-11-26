@@ -190,7 +190,7 @@ function moveMenuItem(label, price, store) {
     return item;
 }
 
-// moveOptRow puts the row's card in store whatever the optimizer's rules
+// moveOptRow puts the row's line in store whatever the optimizer's rules
 // say, in Not bought when store is '-', or back in the optimizer's hands
 // when store is empty, and prices the list again, landing back on the
 // card. The move is the page's alone: the next re-post carries it
@@ -199,7 +199,7 @@ function moveOptRow(row, store) {
     var id = row.dataset.optId;
     var cond = row.dataset.optCond || '';
     document.querySelectorAll('.opt-store tr[data-opt-moved]').forEach(function(tr) {
-        if (tr.dataset.optId === id && (tr.dataset.optCond || '') === cond) {
+        if (tr.dataset.optId === id && (tr.dataset.optCond || '') === cond && tr.dataset.sharePrice === row.dataset.sharePrice) {
             tr.removeAttribute('data-opt-moved');
         }
     });

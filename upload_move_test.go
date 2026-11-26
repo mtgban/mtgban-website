@@ -94,6 +94,48 @@ func TestOptimizerMovesEveryRowOfTheCard(t *testing.T) {
 	}
 }
 
+// A card's lines at two prices move apart, each by the price its move
+// names; a move naming no price, from an older page, moves every line.
+func TestOptimizerMovesALineByItsPrice(t *testing.T) {
+	entries := []UploadEntry{{CardID: "card", OriginalPrice: 10}, {CardID: "card", OriginalPrice: 4, PriceIsMarket: true}}
+	for _, tc := range []struct {
+		moves map[string]string
+		want  string
+	}{
+		{map[string]string{"card\t4m": "SCG"}, "CK 10,SCG 4 moved"},
+		{map[string]string{"card\t10": "SCG"}, "CK 4,SCG 10 moved"},
+		{map[string]string{"card\t4": "SCG"}, "CK 10,CK 4"},
+		{map[string]string{"card": "SCG"}, "SCG 10 moved,SCG 4 moved"},
+		{map[string]string{"card\t4m": notBoughtMove}, "CK 10,- 4m moved"},
+	} {
+		rows := moveRows(t, entries, uploadSettings{moves: tc.moves})
+		var got []string
+		for _, store := range []string{"CK", "SCG"} {
+			for _, entry := range rows.optimizedResults[store] {
+				line := fmt.Sprintf("%s %v", store, entry.LoadedPrice)
+				if entry.Moved {
+					line += " moved"
+				}
+				got = append(got, line)
+			}
+		}
+		// A line in Not bought carries its price for the page's next move
+		for _, entry := range rows.notBought.rows {
+			line := fmt.Sprintf("- %v", entry.LoadedPrice)
+			if entry.LoadedIsMarket {
+				line += "m"
+			}
+			if entry.Moved {
+				line += " moved"
+			}
+			got = append(got, line)
+		}
+		if strings.Join(got, ",") != tc.want {
+			t.Errorf("moves %v: lines at %q, want %s", tc.moves, got, tc.want)
+		}
+	}
+}
+
 // Moves come only from a results page pricing its own rows, in the mode
 // they were made in; a line short of a card or a store is skipped.
 func TestReadOptMoves(t *testing.T) {
@@ -110,6 +152,7 @@ func TestReadOptMoves(t *testing.T) {
 		{"switched to retail", "card\t1", moves, false, nil},
 		{"a list that is not the page's", "", moves, true, nil},
 		{"retail", "card\t1", "retail\ncard\t\tCK", false, map[string]string{"card": "CK"}},
+		{"a line's price", "card\t1", "retail\ncard\tNM\tSCG\t4\ncard\tNM\tCK\t10m", false, map[string]string{"cardNM\t4": "SCG", "cardNM\t10m": "CK"}},
 		{"no moves", "card\t1", "", true, nil},
 	} {
 		form := url.Values{"rows": {tc.rows}, "opt_moves": {tc.moves}}
@@ -244,7 +287,7 @@ func TestNotBoughtMoveMenu(t *testing.T) {
 		UploadEntries: []UploadEntry{{CardID: "a"}, {CardID: "b"}},
 		ResultPrices:  map[string]map[string]float64{"a": {"CK": 5}},
 		NotBought: []LeftoverEntry{
-			{CardID: "a", Quantity: 1, Moved: true},
+			{CardID: "a", Quantity: 1, Moved: true, LoadedPrice: 4, LoadedIsMarket: true},
 			{CardID: "b", Quantity: 1},
 		},
 	}})
@@ -256,6 +299,7 @@ func TestNotBoughtMoveMenu(t *testing.T) {
 		`data-opt-id="a" data-opt-cond="" class="opt-moved" data-opt-moved="-" data-move="CK:5.00"`,
 		`data-opt-id="b" data-opt-cond="" data-k-name`,
 		`popovertarget="opt-not-bought-move-0" title="Moved here by you"`,
+		`data-k-cond="" data-share-price="4m"`,
 	} {
 		if !strings.Contains(section, want) {
 			t.Errorf("no %s", want)

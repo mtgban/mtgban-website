@@ -31,15 +31,17 @@ function packRows(category) {
 }
 
 // The optimizer rows the reader moved, as the server reads them: the mode
-// they were made in, then one line a card naming the store it goes to.
+// they were made in, then one line a card's line naming the store it goes
+// to and the line's price, as a card's lines at two prices move apart.
 function packOptMoves() {
     var seen = {};
     var lines = [];
     document.querySelectorAll('.opt-store tr[data-opt-moved]').forEach(function(tr) {
         var key = tr.dataset.optId + '\t' + (tr.dataset.optCond || '');
-        if (seen[key]) return;
-        seen[key] = true;
-        lines.push(key + '\t' + tr.dataset.optMoved);
+        var price = 'sharePrice' in tr.dataset ? '\t' + tr.dataset.sharePrice : '';
+        if (seen[key + price]) return;
+        seen[key + price] = true;
+        lines.push(key + '\t' + tr.dataset.optMoved + price);
     });
     if (!lines.length) return '';
     var mode = document.getElementById('res_mode');
