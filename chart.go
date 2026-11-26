@@ -761,6 +761,11 @@ func stashNonMagicTimeseries(ctx context.Context, b *matcher.Backend, p *prices,
 	// A miss is keyed on the id it will be filed under, and filed in one
 	// batch before the upsert, since the prices table's FK needs the row.
 	categoryID := GetTCGCategoryID()
+	// Once a stash run, so a workflow that stopped running does not go unseen.
+	if day, quiet := ingestQuiet(categoryID, time.Now()); quiet {
+		ServerNotify("tcgcsv", fmt.Sprintf("no tcgcsv ingest for category %d since %s; this site is writing TCGplayer Low and Market itself",
+			categoryID, day.Format("2006-01-02")))
+	}
 	missing := map[timeseries.TCGVariant]int64{}
 	snapshot := collectNonMagicSnapshot(b, p, start, func(co *matcher.CardObject) int64 {
 		if banID := cachedBanIDForCard(co); banID != 0 {
@@ -835,51 +840,49 @@ func writeSnapshot(ctx context.Context, start time.Time, snapshot longSnapshot) 
 // What that leans on is the ingest always writing the long form.
 var tcgcsvOwnedProviders = timeseries.TCGCSVProviders
 
-// tcgcsvOwnsTCGSeries reports whether the tcgcsv ingest covers this
-// deployment's own game: listed in its own tcgcsv_config, or ingested
-// lately by another site's, which the archive's ingest days tell. Either
-// way the game's TCGplayer prices arrive without the snapshot's help, and
-// a partial day written here would stand beside the ingest's full one. A
-// deployment carrying no tcgcsv_config at all keeps writing them itself,
-// since nothing else would. Those rows cannot advance the ingest's gate
-// (timeseries.LatestIngestDate).
+// tcgcsvOwnsTCGSeries reports whether the tcgcsv ingest covers this game.
+// The ingest runs outside the site, so the archive's ingest days are the only
+// signal; without them the snapshot writes the TCGplayer series itself.
 func tcgcsvOwnsTCGSeries() bool {
-	if Config().TCGCSVConfig == nil {
-		return false
-	}
 	id := GetTCGCategoryID()
 	if id == 0 {
-		// A snapshot can fire before the catalog is in: the boot goroutine
-		// publishes the scrapers first and loads the catalog after them, so a
-		// process that restarted shortly before the 12h cron is serving prices
-		// while it still cannot name its own category. Both answers are a guess
-		// there and this is the cheap one — the day's TCGplayer rows arrive from
-		// the ingest anyway, where writing them here would overwrite its
-		// whole-category pass with the subset this scraper loaded.
+		// The boot goroutine loads the catalog after the scrapers, so a snapshot
+		// can fire before the category is named; defer to the ingest rather than
+		// overwrite its whole-category pass with the subset this scraper loaded.
 		return true
 	}
-	for _, game := range Config().TCGCSVConfig.Games {
-		if game.CategoryID == id {
-			return true
-		}
-	}
-	return ingestedLately(id)
+	day, ok := latestIngestDay(id)
+	return ok && time.Since(day) < ingestQuietAfter
 }
 
-// ingestedLately reports whether a tcgcsv ingest filed the category within
-// the last three days, long enough to ride out a missed run.
-func ingestedLately(categoryID int) bool {
+// ingestQuietAfter is how long the ingest may miss a category before the site
+// takes the TCGplayer series back, long enough to ride out a missed run.
+const ingestQuietAfter = 72 * time.Hour
+
+// latestIngestDay is the newest day a tcgcsv ingest filed for the category,
+// ok false when there is none or the archive cannot say.
+var latestIngestDay = func(categoryID int) (day time.Time, ok bool) {
 	if PricesArchiveDB == nil {
-		return false
+		return time.Time{}, false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	day, ok, err := PricesArchiveDB.LatestIngestDate(ctx, categoryID)
 	if err != nil {
 		log.Println("tcgcsv: latest ingest day:", err)
-		return false
+		return time.Time{}, false
 	}
-	return ok && time.Since(day) < 72*time.Hour
+	return day, ok
+}
+
+// ingestQuiet reports an ingest that once filed the category and has gone
+// ingestQuietAfter or more without filing it again.
+func ingestQuiet(categoryID int, now time.Time) (day time.Time, quiet bool) {
+	if categoryID == 0 {
+		return time.Time{}, false
+	}
+	day, ok := latestIngestDay(categoryID)
+	return day, ok && now.Sub(day) >= ingestQuietAfter
 }
 
 // collectNonMagicSnapshot walks the served scrapers and accumulates every price
@@ -1095,9 +1098,7 @@ func (s *site) stashInTimeseries() {
 }
 
 // variantCacheScope is the slice of the shared variants table this process can
-// use: the game it serves, plus every category it ingests, since the tcgcsv
-// ingest resolves a ban_id for each price row it writes and a row outside the
-// cache costs a round-trip.
+// use: the game it serves, since the site writes no other category.
 //
 // The game's own category comes from the loaded catalog, which names it - the
 // same source GetTCGCategoryID exists to provide, so enabling a game stays a
@@ -1113,13 +1114,6 @@ func variantCacheScope() timeseries.VariantScope {
 	} else {
 		log.Printf("variant cache: no catalog loaded for game %q, warming every game", Config().Game)
 		return timeseries.VariantScope{}
-	}
-	if Config().TCGCSVConfig != nil {
-		for _, game := range Config().TCGCSVConfig.Games {
-			if !slices.Contains(scope.TCGCategoryIDs, game.CategoryID) {
-				scope.TCGCategoryIDs = append(scope.TCGCategoryIDs, game.CategoryID)
-			}
-		}
 	}
 	return scope
 }

@@ -88,26 +88,21 @@ func TestNonMagicSnapshotKeepsLastWriteLast(t *testing.T) {
 	}
 }
 
-// withTCGCSVGames points the config's ingestion registry at the given category
-// ids and loads a catalog for one of them, which is how the site learns which
-// slice of the shared archive is its own.
-func withTCGCSVGames(t *testing.T, ownCategory int, ingested []int) {
+// withTCGCatalog loads a catalog naming ownCategory, 0 for none yet, and
+// swaps latestIngestDay to answer an hour ago for the categories in ingested.
+func withTCGCatalog(t *testing.T, ownCategory int, ingested []int) {
 	t.Helper()
-	prevConfig := Config().TCGCSVConfig
-	prevCatalog := tcgCatalogPtr.Load()
+	prevCatalog, prevDay := tcgCatalogPtr.Load(), latestIngestDay
 	t.Cleanup(func() {
-		Config().TCGCSVConfig = prevConfig
 		tcgCatalogPtr.Store(prevCatalog)
+		latestIngestDay = prevDay
 	})
 
-	if ingested == nil {
-		Config().TCGCSVConfig = nil
-	} else {
-		cfg := &tcgcsv.Config{}
-		for _, id := range ingested {
-			cfg.Games = append(cfg.Games, tcgcsv.GameConfig{CategoryID: id})
+	latestIngestDay = func(categoryID int) (time.Time, bool) {
+		if !slices.Contains(ingested, categoryID) {
+			return time.Time{}, false
 		}
-		Config().TCGCSVConfig = cfg
+		return time.Now().Add(-time.Hour), true
 	}
 	if ownCategory == 0 {
 		tcgCatalogPtr.Store(nil)
@@ -116,31 +111,69 @@ func withTCGCSVGames(t *testing.T, ownCategory int, ingested []int) {
 	}
 }
 
-// The ingest owns the TCGplayer series where the config lists this game. With no
-// tcgcsv_config at all the snapshot keeps writing them, because otherwise nobody
-// would; with a config but no catalog yet - the boot window, scrapers published
-// and the category not named - it defers to the ingest rather than overwrite a
-// whole-category pass with the subset this process loaded.
+// The ingest runs outside the site, so only the archive's ingest days say it
+// owns the TCGplayer series; tcgcsv_config is ignored. With no catalog yet the
+// snapshot defers rather than overwrite a whole-category pass.
 func TestTCGCSVOwnsTCGSeries(t *testing.T) {
-	savedArchive := PricesArchiveDB
-	PricesArchiveDB = nil
-	t.Cleanup(func() { PricesArchiveDB = savedArchive })
 	for _, tc := range []struct {
 		name        string
-		ownCategory int
-		ingested    []int
+		ownCategory int   // 0: no catalog loaded yet
+		ingested    []int // categories the archive saw lately
+		listed      []int // tcgcsv_config.games, which must not matter
 		want        bool
 	}{
-		{"own game is ingested", 71, []int{1, 71, 85}, true},
-		{"another game is ingested, no archive to ask", 71, []int{1, 85}, false},
-		{"no tcgcsv_config at all", 71, nil, false},
-		{"config but no catalog yet", 0, []int{71}, true},
-		{"no tcgcsv_config and no catalog", 0, nil, false},
+		{"ingested lately", 71, []int{71}, nil, true},
+		{"not ingested lately", 71, []int{3}, nil, false},
+		{"config lists the game, archive does not", 71, nil, []int{71}, false},
+		{"no catalog yet", 0, nil, nil, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			withTCGCSVGames(t, tc.ownCategory, tc.ingested)
+			withConfigCopy(t)
+			Config().TCGCSVConfig = nil
+			if tc.listed != nil {
+				cfg := &tcgcsv.Config{}
+				for _, id := range tc.listed {
+					cfg.Games = append(cfg.Games, tcgcsv.GameConfig{CategoryID: id})
+				}
+				Config().TCGCSVConfig = cfg
+			}
+			withTCGCatalog(t, tc.ownCategory, tc.ingested)
 			if got := tcgcsvOwnsTCGSeries(); got != tc.want {
 				t.Errorf("tcgcsvOwnsTCGSeries() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// An ingest day ingestQuietAfter old or older is an outage worth a post; a game
+// the archive has never seen, or no catalog yet, is not.
+func TestIngestQuiet(t *testing.T) {
+	now := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name     string
+		category int
+		age      time.Duration
+		stored   bool
+		want     bool
+	}{
+		{"71 hours old", 71, 71 * time.Hour, true, false},
+		{"exactly 72 hours old", 71, 72 * time.Hour, true, true},
+		{"five days old", 71, 5 * 24 * time.Hour, true, true},
+		{"no ingest day", 71, 0, false, false},
+		{"no catalog yet", 0, 5 * 24 * time.Hour, true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prev := latestIngestDay
+			t.Cleanup(func() { latestIngestDay = prev })
+			latestIngestDay = func(int) (time.Time, bool) {
+				if !tc.stored {
+					return time.Time{}, false
+				}
+				return now.Add(-tc.age), true
+			}
+			day, quiet := ingestQuiet(tc.category, now)
+			if quiet != tc.want {
+				t.Errorf("ingestQuiet = %v (day %s), want %v", quiet, day, tc.want)
 			}
 		})
 	}
@@ -212,7 +245,7 @@ func TestCollectNonMagicSnapshotFromServedScrapers(t *testing.T) {
 	known, unknown := ids[0], ids[1]
 
 	keepScrapers(t)
-	withTCGCSVGames(t, 71, []int{71})
+	withTCGCatalog(t, 71, []int{71})
 	withDatasets(t, []DatasetConfig{
 		{Retail: []string{"ZZMKM"}, PublicName: "Cardmarket Low", Provider: timeseries.ProviderMKMLow},
 		{Buylist: []string{"ZZSCG"}, PublicName: "Star City Games Buylist", Provider: timeseries.ProviderSCGBuylist},

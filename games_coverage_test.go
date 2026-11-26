@@ -59,7 +59,8 @@ func TestVariantCacheScope(t *testing.T) {
 		tcgCatalogPtr.Store(origCatalog)
 	})
 
-	ingesting := &tcgcsv.Config{Games: []tcgcsv.GameConfig{
+	// A config listing other games must not widen the scope: the site ingests nothing.
+	listing := &tcgcsv.Config{Games: []tcgcsv.GameConfig{
 		{Name: "Disney Lorcana", CategoryID: tcgcsv.CategoryLorcana},
 		{Name: "Riftbound", CategoryID: tcgcsv.CategoryRiftbound},
 	}}
@@ -85,45 +86,16 @@ func TestVariantCacheScope(t *testing.T) {
 			want:    timeseries.VariantScope{TCGCategoryIDs: []int{tcgcsv.CategoryLorcana}},
 		},
 		{
-			name:    "an ingesting site also reads what it writes",
+			name:    "a tcgcsv_config listing other games does not widen the scope",
 			game:    "onepiece",
 			catalog: tcgcsv.CategoryOnePiece,
-			tcgcsv:  ingesting,
-			want: timeseries.VariantScope{TCGCategoryIDs: []int{
-				tcgcsv.CategoryOnePiece, tcgcsv.CategoryLorcana, tcgcsv.CategoryRiftbound,
-			}},
-		},
-		{
-			name:    "the site's own category is not repeated",
-			game:    "lorcana",
-			catalog: tcgcsv.CategoryLorcana,
-			tcgcsv:  ingesting,
-			want: timeseries.VariantScope{TCGCategoryIDs: []int{
-				tcgcsv.CategoryLorcana, tcgcsv.CategoryRiftbound,
-			}},
-		},
-		{
-			name:   "magic ingesting non-magic games wants both halves",
-			game:   DefaultGame,
-			tcgcsv: ingesting,
-			want: timeseries.VariantScope{Magic: true, TCGCategoryIDs: []int{
-				tcgcsv.CategoryLorcana, tcgcsv.CategoryRiftbound,
-			}},
+			tcgcsv:  listing,
+			want:    timeseries.VariantScope{TCGCategoryIDs: []int{tcgcsv.CategoryOnePiece}},
 		},
 		{
 			name: "a site whose catalog has not loaded falls back to the whole table",
 			game: "lorcana",
 			want: timeseries.VariantScope{},
-		},
-		{
-			// The fallback has to stay the whole table rather than narrowing to
-			// what this process ingests: the site's own game is the one thing
-			// the ingest list does not name, and dropping it would cost every
-			// rendered card its ban_id.
-			name:   "and still reads everything even when it ingests",
-			game:   "lorcana",
-			tcgcsv: ingesting,
-			want:   timeseries.VariantScope{},
 		},
 	}
 	for _, tc := range cases {

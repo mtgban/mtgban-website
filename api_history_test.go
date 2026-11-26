@@ -43,16 +43,30 @@ func TestHistoryCardsAllowed(t *testing.T) {
 }
 
 // A response is good until the next archive write, at 00:00 and 12:00 on the
-// host clock plus 21:00 off Magic, never for less than a minute, and for a
-// minute in the half hour after a write hour.
+// host clock plus the ingest's UTC hours off Magic, never under a minute,
+// and for a minute inside a write's window: 30 minutes for the snapshot, 90
+// for the ingest, a window that began the day before included.
 func TestHistoryMaxAge(t *testing.T) {
 	loc := time.FixedZone("host", 0)
 	at := func(h, m, s int) time.Time { return time.Date(2026, 10, 11, h, m, s, 0, loc) }
-	snapshot, tcgcsv := []int{0, 12}, []int{0, 12, 21}
+	snap := func(hours ...int) []historyWrite {
+		var writes []historyWrite
+		for _, h := range hours {
+			writes = append(writes, historyWrite{h, historyWriteWindow, false})
+		}
+		return writes
+	}
+	snapshot := snap(0, 12)
+	tcgcsv := []historyWrite{
+		{0, historyWriteWindow, false}, {3, historyIngestWindow, true}, {12, historyWriteWindow, false},
+		{21, historyIngestWindow, true}, {23, historyIngestWindow, true},
+	}
+	// A host five hours behind UTC: the ingest hours stay UTC, the snapshot's stay local.
+	behind := func(h, m int) time.Time { return time.Date(2026, 10, 11, h, m, 0, 0, time.FixedZone("UTC-5", -5*3600)) }
 	for _, tc := range []struct {
-		now   time.Time
-		hours []int
-		want  int
+		now    time.Time
+		writes []historyWrite
+		want   int
 	}{
 		{at(3, 0, 0), snapshot, 9 * 3600},
 		{at(11, 59, 0), snapshot, 60},
@@ -67,30 +81,103 @@ func TestHistoryMaxAge(t *testing.T) {
 		{at(20, 30, 0), tcgcsv, 1800},
 		{at(21, 0, 0), tcgcsv, 60},
 		{at(21, 10, 0), tcgcsv, 60},
-		{at(21, 30, 0), tcgcsv, 2*3600 + 1800},
-		{at(13, 0, 0), []int{21, 12, 0}, 8 * 3600},
+		{at(21, 45, 0), tcgcsv, 60},
+		{at(22, 29, 0), tcgcsv, 60},
+		{at(22, 30, 0), tcgcsv, 1800},
+		{at(23, 45, 0), tcgcsv, 60},
+		{at(0, 20, 0), tcgcsv, 60},
+		{at(0, 29, 0), tcgcsv, 60},
+		{at(0, 31, 0), tcgcsv, 2*3600 + 29*60},
+		{at(2, 0, 0), tcgcsv, 3600},
+		{at(3, 10, 0), tcgcsv, 60},
+		{at(4, 29, 0), tcgcsv, 60},
+		{at(4, 30, 0), tcgcsv, 7*3600 + 1800},
+		{at(12, 10, 0), tcgcsv, 60},
+		{at(12, 31, 0), tcgcsv, 8*3600 + 29*60},
+		// 23:00's window carries past midnight on its own.
+		{at(0, 20, 0), []historyWrite{{23, historyIngestWindow, true}}, 60},
+		{at(0, 31, 0), []historyWrite{{23, historyIngestWindow, true}}, 22*3600 + 29*60},
+		{at(13, 0, 0), snap(21, 12, 0), 8 * 3600},
+		// 16:10 local is 21:10 UTC, inside the 21:15 run's window.
+		{behind(16, 10), tcgcsv, 60},
+		// 21:10 local is 02:10 UTC: next is 03:00 UTC, 22:00 local, before local midnight.
+		{behind(21, 10), tcgcsv, 3000},
 	} {
-		if got := historyMaxAge(tc.now, tc.hours); got != tc.want {
-			t.Errorf("historyMaxAge(%s, %v) = %d, want %d", tc.now.Format("15:04:05"), tc.hours, got, tc.want)
+		if got := historyMaxAge(tc.now, tc.writes); got != tc.want {
+			t.Errorf("historyMaxAge(%s, %v) = %d, want %d", tc.now.Format("15:04:05"), tc.writes, got, tc.want)
 		}
 	}
 }
 
 // A Magic host's archive is written at 00:00 and 12:00; any other game's at
-// 21:00 too, wherever its tcgcsv ingest runs.
-func TestHistoryCacheHours(t *testing.T) {
+// the tcgcsv workflow's daily hours too, with the longer ingest window.
+func TestHistoryWrites(t *testing.T) {
 	withConfigCopy(t)
 	Config().Game = DefaultGame
-	if got := historyCacheHours(); !slices.Equal(got, []int{0, 12}) {
-		t.Errorf("magic = %v", got)
+	magic := []historyWrite{{0, historyWriteWindow, false}, {12, historyWriteWindow, false}}
+	if got := historyWrites(); !slices.Equal(got, magic) {
+		t.Errorf("magic = %v, want %v", got, magic)
 	}
 	Config().Game = "lorcana"
-	if got := historyCacheHours(); !slices.Equal(got, []int{0, 12, 21}) {
-		t.Errorf("lorcana = %v", got)
+	lorcana := []historyWrite{
+		{0, historyWriteWindow, false}, {3, historyIngestWindow, true}, {12, historyWriteWindow, false},
+		{21, historyIngestWindow, true}, {23, historyIngestWindow, true},
 	}
-	at := time.Date(2026, 10, 11, 21, 10, 0, 0, time.Local)
-	if got := historyMaxAge(at, historyCacheHours()); got != 60 {
+	if got := historyWrites(); !slices.Equal(got, lorcana) {
+		t.Errorf("lorcana = %v, want %v", got, lorcana)
+	}
+	at := time.Date(2026, 10, 11, 21, 10, 0, 0, time.UTC)
+	if got := historyMaxAge(at, historyWrites()); got != 60 {
 		t.Errorf("lorcana at 21:10 = %d, want 60", got)
+	}
+}
+
+// The non-Magic writes cover every daily run of the tcgcsv workflow, from its
+// start minute to an hour past it.
+func TestHistoryWritesMatchWorkflow(t *testing.T) {
+	body, err := os.ReadFile(".github/workflows/tcgcsvd.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Daily crons only: "M H * * *". The weekly products cron ends in a weekday.
+	daily := regexp.MustCompile(`cron: '(\d+) (\d+) \* \* \*'`).FindAllStringSubmatch(string(body), -1)
+	if len(daily) != 3 {
+		t.Fatalf("found %d daily crons, want 3", len(daily))
+	}
+	withConfigCopy(t)
+	Config().Game = "lorcana"
+	writes := historyWrites()
+	for _, m := range daily {
+		minute, _ := strconv.Atoi(m[1])
+		hour, _ := strconv.Atoi(m[2])
+		need := time.Duration(minute+60) * time.Minute
+		i := slices.IndexFunc(writes, func(w historyWrite) bool { return w.hour == hour })
+		if i < 0 || writes[i].window < need || !writes[i].utc {
+			t.Errorf("workflow runs the daily ingest at %02d:%02d UTC, historyWrites %v lacks a UTC window of %v at that hour", hour, minute, writes, need)
+		}
+	}
+	var hours []int
+	for _, w := range writes {
+		hours = append(hours, w.hour)
+	}
+	if want := []int{0, 3, 12, 21, 23}; !slices.Equal(hours, want) {
+		t.Errorf("historyWrites hours = %v, want %v", hours, want)
+	}
+}
+
+// The weekly products cron sits at 18:15 Monday, clear of the daily runs'
+// crawl lock, and the pick step names the same schedule.
+func TestWorkflowProductsCron(t *testing.T) {
+	body, err := os.ReadFile(".github/workflows/tcgcsvd.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	weekly := regexp.MustCompile(`cron: '[^']*\* \* \d'`).FindAllString(string(body), -1)
+	if want := []string{"cron: '15 18 * * 1'"}; !slices.Equal(weekly, want) {
+		t.Errorf("weekly crons = %q, want %q", weekly, want)
+	}
+	if n := strings.Count(string(body), "15 18 * * 1"); n != 2 {
+		t.Errorf("found %q %d times, want 2: the schedule and the pick step", "15 18 * * 1", n)
 	}
 }
 
