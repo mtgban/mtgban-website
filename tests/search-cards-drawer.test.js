@@ -45,7 +45,7 @@ function phone(n) {
         setPointerCapture() {},
     });
     Object.assign(page, { classList, querySelector: (s) => (s === '.m-scrub' ? scrub : s === '.m-results-end' ? {} : null) });
-    Object.assign(deck, { scrollTop: 0, clientHeight: H, parentNode: stage, closest: () => page, querySelector: () => cards[0], querySelectorAll: () => cards });
+    Object.assign(deck, { scrollTop: 0, clientHeight: H, parentNode: stage, closest: () => page, querySelector: () => cards[0], querySelectorAll: () => cards, contains: () => true });
     portrait.matches = true;
     Object.assign(win, { innerWidth: W, innerHeight: H, scrollY: 0, matchMedia: (q) => (q.includes('portrait') ? portrait : { matches: false }) });
     doc.querySelector = (s) => (s === '.m-layout-cards .m-results' ? deck : null);
@@ -54,8 +54,11 @@ function phone(n) {
     // The debounced scrolls wait here until settle() runs them.
     const due = new Map();
     let id = 0;
-    new Function('window', 'document', 'history', 'requestAnimationFrame', 'setTimeout', 'clearTimeout', source)(
-        win, doc, history, (fn) => fn(t += 100), (fn) => { due.set(++id, fn); return id; }, (k) => due.delete(k));
+    const tracked = [];
+    win.BAN = {};
+    new Function('window', 'document', 'history', 'requestAnimationFrame', 'setTimeout', 'clearTimeout', 'BAN', source)(
+        win, doc, history, (fn) => fn(t += 100), (fn) => { due.set(++id, fn); return id; }, (k) => due.delete(k),
+        { track: (...args) => tracked.push(args) });
 
     // A finger on the cards, unless it is on one of the page's sheets, whose
     // events reach .m-page and not the deck's stage.
@@ -91,7 +94,12 @@ function phone(n) {
         due.clear();
         fns.forEach((fn) => fn());
     }
-    return { deck, cards, scrub, win, history, touch, swipeUp, turn, scroll, settle, open: () => classes.has('m-pager-open') };
+    // A tap on a card's edge button for a list
+    function tap(card, pane) {
+        const btn = { closest: (s) => (s === '.m-card' ? card : btn), getAttribute: () => pane };
+        deck.fire('click', { target: btn });
+    }
+    return { deck, cards, scrub, win, history, tracked, touch, swipeUp, turn, scroll, settle, tap, open: () => classes.has('m-pager-open') };
 }
 
 test('a swipe up on the last card raises the drawer, and one down lowers it', () => {
@@ -190,4 +198,18 @@ test('turned back upright, the deck takes the card landscape scrolled to', () =>
     p.win.scrollY = 1 * L;
     p.win.fire('pagehide', {});
     expect(p.history.state).toEqual({ cardsIndex: 1 });
+});
+
+test('a swipe to a list after an edge tap swiped back is counted', () => {
+    const p = phone(1);
+    const card = p.cards[0];
+    p.tap(card, 'buyers');
+    expect(card.scrollLeft).toBe(2 * W);
+    card.scrollLeft = W;
+    p.scroll(card);
+    p.settle();
+    card.scrollLeft = 2 * W;
+    p.scroll(card);
+    p.settle();
+    expect(p.tracked).toEqual([['ui.cards.pane', 'buyers', 'swipe']]);
 });
