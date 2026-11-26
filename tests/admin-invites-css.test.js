@@ -12,6 +12,10 @@ test('the invites rows wrap so the link and revoke fit the admin column', () => 
     expect(css).toMatch(/\.admin-invite-link input \{\s*width: 10em;/);
 });
 
+test('an expanded acceptance wraps, a long IPv6 address included', () => {
+    expect(css).toMatch(/\.admin-invite-redemptions li \{\s*white-space: normal;\s*overflow-wrap: anywhere;/);
+});
+
 test('the invite form is 16px on a touch screen, so iOS does not zoom into it', () => {
     const coarse = css.slice(css.indexOf('@media (pointer: coarse)'));
     const rule = coarse.match(/\{([\s\S]*?)\{([^}]*)\}/);
