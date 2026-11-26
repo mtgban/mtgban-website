@@ -2,6 +2,7 @@ package docparse
 
 import (
 	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -453,5 +454,26 @@ func TestParseRowOneFieldRowLeavesTheHeaderAlone(t *testing.T) {
 	res, _ := p.ParseRow(indexMap, []string{"2", "Beta", "Lightning Bolt"})
 	if res.Card.Name != "Lightning Bolt" {
 		t.Errorf("name after a one-field row = %q, want Lightning Bolt", res.Card.Name)
+	}
+}
+
+// Copies of a card loaded at two prices stay two lines; at one price, and
+// with no price, they are one.
+func TestMergeIdenticalEntriesKeepsTwoPricesApart(t *testing.T) {
+	merged := MergeIdenticalEntries([]Entry{
+		{CardID: "bolt", OriginalCondition: mtgban.NM, OriginalPrice: 10},
+		{CardID: "bolt", OriginalCondition: mtgban.NM, OriginalPrice: 4},
+		{CardID: "bolt", OriginalCondition: mtgban.NM, OriginalPrice: 10},
+		{CardID: "bolt", OriginalCondition: mtgban.NM, OriginalPrice: 4, PriceIsMarket: true},
+		{CardID: "ring"},
+		{CardID: "ring"},
+	})
+	var got []string
+	for _, e := range merged {
+		got = append(got, fmt.Sprintf("%s %v%s x%d", e.CardID, e.OriginalPrice, map[bool]string{true: "m"}[e.PriceIsMarket], e.QuantityOrOne()))
+	}
+	want := []string{"bolt 10 x2", "bolt 4 x1", "bolt 4m x1", "ring 0 x2"}
+	if !slices.Equal(got, want) {
+		t.Errorf("merged into %q, want %q", got, want)
 	}
 }

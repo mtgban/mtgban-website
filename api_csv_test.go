@@ -435,3 +435,25 @@ func TestUUID2BuylistCSV(t *testing.T) {
 		}
 	}
 }
+
+// A card's lines at two prices share the copies cap, as they share its row.
+func TestTCGCSVCapsACardsLinesTogether(t *testing.T) {
+	b, p := decklistCSVFixture(t)
+	ids := []string{"FIXTUREA-1", "FIXTUREA-1"}
+	uploadedData, err := loadHashes(ids, []string{"4", "4"}, []string{"NM", "NM"}, []string{"10", "4"}, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	err = writeTCGplayerCSV(rec, b, p, uploadedData, 1, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := csv.NewReader(rec.Body).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 2 || records[1][13] != "4" {
+		t.Errorf("got %v, want one row of 4 copies", records[1:])
+	}
+}
