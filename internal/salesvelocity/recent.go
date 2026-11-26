@@ -422,6 +422,8 @@ type Line struct {
 	Date, Time string
 	Source     string
 	Price, Qty string
+	// A graded sale's own listing, and a note on its price.
+	Link, Note string
 }
 
 // recentSource is where every order here was sold.
@@ -435,6 +437,8 @@ type Group struct {
 	Avg         string
 	Shown, More []Line
 	Link        string
+	// Slab is a graded sale's grade, which names no condition.
+	Slab bool
 }
 
 // Groups is r's orders per grade in Grades' order; none for a grade with no

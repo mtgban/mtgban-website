@@ -745,6 +745,9 @@ type SearchVars struct {
 	BuyersMode string
 	CanSales   bool
 	HasSales   map[string]bool
+	// The Graded page's Last Sold column, per card: its listed grades' sales,
+	// drawn as the Sales pane draws the recent orders.
+	GradedSales map[string][]salesvelocity.Group
 	// VelocityNotice says a velocity filter needs a higher tier, for the phone's
 	// empty page, which quotes the query instead of listing the notices.
 	VelocityNotice string
@@ -986,6 +989,12 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		}
 		pageVars.CondKeys = groupBySlab(result.sellers, byPrice)
 		pageVars.Embed.RetailLabel, pageVars.Embed.BuylistLabel = "", ""
+		pageVars.CanSales = canSeeSales(sig)
+		if pageVars.CanSales {
+			graded := gradedSalesStore.Snapshot()
+			pageVars.GradedSales = gradedSales(graded, result.sellers, pageVars.CondKeys)
+			gradedVelocity(pageVars.Metadata, graded, shown.keys)
+		}
 	} else {
 		rebuildIndexRows(&pageVars.SearchVars, pageVars.Metadata, b, p, config, shown.keys, result)
 	}

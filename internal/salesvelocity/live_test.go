@@ -187,15 +187,21 @@ func risingByChance(orders int32, start time.Time) float64 {
 // newspaper the config names, skipping unless NEWSPAPER_LIVE is set.
 func liveNewspaper(t *testing.T) (*matcher.Backend, *sql.DB) {
 	t.Helper()
+	return liveNewspaperFor(t, matcher.GameMagic, "../../allprintings5.json")
+}
+
+// liveNewspaperFor is liveNewspaper for game's datastore at datastorePath.
+func liveNewspaperFor(t *testing.T, game matcher.Game, datastorePath string) (*matcher.Backend, *sql.DB) {
+	t.Helper()
 	if os.Getenv("NEWSPAPER_LIVE") != "1" {
 		t.Skip("NEWSPAPER_LIVE not set; skipping the live newspaper test")
 	}
-	datastore, err := os.Open("../../allprintings5.json")
+	datastore, err := os.Open(datastorePath)
 	if err != nil {
 		t.Skip("no local datastore: ", err)
 	}
 	defer datastore.Close()
-	b, err := matcher.Open(matcher.GameMagic, datastore)
+	b, err := matcher.Open(game, datastore)
 	if err != nil {
 		t.Fatal(err)
 	}

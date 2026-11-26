@@ -71,6 +71,31 @@ func (s *site) loadRecentSales() {
 	}
 }
 
+// gradedSalesStore holds the slabs' sales, for the Graded page's Last Sold
+// column and nothing else (docs/adr/0012-graded-sales.md).
+var gradedSalesStore = &salesvelocity.GradedStore{}
+
+// loadGradedSales reads the slabs' sales the newspaper pulls.
+func (s *site) loadGradedSales() {
+	game, found := gameMap[Config().Game]
+	if !found || SkipNewspaper || NewNewspaperDB == nil {
+		return
+	}
+	b := s.backend()
+	if len(b.GetUUIDs()) == 0 {
+		// No datastore yet: its load runs this once it is in.
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	result, problem := gradedSalesStore.Load(ctx, NewNewspaperDB, b, game, time.Now())
+	if result != "" || problem != "" {
+		backgroundJobs.Report(jobGradedSales, result, problem)
+	}
+}
+
 // The Buyers column's two modes, as the SearchBuyersMode cookie stores them.
 const (
 	buyersBuylist = "buylist"

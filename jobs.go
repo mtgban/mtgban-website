@@ -20,6 +20,7 @@ const (
 	jobTCGListings     = "TCG listings"
 	jobSalesVelocity   = "Sales velocity"
 	jobRecentSales     = "Recent sales"
+	jobGradedSales     = "Graded sales"
 	jobNewspaperSales  = "Newspaper sales"
 	jobOffline         = "Offline refresh"
 	jobTCGCSVPrices    = "TCGCSV prices"
@@ -135,6 +136,11 @@ func (s *site) scheduleCrons() *cron.Cron {
 	// pull runs once a day, over a few hours; the other runs find nothing new
 	// and read one indexed range.
 	addJob("40 */3 * * *", jobRecentSales, s.loadRecentSales)
+
+	// Reload the graded sales the newspaper pulls once a day: a load reads the
+	// whole table, about 25 seconds, once 6 hours old or on another datastore,
+	// so a datastore load that met one running is read within 15 minutes.
+	addJob("*/15 * * * *", jobGradedSales, s.loadGradedSales)
 
 	// Alarm on the newspaper's sales pull signing out or stopping. Every site reads
 	// the same table, so one of them watches it.

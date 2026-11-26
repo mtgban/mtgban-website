@@ -5,6 +5,12 @@ of the card sell on TCGplayer a day. The number comes from the newspaper's
 TCGplayer sales scrape and is shown to the tiers that have the Newspaper
 page; the others get a line offering it. Issue #220.
 
+The row is labelled Sales Velocity, naming no marketplace: the Graded page
+heads its Last Sold column with the same row, counted from the slabs' eBay
+and Fanatics Collect sales (`docs/adr/0012-graded-sales.md`). There it is
+shown for a signature carrying `SearchSales`, like the Sales pane, and has
+no colour or rising arrow, which compare against TCGplayer's price bands.
+
 ## The data
 
 `tcgplayersalesdata` in the newspaper database holds one row per
