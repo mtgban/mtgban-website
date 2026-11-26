@@ -52,10 +52,11 @@ class FakeElement {
 // (itself a FakeElement standing in for a DocumentFragment) each time,
 // so two hovers over the same result don't share nodes, and counts them.
 class FakeTemplate extends FakeElement {
-    constructor(printingsHTML, productsHTML) {
+    constructor(printingsHTML, productsHTML, velocity) {
         super('result-hover');
         this.printingsHTML = printingsHTML;
         this.productsHTML = productsHTML;
+        this.velocity = velocity;
         this.clones = 0;
         this.content = { cloneNode: () => { this.clones++; return this._buildFragment(); } };
     }
@@ -67,6 +68,12 @@ class FakeTemplate extends FakeElement {
         if (this.productsHTML) products.append(new FakeElement('products-child'));
         frag.append(printings);
         frag.append(products);
+        // The Graded page's Sales Velocity row, on a card that has one.
+        if (this.velocity) {
+            const velocity = new FakeElement('hover-velocity');
+            velocity.append(new FakeElement('velocity-child'));
+            frag.append(velocity);
+        }
         return frag;
     }
 }
@@ -79,7 +86,7 @@ function fakeDom() {
     results.append(new FakeElement('result-header-cover'));
     const h1 = results.append(new FakeElement('result-header'));
     h1.setAttribute('data-hover', JSON.stringify(['img1', true, false, 'LEB', false, 2, '1993', 'Animate Wall']));
-    h1.append(new FakeTemplate('<p>p1</p>', '<p>q1</p>'));
+    h1.append(new FakeTemplate('<p>p1</p>', '<p>q1</p>', true));
     // A variant row (FlavorName/PromoTypes/Flag) sits between header and
     // body for some cards; headerFor must walk past it to reach h1.
     results.append(new FakeElement('result-card-extra'));
@@ -126,12 +133,14 @@ function load(dom, opts) {
         set textContent(v) { this._text = v; },
         get textContent() { return this._text; },
     };
+    const velocityStub = { replaceChildren(...nodes) { this.lastReplace = nodes; } };
     const document = {
         querySelector: sel => (sel === '.search-results' ? dom.results : null),
         getElementById: id => {
             if (id === 'cardImage') return cardImageStub;
             if (id === 'printings') return printingsStub;
             if (id === 'products') return productsStub;
+            if (id === 'sidebarVelocity') return velocityStub;
             return null;
         },
         addEventListener: (ev, fn) => {
@@ -159,7 +168,7 @@ function load(dom, opts) {
     const fn = new Function('document', 'window', 'self', 'performance',
         utilsSource + '\n' + source + '\n' + stubTail);
     const w = fn(document, window, window, window.performance);
-    return { w, calls: w.__hoverCalls, cardArtCalls, printingsStub, productsStub, cardImageStub, docListeners };
+    return { w, calls: w.__hoverCalls, cardArtCalls, printingsStub, productsStub, velocityStub, cardImageStub, docListeners };
 }
 
 test('hoverDataFor finds the header from a nested body element and parses once', () => {
@@ -262,6 +271,19 @@ test("updateSidebar inserts the template wrapper's children, not the wrapper its
     expect(printingsStub.lastReplace.some(n => n.cls === 'printings-child')).toBe(true);
     expect(productsStub.lastReplace.some(n => n.cls === 'hover-products')).toBe(false);
     expect(productsStub.lastReplace.some(n => n.cls === 'products-child')).toBe(true);
+});
+
+test("the Graded page's Sales Velocity follows the card on show, and empties for one without", () => {
+    const dom = fakeDom();
+    const { w, velocityStub } = load(dom);
+    // The seeded first result is on show; away to the second and back.
+    dom.listeners.mouseover({ target: dom.h2 });
+    w.updateSidebar.apply(null, w.__hoverCalls[w.__hoverCalls.length - 1]);
+    expect(velocityStub.lastReplace).toEqual([]);
+
+    dom.listeners.mouseover({ target: dom.h1 });
+    w.updateSidebar.apply(null, w.__hoverCalls[w.__hoverCalls.length - 1]);
+    expect(velocityStub.lastReplace.map(n => n.cls)).toEqual(['velocity-child']);
 });
 
 test('with no results, the sidebar seed still reaches setCardArtSource with an empty src', () => {

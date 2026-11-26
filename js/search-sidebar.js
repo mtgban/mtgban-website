@@ -326,7 +326,7 @@ function sidebarCardKey(src, isFoil, isEtched, setCode, cardName) {
     return [src || '', isFoil ? 'foil' : '', isEtched ? 'etched' : '', setCode || '', cardName || ''].join('\u001f');
 }
 
-function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning, productsCount, releaseDate, cardName) {
+function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning, productsCount, releaseDate, cardName, velocity) {
     var img = document.getElementById('cardImage');
     var cardKey = sidebarCardKey(src, isFoil, isEtched, setCode, cardName);
     if (img && img.__sidebarCardKey === cardKey) return;
@@ -392,6 +392,15 @@ function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasW
     if (productCountSpan) {
         productCountSpan.textContent = productsCount > 0 ? productsCount : '';
     }
+    // The Graded page's Sales Velocity row, cloned like the products.
+    let velocityDiv = document.getElementById('sidebarVelocity');
+    if (velocityDiv) {
+        if (velocity && velocity.firstChild) {
+            velocityDiv.replaceChildren(...velocity.childNodes);
+        } else {
+            velocityDiv.replaceChildren();
+        }
+    }
 }
 
 // The sort row's chart and random links that do not fit wrap onto a line
@@ -443,19 +452,20 @@ function hoverDataFor(el) {
 window.hoverDataFor = hoverDataFor;
 window.updateSidebar = updateSidebar;
 
-// Builds updateSidebar's ten-argument list from hoverDataFor's eight
-// scalars: clones the result's template for the printings/products
+// Builds updateSidebar's argument list from hoverDataFor's eight
+// scalars: clones the result's template for the printings/products/velocity
 // nodes, and runs the image URL through httpURL so a tampered attribute
 // can reach img.src as nothing but http(s).
 function hoverArgsFrom(data) {
     var a = data.args;
-    var printings = null, products = null;
+    var printings = null, products = null, velocity = null;
     if (data.tpl && data.tpl.content) {
         var frag = data.tpl.content.cloneNode(true);
         printings = frag.querySelector('.hover-printings');
         products = frag.querySelector('.hover-products');
+        velocity = frag.querySelector('.hover-velocity');
     }
-    return [httpURL(a[0]), printings, products, a[1], a[2], a[3], a[4], a[5], a[6], a[7]];
+    return [httpURL(a[0]), printings, products, a[1], a[2], a[3], a[4], a[5], a[6], a[7], velocity];
 }
 
 // The result header whose card the sidebar shows, for the backpack keys.

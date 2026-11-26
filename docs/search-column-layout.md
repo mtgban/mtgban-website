@@ -70,7 +70,8 @@ apart silently.
 ## The sidebar is a stack that degrades in a stated order
 
 Three boxes on one 8px gap: the card and its edition icons, Available In,
-then Export/Upload.
+then Export/Upload. The Graded page puts its Sales Velocity card in
+Available In's place; it holds one row and never needs to shrink.
 
 **The card never resizes.** It is the one thing here that cannot be made
 smaller without making it worse, and because a replaced element's size is

@@ -155,27 +155,40 @@
 {{end}}
 
 {{/* The Sales Velocity row atop a card's Buyers or Last Sold: how fast it
-     sells, opening to what the rate counts (docs/search-sales-velocity.md) */}}
+     sells, opening to what the rate counts (docs/search-sales-velocity.md).
+     Fixed draws it always open, for the Graded page's sidebar */}}
 {{define "sales-velocity"}}{{$card := .Card}}
+{{if .Fixed}}
+<div class="sales-velocity sales-velocity-fixed">
+    <div class="price-row">{{template "sales-velocity-rate" $card}}</div>
+    <div class="sales-velocity-detail">{{tip_html $card.VelocityDetail}}</div>
+</div>
+{{else}}
 <details class="sales-velocity"{{if .Open}} open{{end}}>
     <summary class="price-row">
-        <span class="store-name dim">Sales Velocity</span>
-        <span class="price"><span class="amt{{with $card.VelocityPace}} velocity-{{.}}{{end}}"{{with $card.VelocityNote}} title="{{.}}"{{end}}>{{if $card.VelocityRising}}<span class="velocity-rising" title="Selling at least twice as fast this week">&#8593;</span>{{end}}{{$card.Velocity}}</span></span>
+        {{template "sales-velocity-rate" $card}}
         <i class="sales-velocity-chevron" data-lucide="chevron-down"></i>
     </summary>
     <div class="sales-velocity-detail">{{tip_html $card.VelocityDetail}}</div>
 </details>
 {{end}}
+{{end}}
+
+{{define "sales-velocity-rate"}}
+<span class="store-name dim">Sales Velocity</span>
+<span class="price"><span class="amt{{with .VelocityPace}} velocity-{{.}}{{end}}"{{with .VelocityNote}} title="{{.}}"{{end}}>{{if .VelocityRising}}<span class="velocity-rising" title="Selling at least twice as fast this week">&#8593;</span>{{end}}{{.Velocity}}</span></span>
+{{end}}
 
 {{define "result-buyers"}}{{$page := .Page}}{{$card := .Card}}{{$cardId := .CardID}}
 {{/* No store buys slabs, so the Graded page shows what they last sold for,
-     never the raw copies' sales: the slabs' Sales Velocity, then each listed
-     grade's eBay and Fanatics sales (docs/adr/0012-graded-sales.md) */}}
+     never the raw copies' sales: each listed grade's eBay and Fanatics sales
+     (docs/adr/0012-graded-sales.md). The slabs' Sales Velocity heads them
+     where the desktop sidebar is hidden, and sits in that sidebar elsewhere */}}
 {{if $page.IsGraded}}
 <div class="result-col">
     <div class="result-col-header">Last Sold</div>
     {{if $page.CanSales}}
-        {{if $card.Velocity}}{{template "sales-velocity" dict "Card" $card "Open" $page.VelocityOpen}}{{end}}
+        {{if $card.Velocity}}<div class="graded-velocity-col">{{template "sales-velocity" dict "Card" $card "Open" $page.VelocityOpen}}</div>{{end}}
         <div class="sales-pane">{{template "sales-pane" (index $page.GradedSales $cardId)}}</div>
     {{else if and $page.ShowUpsell (or $card.Velocity (index $page.GradedSales $cardId))}}
         <a class="sales-velocity-upsell" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener" data-track="ui.row.locked" data-track-value="sales_upsell">Increase your tier to unlock graded sales</a>

@@ -6,8 +6,9 @@ TCGplayer sales scrape and is shown to the tiers that have the Newspaper
 page; the others get a line offering it. Issue #220.
 
 The row is labelled Sales Velocity, naming no marketplace: the Graded page
-heads its Last Sold column with the same row, counted from the slabs' eBay
-and Fanatics Collect sales (`docs/adr/0012-graded-sales.md`). There it is
+shows the same row in its sidebar, or atop its Last Sold column where the
+sidebar is hidden, counted from the slabs' eBay and Fanatics Collect sales
+(`docs/adr/0012-graded-sales.md`). There it is
 shown for a signature carrying `SearchSales`, like the Sales pane, and has
 no colour or rising arrow, which compare against TCGplayer's price bands.
 
