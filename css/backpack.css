@@ -248,8 +248,9 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 .backpack-tab.drop-after { box-shadow: 3px 0 0 var(--dodgerblue); }
 
 .backpack-tab-field { width: 10em; }
-/* a width in % lets the row's column shrink under it on a phone */
-.backpack-paid-field { width: 100%; max-width: 7em; box-sizing: border-box; }
+/* the field fills what the row's column leaves beside its label, so it
+   never widens the column itself */
+.backpack-paid-field { flex: 1 1 auto; width: 0; min-width: 2.5em; max-width: 6.5em; box-sizing: border-box; }
 
 .backpack-sort {
     flex: none;
@@ -280,7 +281,26 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 .backpack-row-price,
 .backpack-row-paid { font-size: 0.85em; font-variant-numeric: tabular-nums; }
 
-.backpack-row-price.none { opacity: 0.6; }
+.backpack-row-price.none,
+.backpack-row-paid.none { opacity: 0.6; }
+
+/* the line is its own field's button, marked by its underline */
+.backpack-row-paid {
+    display: block;
+    width: fit-content;
+    border: 0;
+    border-bottom: 1px dashed var(--border-moderate);
+    background: none;
+    color: inherit;
+    font-family: inherit;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+}
+
+.backpack-row-paid:hover { border-bottom-color: var(--dodgerblue); color: var(--dodgerblue); }
+
+.backpack-paid-edit { display: flex; align-items: center; justify-content: flex-end; gap: 0.3em; font-size: 0.85em; white-space: nowrap; }
 
 .backpack-list {
     flex: 1;
@@ -337,11 +357,17 @@ html:has(.backpack-panel.open) { overflow: hidden; }
     border: 1px solid var(--border-moderate);
 }
 
+/* the grade and count on a line, the price paid right-aligned below */
 .backpack-row-ctl {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, auto);
     align-items: center;
-    gap: 0.35em;
+    gap: 0.3em 0.35em;
 }
+
+.backpack-row-ctl .backpack-row-paid,
+.backpack-row-ctl .backpack-paid-edit { grid-column: 1 / -1; }
+.backpack-row-ctl .backpack-row-paid { justify-self: end; }
 
 .backpack-qty { min-width: 1.5em; text-align: center; font-weight: 600; }
 
@@ -453,6 +479,22 @@ body.mobile .backpack-row-art { grid-row: span 2; }
 body.mobile .backpack-row-name { display: block; width: fit-content; }
 body.mobile .backpack-row-where { display: inline; }
 body.mobile .backpack-row-finish { margin-left: 0.4em; }
+
+/* the price paid ends the controls' line, its field filling what is left,
+   beside a grade sized for its two letters; a narrower phone wraps it */
+body.mobile .backpack-row-ctl { display: flex; flex-wrap: wrap; row-gap: 0.4em; }
+body.mobile .backpack-cond { width: 3.5em; }
+body.mobile .backpack-row-ctl .backpack-row-paid { margin-left: auto; white-space: nowrap; }
+body.mobile .backpack-row-ctl .backpack-paid-edit { flex: 1; }
+body.mobile .backpack-row-ctl .backpack-paid-word { display: none; }
+
+.backpack-paid-short { display: none; }
+
+/* a phone too narrow for "(unknown)" beside the controls says n/a */
+@media (max-width: 370px) {
+    body.mobile .backpack-row-ctl .backpack-paid-long { display: none; }
+    body.mobile .backpack-row-ctl .backpack-paid-short { display: inline; }
+}
 
 /* iOS zooms into a field under 16px */
 body.mobile .backpack-cond,

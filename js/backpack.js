@@ -1527,8 +1527,8 @@
 
     // condSelect moves the entry to a grade, or adds the card in one more,
     // never offering the grades its other entries hold, or moves it to one
-    // of the other backpacks, or opens the field for its price paid.
-    function condSelect(e, held, others, editPaid) {
+    // of the other backpacks.
+    function condSelect(e, held, others) {
         var sel = text("select", "backpack-cond");
         sel.setAttribute("aria-label", "Condition");
         CONDS.forEach(function (c) {
@@ -1547,17 +1547,10 @@
             others.forEach(function (t) { to.appendChild(option("@" + t.pack, t.name, "Move every copy to " + t.name)); });
             sel.appendChild(to);
         }
-        var cost = text("optgroup");
-        cost.setAttribute("label", "Price paid");
-        var paid = option("$", paidLabel(e), "What each copy cost");
-        paid.setAttribute("class", "backpack-cond-paid");
-        cost.appendChild(paid);
-        sel.appendChild(cost);
         sel.value = e.cond;
         sel.addEventListener("change", function () {
             var v = sel.value;
             sel.value = e.cond;
-            if (v === "$") { editPaid(); return; }
             if (v.charAt(0) === "@") {
                 moveCard(key(e), parseInt(v.slice(1), 10));
                 focusTab(active());
@@ -1596,28 +1589,31 @@
         return text("div", "backpack-row-price", "NM $ " + got.v.toFixed(2) + (got.store ? " · " + got.store : ""));
     }
 
-    // paidLabel is the price paid as the dropdown offers to change it.
-    function paidLabel(e) {
-        return e.paid ? "$ " + e.paid.toFixed(2) : "Set price";
-    }
-
     // The field askPaid has open, and whether the list was due a redraw
     // meanwhile, which would take the field with what is typed in it.
     var asking = null, redraw = false;
 
-    // paidLine is what each copy of the row's card cost, or null.
-    function paidLine(e) {
-        if (!e.paid) return null;
-        var line = text("div", "backpack-row-paid", "Paid $ " + e.paid.toFixed(2));
-        line.setAttribute("title", "Each copy");
+    // paidLine is what each copy of the row's card cost, unknown where
+    // none is set, and opens the field for it.
+    function paidLine(e, editPaid) {
+        var line = text("button", "backpack-row-paid" + (e.paid ? "" : " none"), e.paid ? "Paid $ " + e.paid.toFixed(2) : null);
+        line.setAttribute("type", "button");
+        // A narrow phone says n/a for unknown, beside the controls
+        if (!e.paid) {
+            line.append(text("span", null, "Paid "), text("span", "backpack-paid-long", "(unknown)"), text("span", "backpack-paid-short", "n/a"));
+            line.setAttribute("aria-label", "Paid (unknown)");
+        }
+        line.setAttribute("title", "What each copy cost");
+        line.addEventListener("click", function () { editPaid(line); });
         return line;
     }
 
     // askPaid swaps the row's price paid for a field: Enter or leaving it
     // saves, blank taking the price away, and Escape keeps the price. Then
-    // done, given the field and told whether a key ended it, redraws the row.
-    function askPaid(e, body, done) {
-        var was = body.querySelector(".backpack-row-paid");
+    // done, given what holds the field and told whether a key ended it,
+    // redraws the row.
+    function askPaid(e, line, done) {
+        var edit = text("span", "backpack-paid-edit");
         var field = document.createElement("input");
         field.type = "number";
         field.setAttribute("class", "backpack-paid-field");
@@ -1635,7 +1631,7 @@
             // A number field reads as blank while it holds no number
             if (field.validity && field.validity.badInput) save = false;
             if (save && setPaid(key(e), field.value) && window.BAN && window.BAN.track) window.BAN.track("ui.backpack.card", "paid");
-            done(field, byKey);
+            done(edit, byKey);
         };
         field.addEventListener("keydown", function (ev) {
             if (ev.key !== "Enter" && ev.key !== "Escape") return;
@@ -1645,7 +1641,8 @@
             finish(ev.key === "Enter", true);
         });
         field.addEventListener("blur", function () { finish(true, false); });
-        if (was) was.replaceWith(field); else body.appendChild(field);
+        edit.append(text("span", "backpack-paid-word", "Paid"), text("span", null, "$"), field);
+        line.replaceWith(edit);
         asking = field;
         field.focus();
         if (field.select) field.select();
@@ -1685,8 +1682,6 @@
         body.append(name, where);
         if (e.finishTag) body.appendChild(text("span", "backpack-row-finish " + (e.finishClass || ""), e.finishTag));
         if (price) body.appendChild(price);
-        var paid = paidLine(e);
-        if (paid) body.appendChild(paid);
 
         // The minus takes the last copy with the card; Undo brings it back.
         var ctl = text("div", "backpack-row-ctl");
@@ -1717,8 +1712,8 @@
             render();
             if (focused) focusCtl(key(e), ".backpack-plus");
         });
-        var editPaid = function () {
-            askPaid(e, body, function (field, byKey) {
+        function editPaid(line) {
+            askPaid(e, line, function (edit, byKey) {
                 var cur = live().filter(function (x) { return key(x) === key(e); })[0];
                 if (redraw) {
                     redraw = false;
@@ -1729,15 +1724,13 @@
                     // The price alone: redrawing more would take the control
                     // a click is leaving the field for
                     e.paid = cur.paid;
-                    var line = paidLine(e);
-                    if (line) field.replaceWith(line); else field.remove();
-                    r.querySelector(".backpack-cond-paid").textContent = paidLabel(e);
+                    edit.replaceWith(paidLine(e, editPaid));
                 }
                 undoBtn.disabled = undoSteps().length === 0;
-                if (byKey) focusCtl(key(e), ".backpack-cond");
+                if (byKey) focusCtl(key(e), ".backpack-row-paid");
             });
-        };
-        ctl.append(condSelect(e, held, others, editPaid), minus, qty, plus);
+        }
+        ctl.append(condSelect(e, held, others), minus, qty, plus, paidLine(e, editPaid));
 
         r.append(art, body, ctl);
         return r;
