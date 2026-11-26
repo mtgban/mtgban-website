@@ -42,12 +42,8 @@
             return;
         }
 
-        // Allow PgUp/PgDn to scroll even when searchbox is focused
-        if (e.key !== 'PageDown' && e.key !== 'PageUp') {
-            var tag = e.target.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-            if (e.target.isContentEditable) return;
-        }
+        // Only paging drives the sidebar; it works even when the searchbox is focused
+        if (e.key !== 'PageDown' && e.key !== 'PageUp') return;
 
         if (e.key === 'PageDown') {
             e.preventDefault();
