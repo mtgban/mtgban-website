@@ -1,0 +1,141 @@
+name: tcgcsvd
+
+on:
+  schedule:
+    - cron: '15 21 * * *' # daily
+    - cron: '15 23 * * *' # daily
+    - cron: '15 3 * * *' # daily
+    - cron: '15 18 * * 1' # products
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "The job to run"
+        type: choice
+        options:
+          - daily
+          - products
+          - backfill
+          - games
+        default: daily
+      from:
+        description: "Backfill start date YYYY-MM-DD (default: earliest archive; an explicit date fetches the whole range, bypassing the resume cursor)"
+        type: string
+        default: ""
+      to:
+        description: "Backfill end date YYYY-MM-DD (default: today)"
+        type: string
+        default: ""
+      categories:
+        description: "Restrict the backfill to these TCGplayer category ids, comma-separated (default: every configured game)"
+        type: string
+        default: ""
+      force:
+        description: "Re-ingest dates already stored (ignore the resume cursor)"
+        type: boolean
+        default: false
+
+permissions: {}
+
+# A backfill must not queue the daily behind it; the crawl lock keeps crawls apart.
+concurrency:
+  group: tcgcsvd-${{ inputs.job || github.event.schedule }}
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    if: github.repository == 'mtgban/mtgban-website'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: read
+    env:
+      JOB: ${{ inputs.job }}
+      FROM: ${{ inputs.from }}
+      TO: ${{ inputs.to }}
+      CATEGORIES: ${{ inputs.categories }}
+      FORCE: ${{ inputs.force }}
+      SCHEDULE: ${{ github.event.schedule }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # First, so a later failure still finds the webhook for its report.
+      - name: Write the config
+        env:
+          TCGCSVD_CONFIG: ${{ secrets.TCGCSVD_CONFIG }}
+        run: |
+          if [ -z "$TCGCSVD_CONFIG" ]; then
+            echo "::error::the TCGCSVD_CONFIG repository secret is not set"
+            exit 1
+          fi
+          umask 077
+          cfg="$RUNNER_TEMP/tcgcsvd.json"
+          printf '%s' "$TCGCSVD_CONFIG" > "$cfg"
+          if ! jq -e . "$cfg" >/dev/null 2>&1; then
+            echo "::error::the TCGCSVD_CONFIG secret is not valid JSON"
+            exit 1
+          fi
+          # lib/pq errors print host, user and database, and these logs are public.
+          for path in '.sql_config.password' '.sql_config.host' '.sql_config.user' '.sql_config.dbname' '.discord.server_webhook_url'; do
+            value=$(jq -r "$path // empty" "$cfg")
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Pick the job
+        id: pick
+        run: |
+          job="$JOB"
+          if [ -z "$job" ]; then
+            if [ "$SCHEDULE" = '15 18 * * 1' ]; then
+              job=products
+            else
+              job=daily
+            fi
+          fi
+          echo "job=$job" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: go build -o "$RUNNER_TEMP/tcgcsvd" ./cmd/tcgcsvd
+
+      # The backfill needs 7z, which ubuntu-latest ships.
+      - name: Run
+        timeout-minutes: ${{ steps.pick.outputs.job == 'backfill' && 340 || 60 }}
+        env:
+          PICKED: ${{ steps.pick.outputs.job }}
+        run: |
+          args=(-config "$RUNNER_TEMP/tcgcsvd.json" "-$PICKED")
+          if [ "$PICKED" = backfill ]; then
+            [ -n "$FROM" ] && args+=(-from "$FROM")
+            [ -n "$TO" ] && args+=(-to "$TO")
+            [ -n "$CATEGORIES" ] && args+=(-categories "$CATEGORIES")
+            [ "$FORCE" = true ] && args+=(-force)
+          elif [ -n "$FROM$TO$CATEGORIES" ] || [ "$FORCE" = true ]; then
+            echo "::error::from, to, categories and force apply to the backfill job only, not $PICKED"
+            exit 1
+          fi
+          "$RUNNER_TEMP/tcgcsvd" "${args[@]}"
+
+      - name: Check freshness
+        if: steps.pick.outputs.job == 'daily'
+        timeout-minutes: 5
+        run: '"$RUNNER_TEMP/tcgcsvd" -config "$RUNNER_TEMP/tcgcsvd.json" -games -stale-after 50h'
+
+      - name: Report a failure
+        if: failure()
+        env:
+          PICKED: ${{ steps.pick.outputs.job }}
+        run: |
+          cfg="$RUNNER_TEMP/tcgcsvd.json"
+          [ -f "$cfg" ] || exit 0
+          url=$(jq -r '.discord.server_webhook_url // empty' "$cfg" 2>/dev/null) || exit 0
+          [ -n "$url" ] || exit 0
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          jq -n --arg c "tcgcsvd ${PICKED:-${JOB:-scheduled}} failed: $run_url" '{content: $c}' |
+            curl -fsS -H 'Content-Type: application/json' -d @- "$url"

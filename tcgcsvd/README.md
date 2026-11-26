@@ -9,19 +9,18 @@ of reach. The archive reader stays here because the archives are still being
 recorded upstream, just not published; `docs/tcgcsv-archive-withdrawal.md` has
 the notice tcgcsv serves and what a backfill can still do.
 
-This is a library plus a standalone binary. The website imports the library for
-its crons and the admin "Ingest TCGCSV" button; `cmd/tcgcsvd` runs the same jobs
-as its own process, with no web server, datastore, or template stack loaded.
-The two scheduled jobs take the same cross-process Postgres advisory lock before
-crawling, so a server with its crons on and a standalone run never hit
-tcgcsv.com at once; a run that loses the lock says so and exits 0. The backfill's
+This is a library plus a standalone binary. `cmd/tcgcsvd` runs the jobs as its
+own process, with no web server, datastore, or template stack loaded, and the
+website no longer ingests: `.github/workflows/tcgcsvd.yml` runs them on a
+schedule. The two scheduled jobs take a cross-process Postgres advisory lock
+before crawling, so two runs never hit tcgcsv.com at once; a run that loses the
+lock says so and exits 0. The backfill's
 archive walk stays outside the lock on purpose — it is operator-driven and can
 run for hours, and holding the lock that long would starve the daily pull — but
 its snapshot fallback takes it, being the same full crawl the daily job makes.
 The lock needs one Postgres session throughout, which PgBouncer in transaction
 mode does not keep: where `sql_config` points at one, set its `direct_port` to
-Postgres's own port in every `sql_config` the two read, the infrastructure
-file's and any config's own.
+Postgres's own port.
 
 ```
 go install github.com/mtgban/mtgban-website/cmd/tcgcsvd@latest
@@ -167,40 +166,50 @@ stops appearing for a category does not hold it back.
 
 ## Running it as its own service
 
-The website still registers the crons when `tcgcsv_config` and a price database
-are both present. To move ingestion off the web servers, drop `tcgcsv_config`
-from their config (the crons then stay unregistered and the admin button reports
-ingestion as unconfigured) and give the box a unit and a timer. A server
-without `tcgcsv_config` writes TCGplayer Low and Market for its own game from
-its stash, twice a day; those cannot advance the ingest's gate, since the stash
-never writes 5 to 7 (see Configuration above).
+The ingest runs from `.github/workflows/tcgcsvd.yml`, all times UTC:
+
+- `daily` at 21:15, 23:15 and 03:15. A late or skipped schedule is covered by
+  the next one, and a run on a game already stored for the day is a no-op, so
+  the spares cost nothing.
+- `products` on Mondays at 22:15.
+
+To run a job or a backfill by hand, open the Actions tab, pick `tcgcsvd` and
+Run workflow: choose the job (`daily`, `products`, `backfill` or `games`),
+and for a backfill fill `from`, `to`, `categories` and `force`, which any other
+job rejects.
+
+The workflow reads the whole config from the `TCGCSVD_CONFIG` repository
+secret, a JSON file with three keys:
+
+- `sql_config`, where either `port` or `direct_port` must reach Postgres
+  directly, since the crawl lock needs one session
+- `tcgcsv_config`, the chosen categories and the User-Agent
+- `discord.server_webhook_url`, which also gets a notice when a run fails
+
+After each `daily` run the workflow runs `tcgcsvd -games -stale-after 50h`,
+which fails the run when any configured game's newest stored day is missing or
+older than 50 hours, the age counted from the stored day's UTC midnight, so in
+practice the check fails once a whole UTC day's snapshot is still missing at
+02:00 the next day.
+
+A box can run the same binary instead, with a unit and a timer; the crawl
+lock keeps it and the workflow apart.
 
 ```ini
 # /etc/systemd/system/tcgcsvd@.service   —  %i is the job: daily, products
-[Unit]
-Description=tcgcsv ingest (%i)
-After=network.target
-
 [Service]
 Type=oneshot
-User=koda
-EnvironmentFile=/etc/mtgban.env
-ExecStart=/usr/local/bin/tcgcsvd -config b2://mtgban-config/magic/config.json -%i
+ExecStart=/usr/local/bin/tcgcsvd -config /etc/tcgcsvd.json -%i
 ```
 
 ```ini
 # /etc/systemd/system/tcgcsvd@daily.timer
 [Timer]
-OnCalendar=*-*-* 21:00:00 UTC
+OnCalendar=*-*-* 21:15:00 UTC
 
 [Install]
 WantedBy=timers.target
 ```
-
-Nothing enforces which process ingests: the crawl lock means several can be
-armed at once and only one crawls. That makes the cutover safe in either
-direction — stand up the timer first, confirm it wins the lock, then drop the
-config from the servers.
 
 ## As a library
 
