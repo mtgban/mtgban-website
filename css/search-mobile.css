@@ -43,6 +43,9 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     html:has(.m-landing) body {
         height: 100%;
         overflow: hidden;
+        /* Safari scrolls a hidden root too on a category jump, putting the
+           heading under the nav; a clipped one it cannot scroll */
+        overflow: clip;
         overscroll-behavior: none;
     }
 
