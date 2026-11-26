@@ -81,13 +81,15 @@
 }
 .admin-invite-closed { color: var(--text-dim); }
 
-/* The rows wrap, a long address anywhere, so the link and revoke fit the
-   admin column; the link and its Copy stay on one line */
+/* The rows wrap, a long address anywhere (an acceptance's IPv6 too), so
+   the link and revoke fit the admin column; the link and its Copy stay on
+   one line */
 .admin-table.admin-invites td { white-space: normal; }
 .admin-table.admin-invites td.admin-invite-minted { overflow-wrap: anywhere; min-width: 9em; }
 .admin-table.admin-invites td.admin-invite-memo { min-width: 8em; }
 .admin-invite-grants .admin-dim { white-space: nowrap; }
 .admin-table.admin-invites td.admin-invite-link { white-space: nowrap; }
+.admin-invite-redemptions li { white-space: normal; overflow-wrap: anywhere; }
 
 /* iOS zooms the page into a focused field under 16px. */
 @media (pointer: coarse) {
