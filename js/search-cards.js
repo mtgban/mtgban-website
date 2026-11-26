@@ -114,16 +114,31 @@
         return Math.round(deck.scrollTop / pitch());
     }
 
-    // In landscape the page scrolls instead, and the deck's place means nothing.
+    // In landscape the page scrolls instead, and the card in view is the one
+    // across the middle of the screen.
+    function inView() {
+        var list = cards();
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].getBoundingClientRect().bottom > window.innerHeight / 2) return i;
+        }
+        return Math.max(list.length - 1, 0);
+    }
+
     function remember() {
-        if (!portrait.matches) return;
-        var state = Object.assign({}, history.state || {}, { cardsIndex: current() });
+        var i = portrait.matches ? current() : inView();
+        var state = Object.assign({}, history.state || {}, { cardsIndex: i });
         try { history.replaceState(state, ''); } catch (e) {}
     }
 
     function restore() {
         var i = history.state && history.state.cardsIndex;
         if (i > 0 && portrait.matches && current() !== i) deck.scrollTop = i * pitch();
+    }
+
+    // Landscape puts the card under the nav, which its scroll-margin clears.
+    function restorePage() {
+        var i = history.state && history.state.cardsIndex;
+        if (i > 0 && !portrait.matches && cards()[i]) cards()[i].scrollIntoView({ block: 'start' });
     }
     restore();
     // Again once the page has loaded, should the browser have moved the deck
@@ -132,11 +147,13 @@
     window.addEventListener('pageshow', function (e) { if (e.persisted) restore(); });
     // The card in view as the page is left, even mid-swipe.
     window.addEventListener('pagehide', remember);
-    // A turned phone takes each card to its picture and the deck to its card.
+    // A turned phone takes each card to its picture, and the deck or the page
+    // to its card.
     portrait.addEventListener('change', function () {
         pager(false);
         centreAll();
         restore();
+        restorePage();
     });
 
     // Settled scrolls: the card the reader is on, and the list a swipe
@@ -343,6 +360,12 @@
 
     document.addEventListener('scroll', function (e) {
         var el = e.target;
+        // Landscape scrolls the page: remember the card it settles on.
+        if (el === document && !portrait.matches) {
+            clearTimeout(timers.get(el));
+            timers.set(el, setTimeout(remember, 150));
+            return;
+        }
         if (el !== deck && !(el.classList && el.classList.contains('m-card') && el.parentNode === deck)) return;
         if (el === deck) place();
         if (window.closeActionsMenus) window.closeActionsMenus();
