@@ -407,13 +407,13 @@ func TestAdminViewsAnswerAGet(t *testing.T) {
 		}
 	}
 
+	// Invites are minted on the Invites tab now; the old query mints none.
 	req := httptest.NewRequest(http.MethodGet, "/admin?tool=invite&tier=Free&duration=7", nil)
 	req.Host = "mtgban.com"
 	rec := httptest.NewRecorder()
 	s.Admin(rec, req)
-	loc, err := url.Parse(rec.Header().Get("Location"))
-	if rec.Code != http.StatusFound || err != nil || loc.Query().Get("html") != "invite" || !strings.Contains(loc.Query().Get("msg"), "/?sig=") {
-		t.Errorf("an invite GET answered %d to %q, want the invite link", rec.Code, rec.Header().Get("Location"))
+	if rec.Code != http.StatusOK || rec.Header().Get("Location") != "" || strings.Contains(rec.Body.String(), "/?sig=") {
+		t.Errorf("an invite GET answered %d to %q, want the page and no link", rec.Code, rec.Header().Get("Location"))
 	}
 }
 

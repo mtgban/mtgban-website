@@ -5,6 +5,7 @@
 
 {{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/admin.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/admin-invites.css?hash={{.Hash}}">
 {{end}}
 
 {{define "content"}}
@@ -72,6 +73,7 @@
         <button class="admin-tab{{if eq .Page "searches"}} active{{end}}" onclick="location.href='?page=searches'">Searches</button>
         <button class="admin-tab{{if eq .Page "metrics"}} active{{end}}" onclick="location.href='?page=metrics'">Metrics</button>
         <button class="admin-tab{{if eq .Page "alerts"}} active{{end}}" onclick="location.href='?page=alerts'">Alerts</button>
+        <button class="admin-tab{{if eq .Page "invites"}} active{{end}}" onclick="location.href='?page=invites'">Invites</button>
         <button class="admin-tab{{if eq .Page "people"}} active{{end}}" onclick="window.switchTab && switchTab(this,'people')">People</button>
         <button class="admin-tab{{if $isFile}} active{{end}}" onclick="window.switchTab && switchTab(this,'files')">Files</button>
         <button class="admin-tab{{if eq .Page "tools"}} active{{end}}" onclick="window.switchTab && switchTab(this,'tools')">Tools</button>
@@ -217,6 +219,13 @@
          ═══════════════════════ -->
     <div class="admin-panel{{if eq .Page "alerts"}} active{{end}}" id="panel-alerts">
         {{if eq .Page "alerts"}}{{template "admin-alerts" .}}{{end}}
+    </div>
+
+    <!-- ═══════════════════════
+         INVITES
+         ═══════════════════════ -->
+    <div class="admin-panel{{if eq .Page "invites"}} active{{end}}" id="panel-invites">
+        {{if eq .Page "invites"}}{{template "admin-invites" .}}{{end}}
     </div>
 
     <!-- ═══════════════════════
@@ -606,32 +615,6 @@
             <!-- Admin Tools -->
             <div class="card tools-card">
                 <h3>Admin Tools</h3>
-
-                {{/* An invite link carries a tier's grants and an expiry, so
-                     it takes both before there is anything to mint: either
-                     select submits once the other has been answered, so the
-                     two can be picked in whichever order. */}}
-                <div class="admin-tool">
-                    <label>Create Invite Link</label>
-                    <form action="admin" method="GET">
-                        <input type="hidden" name="tool" value="invite"/>
-                        <select name="tier" onchange="if (this.form.tier.value &amp;&amp; this.form.duration.value) { this.form.submit() }">
-                            <option disabled selected value="">~ choose tier ~</option>
-                            {{range .Tiers}}
-                                <option value="{{.}}">{{.}}</option>
-                            {{end}}
-                        </select>
-                        <div class="tool-row">
-                            <select name="duration" onchange="if (this.form.tier.value &amp;&amp; this.form.duration.value) { this.form.submit() }">
-                                <option disabled selected value="">~ expires in ~</option>
-                                <option value="1">One day</option>
-                                <option value="7">One week</option>
-                                <option value="15">Two weeks</option>
-                                <option value="30">One month</option>
-                            </select>
-                        </div>
-                    </form>
-                </div>
 
                 <div class="admin-tool">
                     <label>Generate API Key</label>

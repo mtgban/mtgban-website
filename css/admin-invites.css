@@ -1,0 +1,82 @@
+/* The admin's Invites tab, desktop and mobile alike: the mint form, its
+   features, and the table's link and acceptances. */
+.admin-invite-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.admin-invite-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+}
+.admin-invite-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+}
+.admin-invite-note { flex: 1; min-width: 14em; }
+.admin-invite-form input[type="text"],
+.admin-invite-form input[type="number"],
+.admin-invite-form select,
+.admin-invite-link input {
+    box-sizing: border-box;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-2);
+    color: var(--normal);
+    font-size: var(--text-md);
+}
+.admin-invite-form input[type="number"] { width: 6em; }
+.admin-invite-features {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--border-moderate);
+    border-radius: var(--radius-sm);
+}
+.admin-invite-features legend { color: var(--text-dim); font-size: var(--text-sm); }
+.admin-invite-features p {
+    margin: 4px 0 0;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+.admin-invite-feature {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 6px 12px;
+}
+.admin-invite-form .admin-invite-page {
+    flex-direction: row;
+    align-items: center;
+    min-width: 8em;
+    color: var(--normal);
+}
+.admin-invite-option input { width: 9em; }
+.admin-invite-form button.admin-invite-mint {
+    align-self: flex-start;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--dodgerblue-fill);
+    color: #fff;
+    font-size: var(--text-md);
+    font-weight: 600;
+    cursor: pointer;
+}
+.admin-invite-link { white-space: nowrap; }
+.admin-invite-link input { width: 16em; }
+.admin-invite-redemptions {
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    text-align: left;
+    white-space: nowrap;
+}
+.admin-invite-closed { color: var(--text-dim); }
