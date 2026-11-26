@@ -447,6 +447,13 @@ body.mobile .backpack-panel .m-drawer-handle span {
 
 body.mobile.light-theme .backpack-panel .m-drawer-handle span { background: rgba(0, 0, 0, 0.2); }
 
+/* a phone row gives the card its width, its controls a line below */
+body.mobile .backpack-row { grid-template-columns: 2.5em minmax(0, 1fr); row-gap: 0.4em; }
+body.mobile .backpack-row-art { grid-row: span 2; }
+body.mobile .backpack-row-name { display: block; width: fit-content; }
+body.mobile .backpack-row-where { display: inline; }
+body.mobile .backpack-row-finish { margin-left: 0.4em; }
+
 /* iOS zooms into a field under 16px */
 body.mobile .backpack-cond,
 body.mobile .backpack-sort-by,
