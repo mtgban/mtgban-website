@@ -5,14 +5,17 @@ const optimizer = readFileSync(new URL('../js/upload-optimizer.js', import.meta.
 const exportsSource = readFileSync(new URL('../js/upload-exports.js', import.meta.url), 'utf8');
 
 // An optimizer row as templates/upload.html draws it: its card, condition,
-// the stores it can move to and, when moved, the store it was moved to.
-function row(id, cond, move, moved) {
+// the stores it can move to, when moved, the store it was moved to, and
+// the price its line carries.
+function row(id, cond, move, moved, price) {
     const attrs = moved ? { 'data-opt-moved': moved } : {};
+    const dataset = {
+        optId: id, optCond: cond, move,
+        get optMoved() { return attrs['data-opt-moved']; },
+    };
+    if (price !== undefined) dataset.sharePrice = price;
     return {
-        dataset: {
-            optId: id, optCond: cond, move,
-            get optMoved() { return attrs['data-opt-moved']; },
-        },
+        dataset,
         hasAttribute: (name) => name in attrs,
         setAttribute: (name, value) => { attrs[name] = value; },
         removeAttribute: (name) => { delete attrs[name]; },
@@ -60,6 +63,21 @@ test('the moves go with the mode they were made in, one line a card', () => {
     expect(packOptMoves(rows, 'true')).toBe('buylist\na\tNM\tSCG\nb\t\tCK');
     expect(packOptMoves(rows, 'false')).toBe('retail\na\tNM\tSCG\nb\t\tCK');
     expect(packOptMoves([row('c', 'NM', '', undefined)], 'true')).toBe('');
+});
+
+test('a card\'s lines at two prices move apart, each naming its price', () => {
+    const rows = [row('a', 'NM', '', 'SCG', '4'), row('a', 'NM', '', 'CK', '10m'), row('a', 'NM', '', 'SCG', '4')];
+    expect(packOptMoves(rows, 'true')).toBe('buylist\na\tNM\tSCG\t4\na\tNM\tCK\t10m');
+});
+
+test('a move on one of a card\'s price lines leaves the other line\'s move', () => {
+    const ten = row('a', 'NM', '', 'CK', '10');
+    const four = row('a', 'NM', 'SCG:4.00', 'CK', '4');
+    const { moveOptRow } = loadOptimizer([ten, four]);
+
+    moveOptRow(four, 'SCG');
+    expect(four.dataset.optMoved).toBe('SCG');
+    expect(ten.dataset.optMoved).toBe('CK');
 });
 
 test('a move marks the row alone for its card and prices the list again on the card', () => {

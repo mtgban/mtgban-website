@@ -1188,7 +1188,7 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 		offers := rows.tallyOffers(row, blMode, st, prices, indexes)
 		priced = append(priced, pricedRow{row, offers})
 		// A row moved to Not bought goes to no store, so it tips no tie
-		if row.counts && !(blMode && st.moves[row.priceKey] == notBoughtMove) {
+		if row.counts && !(blMode && optMove(st.moves, row) == notBoughtMove) {
 			shares.Add(offers, blMode)
 		}
 	}
@@ -1215,7 +1215,7 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 
 		// A row the reader moved goes to their store alone, while that
 		// store still offers for it, or to Not bought, which a buylist has
-		moved := st.moves[row.priceKey]
+		moved := optMove(st.moves, row)
 		if offers[moved] > 0 {
 			bestStores = []string{moved}
 		}
@@ -1232,7 +1232,7 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 
 		listed := rows.optimizeRow(row, offers, bestStores, st, indexes)
 		if blMode && !listed {
-			e := LeftoverEntry{CardID: row.CardID, Condition: row.conds, Quantity: row.qty, Loaded: rowComparePrice(row, st, indexes), CompareSource: st.altPriceSource, Moved: movedOut, Notes: row.Notes}
+			e := LeftoverEntry{CardID: row.CardID, Condition: row.conds, Quantity: row.qty, Loaded: rowComparePrice(row, st, indexes), CompareSource: st.altPriceSource, Moved: movedOut, LoadedPrice: row.OriginalPrice, LoadedIsMarket: row.PriceIsMarket, Notes: row.Notes}
 			if len(bestStores) == 0 && !bulkTakes {
 				rows.notBought.add(row, e)
 			} else {
@@ -1337,6 +1337,10 @@ type LeftoverEntry struct {
 	MoveTo string
 	// Moved is whether the reader moved the row to Not bought
 	Moved bool
+	// LoadedPrice is the row's own price, which names its line in a move,
+	// as OptimizedUploadEntry's
+	LoadedPrice    float64
+	LoadedIsMarket bool
 	// Bulk is the bulk shelf's row that takes it, when it pays more than
 	// every store
 	Bulk bulkrates.Tier
@@ -1384,7 +1388,7 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 		price := rows.resultPrices[row.priceKey][bestStore]
 
 		// Skip if needed, unless the reader put the row here
-		moved := st.moves[row.priceKey] == bestStore
+		moved := optMove(st.moves, row) == bestStore
 		if !moved && st.skipLowValueAbs && price < st.minLowVal {
 			continue
 		}
@@ -2013,12 +2017,13 @@ const notBoughtMove = "-"
 const maxTieOrder = 3
 
 // readOptMoves reads the optimizer rows the reader moved to a store of their
-// choosing, the store by price key (card id and condition). Only a results
-// page pricing its own rows again sends them, as a first line naming the
-// mode and one "id<TAB>condition<TAB>store" line a row, the store
-// notBoughtMove for a row moved to Not bought; a store's shorthand
-// names its buylist and its retail alike, so a move made in the other mode
-// is dropped.
+// choosing, the store by price key (card id and condition) and the row's
+// price. Only a results page pricing its own rows again sends them, as a
+// first line naming the mode and one "id<TAB>condition<TAB>store<TAB>price"
+// line a row, the store notBoughtMove for a row moved to Not bought; a line
+// with no price, from an older page, moves every line of the card. A store's
+// shorthand names its buylist and its retail alike, so a move made in the
+// other mode is dropped.
 func readOptMoves(r *http.Request, blMode, skipConds bool) map[string]string {
 	if r.FormValue("rows") == "" {
 		return nil
@@ -2037,7 +2042,7 @@ func readOptMoves(r *http.Request, blMode, skipConds bool) map[string]string {
 			break
 		}
 		fields := strings.Split(strings.TrimSuffix(line, "\r"), "\t")
-		if len(fields) != 3 || fields[0] == "" || fields[2] == "" {
+		if len(fields) < 3 || len(fields) > 4 || fields[0] == "" || fields[2] == "" {
 			continue
 		}
 		// No row holds a condition once the settings ignore them, and a
@@ -2046,6 +2051,9 @@ func readOptMoves(r *http.Request, blMode, skipConds bool) map[string]string {
 			fields[1] = ""
 		}
 		key := fields[0] + fields[1]
+		if len(fields) == 4 {
+			key += "\t" + fields[3]
+		}
 		store, found := moves[key]
 		if found && store != fields[2] {
 			fields[2] = ""
@@ -2053,6 +2061,20 @@ func readOptMoves(r *http.Request, blMode, skipConds bool) map[string]string {
 		moves[key] = fields[2]
 	}
 	return moves
+}
+
+// optMove is the store the reader moved the row's line to: the move naming
+// its price as the page shows it (data-share-price), else its card's.
+func optMove(moves map[string]string, row uploadRow) string {
+	price := fmt.Sprint(row.OriginalPrice)
+	if row.PriceIsMarket {
+		price += "m"
+	}
+	store, found := moves[row.priceKey+"\t"+price]
+	if !found {
+		store = moves[row.priceKey]
+	}
+	return store
 }
 
 // uploadStores are the stores and index prices an upload is priced against,
