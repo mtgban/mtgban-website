@@ -92,6 +92,7 @@ func (s *site) registerRoutes() {
 	http.HandleFunc("/sealed/", s.SealedRedirect)
 	http.HandleFunc("/random", s.RandomSearch)
 	http.HandleFunc("/randomsealed", s.RandomSealedSearch)
+	http.HandleFunc("/randomgraded", s.RandomGradedSearch)
 	http.HandleFunc("/discord", discordRedirect)
 
 	// Public changelog sourced from the Discord announcement channel.

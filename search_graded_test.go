@@ -257,3 +257,47 @@ func TestGradedPageLastSold(t *testing.T) {
 		t.Error("a reader without the sales sees them, or no upsell")
 	}
 }
+
+// The Graded page's random card is always one a graded store the reader sees
+// lists, never a raw card or one only a blocked or hidden store lists.
+func TestRandomGradedSearch(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+	cards := somePlainCardUUIDs(t, 3)
+	slab := &mtgban.Slab{Grader: "PSA", Score: 9}
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[0]: {{Conditions: "NM", Price: 10, URL: "u"}},
+		}, mtgban.ScraperInfo{Name: "RAWSHOP", Shorthand: "RAWSHOP"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[1]: {{Conditions: "NM", Price: 40, URL: "u", Slab: slab}},
+		}, mtgban.ScraperInfo{Name: "SLABSHOP", Shorthand: "SLABSHOP", GradedMode: true}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[2]: {{Conditions: "NM", Price: 40, URL: "u", Slab: slab}},
+		}, mtgban.ScraperInfo{Name: "HIDDENSLABS", Shorthand: "HIDDENSLABS", GradedMode: true}),
+	}, nil)
+	withConfigCopy(t)
+	Config().Stores.SearchRetailBlockList = []string{"HIDDENSLABS"}
+
+	for range 30 {
+		rec := httptest.NewRecorder()
+		testSite.RandomGradedSearch(rec, httptest.NewRequest(http.MethodGet, "/randomgraded", nil))
+		want := "/graded?q=" + cards[1]
+		if rec.Code != http.StatusFound || rec.Header().Get("Location") != want {
+			t.Fatalf("redirect %d to %q, want %q", rec.Code, rec.Header().Get("Location"), want)
+		}
+	}
+
+	// A store the reader hid in their store choices is skipped too.
+	Config().Stores.SearchRetailBlockList = nil
+	for range 30 {
+		req := httptest.NewRequest(http.MethodGet, "/randomgraded", nil)
+		req.Header.Set("Cookie", "SearchSellersList=SLABSHOP,")
+		rec := httptest.NewRecorder()
+		testSite.RandomGradedSearch(rec, req)
+		want := "/graded?q=" + cards[2]
+		if rec.Header().Get("Location") != want {
+			t.Fatalf("with SLABSHOP hidden, redirect to %q, want %q", rec.Header().Get("Location"), want)
+		}
+	}
+}

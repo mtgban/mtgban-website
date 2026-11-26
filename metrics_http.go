@@ -19,7 +19,7 @@ var routeLabels = map[string]string{
 
 	"/go/":    "go",
 	"/http:/": "redirect", "/https:/": "redirect", "/card/": "redirect", "/sealed/": "redirect",
-	"/random": "redirect", "/randomsealed": "redirect", "/discord": "redirect", "/monroecards": "redirect",
+	"/random": "redirect", "/randomsealed": "redirect", "/randomgraded": "redirect", "/discord": "redirect", "/monroecards": "redirect",
 
 	"/changelog": "changelog", "/user": "user", "/guide": "guide", "/privacy": "privacy",
 	"/offline": "offline", "/upload/handoff": "upload/handoff", "/toggle-mobile": "toggle-mobile",

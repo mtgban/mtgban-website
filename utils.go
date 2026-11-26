@@ -1670,6 +1670,29 @@ func randomUUID(b *matcher.Backend, sealed bool) string {
 	return uuids[index]
 }
 
+// randomGradedUUID is a card a graded store lists, none of them in blocked,
+// each card as likely as any other; empty with none.
+func randomGradedUUID(p *prices, blocked []string) string {
+	seen := map[string]bool{}
+	var uuids []string
+	for _, seller := range p.sellers {
+		info := seller.Info()
+		if !info.GradedMode || slices.Contains(blocked, info.Shorthand) {
+			continue
+		}
+		for cardID := range seller.Inventory() {
+			if !seen[cardID] {
+				seen[cardID] = true
+				uuids = append(uuids, cardID)
+			}
+		}
+	}
+	if len(uuids) == 0 {
+		return ""
+	}
+	return uuids[rand.Intn(len(uuids))]
+}
+
 type Pagination struct {
 	TotalIndex   int
 	CurrentIndex int
