@@ -989,12 +989,12 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		}
 		pageVars.CondKeys = groupBySlab(result.sellers, byPrice)
 		pageVars.Embed.RetailLabel, pageVars.Embed.BuylistLabel = "", ""
+		// Filled for every reader: the template shows a locked reader the
+		// upsell only where there are sales to unlock.
 		pageVars.CanSales = canSeeSales(sig)
-		if pageVars.CanSales {
-			graded := gradedSalesStore.Snapshot()
-			pageVars.GradedSales = gradedSales(graded, result.sellers, pageVars.CondKeys)
-			gradedVelocity(pageVars.Metadata, graded, shown.keys)
-		}
+		graded := gradedSalesStore.Snapshot()
+		pageVars.GradedSales = gradedSales(graded, result.sellers, pageVars.CondKeys)
+		gradedVelocity(pageVars.Metadata, graded, shown.keys)
 	} else {
 		rebuildIndexRows(&pageVars.SearchVars, pageVars.Metadata, b, p, config, shown.keys, result)
 	}

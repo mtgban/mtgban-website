@@ -76,7 +76,8 @@ counted from these sales over the same 30 days: the rate is slabs sold a
 day, and its drawer the sales and days with one, eBay's and Fanatics's
 shares, and the last sale with its grade. Then it lists the grades a store
 lists the card in, in the page's order. Both need a signature carrying
-`SearchSales`; a reader without one gets an upsell.
+`SearchSales`; a reader without one gets an upsell where the card has
+either, and "No sales on record" where it has neither.
 
 ## Consequences
 

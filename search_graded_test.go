@@ -254,8 +254,17 @@ func TestGradedPageLastSold(t *testing.T) {
 	rec = httptest.NewRecorder()
 	testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/graded?q="+cards[0], nil))
 	body = rec.Body.String()
-	if strings.Contains(body, "ebay.com/itm/111") || !strings.Contains(body, `data-track-value="sales_upsell"`) {
-		t.Error("a reader without the sales sees them, or no upsell")
+	if strings.Contains(body, "ebay.com/itm/111") || strings.Contains(body, ">0.1/day<") || strings.Contains(body, "$515.00 PSA 9") || !strings.Contains(body, `data-track-value="sales_upsell"`) {
+		t.Error("a reader without the sales sees them or their velocity, or no upsell")
+	}
+
+	// With no sales to unlock, the column only says so.
+	gradedSalesStore.Publish(&salesvelocity.GradedSnapshot{Day: now})
+	rec = httptest.NewRecorder()
+	testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/graded?q="+cards[0], nil))
+	body = rec.Body.String()
+	if strings.Contains(body, `data-track-value="sales_upsell"`) || !strings.Contains(body, "No sales on record") {
+		t.Error("a reader without the sales gets an upsell for a card with none")
 	}
 }
 
