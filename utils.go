@@ -24,6 +24,7 @@ import (
 	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/notify"
+	"github.com/mtgban/mtgban-website/internal/phyrexian"
 	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 	"github.com/mtgban/mtgban-website/internal/siteorigin"
 )
@@ -1002,6 +1003,9 @@ func uuid2card(b *matcher.Backend, p *prices, cardID string, preferFlavorName bo
 		if preferFlavorName || allLanguageFlags[co.Language] == "" {
 			name, flavor = co.FlavorName, co.Name
 		}
+	}
+	if co.Language == magic.LanguagePhyrexian {
+		name = phyrexian.Respell(name)
 	}
 
 	query := genQuery(co)
