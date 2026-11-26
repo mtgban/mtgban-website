@@ -138,7 +138,7 @@ func TestSearchUIPages(t *testing.T) {
 		"ui.search.sort_locked": "search,sealed", "ui.search.chart_top": "search,sealed",
 		"ui.search.random": "search,sealed", "ui.search.buyers_mode": "search,sealed",
 		"ui.sidebar.export": "search,sealed", "ui.sidebar.upload": "search,sealed",
-		"ui.row.velocity": "search,sealed",
+		"ui.row.velocity": "search,sealed,graded",
 	}
 	denoms := map[string]string{
 		"ui.mfilter.apply": "ui.mfilter.open", "ui.mchart.reset_zoom": "ui.mchart.open", "ui.mchart.gesture": "ui.mchart.open",

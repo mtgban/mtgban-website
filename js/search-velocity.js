@@ -1,4 +1,4 @@
-// Remembers whether the TCGplayer sales row was last opened or closed, so
+// Remembers whether the Sales Velocity row was last opened or closed, so
 // the next results page draws it the same way (VelocityOpen, search.go).
 (function () {
     function remember(e) {

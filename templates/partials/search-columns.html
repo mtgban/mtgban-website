@@ -154,13 +154,34 @@
 </div>
 {{end}}
 
+{{/* The Sales Velocity row atop a card's Buyers or Last Sold: how fast it
+     sells, opening to what the rate counts (docs/search-sales-velocity.md) */}}
+{{define "sales-velocity"}}{{$card := .Card}}
+<details class="sales-velocity"{{if .Open}} open{{end}}>
+    <summary class="price-row">
+        <span class="store-name dim">Sales Velocity</span>
+        <span class="price"><span class="amt{{with $card.VelocityPace}} velocity-{{.}}{{end}}"{{with $card.VelocityNote}} title="{{.}}"{{end}}>{{if $card.VelocityRising}}<span class="velocity-rising" title="Selling at least twice as fast this week">&#8593;</span>{{end}}{{$card.Velocity}}</span></span>
+        <i class="sales-velocity-chevron" data-lucide="chevron-down"></i>
+    </summary>
+    <div class="sales-velocity-detail">{{tip_html $card.VelocityDetail}}</div>
+</details>
+{{end}}
+
 {{define "result-buyers"}}{{$page := .Page}}{{$card := .Card}}{{$cardId := .CardID}}
 {{/* No store buys slabs, so the Graded page shows what they last sold for,
-     never the raw copies' sales. Nothing records a slab's sales yet. */}}
+     never the raw copies' sales: the slabs' Sales Velocity, then each listed
+     grade's eBay and Fanatics sales (docs/adr/0012-graded-sales.md) */}}
 {{if $page.IsGraded}}
 <div class="result-col">
     <div class="result-col-header">Last Sold</div>
-    <div class="no-offers"><i>No sales on record</i></div>
+    {{if $page.CanSales}}
+        {{if $card.Velocity}}{{template "sales-velocity" dict "Card" $card "Open" $page.VelocityOpen}}{{end}}
+        <div class="sales-pane">{{template "sales-pane" (index $page.GradedSales $cardId)}}</div>
+    {{else if $page.ShowUpsell}}
+        <a class="sales-velocity-upsell" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener" data-track="ui.row.locked" data-track-value="sales_upsell">Increase your tier to unlock graded sales</a>
+    {{else}}
+        <div class="no-offers"><i>No sales on record</i></div>
+    {{end}}
 </div>
 {{else}}
 {{/* Switch, on a page with sales, adds their column after this one, and the
@@ -171,14 +192,7 @@
     <div class="result-col-header">Buyers{{if .Switch}}{{template "buyers-switch" $page.BuyersMode}}{{end}}</div>
     {{if $card.Velocity}}
         {{if $page.CanVelocity}}
-            <details class="sales-velocity"{{if $page.VelocityOpen}} open{{end}}>
-                <summary class="price-row">
-                    <span class="store-name dim">TCGplayer sales</span>
-                    <span class="price"><span class="amt{{with $card.VelocityPace}} velocity-{{.}}{{end}}"{{with $card.VelocityNote}} title="{{.}}"{{end}}>{{if $card.VelocityRising}}<span class="velocity-rising" title="Selling at least twice as fast this week">&#8593;</span>{{end}}{{$card.Velocity}}</span></span>
-                    <i class="sales-velocity-chevron" data-lucide="chevron-down"></i>
-                </summary>
-                <div class="sales-velocity-detail">{{tip_html $card.VelocityDetail}}</div>
-            </details>
+            {{template "sales-velocity" dict "Card" $card "Open" $page.VelocityOpen}}
         {{else if $page.ShowUpsell}}
             <a class="sales-velocity-upsell" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener" data-track="ui.row.locked" data-track-value="velocity_upsell">Increase your tier to unlock sales velocity</a>
         {{end}}

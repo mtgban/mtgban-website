@@ -2,18 +2,20 @@
      each grade's newest orders, its average in the header. A sealed
      product's header names no condition, since it only sells unopened. The fold comes
      before the rest, so a reader goes on to them, and is drawn after them.
-     /data/sales/ draws it. */}}
+     /data/sales/ draws it. The Graded page draws its slabs' sales with it
+     too, each under its grade and linking to its own listing
+     (docs/adr/0012-graded-sales.md). */}}
 {{define "buyers-switch"}}<span class="buyers-switch" role="group" aria-label="Buyers column shows">
 <button type="button" class="buyers-switch-btn{{if ne . "sales"}} on{{end}}" aria-pressed="{{if ne . "sales"}}true{{else}}false{{end}}" data-buyers-set="buylist" data-track="ui.search.buyers_mode" data-track-value="buylist">Buylist</button><button type="button" class="buyers-switch-btn{{if eq . "sales"}} on{{end}}" aria-pressed="{{if eq . "sales"}}true{{else}}false{{end}}" data-buyers-set="sales" data-track="ui.search.buyers_mode" data-track-value="sales">Sales</button>
 </span>{{end}}
 
 {{define "sales-source"}}{{if eq . "TCGplayer"}}<img class="sales-src-icon" src="/img/logo/tcgplayer.png" alt="" width="14" height="14">{{end}}<span class="sales-src-name">{{.}}</span>{{end}}
 
-{{define "sales-row"}}<div class="price-row sales-row{{if .More}} sales-row-more{{end}}">{{if .Link}}<a class="sales-src" href="{{.Link}}" target="_blank" rel="nofollow" data-track="ui.row.store" data-track-value="TCGPlayer" data-track-scope="sales">{{template "sales-source" .Line.Source}}</a>{{else}}<span class="sales-src">{{template "sales-source" .Line.Source}}</span>{{end}}{{with .Line}}<span class="sales-date" title="{{.Time}}">{{.Date}}</span><span class="sales-price"><span class="price"><span class="cur">$</span><span class="amt">{{.Price}}</span></span><span class="sales-qty">{{.Qty}}</span></span>{{end}}</div>{{end}}
+{{define "sales-row"}}{{$link := or .Line.Link .Link}}<div class="price-row sales-row{{if .More}} sales-row-more{{end}}">{{if $link}}<a class="sales-src" href="{{$link}}" target="_blank" rel="nofollow" data-track="ui.row.store" {{if eq .Line.Source "eBay"}}data-track-value="eBay"{{else if eq .Line.Source "Fanatics"}}data-track-value="Fanatics"{{else}}data-track-value="TCGPlayer"{{end}} data-track-scope="sales">{{template "sales-source" .Line.Source}}</a>{{else}}<span class="sales-src">{{template "sales-source" .Line.Source}}</span>{{end}}{{with .Line}}<span class="sales-date" title="{{.Time}}">{{.Date}}</span><span class="sales-price"{{with .Note}} title="{{.}}"{{end}}><span class="price"><span class="cur">$</span><span class="amt">{{.Price}}</span></span><span class="sales-qty">{{.Qty}}</span></span>{{end}}</div>{{end}}
 
 {{define "sales-pane"}}
 {{range $group := .}}
-<div class="price-cond-header sales-cond-header">{{if ne .Grade "Unopened"}}<span>Condition: {{.Grade}}</span>{{end}}<span class="sales-avg">avg <b>$ {{.Avg}}</b></span></div>
+<div class="price-cond-header sales-cond-header">{{if .Slab}}<span>{{.Grade}}</span>{{else if ne .Grade "Unopened"}}<span>Condition: {{.Grade}}</span>{{end}}{{with .Avg}}<span class="sales-avg">avg <b>$ {{.}}</b></span>{{end}}</div>
 <div class="sales-rows">
 {{range .Shown}}{{template "sales-row" dict "Line" . "Link" $group.Link}}{{end}}
 {{with .More}}<details class="sales-more"><summary><span class="sales-more-open">{{len .}} more (show)</span><span class="sales-more-close">Hide</span></summary></details>

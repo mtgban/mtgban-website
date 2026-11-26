@@ -8,8 +8,10 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
 
 func TestGroupBySlab(t *testing.T) {
@@ -167,5 +169,91 @@ func TestGradedPageHiddenWithoutSlabs(t *testing.T) {
 		if nav.hiddenOn(testSite) == graded {
 			t.Errorf("with a graded store %v: hidden = %v", graded, !graded)
 		}
+	}
+}
+
+// The Last Sold column opens with the slabs' Sales Velocity, then draws the
+// sales of the grades a store lists the card in as the Sales pane draws the
+// recent orders, in the page's order, and shows a reader without the sales an
+// upsell instead.
+func TestGradedPageLastSold(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Search") })
+	}
+	cards := somePlainCardUUIDs(t, 1)
+	psa9 := mtgban.Slab{Grader: "PSA", Score: 9}
+	pristine := mtgban.Slab{Grader: "CGC", Score: 10, Label: "Pristine"}
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[0]: {
+				{Conditions: "NM", Price: 40, URL: "u", Slab: &psa9},
+				{Conditions: "NM", Price: 90, URL: "u", Slab: &pristine},
+			},
+		}, mtgban.ScraperInfo{Name: "SLABSHOP", Shorthand: "SLABSHOP", GradedMode: true}),
+	}, nil)
+
+	now := time.Now()
+	at := func(days int) uint32 { return uint32(now.AddDate(0, 0, -days).Unix()) }
+	previous := gradedSalesStore.Snapshot()
+	t.Cleanup(func() { gradedSalesStore.Publish(previous) })
+	gradedSalesStore.Publish(&salesvelocity.GradedSnapshot{Day: now, Cards: map[string]*salesvelocity.GradedCard{
+		cards[0]: {
+			Grades: map[mtgban.Slab]*salesvelocity.GradeSales{
+				psa9: {Sales: []salesvelocity.GradedSale{
+					{At: at(1), Cents: 51500, ListingID: "111"},
+					{At: at(3), Cents: 70000, ListingID: "222", BestOffer: true},
+				}},
+				pristine: {Sales: []salesvelocity.GradedSale{{At: at(200), Cents: 99900, Fanatics: true, ListingID: "fanatics:W1"}}},
+				// No store lists a PSA 10 of it.
+				{Grader: "PSA", Score: 10}: {Sales: []salesvelocity.GradedSale{{At: at(1), Cents: 123400, ListingID: "333"}}},
+			},
+			Sales: 3, Days: 2,
+			Last: salesvelocity.GradedSale{At: at(1), Cents: 51500}, LastSlab: psa9,
+		},
+	}})
+
+	req := httptest.NewRequest(http.MethodGet, "/graded?q="+cards[0], nil)
+	rec := httptest.NewRecorder()
+	testSite.Search(rec, req)
+	body := rec.Body.String()
+	for _, want := range []string{
+		"<span>PSA 9</span><span class=\"sales-avg\">avg <b>$ 515.00</b>",
+		`href="https://www.ebay.com/itm/111"`,
+		`data-track-value="eBay"`,
+		`<span class="sales-qty">offer</span>`,
+		"<span>CGC 10 Pristine</span><span class=\"sales-avg\">avg <b>$ 999.00</b>",
+		`href="https://sales-history.fanaticscollect.com/items/W1"`,
+		`<span class="store-name dim">Sales Velocity</span>`,
+		">0.1/day<",
+		"$515.00 PSA 9",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("Last Sold: %q is missing", want)
+		}
+	}
+	if strings.Contains(body, "ebay.com/itm/333") {
+		t.Error("Last Sold lists a grade no store lists the card in")
+	}
+	psa, cgc := strings.Index(body, "ebay.com/itm/111"), strings.Index(body, "items/W1")
+	if psa < 0 || cgc < 0 || psa > cgc {
+		t.Error("Last Sold does not follow the page's order of grades")
+	}
+	if strings.Contains(body, "No sales on record") || strings.Contains(body, "Condition: PSA") {
+		t.Error("Last Sold says there are no sales, or heads a grade as a condition")
+	}
+
+	// Without the sales, the column says how to get them.
+	withSigMode(t, true, true)
+	rec = httptest.NewRecorder()
+	testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/graded?q="+cards[0], nil))
+	body = rec.Body.String()
+	if strings.Contains(body, "ebay.com/itm/111") || !strings.Contains(body, `data-track-value="sales_upsell"`) {
+		t.Error("a reader without the sales sees them, or no upsell")
 	}
 }

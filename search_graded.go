@@ -4,8 +4,10 @@ import (
 	"cmp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
 
 // slabGraders is the order the Graded page lists the graders in.
@@ -47,6 +49,51 @@ func (p *prices) hasGradedStores() bool {
 func gradedSearch(config *SearchConfig) {
 	config.GradedOnly = true
 	config.SkipBuylist = true
+}
+
+// gradedSales is each card's Last Sold groups, as the Sales pane draws them:
+// the sales of the grades a store lists it in, in the page's order of grades.
+func gradedSales(snap *salesvelocity.GradedSnapshot, found map[string]map[mtgban.Condition][]SearchEntry, keys []mtgban.Condition) map[string][]salesvelocity.Group {
+	out := map[string][]salesvelocity.Group{}
+	for cardID, listed := range found {
+		sales := snap.For(cardID)
+		if sales == nil {
+			continue
+		}
+		byGrade := map[mtgban.Condition]*salesvelocity.GradeSales{}
+		for slab, grade := range sales.Grades {
+			name, graded := slabGroup(&slab)
+			if graded {
+				byGrade[name] = grade
+			}
+		}
+		for _, key := range keys {
+			grade, found := byGrade[key]
+			if found && len(listed[key]) > 0 {
+				out[cardID] = append(out[cardID], grade.Group(string(key)))
+			}
+		}
+	}
+	return out
+}
+
+// gradedVelocity puts the slabs' Sales Velocity in place of the raw copies'
+// on each card, none where no slab of it sold.
+func gradedVelocity(m cardMetadata, snap *salesvelocity.GradedSnapshot, keys []string) {
+	name := func(slab mtgban.Slab) string { return slabName(&slab) }
+	var day time.Time
+	if snap != nil {
+		day = snap.Day
+	}
+	for _, cardID := range keys {
+		card, found := m[cardID]
+		if !found {
+			continue
+		}
+		card.Velocity, card.VelocityDetail = snap.For(cardID).Velocity(day, name)
+		card.VelocityPace, card.VelocityNote, card.VelocityRising = salesvelocity.PaceNone, "", false
+		m[cardID] = card
+	}
 }
 
 // slabGroup is the group a slab is listed under, on the Graded page and in

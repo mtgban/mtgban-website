@@ -629,7 +629,7 @@ func TestSearchShowsSalesVelocity(t *testing.T) {
 		"velocity-card": {Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)},
 	})
 	for name, page := range velocityPages(t, velocityPageVars(true, true)) {
-		for _, want := range []string{"TCGplayer sales", "2.3/day", ">days<", ">18/30<", ">Oct 11<"} {
+		for _, want := range []string{"Sales Velocity</span>", "2.3/day", ">days<", ">18/30<", ">Oct 11<"} {
 			if strings.Count(page, want) != 1 {
 				t.Errorf("%s: want %q once, rendered:\n%s", name, want, page)
 			}
@@ -643,7 +643,7 @@ func TestSearchShowsSalesVelocity(t *testing.T) {
 		if strings.Count(page, velocityUpsell) != 1 {
 			t.Errorf("%s: want the upsell once, rendered:\n%s", name, page)
 		}
-		for _, mark := range []string{"TCGplayer sales", "2.3/day", "18/30", "Oct 11"} {
+		for _, mark := range []string{"Sales Velocity</span>", "2.3/day", "18/30", "Oct 11"} {
 			if strings.Contains(page, mark) {
 				t.Errorf("%s: %q shown to a reader without the newspaper tier", name, mark)
 			}
@@ -651,7 +651,7 @@ func TestSearchShowsSalesVelocity(t *testing.T) {
 	}
 
 	for name, page := range velocityPages(t, velocityPageVars(false, false)) {
-		if strings.Contains(page, velocityUpsell) || strings.Contains(page, "TCGplayer sales") {
+		if strings.Contains(page, velocityUpsell) || strings.Contains(page, "Sales Velocity</span>") {
 			t.Errorf("%s: a reader hiding upsells still sees one", name)
 		}
 	}
@@ -659,7 +659,7 @@ func TestSearchShowsSalesVelocity(t *testing.T) {
 	setTestSalesVelocity(t, map[string]*salesvelocity.Sales{})
 	for _, canVelocity := range []bool{true, false} {
 		for name, page := range velocityPages(t, velocityPageVars(canVelocity, true)) {
-			if strings.Contains(page, "TCGplayer sales") || strings.Contains(page, velocityUpsell) {
+			if strings.Contains(page, "Sales Velocity</span>") || strings.Contains(page, velocityUpsell) {
 				t.Errorf("%s: row or upsell shown for a card with no sales data", name)
 			}
 		}
