@@ -3,6 +3,8 @@ package main
 import (
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
+
 	"github.com/mtgban/mtgban-website/internal/offline"
 )
 
@@ -64,5 +66,53 @@ func banprice2offline(setCode string, snapshot time.Time, retail, buylist map[st
 		Snapshot: snapshot,
 		Retail:   conv(retail),
 		Buylist:  conv(buylist),
+	}
+}
+
+// addSlabTags gives each graded store among sellers its slabs' own condition
+// tags in a set's retail section: the tag the slab folds to, then "|" and the
+// slab's name, so "NM|PSA 9". Only entries the payload already holds change.
+// The base price, watermarked under Cond, may then differ by a cent from the
+// slab tag it came from, which the page does not show beside it.
+func addSlabTags(b *matcher.Backend, p *prices, setCode string, sellers []string, retail map[string]map[string]*offline.PriceEntry) {
+	graded := onlyGraded(p, sellers, true)
+	if len(graded) == 0 {
+		return
+	}
+	config := apiSearchConfig(b, resolveEditionFilter(b, setCode, nil, false), graded, "", false)
+	cardIDs := filterUUIDs(b, p, config.UUIDs, config.CardFilters)
+	found := searchSellers(p, cardIDs, config)
+	for cardID, buckets := range found {
+		co, err := b.GetUUID(cardID)
+		if err != nil {
+			continue
+		}
+		rewritten := map[string]bool{}
+		for _, cond := range AllConditions {
+			for _, row := range buckets[cond] {
+				entry := retail[cardID][row.Shorthand]
+				if entry == nil || row.Price == 0 {
+					continue
+				}
+				if !rewritten[row.Shorthand] {
+					rewritten[row.Shorthand] = true
+					entry.Conditions, entry.Quantities = map[string]float64{}, nil
+				}
+				tag := string(cond) + finishSuffix(co)
+				if row.Slab != nil {
+					tag += "|" + slabName(row.Slab)
+				}
+				best, ok := entry.Conditions[tag]
+				if !ok || row.Price < best {
+					entry.Conditions[tag] = row.Price
+				}
+				if !row.NoQuantity && row.Quantity > 0 {
+					if entry.Quantities == nil {
+						entry.Quantities = map[string]int{}
+					}
+					entry.Quantities[tag] += row.Quantity
+				}
+			}
+		}
 	}
 }

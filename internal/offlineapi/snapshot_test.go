@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
@@ -101,6 +102,30 @@ func TestReadOnlyManifestIsNotWritten(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "offline-manifest.json")); err != nil {
 		t.Errorf("a writable service did not write the manifest: %v", err)
+	}
+}
+
+// A slab regraded at the same price is a change to its set, which a client
+// must download again to see.
+func TestFingerprintReadsTheSlab(t *testing.T) {
+	s, _ := newTestService(t)
+	s.deps.Vendors = func() []mtgban.Vendor { return nil }
+	b := &matcher.Backend{UUIDs: map[string]*matcher.CardObject{
+		"X-1": {Card: matcher.Card{UUID: "X-1", SetCode: "X"}},
+	}}
+	fingerprint := func(slab *mtgban.Slab) string {
+		inv := mtgban.InventoryRecord{"X-1": {{Conditions: "NM", Price: 10, Quantity: 1, Slab: slab}}}
+		s.deps.Sellers = func() []mtgban.Seller {
+			return []mtgban.Seller{mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "SLAB", GradedMode: true})}
+		}
+		return s.computeFingerprints(b)["X"]
+	}
+	raw := fingerprint(nil)
+	psa9 := fingerprint(&mtgban.Slab{Grader: "PSA", Score: 9})
+	psa10 := fingerprint(&mtgban.Slab{Grader: "PSA", Score: 10})
+	pristine := fingerprint(&mtgban.Slab{Grader: "PSA", Score: 10, Label: "Pristine"})
+	if raw == "" || raw == psa9 || psa9 == psa10 || psa10 == pristine {
+		t.Errorf("fingerprints raw %q, PSA 9 %q, PSA 10 %q, Pristine %q: want all different", raw, psa9, psa10, pristine)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -145,8 +146,86 @@ func TestOfflinePricesBlockOneSide(t *testing.T) {
 	}
 }
 
-// Offline rows carry no slab, so a seller of slabs named as its store is told
-// apart by its name in the catalog.
+// A slab store's prices are filed under each slab's own tag, the condition it
+// folds to and then its name, while a raw store keeps the plain conditions.
+func TestOfflinePricesCarryTheSlab(t *testing.T) {
+	withSigMode(t, true, false)
+	withConfigCopy(t)
+
+	b := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01",
+		[][2]string{{"Fixture Card Alpha", "1"}, {"Fixture Card Alpha Foil", "2"}})
+	b.UUIDs["FIXTUREA-2"].Foil = true
+	slab := func(cond mtgban.Condition, price float64, quantity int, slab *mtgban.Slab) mtgban.InventoryEntry {
+		return mtgban.InventoryEntry{Conditions: cond, Price: price, Quantity: quantity, URL: "u", Slab: slab}
+	}
+	s := fixtureSite(t, b, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"FIXTUREA-1": {
+			slab("NM", 7, 1, nil),
+		}}, mtgban.ScraperInfo{Name: "RAW", Shorthand: "RAW"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			"FIXTUREA-1": {
+				slab("NM", 5, 1, nil),
+				slab("NM", 10, 1, &mtgban.Slab{Grader: "PSA", Score: 9}),
+				slab("NM", 12, 2, &mtgban.Slab{Grader: "PSA", Score: 9}),
+				slab("NM", 30, 1, &mtgban.Slab{Grader: "CGC", Score: 10, Label: "Pristine"}),
+				slab("NM", 15, 1, &mtgban.Slab{Label: "SGC 9"}),
+				slab("SP", 4, 1, &mtgban.Slab{Grader: "PSA", Score: 6}),
+			},
+			"FIXTUREA-2": {slab("NM", 20, 1, &mtgban.Slab{Grader: "PSA", Score: 9})},
+		}, mtgban.ScraperInfo{Name: "SLAB", Shorthand: "SLAB", GradedMode: true}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"FIXTUREA-1": {
+			slab("NM", 9, 3, &mtgban.Slab{Grader: "BGS", Score: 9}),
+		}}, mtgban.ScraperInfo{Name: "SLABNOQTY", Shorthand: "SLABNOQTY", GradedMode: true, NoQuantityInventory: true}),
+	}, nil)
+
+	w := httptest.NewRecorder()
+	s.offline.Handle(w, httptest.NewRequest(http.MethodGet, "/api/offline/prices/FIXTUREA.bin", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+	gr, err := gzip.NewReader(w.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := io.ReadAll(gr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := offline.Decode(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		cardID, store string
+		prices        map[string]float64
+		quantities    map[string]int
+	}{
+		{"FIXTUREA-1", "RAW", map[string]float64{"NM": 7}, map[string]int{"NM": 1}},
+		{"FIXTUREA-1", "SLAB", map[string]float64{
+			"NM":                 5,
+			"NM|PSA 9":           10,
+			"NM|CGC 10 Pristine": 30,
+			"NM|SGC 9":           15,
+			"SP|PSA 6":           4,
+		}, map[string]int{"NM": 1, "NM|PSA 9": 3, "NM|CGC 10 Pristine": 1, "NM|SGC 9": 1, "SP|PSA 6": 1}},
+		{"FIXTUREA-2", "SLAB", map[string]float64{"NM_foil|PSA 9": 20}, map[string]int{"NM_foil|PSA 9": 1}},
+		{"FIXTUREA-1", "SLABNOQTY", map[string]float64{"NM|BGS 9": 9}, nil},
+	} {
+		entry := payload.Retail[tc.cardID][tc.store]
+		if entry == nil {
+			t.Errorf("%s at %s: no entry", tc.cardID, tc.store)
+			continue
+		}
+		if !maps.Equal(entry.Conditions, tc.prices) || !maps.Equal(entry.Quantities, tc.quantities) {
+			t.Errorf("%s at %s: prices %v quantities %v, want %v %v",
+				tc.cardID, tc.store, entry.Conditions, entry.Quantities, tc.prices, tc.quantities)
+		}
+	}
+}
+
+// A seller of slabs named as its store is told apart by its name in the
+// catalog.
 func TestOfflineCatalogMarksAGradedStore(t *testing.T) {
 	withSigMode(t, true, false)
 	withConfigCopy(t)

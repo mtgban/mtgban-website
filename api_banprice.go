@@ -698,12 +698,7 @@ func banPricesFromRows(b *matcher.Backend, p *prices, cardIDs []string, found ma
 			continue
 		}
 
-		suffix := ""
-		if co.Etched {
-			suffix = "_etched"
-		} else if co.Foil {
-			suffix = "_foil"
-		}
+		suffix := finishSuffix(co)
 
 		// Per-store output for this card; nil marks a store dropped for a
 		// zero base price. Different uuids can share an output id (a name
@@ -1034,6 +1029,18 @@ func finishPrice(price *BanPrice, co *matcher.CardObject) *float64 {
 		return &price.Foil
 	}
 	return &price.Regular
+}
+
+// finishSuffix is what a card's condition tags end in: its finish, or nothing
+// for a nonfoil.
+func finishSuffix(co *matcher.CardObject) string {
+	if co.Etched {
+		return "_etched"
+	}
+	if co.Foil {
+		return "_foil"
+	}
+	return ""
 }
 
 // setGrade files one listing under its grade, which keeps the best price
