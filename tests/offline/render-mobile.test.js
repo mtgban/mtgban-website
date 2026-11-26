@@ -228,3 +228,10 @@ test('a row with no price objects renders as no offers', () => {
     expect(R.buildHTML([result({retail: null})], CTX))
         .toBe(R.buildHTML([result({retail: {}})], CTX));
 });
+
+test('a graded store lists each slab with its name', () => {
+    const ctx = Object.assign({}, CTX, {stores: Object.assign({}, CTX.stores, {CKG: {n: 'Card Kingdom Graded'}})});
+    const html = R.buildHTML([result({retail: {CKG: {regular: 10, cond: 'NM', conditions: {'NM|PSA 9': 10}}}})], ctx);
+    expect(html).toContain('<span class="slab-name" title="PSA 9">PSA 9</span>');
+    expect(html.split('Card Kingdom Graded').length - 1).toBe(1);
+});

@@ -356,3 +356,66 @@ test('a row with no price objects renders as no offers', () => {
     expect(R.buildHTML([result({retail: null})], CTX))
         .toBe(R.buildHTML([result({retail: {}})], CTX));
 });
+
+// A graded store, as the payload files it: each slab under the condition it
+// folds to, a bar and its name.
+const GRADED_CTX = Object.assign({}, CTX, {stores: Object.assign({}, CTX.stores, {CKG: {n: 'Card Kingdom Graded'}})});
+
+function gradedResult(conditions, quantities) {
+    return result({retail: {CKG: {regular: 10, cond: 'NM', qty: 1, conditions: conditions, quantities: quantities}}});
+}
+
+test('a graded store has a row per slab under the condition it folds to', () => {
+    const html = R.buildHTML([gradedResult(
+        {'NM|PSA 9': 10, 'NM|CGC 10 Pristine': 30, 'SP|PSA 6': 4},
+        {'NM|PSA 9': 3})], GRADED_CTX);
+    expect(html).toContain('<span class="store-cell"><a class="store-name dim">Card Kingdom Graded</a><span class="slab-name" title="PSA 9">PSA 9</span></span>');
+    expect(html).toContain('<span class="slab-name" title="CGC 10 Pristine">CGC 10 Pristine</span>');
+    expect(html).toContain('<span class="qty">3</span>');
+    // The base price is the PSA 9, so it adds no row of its own
+    expect(html.split('Card Kingdom Graded').length - 1).toBe(3);
+    const sp = html.indexOf('Condition: SP');
+    expect(html.indexOf('PSA 9')).toBeLessThan(html.indexOf('CGC 10 Pristine'));
+    expect(html.indexOf('CGC 10 Pristine')).toBeLessThan(sp);
+    expect(html.indexOf('PSA 6')).toBeGreaterThan(sp);
+});
+
+test('a foil slab is read off its suffixed tag', () => {
+    const r = gradedResult({'NM_foil|PSA 9': 20}, {});
+    r.card = Object.assign({}, r.card, {f: true});
+    const html = R.buildHTML([r], GRADED_CTX);
+    expect(html).toContain('<div class="price-cond-header cond-NM">Condition: NM</div>');
+    expect(html).toContain('<span class="slab-name" title="PSA 9">PSA 9</span>');
+    expect(html).toContain('<span class="amt">20.00</span>');
+});
+
+test('sorted by store, one store\'s slabs go by price', () => {
+    const html = R.buildHTML([gradedResult({'NM|PSA 10': 50, 'NM|PSA 9': 10, 'NM|BGS 9': 30})],
+        Object.assign({}, GRADED_CTX, {byStore: true}));
+    expect(html.indexOf('PSA 9')).toBeLessThan(html.indexOf('BGS 9'));
+    expect(html.indexOf('BGS 9')).toBeLessThan(html.indexOf('PSA 10'));
+});
+
+test('a slab name is escaped', () => {
+    const html = R.buildHTML([gradedResult({'NM|"><img src=x onerror=alert(1)>': 10})], GRADED_CTX);
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('title="&quot;&gt;&lt;img');
+});
+
+test('a graded store with no slab tags shows its base price as before', () => {
+    const html = R.buildHTML([gradedResult({NM: 10}, {NM: 1})], GRADED_CTX);
+    expect(html).toContain('<span class="store-cell"><a class="store-name dim">Card Kingdom Graded</a></span>');
+    expect(html).not.toContain('slab-name');
+    const bare = R.buildHTML([result({retail: {CKG: {regular: 10, cond: 'NM', qty: 1}}})], GRADED_CTX);
+    expect(bare).toContain('<span class="store-cell"><a class="store-name dim">Card Kingdom Graded</a></span>');
+});
+
+test('condPrices leaves slab tags to slabPrices', () => {
+    const S = globalThis.OfflineRenderShared;
+    const entry = {regular: 10, cond: 'NM', conditions: {'NM|PSA 9': 10, 'SP|PSA 6': 4}};
+    expect(S.condPrices(entry, {})).toEqual({});
+    expect(S.slabPrices(entry)).toEqual([
+        {cond: 'NM', slab: 'PSA 9', price: 10, qty: 0},
+        {cond: 'SP', slab: 'PSA 6', price: 4, qty: 0},
+    ]);
+});
