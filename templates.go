@@ -373,6 +373,8 @@ var funcMap = template.FuncMap{
 	},
 	"storeLabel": storeLabel,
 	"slab_name":  slabName,
+	// The Graded page landing's sold slabs, newest first
+	"sold_slabs": soldSlabs,
 	"slice_has": func(s []string, p string) bool {
 		return slices.Contains(s, p)
 	},

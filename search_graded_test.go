@@ -476,6 +476,62 @@ func TestGradedLastSoldCards(t *testing.T) {
 	}
 }
 
+// A reader who may see the slabs' sales gets the newest slab sold of each card,
+// newest first and never a best offer; no other reader gets the carousel.
+func TestGradedLandingSoldSlabs(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+	cards := somePlainCardUUIDs(t, 3)
+	psa9 := mtgban.Slab{Grader: "PSA", Score: 9}
+	bgs10 := mtgban.Slab{Grader: "BGS", Score: 10}
+	withPrices(t, nil, nil)
+	now := time.Now()
+	at := func(days int) uint32 { return uint32(now.AddDate(0, 0, -days).Unix()) }
+	previous := gradedSalesStore.Snapshot()
+	t.Cleanup(func() { gradedSalesStore.Publish(previous) })
+	gradedSalesStore.Publish(&salesvelocity.GradedSnapshot{Day: now, Cards: map[string]*salesvelocity.GradedCard{
+		cards[0]: {Grades: map[mtgban.Slab]*salesvelocity.GradeSales{
+			psa9:  {Sales: []salesvelocity.GradedSale{{At: at(1), Cents: 99900, BestOffer: true}, {At: at(5), Cents: 12300}}},
+			bgs10: {Sales: []salesvelocity.GradedSale{{At: at(3), Cents: 45600, Fanatics: true}}},
+		}},
+		cards[1]: {Grades: map[mtgban.Slab]*salesvelocity.GradeSales{
+			psa9: {Sales: []salesvelocity.GradedSale{{At: at(2), Cents: 7800}}},
+		}},
+	}})
+
+	landing := func() string {
+		rec := httptest.NewRecorder()
+		testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/graded", nil))
+		return rec.Body.String()
+	}
+	body := landing()
+	for _, want := range []string{
+		`href="/graded?q=is%3Alastsold"`,
+		`<span class="slab-showcase-slab">BGS 10</span>`,
+		`<span class="slab-showcase-price">$456.00</span>`,
+		"Fanatics · ",
+		`<span class="slab-showcase-price">$78.00</span>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the sold carousel is missing %q", want)
+		}
+	}
+	if strings.Contains(body, "999.00") || strings.Contains(body, "123.00") {
+		t.Error("the sold carousel shows a best offer, or a card's older sale")
+	}
+	if strings.Index(body, `href="/graded?q=`+cards[1]+`"`) > strings.Index(body, `href="/graded?q=`+cards[0]+`"`) {
+		t.Error("the sold carousel is not newest first")
+	}
+	if strings.Contains(body, cards[2]) {
+		t.Error("the sold carousel shows a card with no sale")
+	}
+
+	withSigMode(t, true, true)
+	if strings.Contains(landing(), "Graded slabs sold lately") {
+		t.Error("a reader without the sales gets the sold carousel")
+	}
+}
+
 // An open-mode reader sees a store that is no affiliate locked, or nothing of
 // it where the config hides those stores, and is told why the carousel is empty.
 func TestGradedLandingLocked(t *testing.T) {

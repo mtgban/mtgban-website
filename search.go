@@ -860,6 +860,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		}
 		tmpl := fillSearchLanding(&pageVars.SearchVars, ds, isSetsPage, sortOpt)
 		if pageVars.IsGraded {
+			pageVars.CanSales = canSeeSales(sig)
 			fillSlabShowcase(&pageVars, b, p, blocklistRetail)
 		}
 		if isPageView(r) {
