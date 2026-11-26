@@ -130,6 +130,12 @@ html:has(.m-landing) {
         display: none;
     }
 
+    /* A turn of the phone scrolls the reader's card to the top, under the
+       nav */
+    .m-layout-cards .m-card {
+        scroll-margin-top: 48px;
+    }
+
     .m-layout-cards .m-actions-fav,
     .m-layout-cards .m-actions-pack:not([hidden]),
     .m-layout-cards .m-actions-chart {

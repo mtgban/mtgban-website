@@ -4,8 +4,11 @@ import { join } from 'path';
 
 // The whole script over a stub deck of n cards, 390x700 upright, firing the
 // listeners it adds. The end drawer is up when .m-page has m-pager-open.
+// In landscape the page scrolls by scrollY under the 48px nav, each card L
+// high, and a card scrolled into view sits under the nav, as its
+// scroll-margin-top puts it.
 const source = readFileSync(join(import.meta.dir, '..', 'js', 'search-cards.js'), 'utf8');
-const W = 390, H = 700;
+const W = 390, H = 700, L = 300, NAV = 48;
 
 function target() {
     const on = {};
@@ -24,12 +27,14 @@ function phone(n) {
         remove: (c) => classes.delete(c),
     };
     const stage = target(), page = target(), deck = target(), scrub = target(), win = target(), doc = target(), portrait = target();
-    const cards = Array.from({ length: n }, () => ({
+    const cards = Array.from({ length: n }, (_, k) => ({
         scrollLeft: W, clientWidth: W, scrollWidth: 3 * W, offsetHeight: H, parentNode: deck, style: {},
         classList: { contains: (c) => c === 'm-card' },
         querySelector: (s) => (s.includes('sellers') ? { id: 'sellers-x' } : null),
         querySelectorAll: () => [{ id: 'buyers-x' }],
         scrollTo(o) { this.scrollLeft = o.left; },
+        getBoundingClientRect: () => ({ top: NAV + k * L - win.scrollY, bottom: NAV + (k + 1) * L - win.scrollY }),
+        scrollIntoView() { win.scrollY = k * L; },
     }));
     const scrubbing = new Set();
     Object.assign(scrub, {
@@ -42,11 +47,15 @@ function phone(n) {
     Object.assign(page, { classList, querySelector: (s) => (s === '.m-scrub' ? scrub : s === '.m-results-end' ? {} : null) });
     Object.assign(deck, { scrollTop: 0, clientHeight: H, parentNode: stage, closest: () => page, querySelector: () => cards[0], querySelectorAll: () => cards });
     portrait.matches = true;
-    Object.assign(win, { innerWidth: W, matchMedia: (q) => (q.includes('portrait') ? portrait : { matches: false }) });
+    Object.assign(win, { innerWidth: W, innerHeight: H, scrollY: 0, matchMedia: (q) => (q.includes('portrait') ? portrait : { matches: false }) });
     doc.querySelector = (s) => (s === '.m-layout-cards .m-results' ? deck : null);
     const history = { state: null, replaceState(s) { this.state = s; } };
     let t = 0;
-    new Function('window', 'document', 'history', 'requestAnimationFrame', source)(win, doc, history, (fn) => fn(t += 100));
+    // The debounced scrolls wait here until settle() runs them.
+    const due = new Map();
+    let id = 0;
+    new Function('window', 'document', 'history', 'requestAnimationFrame', 'setTimeout', 'clearTimeout', source)(
+        win, doc, history, (fn) => fn(t += 100), (fn) => { due.set(++id, fn); return id; }, (k) => due.delete(k));
 
     // A finger on the cards, unless it is on one of the page's sheets, whose
     // events reach .m-page and not the deck's stage.
@@ -68,11 +77,21 @@ function phone(n) {
     function turn(upright) {
         portrait.matches = upright;
         win.innerWidth = upright ? W : 844;
+        win.innerHeight = upright ? H : W;
         if (!upright) deck.scrollTop = 0;
         win.fire('resize', {});
         portrait.fire('change', {});
     }
-    return { deck, scrub, win, history, touch, swipeUp, turn, open: () => classes.has('m-pager-open') };
+    // A scroll of el, the page's own being the document's
+    function scroll(el) {
+        doc.fire('scroll', { target: el || doc });
+    }
+    function settle() {
+        const fns = [...due.values()];
+        due.clear();
+        fns.forEach((fn) => fn());
+    }
+    return { deck, cards, scrub, win, history, touch, swipeUp, turn, scroll, settle, open: () => classes.has('m-pager-open') };
 }
 
 test('a swipe up on the last card raises the drawer, and one down lowers it', () => {
@@ -131,7 +150,7 @@ test('the scrubber and a turn of the phone lower the drawer', () => {
     expect(turned.open()).toBe(false);
 });
 
-test('a turned phone comes back to its card, and landscape does not replace it', () => {
+test('a turned phone comes back to its card', () => {
     const p = phone(5);
     p.deck.scrollTop = 3 * H;
     p.win.fire('pagehide', {});
@@ -140,4 +159,35 @@ test('a turned phone comes back to its card, and landscape does not replace it',
     expect(p.history.state).toEqual({ cardsIndex: 3 });
     p.turn(true);
     expect(p.deck.scrollTop).toBe(3 * H);
+});
+
+test('landscape opens on the card the reader was on upright', () => {
+    const p = phone(5);
+    p.deck.scrollTop = 3 * H;
+    p.scroll(p.deck);
+    p.settle();
+    p.turn(false);
+    expect(p.cards[3].getBoundingClientRect().top).toBe(NAV);
+
+    const css = readFileSync(join(import.meta.dir, '..', 'css', 'search-cards-mobile.css'), 'utf8');
+    const landscape = css.slice(css.indexOf('@media (orientation: landscape)'));
+    expect(landscape).toMatch(/\.m-layout-cards \.m-card \{\n\s+scroll-margin-top: 48px;/);
+});
+
+test('turned back upright, the deck takes the card landscape scrolled to', () => {
+    const p = phone(5);
+    p.deck.scrollTop = 3 * H;
+    p.win.fire('pagehide', {});
+    p.turn(false);
+    p.win.scrollY = 4 * L + 100;
+    p.scroll();
+    p.settle();
+    p.turn(true);
+    expect(p.deck.scrollTop).toBe(4 * H);
+
+    // And left from landscape, Back opens upright on that card
+    p.turn(false);
+    p.win.scrollY = 1 * L;
+    p.win.fire('pagehide', {});
+    expect(p.history.state).toEqual({ cardsIndex: 1 });
 });
