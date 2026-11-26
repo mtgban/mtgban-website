@@ -26,7 +26,8 @@ const inviteTestACL = `{
 }`
 
 // fakeInviteStore keeps invites in memory, spending uses as the real store
-// does and answering a repeated nonce from its first redemption.
+// does and answering a repeated nonce from its first redemption while its
+// tier is still allowed.
 type fakeInviteStore struct {
 	invites   map[string]userstate.Invite
 	redeemed  map[string]userstate.Redemption
@@ -57,6 +58,9 @@ func (f *fakeInviteStore) RedeemInvite(_ context.Context, in userstate.Redeem) (
 	f.lastTiers = in.Tiers
 	red, ok := f.redeemed[in.Code+"/"+in.Nonce]
 	if ok {
+		if !slices.Contains(in.Tiers, red.Tier) {
+			return userstate.Redemption{}, userstate.ErrInviteClosed
+		}
 		red.Repeat = true
 		return red, nil
 	}
@@ -263,6 +267,25 @@ func TestInviteRepeatedPressReissues(t *testing.T) {
 	}
 	if logged.Len() != 0 {
 		t.Errorf("a repeat was logged: %q", logged)
+	}
+}
+
+func TestInviteRepeatAfterTierGainsAdmin(t *testing.T) {
+	inviteTestEnv(t)
+	s := newSite()
+	store := newFakeInviteStore(testInvite("abcdefgh", 1))
+	nonce, _ := invites.NewNonce()
+
+	signatureCookieOf(t, serveInvite(s, store, acceptRequest("abcdefgh", nonce)))
+	withACL(t, `{"Any": {"Search": {}}, "Pioneer": {"Search": {}, "Admin": {}}}`)
+	rec := serveInvite(s, store, acceptRequest("abcdefgh", nonce))
+	if rec.Code != http.StatusGone {
+		t.Errorf("repeat = %d, want %d", rec.Code, http.StatusGone)
+	}
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == signatureCookie {
+			t.Errorf("repeat set a signature: Admin=%q", GetParamFromSig(c.Value, "Admin"))
+		}
 	}
 }
 

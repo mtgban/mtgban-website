@@ -122,6 +122,25 @@ func TestRedeemInviteAnswersARepeatedNonceFromItsRow(t *testing.T) {
 	}
 }
 
+// A repeated nonce re-signs the invite's tier, so it is refused once that
+// tier is no longer one an invite may sign.
+func TestRedeemInviteRefusesARepeatOfATierNoLongerAllowed(t *testing.T) {
+	c := testClient(t)
+	ctx := context.Background()
+	inv := freshInvite(t, c, 1)
+
+	in := redeemOf(inv, "same")
+	_, err := c.RedeemInvite(ctx, in)
+	if err != nil {
+		t.Fatalf("first redeem: %v", err)
+	}
+	in.Tiers = nil
+	red, err := c.RedeemInvite(ctx, in)
+	if !errors.Is(err, ErrInviteClosed) {
+		t.Errorf("repeat = %+v, %v; want ErrInviteClosed", red, err)
+	}
+}
+
 // Many people pressing at once on the last use: exactly one gets it.
 func TestRedeemInviteGivesTheLastUseToOne(t *testing.T) {
 	c := testClient(t)

@@ -153,8 +153,9 @@ func (c *Client) InviteRedemptions(ctx context.Context, codes []string) (map[str
 // RedeemInvite spends one use of an open invite and records who spent it,
 // in one transaction, so two presses on the last use cannot both have it.
 // A press whose nonce already redeemed the invite spends nothing and gets
-// that first redemption back, marked Repeat; it can find the invite used
-// up, or collide on the nonce, when it raced the first.
+// that first redemption back, marked Repeat, while the invite's tier is
+// still in Tiers; it can find the invite used up, or collide on the nonce,
+// when it raced the first.
 func (c *Client) RedeemInvite(ctx context.Context, in Redeem) (Redemption, error) {
 	red, err := c.spendInvite(ctx, in)
 	if err == nil {
@@ -163,7 +164,7 @@ func (c *Client) RedeemInvite(ctx context.Context, in Redeem) (Redemption, error
 	if !errors.Is(err, ErrInviteClosed) && !isUniqueViolation(err) {
 		return Redemption{}, err
 	}
-	red, err = c.redemptionByNonce(ctx, in.Code, in.Nonce)
+	red, err = c.redemptionByNonce(ctx, in.Code, in.Nonce, in.Tiers)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Redemption{}, ErrInviteClosed
 	}
@@ -212,14 +213,15 @@ func (c *Client) spendInvite(ctx context.Context, in Redeem) (Redemption, error)
 }
 
 // redemptionByNonce is the redemption the nonce made, with its invite's
-// tier and overrides; sql.ErrNoRows when it made none.
-func (c *Client) redemptionByNonce(ctx context.Context, code, nonce string) (Redemption, error) {
+// tier and overrides; sql.ErrNoRows when it made none, or when that tier
+// is not among tiers, since a repeat signs the tier again.
+func (c *Client) redemptionByNonce(ctx context.Context, code, nonce string, tiers []string) (Redemption, error) {
 	var red Redemption
 	var overrides []byte
 	err := c.db.QueryRowContext(ctx, `
 		SELECT r.redeemed_at, r.expires_at, r.ip, r.ua, r.site, r.signed_in, i.tier, i.overrides
 		FROM invite_redemptions r JOIN invites i USING (code)
-		WHERE r.code = $1 AND r.nonce = $2`, code, nonce).Scan(
+		WHERE r.code = $1 AND r.nonce = $2 AND i.tier = ANY($3)`, code, nonce, pq.Array(tiers)).Scan(
 		&red.RedeemedAt, &red.ExpiresAt, &red.IP, &red.UA, &red.Site, &red.SignedIn, &red.Tier, &overrides)
 	if err != nil {
 		return Redemption{}, err

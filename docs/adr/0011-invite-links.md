@@ -157,7 +157,8 @@ A POST whose nonce is already on a redemption of the same code re-issues
 that redemption's signature the same way, so to the same expiry, without
 spending: a double click, or a browser that dropped the first response,
 does not burn a single-use link. The nonce only ever reached the page
-that redeemed.
+that redeemed. The re-issue checks the tier as a spend does, since it
+signs under today's ACL: a tier given Admin since is refused.
 
 **A signed-in visitor.** The invite's signature stays nameless and
 replaces theirs, because a named one would be taken for a login:
