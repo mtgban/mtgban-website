@@ -473,12 +473,25 @@ func noSigning(next http.Handler) http.Handler {
 // names, or for a request the API gateway signed, the client the gateway
 // resolved, which it sends as the only X-Forwarded-For entry.
 // An IPv6 address counts as its /64, the block one subscriber holds.
+func apiLimitAddress(r *http.Request) (net.IP, error) {
+	ip, err := clientAddress(r)
+	if err != nil {
+		return nil, err
+	}
+	if ip.To4() == nil {
+		ip = ip.Mask(net.CIDRMask(64, 128))
+	}
+	return ip, nil
+}
+
+// clientAddress is the client's own address, resolved as apiLimitAddress
+// resolves it but whole, for a record of where a request came from.
 //
 // $BAN_CLIENT_IP_HEADER is set on App Platform to DO-Connecting-IP, which
 // its ingress writes; X-Forwarded-For there ends with a public hop of the
 // ingress's own. Behind nginx it stays unset, since nginx passes any such
 // header on as the client sent it.
-func apiLimitAddress(r *http.Request) (net.IP, error) {
+func clientAddress(r *http.Request) (net.IP, error) {
 	ip, err := ratelimit.IPAddress(r)
 	if err != nil {
 		return nil, err
@@ -493,9 +506,6 @@ func apiLimitAddress(r *http.Request) (net.IP, error) {
 	client := ratelimit.FirstForwarded(r)
 	if client != nil && signedByGateway(r) {
 		ip = client
-	}
-	if ip.To4() == nil {
-		ip = ip.Mask(net.CIDRMask(64, 128))
 	}
 	return ip, nil
 }

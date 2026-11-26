@@ -258,3 +258,24 @@ func TestAPIRateLimitDoesNotParseTheBodyFirst(t *testing.T) {
 		t.Error("the refused request's body was parsed before the limiter")
 	}
 }
+
+// clientAddress keeps an IPv6 address whole, where the limiter keys on its
+// /64, and reads $BAN_CLIENT_IP_HEADER the same way.
+func TestClientAddressKeepsTheWholeAddress(t *testing.T) {
+	withSigMode(t, false, true)
+	req := viaNginx("/invite/abcdefgh", "", "2001:db8:1:2:aaaa:bbbb:cccc:dddd")
+	ip, err := clientAddress(req)
+	if err != nil || ip.String() != "2001:db8:1:2:aaaa:bbbb:cccc:dddd" {
+		t.Errorf("clientAddress = %v, %v", ip, err)
+	}
+	masked, err := apiLimitAddress(req)
+	if err != nil || masked.String() != "2001:db8:1:2::" {
+		t.Errorf("apiLimitAddress = %v, %v", masked, err)
+	}
+
+	t.Setenv("BAN_CLIENT_IP_HEADER", "DO-Connecting-IP")
+	ip, err = clientAddress(viaAppPlatform("/invite/abcdefgh", "203.0.113.1", "198.51.100.7"))
+	if err != nil || ip.String() != "198.51.100.7" {
+		t.Errorf("App Platform: clientAddress = %v, %v", ip, err)
+	}
+}
