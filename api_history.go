@@ -49,31 +49,52 @@ func historyCardsAllowed(days int) int {
 	return cards
 }
 
-// historyWriteWindow is how long after a write hour a write may still be running.
+// historyWriteWindow is how long after a snapshot hour a write may still be running.
 const historyWriteWindow = 30 * time.Minute
 
-// historyWriteGrace is the max-age served inside that window.
+// historyIngestWindow is the same for the ingest: the workflow starts at :15 and can start late.
+const historyIngestWindow = 90 * time.Minute
+
+// historyWriteGrace is the max-age served inside a write's window.
 const historyWriteGrace = 60 * time.Second
 
-// historyMaxAge is the seconds until the next archive write at one of hours
-// on the host clock, at least a minute, and a minute just after one.
-func historyMaxAge(now time.Time, hours []int) int {
-	hours = slices.Sorted(slices.Values(hours))
-	if len(hours) == 0 {
-		hours = []int{0}
+// historyWrite is an archive write starting at hour, running up to window.
+// The hour is UTC for the workflow's ingest, else on the host clock.
+type historyWrite struct {
+	hour   int
+	window time.Duration
+	utc    bool
+}
+
+// historyMaxAge is the seconds until the next archive write's hour, at least
+// a minute, and a minute inside any write's window.
+func historyMaxAge(now time.Time, writes []historyWrite) int {
+	if len(writes) == 0 {
+		writes = []historyWrite{{0, historyWriteWindow, false}}
 	}
-	y, m, d := now.Date()
-	// cmd/tcgcsvd and a blue-green deploy's other instance write unseen by this process.
-	for _, h := range hours {
-		if at := time.Date(y, m, d, h, 0, 0, 0, now.Location()); !now.Before(at) && now.Sub(at) < historyWriteWindow {
-			return int(historyWriteGrace.Seconds())
+	start := func(day int, w historyWrite) time.Time {
+		at := now
+		if w.utc {
+			at = now.UTC()
+		}
+		y, m, d := at.Date()
+		return time.Date(y, m, d+day, w.hour, 0, 0, 0, at.Location())
+	}
+	// The tcgcsv workflow and a blue-green deploy's other instance write unseen by this process.
+	// A window can run past the next hour or past midnight, so yesterday's starts count too.
+	for _, w := range writes {
+		for _, day := range []int{-1, 0} {
+			if at := start(day, w); !now.Before(at) && now.Sub(at) < w.window {
+				return int(historyWriteGrace.Seconds())
+			}
 		}
 	}
-	next := time.Date(y, m, d+1, hours[0], 0, 0, 0, now.Location())
-	for _, h := range hours {
-		if at := time.Date(y, m, d, h, 0, 0, 0, now.Location()); now.Before(at) {
-			next = at
-			break
+	var next time.Time
+	for _, w := range writes {
+		for _, day := range []int{0, 1} {
+			if at := start(day, w); now.Before(at) && (next.IsZero() || at.Before(next)) {
+				next = at
+			}
 		}
 	}
 	secs := int(next.Sub(now).Seconds())
@@ -83,16 +104,21 @@ func historyMaxAge(now time.Time, hours []int) int {
 	return secs
 }
 
-// historyCacheHours are the archive's write hours: the snapshot, and the tcgcsv ingest off Magic.
-func historyCacheHours() []int {
+// historyWrites are the archive's writes: the snapshot, and the tcgcsv ingest off Magic.
+func historyWrites() []historyWrite {
+	snapshot := []historyWrite{{0, historyWriteWindow, false}, {12, historyWriteWindow, false}}
 	if Config().Game == DefaultGame {
-		return []int{0, 12}
+		return snapshot
 	}
-	return []int{0, 12, 21}
+	// The snapshot's 0 and 12, plus the daily crons in .github/workflows/tcgcsvd.yml, in UTC.
+	return []historyWrite{
+		snapshot[0], {3, historyIngestWindow, true}, snapshot[1],
+		{21, historyIngestWindow, true}, {23, historyIngestWindow, true},
+	}
 }
 
 // historyStashing reports an archive write in progress, a variable so tests can swap it.
-var historyStashing = func() bool { return IsStashingInProgress() || IsTCGCSVStashing() }
+var historyStashing = func() bool { return IsStashingInProgress() }
 
 // historyKey is where a provider's series is filed: the section and store key.
 type historyKey struct {
@@ -626,7 +652,7 @@ func (s *site) HistoryAPI(w http.ResponseWriter, r *http.Request) {
 	sum := sha1.Sum(tagBody)
 	etag := `"` + hex.EncodeToString(sum[:]) + `"`
 	w.Header().Set("ETag", etag)
-	w.Header().Set("Cache-Control", "public, max-age="+strconv.Itoa(historyMaxAge(time.Now(), historyCacheHours())))
+	w.Header().Set("Cache-Control", "public, max-age="+strconv.Itoa(historyMaxAge(time.Now(), historyWrites())))
 	if etagMatches(r.Header.Get("If-None-Match"), etag) {
 		w.WriteHeader(http.StatusNotModified)
 		return
