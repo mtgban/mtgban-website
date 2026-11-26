@@ -1754,7 +1754,7 @@ func redirectToCardConduit(w http.ResponseWriter, r *http.Request, b *matcher.Ba
 		}
 		qty := uploadedData[i].QuantityOrOne()
 		qty = adjustQty(qty, multiplier, maxQty)
-		qty = capShared(capped, uploadedData[i].CardID+string(uploadedData[i].OriginalCondition), qty, maxQty)
+		qty = capShared(capped, exportCapKey(&uploadedData[i]), qty, maxQty)
 		if qty == 0 {
 			continue
 		}
@@ -1807,7 +1807,7 @@ func writeTCGplayerCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, upl
 		qty := uploadedData[i].QuantityOrOne()
 		qty = adjustQty(qty, multiplier, maxQty)
 		// A card's lines share its cap, as they share its row
-		qty = capShared(capped, uploadedData[i].CardID+string(uploadedData[i].OriginalCondition), qty, maxQty)
+		qty = capShared(capped, exportCapKey(&uploadedData[i]), qty, maxQty)
 		if qty == 0 {
 			continue
 		}
@@ -3095,6 +3095,13 @@ func adjustQty(qty, multiplier, maxQty int) int {
 		qty = maxQty
 	}
 	return qty
+}
+
+// exportCapKey names the copies an export caps together, as the optimizer
+// lists them: a card's loose lines in a grade, and apart from them its
+// copies opened from any product.
+func exportCapKey(e *UploadEntry) string {
+	return e.CardID + string(e.OriginalCondition) + strconv.FormatBool(e.UnpackedFrom != "")
 }
 
 // capShared is how many of qty copies fit under maxQty after the copies

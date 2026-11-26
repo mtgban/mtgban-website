@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -455,5 +456,33 @@ func TestTCGCSVCapsACardsLinesTogether(t *testing.T) {
 	}
 	if len(records) != 2 || records[1][13] != "4" {
 		t.Errorf("got %v, want one row of 4 copies", records[1:])
+	}
+}
+
+// Opened copies are capped apart from the card's loose line, two products'
+// together, as the Optimizer lists them: 4 loose and 4 opened under a cap of 4.
+func TestTCGCSVCapsOpenedCopiesApart(t *testing.T) {
+	b, p := decklistCSVFixture(t)
+	ids := []string{"FIXTUREA-1", "FIXTUREA-1", "FIXTUREA-1"}
+	uploadedData, err := loadHashes(ids, []string{"4", "4", "4"}, []string{"NM", "NM", "NM"}, []string{"10", "0", "0"}, nil, []string{"", "box", "deck"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	err = writeTCGplayerCSV(rec, b, p, uploadedData, 1, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := csv.NewReader(rec.Body).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	copies := 0
+	for _, row := range records[1:] {
+		n, _ := strconv.Atoi(row[13])
+		copies += n
+	}
+	if copies != 8 {
+		t.Errorf("got %v, want 8 copies", records[1:])
 	}
 }
