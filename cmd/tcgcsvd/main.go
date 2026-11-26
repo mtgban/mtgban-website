@@ -4,13 +4,13 @@
 // the keys the ingest needs: sql_config (from the file infrastructure_path
 // names, unless it sets its own), tcgcsv_config, and
 // discord.server_webhook_url for its job reports. It runs
-// the two scheduled jobs under the same cross-process crawl lock, so it can run
-// beside a server that still has its crons enabled without both crawling
+// the two scheduled jobs under a cross-process crawl lock, so two tcgcsvd runs
+// (two workflow runs, or a workflow run and one by hand) never both crawl
 // tcgcsv.com at once.
 // The backfill stays outside that lock, as it does everywhere else: it is
 // operator-driven and runs for hours, and holding the lock for that long would
-// starve the daily pull. Time a long backfill so it doesn't sit on top of a
-// server's 21:00 ingest.
+// starve the daily pull. Time a long backfill so it doesn't sit on top of the
+// workflow's daily runs (21:15, 23:15 and 03:15 UTC).
 //
 //	go install github.com/mtgban/mtgban-website/cmd/tcgcsvd@latest
 //
@@ -39,7 +39,9 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mtgban/mtgban-website/internal/infrastructure"
 	"github.com/mtgban/mtgban-website/internal/notify"
@@ -123,6 +125,7 @@ func main() {
 	to := flag.String("to", "", "Backfill end date YYYY-MM-DD (default: today)")
 	force := flag.Bool("force", false, "Re-ingest dates already stored (ignore the resume cursor)")
 	categories := flag.String("categories", "", "Restrict the backfill to these TCGplayer category ids, comma-separated (default: every configured game)")
+	staleAfter := flag.Duration("stale-after", 0, "With -games: fail when a game's newest stored day is missing or older than this")
 	flag.Parse()
 
 	var chosen int
@@ -130,6 +133,14 @@ func main() {
 		if job {
 			chosen++
 		}
+	}
+	if *staleAfter < 0 {
+		fmt.Fprintln(os.Stderr, "tcgcsvd: -stale-after must not be negative")
+		os.Exit(2)
+	}
+	if *staleAfter != 0 && !*games {
+		fmt.Fprintln(os.Stderr, "tcgcsvd: -stale-after only applies to -games")
+		os.Exit(2)
 	}
 	if chosen != 1 {
 		fmt.Fprintln(os.Stderr, "tcgcsvd: pick exactly one of -games, -daily, -products, -backfill")
@@ -173,11 +184,11 @@ func main() {
 
 	switch {
 	case *games:
-		err = printGames(ctx, svc, db)
+		err = printGames(ctx, svc, db, *staleAfter)
 	case *daily:
-		// Under the crawl lock, so a server whose crons are still armed and this
-		// process never crawl tcgcsv.com at the same time. A skipped run (the
-		// other process holds the lock) is logged and exits 0.
+		// Under the crawl lock, so two tcgcsvd runs (two workflow runs, or one and
+		// a run by hand) never crawl tcgcsv.com at once. A skipped run (the other
+		// run holds the lock) is logged and exits 0.
 		err = svc.WithCrawlLock(ctx, "tcgcsvd -daily", func() error { return svc.IngestLatest(ctx) })
 	case *products:
 		err = svc.WithCrawlLock(ctx, "tcgcsvd -products", func() error { return svc.SyncProducts(ctx) })
@@ -195,11 +206,38 @@ func main() {
 	}
 }
 
+// gameRow is one game's line in the -games table.
+type gameRow struct {
+	Name       string
+	CategoryID int
+	Latest     time.Time
+	Stored     bool
+}
+
+// staleGames names each row with nothing stored or a newest day older than
+// staleAfter before now. A staleAfter of zero or less checks nothing.
+func staleGames(rows []gameRow, now time.Time, staleAfter time.Duration) []string {
+	if staleAfter <= 0 {
+		return nil
+	}
+	var stale []string
+	for _, r := range rows {
+		switch {
+		case !r.Stored:
+			stale = append(stale, fmt.Sprintf("%s (%d): none", r.Name, r.CategoryID))
+		case now.Sub(r.Latest) > staleAfter:
+			stale = append(stale, fmt.Sprintf("%s (%d): %s", r.Name, r.CategoryID, r.Latest.Format("2006-01-02")))
+		}
+	}
+	return stale
+}
+
 // printGames lists the chosen categories — the games we support — with the
 // newest date stored for each, so an operator can see at a glance which game is
-// behind and needs a backfill.
-func printGames(ctx context.Context, svc *tcgcsvd.Service, db *timeseries.Client) error {
+// behind and needs a backfill. With staleAfter set it also fails on a stale game.
+func printGames(ctx context.Context, svc *tcgcsvd.Service, db *timeseries.Client, staleAfter time.Duration) error {
 	fmt.Printf("%-24s %-8s %s\n", "GAME", "CATEGORY", "LATEST STORED")
+	var rows []gameRow
 	for _, g := range svc.Games() {
 		stored := "none"
 		latest, ok, err := db.LatestIngestDate(ctx, g.CategoryID)
@@ -210,6 +248,11 @@ func printGames(ctx context.Context, svc *tcgcsvd.Service, db *timeseries.Client
 			stored = latest.Format("2006-01-02")
 		}
 		fmt.Printf("%-24s %-8d %s\n", g.Name, g.CategoryID, stored)
+		rows = append(rows, gameRow{Name: g.Name, CategoryID: g.CategoryID, Latest: latest, Stored: ok})
+	}
+	stale := staleGames(rows, time.Now().UTC(), staleAfter)
+	if len(stale) > 0 {
+		return fmt.Errorf("stale games: %s", strings.Join(stale, "; "))
 	}
 	return nil
 }

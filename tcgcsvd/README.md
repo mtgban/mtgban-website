@@ -69,6 +69,10 @@ Pokemon                  3        2026-08-14
 Riftbound                89       2026-08-14
 ```
 
+`-stale-after 50h` makes `-games` exit non-zero, naming any game whose newest
+stored day is missing or older than that, which is how the scheduled workflow
+notices an ingest that ran and stored nothing.
+
 `-categories` narrows a single backfill to a subset of those games, for when one
 game has a hole and re-fetching the other nine would be wasted work. It can only
 narrow: an id that isn't a configured game is an error listing the ones that
