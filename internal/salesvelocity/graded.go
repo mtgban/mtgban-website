@@ -36,6 +36,13 @@ const GradedQuery = `
 	                    WHERE o.source = g.source AND o.listing_id = g.listing_id
 	                      AND o.tcgplayer_product_id <> g.tcgplayer_product_id)`
 
+// GradedAnyQuery says whether game has a graded sale since $2: about a second
+// where it has none, against GradedQuery reading the whole table to say so.
+const GradedAnyQuery = `
+	SELECT EXISTS (SELECT 1 FROM tcgplayerproductinfomodel i
+	                 JOIN pptgradedsalemodel g ON g.tcgplayer_product_id = i.product_id
+	                WHERE i.game_name = $1 AND g.sold_at >= $2)`
+
 // GradedSince is the oldest sale read, where the site's price history starts.
 var GradedSince = time.Date(2025, time.September, 1, 0, 0, 0, 0, time.UTC)
 
@@ -131,7 +138,8 @@ func (s *GradedStore) Publish(snap *GradedSnapshot) {
 const GradedReload = 6 * time.Hour
 
 // Load reads game's graded sales into a new snapshot, unless the last one is
-// on b and younger than GradedReload. A failure keeps the last one for the
+// on b and younger than GradedReload; a game with none gets an empty one
+// without the full read. A failure keeps the last one for the
 // next run to retry.
 func (s *GradedStore) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, game string, now time.Time) (result, problem string) {
 	if !s.loading.CompareAndSwap(false, true) {
@@ -144,15 +152,19 @@ func (s *GradedStore) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, 
 		return "", ""
 	}
 
-	gb := newGradedBuilder(cardMatcher(b), cardFacts(b), now)
-	err := scanGraded(ctx, db, game, gb)
+	found, err := anyGraded(ctx, db, game)
 	if err != nil {
-		note := recentUnavailable(err)
-		if note != "" {
-			return strings.Replace(note, "recent sales", "graded sales", 1), ""
-		}
-		log.Println("graded sales:", err)
-		return "", "cannot read graded sales: " + err.Error()
+		return gradedFailure(err)
+	}
+	if !found {
+		s.current.Store(&GradedSnapshot{Cards: map[string]*GradedCard{}, Day: startOfDay(now), Loaded: now, Backend: weak.Make(b)})
+		return "", ""
+	}
+
+	gb := newGradedBuilder(cardMatcher(b), cardFacts(b), now)
+	err = scanGraded(ctx, db, game, gb)
+	if err != nil {
+		return gradedFailure(err)
 	}
 
 	snap := gb.snapshot()
@@ -165,6 +177,34 @@ func (s *GradedStore) Load(ctx context.Context, db *sql.DB, b *matcher.Backend, 
 	result = gb.st.report(len(snap.Cards))
 	log.Println("graded sales:", result)
 	return result, ""
+}
+
+// gradedFailure is a load's result and problem for err: a note for the table
+// missing or unreadable, a problem for any other error.
+func gradedFailure(err error) (result, problem string) {
+	note := recentUnavailable(err)
+	if note != "" {
+		return strings.Replace(note, "recent sales", "graded sales", 1), ""
+	}
+	log.Println("graded sales:", err)
+	return "", "cannot read graded sales: " + err.Error()
+}
+
+// anyGraded is GradedAnyQuery's answer for game.
+func anyGraded(ctx context.Context, q salesQuerier, game string) (bool, error) {
+	rows, err := q.QueryContext(ctx, GradedAnyQuery, game, GradedSince)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	var found bool
+	if rows.Next() {
+		err = rows.Scan(&found)
+		if err != nil {
+			return false, err
+		}
+	}
+	return found, rows.Err()
 }
 
 // gradedRow is one row of GradedQuery.

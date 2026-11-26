@@ -420,3 +420,23 @@ func TestGradedBuilderDropsByTitle(t *testing.T) {
 		t.Errorf("foreign %d, lots %d, guessed %d; want 1 each", gb.st.foreign, gb.st.lots, gb.st.guessed)
 	}
 }
+
+// TestGradedQueries keeps the existence check to the full read's game and
+// date: a check bound wider would load a game with nothing to show, one bound
+// narrower would skip a game with sales.
+func TestGradedQueries(t *testing.T) {
+	for name, parts := range map[string][]string{
+		"any":  {"SELECT EXISTS", "i.game_name = $1", "g.sold_at >= $2"},
+		"full": {"WHERE game_name = $1", "g.sold_at >= $2"},
+	} {
+		query := GradedQuery
+		if name == "any" {
+			query = GradedAnyQuery
+		}
+		for _, part := range parts {
+			if !strings.Contains(query, part) {
+				t.Errorf("%s: missing %q", name, part)
+			}
+		}
+	}
+}
