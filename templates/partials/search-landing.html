@@ -7,6 +7,9 @@
 </script>
 <div class="search-toast" id="desktop-fav-toast"></div>
 <div class="search-landing">
+    {{if .IsGraded}}
+    {{template "slab-showcase" .}}
+    {{else}}
     <div class="search-landing-grid">
         <div class="landing-pane landing-pane-recent" id="desktop-recent-searches">
             <div class="landing-empty">Your recent searches will appear here.</div>
@@ -67,6 +70,46 @@
             </div>
         </div>
     </div>
+    {{end}}
     <p class="landing-syntax-link">Looking for syntax help? See the <a href="/guide">guide</a> page.</p>
 </div>
+{{end}}
+
+{{/* The Graded page's landing, desktop and mobile alike: the dearest slabs in
+     stock, scrolling as the home page's popular searches do. */}}
+{{define "slab-showcase"}}
+<div class="landing-popular slab-showcase">
+    <div class="landing-popular-title">Graded slabs in stock</div>
+    {{if .AllKeys}}
+    <div class="landing-popular-viewport">
+        {{/* The tiles are drawn twice, the second time hidden, so the track loops. */}}
+        <div class="landing-popular-track" style="animation-duration: calc({{len .AllKeys}} * 4s)">
+            {{template "slab-showcase-tiles" dict "Page" . "Copy" false}}
+            {{template "slab-showcase-tiles" dict "Page" . "Copy" true}}
+        </div>
+    </div>
+    {{else}}
+    <div class="landing-empty">{{range .Notices}}{{.}}{{else}}No graded store has slabs in stock right now.{{end}}</div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "slab-showcase-tiles"}}
+{{$page := .Page}}
+{{$copy := .Copy}}
+{{range $cardId := $page.AllKeys}}
+{{$card := index $page.Metadata $cardId}}
+{{range $entries := index $page.FoundSellers $cardId}}{{with index $entries 0}}
+<a class="landing-popular-card slab-showcase-card" href="/graded?q={{$cardId}}" title="{{$card.Name}} - {{$card.Edition}} #{{$card.Number}}"{{if $copy}} aria-hidden="true" tabindex="-1"{{end}}>
+    <img class="landing-popular-img" src="{{$card.ImageURL}}" alt="{{if not $copy}}{{$card.Name}}{{end}}" loading="lazy">
+    <span class="slab-showcase-slab">{{.SlabName}}</span>
+    <span class="landing-popular-label">{{.ScraperName}}</span>
+    {{if .Locked}}
+    <span class="slab-showcase-price" title="Join BAN to unlock additional stores and tools!"><i data-lucide="lock"></i></span>
+    {{else}}
+    <span class="slab-showcase-price">{{.PriceSymbol}}{{.PriceAmount}}</span>
+    {{end}}
+</a>
+{{end}}{{end}}
+{{end}}
 {{end}}

@@ -41,6 +41,7 @@ const (
 	MaxSearchResultsMobile = 25
 	TooLongMessage         = "Your query planeswalked away, try a shorter one"
 	TooManyMessage         = "Too many results, try adjusting your filters"
+	SlabsLockedMessage     = "Join BAN to see the graded stores' slabs"
 	TransferCutMessage     = "Only the first 9,999 results go to the Uploader and the CSV download"
 	NoResultsMessage       = "No products matching your search could be found"
 	NoPromosMessage        = "No products matching your search could be found - some promos may be hidden"
@@ -855,6 +856,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 			pageVars.SortOption = sortOpt
 		}
 		tmpl := fillSearchLanding(&pageVars.SearchVars, ds, isSetsPage, sortOpt)
+		if pageVars.IsGraded {
+			fillSlabShowcase(&pageVars, b, p, blocklistRetail)
+		}
 		if isPageView(r) {
 			observeFacts(r, nil, searchLandingFacts(searchPageName(r.URL.Path), sortOpt, searchChartKind(roster)))
 		}

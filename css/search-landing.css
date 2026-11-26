@@ -578,3 +578,36 @@
 .fav-sort-pill i[data-lucide] { width: 16px; height: 16px; flex: 0 0 auto; }
 .fav-sort-pill .fav-sort-dir.asc,
 .fav-sort-pill .fav-sort-dir.desc { color: var(--ainfo, #5b8def); }
+
+/* ═══ Graded page landing: the slabs in stock, on the home page's carousel ═══ */
+.slab-showcase {
+    margin: 1.5em 0 0.5em;
+}
+.slab-showcase .landing-popular-title {
+    font-size: 13px;
+}
+.slab-showcase-card {
+    width: 128px;
+    gap: 4px;
+}
+.slab-showcase-card .landing-popular-img {
+    width: 128px;
+    height: 178px;
+    margin-bottom: 4px;
+}
+.slab-showcase-slab {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--activetext);
+    text-align: center;
+}
+.slab-showcase-price {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ainfo);
+    font-variant-numeric: tabular-nums;
+}
+.slab-showcase-price svg,
+.slab-showcase-price i[data-lucide] {
+    width: 13px; height: 13px;
+}

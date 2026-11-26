@@ -70,6 +70,9 @@ type prices struct {
 
 	// The arbitrage pages' comparisons of these stores
 	arbit *arbitCache
+
+	// The slabs the Graded page's landing can show
+	showcase []showcaseSlab
 }
 
 // emptyPrices is what a site serves before its first publish, so a reader
@@ -90,6 +93,7 @@ func newPrices(prev *prices, sellers []mtgban.Seller, vendors []mtgban.Vendor, s
 		mkmIDs:   mkmIDsFor(prev, sellers),
 		tcgSKUs:  tcgSKUsFor(prev, sellers),
 		scrapers: scrapers,
+		showcase: slabShowcaseFor(prev, sellers),
 	}
 	p.sleepers = sleeperTiersFor(prev, p)
 	p.arbit = arbitHeldFor(prev, p)
@@ -128,6 +132,7 @@ func withVendors(p *prices, vendors []mtgban.Vendor) *prices {
 		mkmIDs:   p.mkmIDs,
 		tcgSKUs:  p.tcgSKUs,
 		scrapers: p.scrapers,
+		showcase: p.showcase,
 	}
 	next.sleepers = sleeperTiersFor(p, next)
 	next.arbit = arbitHeldFor(p, next)

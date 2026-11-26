@@ -311,3 +311,117 @@ func TestRandomGradedSearch(t *testing.T) {
 		}
 	}
 }
+
+// The Graded page's landing shows the dearest slabs in stock at the graded
+// stores the reader sees, one per card, in place of the recent searches and
+// favorites the other search pages keep.
+func TestGradedLandingShowcase(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+	cards := somePlainCardUUIDs(t, 4)
+	psa9 := &mtgban.Slab{Grader: "PSA", Score: 9}
+	psa10 := &mtgban.Slab{Grader: "PSA", Score: 10}
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[0]: {{Conditions: "NM", Price: 5000, URL: "u"}},
+		}, mtgban.ScraperInfo{Name: "RAWSHOP", Shorthand: "RAWSHOP"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[1]: {
+				{Conditions: "NM", Price: 40, URL: "u", Slab: psa9},
+				{Conditions: "NM", Price: 90, URL: "u", Slab: psa10},
+			},
+			cards[2]: {{Conditions: "NM", Price: 20, URL: "u", Slab: psa9}},
+		}, mtgban.ScraperInfo{Name: "SLABSHOP", Shorthand: "SLABSHOP", GradedMode: true}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[1]: {{Conditions: "NM", Price: 60, URL: "u", Slab: psa9}},
+		}, mtgban.ScraperInfo{Name: "OTHERSLABS", Shorthand: "OTHERSLABS", GradedMode: true}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[3]: {{Conditions: "NM", Price: 9000, URL: "u", Slab: psa10}},
+		}, mtgban.ScraperInfo{Name: "HIDDENSLABS", Shorthand: "HIDDENSLABS", GradedMode: true}),
+	}, nil)
+	withConfigCopy(t)
+	Config().Stores.SearchRetailBlockList = []string{"HIDDENSLABS"}
+
+	landing := func(path string) string {
+		rec := httptest.NewRecorder()
+		testSite.Search(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		return rec.Body.String()
+	}
+	body := landing("/graded")
+	// Each tile is drawn twice, for the carousel's loop.
+	for link, want := range map[string]int{
+		`href="/graded?q=` + cards[0] + `"`: 0,
+		`href="/graded?q=` + cards[1] + `"`: 2,
+		`href="/graded?q=` + cards[2] + `"`: 2,
+		`href="/graded?q=` + cards[3] + `"`: 0,
+	} {
+		if got := strings.Count(body, link); got != want {
+			t.Errorf("%s occurs %d times, want %d", link, got, want)
+		}
+	}
+	for _, want := range []string{
+		`<span class="slab-showcase-slab">PSA 10</span>`,
+		`<span class="landing-popular-label">SLABSHOP</span>`,
+		`90.00</span>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the showcase is missing %q", want)
+		}
+	}
+	if strings.Contains(body, "OTHERSLABS") || strings.Contains(body, "40.00") {
+		t.Error("the showcase shows a card's cheaper slab")
+	}
+	if strings.Index(body, cards[1]) > strings.Index(body, cards[2]) {
+		t.Error("the showcase is not dearest first")
+	}
+	if strings.Contains(body, `id="desktop-favorites"`) {
+		t.Error("the Graded page's landing still shows the favorites")
+	}
+
+	body = landing("/search")
+	if strings.Contains(body, "slab-showcase") || !strings.Contains(body, `id="desktop-favorites"`) {
+		t.Error("the search landing lost its favorites, or shows slabs")
+	}
+}
+
+// An open-mode reader sees a store that is no affiliate locked, or nothing of
+// it where the config hides those stores, and is told why the carousel is empty.
+func TestGradedLandingLocked(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, true)
+	cards := somePlainCardUUIDs(t, 2)
+	psa9 := &mtgban.Slab{Grader: "PSA", Score: 9}
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[0]: {{Conditions: "NM", Price: 40, URL: "u", Slab: psa9}},
+		}, mtgban.ScraperInfo{Name: "PARTNERSLABS", Shorthand: "PARTNERSLABS", GradedMode: true}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[1]: {{Conditions: "NM", Price: 77, URL: "u", Slab: psa9}},
+		}, mtgban.ScraperInfo{Name: "OTHERSLABS", Shorthand: "OTHERSLABS", GradedMode: true}),
+	}, nil)
+	saved := affiliatesPtr.Load()
+	t.Cleanup(func() { affiliatesPtr.Store(saved) })
+	affiliatesPtr.Store(&AffiliatesConfig{List: []string{"PARTNERSLABS"}})
+	withConfigCopy(t)
+
+	landing := func() string {
+		rec := httptest.NewRecorder()
+		testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/graded", nil))
+		return rec.Body.String()
+	}
+	body := landing()
+	if !strings.Contains(body, "40.00</span>") || strings.Contains(body, "77.00") || !strings.Contains(body, `data-lucide="lock"`) {
+		t.Error("an open-mode reader does not see the affiliate's price and the other store locked")
+	}
+
+	Config().SearchHideNonAffiliates = true
+	body = landing()
+	if strings.Contains(body, `href="/graded?q=`+cards[1]+`"`) || !strings.Contains(body, `href="/graded?q=`+cards[0]+`"`) {
+		t.Error("a hidden store's slab is on the carousel, or the affiliate's is not")
+	}
+	affiliatesPtr.Store(&AffiliatesConfig{})
+	body = landing()
+	if !strings.Contains(body, "Join BAN to see the graded stores&#39; slabs") {
+		t.Error("an empty carousel does not say the slabs are hidden")
+	}
+}
