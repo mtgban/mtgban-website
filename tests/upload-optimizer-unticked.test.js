@@ -20,8 +20,9 @@ function classes() {
 function section(store, rows) {
     const s = {
         id: 'opt-' + store, dispatched: [], all: { checked: true },
-        rows: rows.map(([id, cond]) => {
+        rows: rows.map(([id, cond, price]) => {
             const tr = { dataset: { optId: id, optCond: cond }, classList: classes() };
+            if (price !== undefined) tr.dataset.sharePrice = price;
             tr.cb = { checked: true, closest: () => tr };
             tr.querySelector = () => tr.cb;
             tr.closest = (sel) => (sel === '.opt-store' ? s : null);
@@ -100,4 +101,16 @@ test('a new list starts ticked and forgets the old one', () => {
     expect(ck.rows[0].cb.checked).toBe(true);
     expect(ck.dispatched).toEqual([]);
     expect('uploadOptUnticked' in store).toBe(false);
+});
+
+test('a card\'s lines at two prices are kept apart', () => {
+    const ck = section('CK', [['a', 'NM', '10'], ['a', 'NM', '4']]);
+    const saved = loadOptimizer([ck], {}, false);
+    ck.rows[1].classList.add('opt-removed');
+    saved.fire('change', { target: { closest: () => ck } });
+    expect(JSON.parse(saved.store.uploadOptUnticked)).toEqual(['a\tNM\tCK\t4']);
+
+    const again = section('CK', [['a', 'NM', '10'], ['a', 'NM', '4']]);
+    loadOptimizer([again], saved.store, true).fire('DOMContentLoaded');
+    expect(again.rows.map((tr) => tr.cb.checked)).toEqual([true, false]);
 });
