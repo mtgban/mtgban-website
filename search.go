@@ -281,7 +281,7 @@ func scopeApplies(pinned SearchConfig) bool {
 func scopeNarrowsOffers(pinned SearchConfig) bool {
 	return len(pinned.StoreFilters) > 0 || len(pinned.PriceFilters) > 0 ||
 		len(pinned.EntryFilters) > 0 || len(pinned.PostFilters) > 0 ||
-		pinned.SkipRetail || pinned.SkipBuylist
+		pinned.SkipRetail || pinned.SkipBuylist || pinned.GradedOnly
 }
 
 // parseSearchPage parses what a reader typed into a search's bars. A sealed
@@ -327,6 +327,7 @@ func applySearchScope(config *SearchConfig, pinned SearchConfig) []FilterElem {
 	config.PostFilters = append(config.PostFilters, pinned.PostFilters...)
 	config.SkipRetail = config.SkipRetail || pinned.SkipRetail
 	config.SkipBuylist = config.SkipBuylist || pinned.SkipBuylist
+	config.GradedOnly = config.GradedOnly || pinned.GradedOnly
 
 	typedFinish := slices.ContainsFunc(config.CardFilters, asksFinish)
 	var overridden []FilterElem
@@ -893,6 +894,12 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	config := parseSearchPage(ds, p, query, pageVars.IsSealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	overridden := applySearchScope(&config, pinnedConfig)
+	// is:graded asks for the Graded page's search, which that page draws:
+	// its slabs' sales and velocity, and none of the raw copies' extras.
+	if config.GradedOnly && r.URL.Path == "/search" {
+		http.Redirect(w, r, "/graded?"+r.URL.RawQuery, http.StatusFound)
+		return
+	}
 	pageVars.ScopeOverridden = len(overridden) > 0
 	pageVars.ScopeAllOverridden = pageVars.ScopeOverridden && len(overridden) == len(pinned) && !scopeNarrowsOffers(pinnedConfig)
 	config.Sales = salesVelocityStore.Snapshot()

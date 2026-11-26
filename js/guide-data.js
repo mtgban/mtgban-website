@@ -562,7 +562,7 @@ window.__BAN_GUIDE = {
             icon: 'tag',
             summary: 'Filter by frame, language, or game properties (is:reserved, is:ea, not:foil).',
             snippets: ['is:reserved', 'is:extendedart', 'is:showcase', 'is:borderless', 'not:foil', 'is:ea', 'is:sc'],
-            keywords: ['properties', 'is:', 'not:', 'reserved', 'token', 'oversize', 'fullart', 'extendedart', 'extended art', 'showcase', 'reskin', 'borderless', 'gold', 'future', 'altfoil', 'japanese', 'phyrexian', 'wcd', 'commander', 'funny', 'gamechanger', 'ea', 'sc', 'bd', 'gc', 'jp', 'jpn', 'ph'],
+            keywords: ['properties', 'is:', 'not:', 'reserved', 'token', 'oversize', 'fullart', 'extendedart', 'extended art', 'showcase', 'reskin', 'borderless', 'gold', 'future', 'altfoil', 'japanese', 'phyrexian', 'wcd', 'commander', 'funny', 'gamechanger', 'graded', 'ea', 'sc', 'bd', 'gc', 'jp', 'jpn', 'ph'],
             content: {
                 table: [
                     { value: 'reserved', short: 'On the Reserved List' },
@@ -584,6 +584,7 @@ window.__BAN_GUIDE = {
                     { value: 'future', short: 'Future frame' },
                     { value: 'foil', short: 'Foil (includes etched)' },
                     { value: 'nonfoil', short: 'Non-foil' },
+                    { value: 'graded', short: 'Search on the Graded page: graded stores only' },
                     { value: 'altfoil', short: 'Any special foil treatment (see Promos & Variants)' },
                     { value: 'japanese / jpn / jp / ja', short: 'Japanese printing' },
                     { value: 'phyrexian / ph', short: 'Phyrexian printing' }
