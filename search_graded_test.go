@@ -225,7 +225,8 @@ func TestGradedPageLastSold(t *testing.T) {
 	for _, want := range []string{
 		"<span>PSA 9</span><span class=\"sales-avg\">avg <b>$ 515.00</b>",
 		`href="https://www.ebay.com/itm/111"`,
-		`data-track-value="eBay"`,
+		`data-track="ui.graded.sale" data-track-value="eBay"`,
+		`data-track="ui.graded.sale" data-track-value="Fanatics"`,
 		`<span class="sales-qty">offer</span>`,
 		"<span>CGC 10 Pristine</span><span class=\"sales-avg\">avg <b>$ 999.00</b>",
 		`href="https://sales-history.fanaticscollect.com/items/W1"`,
