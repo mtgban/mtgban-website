@@ -64,7 +64,26 @@
         return cond;
     }
 
-    // condPrices explodes one store entry into {NM: {price, qty}, ...}.
+    // slabPrices lists a graded store's slabs as {cond, slab, price, qty}, from
+    // the tags written as the condition, a bar and the slab: "NM_foil|PSA 9".
+    function slabPrices(entry) {
+        var out = [];
+        var conds = entry.conditions || {};
+        for (var tag in conds) {
+            var bar = tag.indexOf('|');
+            if (bar === -1 || !(conds[tag] > 0)) continue;
+            out.push({
+                cond: tag.slice(0, bar).split('_')[0],
+                slab: tag.slice(bar + 1),
+                price: conds[tag],
+                qty: (entry.quantities && entry.quantities[tag]) || 0
+            });
+        }
+        return out;
+    }
+
+    // condPrices explodes one store entry into {NM: {price, qty}, ...}. A
+    // graded store's base price is one of its slabs, so it is not read back.
     function condPrices(entry, card) {
         var out = {};
         var conds = entry.conditions;
@@ -78,7 +97,7 @@
                     };
                 }
             }
-            if (Object.keys(out).length > 0) {
+            if (Object.keys(out).length > 0 || slabPrices(entry).length > 0) {
                 return out;
             }
         }
@@ -104,8 +123,11 @@
 
     function rowComparator(ctx) {
         if (ctx.byStore) {
+            // One store's slabs share its name, so they go by price
             return function (a, b) {
-                return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1;
+                var x = a.name.toLowerCase(), y = b.name.toLowerCase();
+                if (x !== y) return x < y ? -1 : 1;
+                return a.price - b.price;
             };
         }
         return function (a, b) {
@@ -153,6 +175,7 @@
         markAttr: markAttr,
         finishPrice: finishPrice,
         condPrices: condPrices,
+        slabPrices: slabPrices,
         storeName: storeName,
         isIndex: isIndex,
         rowComparator: rowComparator,

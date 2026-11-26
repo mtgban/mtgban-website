@@ -6,7 +6,7 @@
     var S = root.OfflineRenderShared;
     var CONDITIONS = S.CONDITIONS, INDEX_PAIRS = S.INDEX_PAIRS;
     var money = S.money, keyruneClasses = S.keyruneClasses, markAttr = S.markAttr, finishPrice = S.finishPrice,
-        condPrices = S.condPrices, storeName = S.storeName, isIndex = S.isIndex,
+        condPrices = S.condPrices, slabPrices = S.slabPrices, storeName = S.storeName, isIndex = S.isIndex,
         rowComparator = S.rowComparator, refRetail = S.refRetail, noticesHTML = S.noticesHTML;
 
     function priceSpan(price) {
@@ -16,10 +16,12 @@
         return '<span class="price">n/a</span>';
     }
 
-    // sellerRow mirrors result-sellers' URL-less branch.
-    function sellerRow(name, price, qty, cond) {
+    // sellerRow mirrors result-sellers' URL-less branch, a slab's name beside
+    // its store.
+    function sellerRow(name, price, qty, cond, slab) {
+        var slabName = slab ? '<span class="slab-name" title="' + escapeHtml(slab) + '">' + escapeHtml(slab) + '</span>' : '';
         return '<div class="price-row' + (cond ? ' cond-' + cond : '') + '">' +
-            '<span class="store-cell"><a class="store-name dim">' + escapeHtml(name) + '</a></span>' +
+            '<span class="store-cell"><a class="store-name dim">' + escapeHtml(name) + '</a>' + slabName + '</span>' +
             '<span class="price-right">' +
             priceSpan(price) +
             '<span class="qty">' + (qty > 0 ? qty : '') + '</span>' +
@@ -141,6 +143,14 @@
                     qty: per[cond].qty
                 });
             }
+            slabPrices(res.retail[s]).forEach(function (slab) {
+                (groups[slab.cond] = groups[slab.cond] || []).push({
+                    name: storeName(ctx, s),
+                    price: slab.price,
+                    qty: slab.qty,
+                    slab: slab.slab
+                });
+            });
         });
         CONDITIONS.forEach(function (cond) {
             var rows = groups[cond];
@@ -149,7 +159,7 @@
             best = best || rows[0].price;
             rowsMain += condHeader(card, cond, false);
             rows.forEach(function (r) {
-                rowsMain += sellerRow(r.name, r.price, r.qty, cond);
+                rowsMain += sellerRow(r.name, r.price, r.qty, cond, r.slab);
             });
         });
 
