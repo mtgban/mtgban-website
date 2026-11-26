@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"maps"
 	"slices"
 	"strings"
@@ -37,11 +38,13 @@ func TestAPIKeepsLanguageCopiesOffTheirOriginalsIDs(t *testing.T) {
 	for _, tc := range []struct {
 		set, mode, identifier string
 		space                 matcher.IDSpace
+		lang                  string
 	}{
-		{"FWB", "mtgjson", "mtgjsonId", matcher.IDSpaceMTGJSON},
-		{"LEGITA", "mtgjson", "mtgjsonId", matcher.IDSpaceMTGJSON},
-		{"FBBFR", "scryfall", "scryfallId", matcher.IDSpaceScryfall},
-		{"4BBES", "scryfall", "scryfallId", matcher.IDSpaceScryfall},
+		{"FWB", "mtgjson", "mtgjsonId", matcher.IDSpaceMTGJSON, ""},
+		{"LEGITA", "mtgjson", "mtgjsonId", matcher.IDSpaceMTGJSON, ""},
+		{"FBBFR", "scryfall", "scryfallId", matcher.IDSpaceScryfall, ""},
+		{"4BBES", "scryfall", "scryfallId", matcher.IDSpaceScryfall, ""},
+		{"4BBPT", "mtgjson", "mtgjsonId", matcher.IDSpaceMTGJSON, "portuguese"},
 	} {
 		t.Run(tc.set+" "+tc.mode, func(t *testing.T) {
 			co, original := languageCopyOf(t, tc.set, tc.identifier, tc.space)
@@ -67,7 +70,7 @@ func TestAPIKeepsLanguageCopiesOffTheirOriginalsIDs(t *testing.T) {
 			for _, want := range []struct {
 				lang           string
 				retail, bought float64
-			}{{"", 700, 200}, {"Ancient Greek", 700, 200}, {strings.ToLower(co.Language), 300, 250}} {
+			}{{"", 700, 200}, {"Ancient Greek", 700, 200}, {cmp.Or(tc.lang, strings.ToLower(co.Language)), 300, 250}} {
 				for _, hashes := range [][]string{nil, {original.UUID, co.UUID}} {
 					retail := getSellerPrices(b, p, tc.mode, want.lang, stores, "", hashes, "", true, true, false, "")
 					if len(retail) != 1 || retail[id]["COPIES"] == nil || retail[id]["COPIES"].Regular != want.retail {

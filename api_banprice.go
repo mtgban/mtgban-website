@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -635,7 +636,7 @@ func languageCopySet(set string) bool {
 func languageID(b *matcher.Backend, space matcher.IDSpace, field, lang string, co *matcher.CardObject) string {
 	id := co.Identifiers[field]
 	if originalOf(b, space, id, co) != nil {
-		if lang == "" || !strings.EqualFold(co.Language, lang) {
+		if lang == "" || !strings.EqualFold(cmp.Or(regionalLanguage[co.Language], co.Language), lang) {
 			return ""
 		}
 		return id
@@ -646,11 +647,15 @@ func languageID(b *matcher.Backend, space matcher.IDSpace, field, lang string, c
 	return id
 }
 
+// regionalLanguage is the language a request names for one the datastore
+// names with its region.
+var regionalLanguage = map[string]string{"Portuguese (Brazil)": "Portuguese"}
+
 // hasCopyIn reports whether a card of another set in lang shares co's id.
 func hasCopyIn(b *matcher.Backend, field, id, lang string, co *matcher.CardObject) bool {
 	for _, uuid := range b.Hashes[matcher.Normalize(co.Name)] {
 		other, err := b.GetUUID(uuid)
-		if err == nil && other.SetCode != co.SetCode && other.Identifiers[field] == id && strings.EqualFold(other.Language, lang) {
+		if err == nil && other.SetCode != co.SetCode && other.Identifiers[field] == id && strings.EqualFold(cmp.Or(regionalLanguage[other.Language], other.Language), lang) {
 			return true
 		}
 	}

@@ -34,8 +34,10 @@ One route, `/api/v2/history/`, serves every form:
   id for is left out, as v2 prices leave it out.
 - `language=` (a code or a name) picks between a card and its copy in
   another language where the two share a `scryfall` or `mtgjson` id, as
-  FBBFR, 4BBES and 4EDALT share their originals': the copy answers it in
-  that language, and the card itself without one.
+  FBBFR and 4BBES share their originals': the copy answers it in that
+  language, and the card itself without one. 4EDALT's copies are English
+  like 4ED's, so they answer only under ids of their own, such as `ban`,
+  `tcg` or `ck`.
 - A request may cover 120 card-months, a card being one printing in one
   finish: the range in 30-day months (rounded, at least one) times the
   cards it names, so 120 at 30 days, 10 at a year. The budget counts the
