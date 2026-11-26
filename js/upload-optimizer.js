@@ -78,12 +78,14 @@ document.addEventListener('change', function(e) {
 
 wireLoadLists({section: '.opt-store', removed: 'opt-removed'});
 
-// The unticked rows, by card, condition and store, are kept in the tab's
-// session so a reload of the page (a move, a store dropped or added, the
-// Reload button or the browser's) unticks them again; a new list starts ticked.
+// The unticked rows, by card, condition, store and price, are kept in the
+// tab's session so a reload of the page (a move, a store dropped or added,
+// the Reload button or the browser's) unticks them again; a new list starts
+// ticked. A card's lines at two prices are two rows.
 function optRowKey(tr) {
     var section = tr.closest('.opt-store');
-    return tr.dataset.optId + '\t' + (tr.dataset.optCond || '') + '\t' + section.id.replace(/^opt-/, '');
+    var price = 'sharePrice' in tr.dataset ? '\t' + tr.dataset.sharePrice : '';
+    return tr.dataset.optId + '\t' + (tr.dataset.optCond || '') + '\t' + section.id.replace(/^opt-/, '') + price;
 }
 
 function saveOptUnticked() {
