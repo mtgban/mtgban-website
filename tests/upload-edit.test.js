@@ -99,8 +99,9 @@ function resultRow(name, id, cond, qty, { editable = true, grade = cond, price =
         : [el('td', {}, [shown]), el('td', {}, [cond]), el('td', {}, [String(qty)])];
     return el('tr', attrs, cells);
 }
-function optRow(id, cond, qty, price = '1.00') {
-    return el('tr', { 'data-opt-id': id, 'data-opt-cond': cond, 'data-load-qty': String(qty) }, [
+// share is the row's loaded price, which pairs it with its results row.
+function optRow(id, cond, qty, price = '1.00', share = '0') {
+    return el('tr', { 'data-opt-id': id, 'data-opt-cond': cond, 'data-load-qty': String(qty), 'data-share-price': share }, [
         el('td', {}, [el('button', { class: 'ures-edit-btn opt-cond-btn', 'data-edit': 'cond' }, [cond])]),
         el('td', {}, [el('button', { class: 'ures-edit-btn opt-price-btn', 'data-edit': 'price' }, [price]), el('button', { class: 'ures-edit-btn opt-qty-btn', 'data-edit': 'qty' }, ['×' + qty])]),
     ]);
@@ -315,11 +316,12 @@ test('the store sends wait for a reload, and the bar nudges', () => {
     expect(dispatch('click', pack.children[0]).defaultPrevented).toBe(false);
 });
 
-test('a price set on an optimizer row prices each list line of its card', () => {
+test('a price set on an optimizer row prices its own list line, not the card\'s line at another price', () => {
     const ring = resultRow('Ring', 'b', 'SP', 1, { price: '1.5' });
     const ring2 = resultRow('Ring', 'b', 'SP', 2, { price: '2' });
-    const opt = optRow('b', 'SP', 3, '1.50');
-    const { calls, menu, shown } = load({ results: [ring, ring2], opt: [opt] });
+    const opt = optRow('b', 'SP', 1, '1.50', '1.5');
+    const opt2 = optRow('b', 'SP', 2, '2.00', '2');
+    const { calls, menu, shown } = load({ results: [ring, ring2], opt: [opt, opt2] });
 
     btn(opt, 'price').click();
     const box = menu().querySelector('.ures-edit-input');
@@ -328,28 +330,44 @@ test('a price set on an optimizer row prices each list line of its card', () => 
     box.value = '3.256';
     menu().querySelector('.ures-edit-set').click();
 
-    expect([ring.dataset.price, ring2.dataset.price]).toEqual(['3.26', '3.26']);
+    expect([ring.dataset.price, ring2.dataset.price]).toEqual(['3.26', '2']);
     expect(btn(ring, 'price').textContent).toBe('$ 3.26');
-    expect(btn(ring2, 'price').classList.contains('edited')).toBe(true);
-    expect(btn(opt, 'price').textContent).toBe('3.26');
-    expect(shown()).toBe('2 updated');
+    expect(btn(ring2, 'price').classList.contains('edited')).toBe(false);
+    expect([btn(opt, 'price').textContent, btn(opt2, 'price').textContent]).toEqual(['3.26', '2.00']);
+    expect(shown()).toBe('1 updated');
     expect(calls.track).toEqual(['ui.optimizer:edit_price']);
-    expect(opt.dataset.sharePrice).toBe('3.26');
+    expect([opt.dataset.sharePrice, opt2.dataset.sharePrice]).toEqual(['3.26', '2']);
     // Not from the backpack, so nothing is taken back there
     expect(calls.pack).toEqual([]);
 
-    // Back to what one line came with clears only that line
-    btn(ring, 'price').click();
+    // The row still finds its line at the new price, and back to what the
+    // line came with leaves nothing to reload
+    btn(opt, 'price').click();
     menu().querySelector('.ures-edit-input').value = '1.5';
     dispatch('keydown', menu().querySelector('.ures-edit-input'), { key: 'Enter' });
+    expect([ring.dataset.price, opt.dataset.sharePrice]).toEqual(['1.5', '1.5']);
     expect(btn(ring, 'price').classList.contains('edited')).toBe(false);
-    expect(shown()).toBe('1 updated');
+    expect(shown()).toBe(null);
 
     // A price that is no number changes nothing
     btn(ring, 'price').click();
     menu().querySelector('.ures-edit-input').value = '';
     menu().querySelector('.ures-edit-set').click();
     expect(ring.dataset.price).toBe('1.5');
+});
+
+test('a grade picked on one of a card\'s lines at two prices moves only its own optimizer row', () => {
+    const bolt = resultRow('Bolt', 'a', 'NM', 1, { price: '10' });
+    const bolt2 = resultRow('Bolt', 'a', 'NM', 1, { price: '4' });
+    const opt = optRow('a', 'NM', 1, '10.00', '10');
+    const opt2 = optRow('a', 'NM', 1, '4.00', '4');
+    const { pick } = load({ results: [bolt, bolt2], opt: [opt, opt2] });
+
+    pick(btn(bolt2, 'cond'), 'SP');
+    expect([opt.dataset.optCond, opt2.dataset.optCond]).toEqual(['NM', 'SP']);
+    // And from the optimizer row, which edits its own line alone
+    pick(btn(opt, 'cond'), 'MP');
+    expect([bolt.dataset.cond, bolt2.dataset.cond]).toEqual(['MP', 'SP']);
 });
 
 test('a price set on a list sent from the backpack goes back to it', () => {
@@ -415,7 +433,7 @@ test('a card takes one more line in a grade it has none in, under the row', () =
     const bolt = resultRow('Bolt', 'a', 'NM', 3, { price: '2' });
     const boltSP = resultRow('Bolt', 'a', 'SP', 1);
     const ring = resultRow('Ring', 'b', 'NM', 1);
-    const table = { results: [bolt, boltSP, ring], opt: [optRow('a', 'NM', 3)], sentPack: 1 };
+    const table = { results: [bolt, boltSP, ring], opt: [optRow('a', 'NM', 3, '2.00', '2')], sentPack: 1 };
     const { calls, menu, pick, shown } = load(table);
     const lines = () => doc.querySelectorAll('.ures-table tr[data-hash]');
 

@@ -1,8 +1,9 @@
 // Editing a result's condition, copies and price. The Results rows are the
 // list: every re-post and export packs them (packRows), so an edit only
 // rewrites their data-cond/data-qtys/data-price, and the offers catch up
-// when the reader reloads. An Optimizer row edits the Results rows of its
-// card and grade, and a card can take one more line in a grade it lacks.
+// when the reader reloads. An Optimizer row edits the Results row of its
+// card, grade and price, and a card can take one more line in a grade it
+// lacks.
 // A list sent from the backpack takes each condition, copies and price
 // edit back to it.
 (function() {
@@ -13,15 +14,23 @@
     var opener = null;
 
     // listRows is the Results rows a button edits: its own row, or for an
-    // Optimizer row every Results row of the same card and grade.
+    // Optimizer row the Results row it prices.
     function listRows(btn) {
         var own = btn.closest('tr[data-hash]');
         if (own) return [own];
         var opt = btn.closest('tr[data-opt-id]');
         if (!opt) return [];
         return Array.prototype.filter.call(document.querySelectorAll('.ures-table tr[data-hash]'), function(tr) {
-            return tr.dataset.hash === opt.dataset.optId && (tr.dataset.grade || '') === (opt.dataset.optCond || '');
+            return pairs(opt, tr);
         });
+    }
+
+    // pairs is whether the Optimizer row prices the Results row: the same
+    // card and grade, and the same price where the row carries one, as a
+    // card's lines at two prices are two rows.
+    function pairs(opt, tr) {
+        if (tr.dataset.hash !== opt.dataset.optId || (tr.dataset.grade || '') !== (opt.dataset.optCond || '')) return false;
+        return !('sharePrice' in opt.dataset) || opt.dataset.sharePrice === (tr.dataset.price || '');
     }
 
     // editable is whether each row has its own edit buttons: the rows of
@@ -178,12 +187,19 @@
         });
     }
 
+    // ownRows is the Optimizer rows pricing the Results row.
+    function ownRows(tr) {
+        return Array.prototype.filter.call(document.querySelectorAll('.opt-store tr[data-opt-id]'), function(opt) {
+            return pairs(opt, tr);
+        });
+    }
+
     function setCond(rows, cond) {
         rows.forEach(function(tr) {
             var was = tr.dataset.cond || '';
             if (was === cond) return;
             remember(tr);
-            optRows(tr.dataset.hash, tr.dataset.grade || '').forEach(function(opt) {
+            ownRows(tr).forEach(function(opt) {
                 // The page's move keys and later edits read the new grade
                 opt.dataset.optCond = cond;
                 var b = opt.querySelector('.ures-edit-btn[data-edit="cond"]');
@@ -285,6 +301,7 @@
         var conds = [];
         rows.forEach(function(tr) {
             remember(tr);
+            var opts = ownRows(tr);
             tr.dataset.price = String(p);
             var b = tr.querySelector('.ures-edit-btn[data-edit="price"]');
             if (b) {
@@ -292,7 +309,7 @@
                 b.parentNode.dataset.sort = p ? p.toFixed(2) : '';
             }
             mark(tr);
-            optRows(tr.dataset.hash, tr.dataset.grade || '').forEach(function(opt) {
+            opts.forEach(function(opt) {
                 // What adding the row to the backpack and sharing it carry
                 opt.dataset.sharePrice = String(p);
                 var ob = opt.querySelector('.ures-edit-btn[data-edit="price"]');
