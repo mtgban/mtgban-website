@@ -403,8 +403,7 @@ html:has(.backpack-panel.open) { overflow: hidden; }
     .backpack-panel { width: 100vw; }
 }
 
-/* The phone layout: a bottom sheet, styled here rather than borrowing the
-   image drawer, which landscape hides. */
+/* The phone layout: a bottom sheet, in either orientation. */
 body.mobile .backpack-panel {
     top: auto;
     left: 0;
