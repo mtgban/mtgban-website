@@ -76,13 +76,14 @@
 {{end}}
 
 {{/* The Graded page's landing, desktop and mobile alike: the dearest slabs in
-     stock, scrolling as the home page's popular searches do. */}}
+     stock and, for a reader who may see them, the newest slabs sold, each
+     scrolling as the home page's popular searches do. The tiles are drawn
+     twice, the second time hidden, so the track loops. */}}
 {{define "slab-showcase"}}
 <div class="landing-popular slab-showcase">
     <div class="landing-popular-title">Graded slabs in stock</div>
     {{if .AllKeys}}
     <div class="landing-popular-viewport">
-        {{/* The tiles are drawn twice, the second time hidden, so the track loops. */}}
         <div class="landing-popular-track" style="animation-duration: calc({{len .AllKeys}} * 4s)">
             {{template "slab-showcase-tiles" dict "Page" . "Copy" false}}
             {{template "slab-showcase-tiles" dict "Page" . "Copy" true}}
@@ -92,6 +93,17 @@
     <div class="landing-empty">{{range .Notices}}{{.}}{{else}}No graded store has slabs in stock right now.{{end}}</div>
     {{end}}
 </div>
+{{if .CanSales}}{{with sold_slabs}}
+<div class="landing-popular slab-showcase">
+    <div class="landing-popular-title"><a href="/graded?q=is%3Alastsold">Graded slabs sold lately</a></div>
+    <div class="landing-popular-viewport">
+        <div class="landing-popular-track" style="animation-duration: calc({{len .}} * 4s)">
+            {{template "slab-sold-tiles" dict "Page" $ "Sold" . "Copy" false}}
+            {{template "slab-sold-tiles" dict "Page" $ "Sold" . "Copy" true}}
+        </div>
+    </div>
+</div>
+{{end}}{{end}}
 {{end}}
 
 {{define "slab-showcase-tiles"}}
@@ -111,5 +123,19 @@
     {{end}}
 </a>
 {{end}}{{end}}
+{{end}}
+{{end}}
+
+{{define "slab-sold-tiles"}}
+{{$page := .Page}}
+{{$copy := .Copy}}
+{{range .Sold}}
+{{$card := index $page.Metadata .CardID}}
+<a class="landing-popular-card slab-showcase-card" href="/graded?q={{.CardID}}" title="{{$card.Name}} - {{$card.Edition}} #{{$card.Number}}"{{if $copy}} aria-hidden="true" tabindex="-1"{{end}}>
+    <img class="landing-popular-img" src="{{$card.ImageURL}}" alt="{{if not $copy}}{{$card.Name}}{{end}}" loading="lazy">
+    <span class="slab-showcase-slab">{{.SlabName}}</span>
+    <span class="landing-popular-label">{{.Where}}</span>
+    <span class="slab-showcase-price">${{.Price}}</span>
+</a>
 {{end}}
 {{end}}

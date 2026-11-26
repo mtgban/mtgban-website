@@ -2,8 +2,10 @@ package main
 
 import (
 	"cmp"
+	"fmt"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
@@ -295,4 +297,88 @@ func fillSlabShowcase(pageVars *PageVars, b *matcher.Backend, p *prices, blocked
 	if hidden && len(pageVars.AllKeys) == 0 {
 		pageVars.Notices = append(pageVars.Notices, SlabsLockedMessage)
 	}
+	if pageVars.CanSales {
+		for _, sold := range soldSlabs() {
+			pageVars.Metadata.add(b, p, sold.CardID, false)
+		}
+	}
+}
+
+// soldSlab is a card's newest slab sale, as the Graded page's landing shows it.
+type soldSlab struct {
+	CardID string
+	Slab   mtgban.Slab
+	Sale   salesvelocity.GradedSale
+}
+
+// SlabName is what the tile says of the slab sold.
+func (s soldSlab) SlabName() string {
+	return slabName(&s.Slab)
+}
+
+// Price is what the slab sold for, in dollars.
+func (s soldSlab) Price() string {
+	return fmt.Sprintf("%.2f", float64(s.Sale.Cents)/100)
+}
+
+// Where is the marketplace the slab sold on, and the day.
+func (s soldSlab) Where() string {
+	market := "eBay"
+	if s.Sale.Fanatics {
+		market = "Fanatics"
+	}
+	return market + " · " + time.Unix(int64(s.Sale.At), 0).UTC().Format("Jan 2")
+}
+
+// soldShowcase is the landing's sold slabs, worked out from one load of the
+// graded sales.
+type soldShowcase struct {
+	snap  *salesvelocity.GradedSnapshot
+	slabs []soldSlab
+}
+
+var soldShowcasePtr atomic.Pointer[soldShowcase]
+
+// soldSlabs is the slabShowcaseSize newest slab sales, one per card, worked
+// out once per load of the graded sales.
+func soldSlabs() []soldSlab {
+	snap := gradedSalesStore.Snapshot()
+	if snap == nil {
+		return nil
+	}
+	cached := soldShowcasePtr.Load()
+	if cached != nil && cached.snap == snap {
+		return cached.slabs
+	}
+	slabs := newestSlabSales(snap)
+	soldShowcasePtr.Store(&soldShowcase{snap, slabs})
+	return slabs
+}
+
+// newestSlabSales is each card's newest sale, newest first, and the
+// slabShowcaseSize newest of them. A best offer is passed over, its price
+// being the ask rather than what was paid.
+func newestSlabSales(snap *salesvelocity.GradedSnapshot) []soldSlab {
+	var out []soldSlab
+	for cardID, card := range snap.Cards {
+		var newest *soldSlab
+		for slab, grade := range card.Grades {
+			for _, sale := range grade.Sales {
+				if sale.BestOffer {
+					continue
+				}
+				if newest == nil || cmp.Or(cmp.Compare(sale.At, newest.Sale.At), slabOrder(newest.Slab, slab)) > 0 {
+					newest = &soldSlab{cardID, slab, sale}
+				}
+				break
+			}
+		}
+		if newest != nil {
+			out = append(out, *newest)
+		}
+	}
+	slices.SortFunc(out, func(a, b soldSlab) int {
+		return cmp.Or(cmp.Compare(b.Sale.At, a.Sale.At), strings.Compare(a.CardID, b.CardID))
+	})
+	return out[:min(len(out), slabShowcaseSize)]
 }

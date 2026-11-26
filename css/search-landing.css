@@ -611,3 +611,9 @@
 .slab-showcase-price i[data-lucide] {
     width: 13px; height: 13px;
 }
+.slab-showcase .landing-popular-title a {
+    color: inherit;
+}
+.slab-showcase .landing-popular-title a:hover {
+    color: var(--ainfo);
+}
