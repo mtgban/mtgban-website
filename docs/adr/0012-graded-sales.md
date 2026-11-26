@@ -82,6 +82,12 @@ page's order. Both need a signature carrying
 `SearchSales`; a reader without one gets an upsell where the card has
 either, and "No sales on record" where it has neither.
 
+For a reader with `SearchSales`, the Graded page also lists a card no store
+has for sale where a slab of it sold, and its Last Sold lists every grade it
+sold in. `is:lastsold` keeps the cards a slab of sold, and `not:lastsold`
+the others. It reads the sales only on the Graded page and only for those
+readers; for anyone else it matches nothing and the page says why.
+
 ## Consequences
 
 - The data never leaves the page: not the price API, `/data/prices`,

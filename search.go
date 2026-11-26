@@ -47,6 +47,8 @@ const (
 	NoPromosMessage        = "No products matching your search could be found - some promos may be hidden"
 	NoCardsMessage         = "No products matching your search could be found"
 	VelocityLockedMessage  = "Increase your tier to filter by sales velocity"
+	LastSoldLockedMessage  = "Increase your tier to filter by last sold"
+	LastSoldGradedMessage  = "is:lastsold only filters slabs, on the Graded page"
 
 	MaxSearchTotalResults = 10000
 	// MaxUploadTransfer is the most results the Uploader transfer posts: a
@@ -906,6 +908,17 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	if pageVars.IsGraded {
 		gradedSearch(&config)
+		if canSeeSales(sig) {
+			config.GradedSales = gradedSalesStore.Snapshot()
+			unlockLastSold(config.CardFilters, config.GradedSales)
+		}
+	}
+	if lockedLastSoldFilter(config.CardFilters) {
+		notice := LastSoldGradedMessage
+		if pageVars.IsGraded {
+			notice = LastSoldLockedMessage
+		}
+		pageVars.Notices = append(pageVars.Notices, notice)
 	}
 	packs := resolveBackpacks(r.Context(), sig, b, &config)
 
@@ -998,7 +1011,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		// upsell only where there are sales to unlock.
 		pageVars.CanSales = canSeeSales(sig)
 		graded := gradedSalesStore.Snapshot()
-		pageVars.GradedSales = gradedSales(graded, result.sellers, pageVars.CondKeys)
+		pageVars.GradedSales = gradedSales(graded, result.sellers, shown.keys, pageVars.CondKeys)
 		gradedVelocity(pageVars.Metadata, graded, shown.keys)
 	} else {
 		rebuildIndexRows(&pageVars.SearchVars, pageVars.Metadata, b, p, config, shown.keys, result)
@@ -1435,7 +1448,7 @@ func runSearch(r *http.Request, ds *datastore, p *prices, config SearchConfig) s
 		allKeys = withoutSealed(b, allKeys)
 	}
 	if config.GradedOnly {
-		allKeys = newPostStores(b, p, r, allKeys, config).offered(allKeys)
+		allKeys = gradedKeys(newPostStores(b, p, r, allKeys, config), allKeys, config.GradedSales)
 	}
 
 	// Limit results to avoid hogging the website with large queries

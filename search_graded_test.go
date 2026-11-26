@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -395,6 +396,83 @@ func TestGradedLandingShowcase(t *testing.T) {
 	body = landing("/search")
 	if strings.Contains(body, "slab-showcase") || !strings.Contains(body, `id="desktop-favorites"`) {
 		t.Error("the search landing lost its favorites, or shows slabs")
+	}
+}
+
+// A card no graded store lists is on the Graded page for a reader who may see
+// the slabs' sales, with every grade it sold in, and is:lastsold keeps the
+// cards with a slab sold. Any other reader gets neither, and a notice.
+func TestGradedLastSoldCards(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Search") })
+	}
+	cards := somePlainCardUUIDs(t, 3)
+	psa9 := mtgban.Slab{Grader: "PSA", Score: 9}
+	bgs10 := mtgban.Slab{Grader: "BGS", Score: 10}
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			cards[0]: {{Conditions: "NM", Price: 40, URL: "u", Slab: &psa9}},
+			cards[2]: {{Conditions: "NM", Price: 40, URL: "u", Slab: &psa9}},
+		}, mtgban.ScraperInfo{Name: "SLABSHOP", Shorthand: "SLABSHOP", GradedMode: true}),
+	}, nil)
+	now := time.Now()
+	at := uint32(now.AddDate(0, 0, -1).Unix())
+	previous := gradedSalesStore.Snapshot()
+	t.Cleanup(func() { gradedSalesStore.Publish(previous) })
+	sold := func(listing string) *salesvelocity.GradeSales {
+		return &salesvelocity.GradeSales{Sales: []salesvelocity.GradedSale{{At: at, Cents: 5000, ListingID: listing}}}
+	}
+	gradedSalesStore.Publish(&salesvelocity.GradedSnapshot{Day: now, Cards: map[string]*salesvelocity.GradedCard{
+		cards[0]: {Grades: map[mtgban.Slab]*salesvelocity.GradeSales{psa9: sold("100")}},
+		cards[1]: {Grades: map[mtgban.Slab]*salesvelocity.GradeSales{psa9: sold("101"), bgs10: sold("102")}},
+	}})
+
+	search := func(path string) string {
+		rec := httptest.NewRecorder()
+		testSite.Search(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		return rec.Body.String()
+	}
+	shows := func(body, cardID string) bool {
+		return strings.Contains(body, `data-card-id="`+cardID+`"`)
+	}
+
+	body := search("/graded?q=" + cards[1])
+	if !shows(body, cards[1]) || !strings.Contains(body, "No offers") {
+		t.Fatal("a card no store lists is not on the Graded page with its sales")
+	}
+	bgs, psa := strings.Index(body, "ebay.com/itm/102"), strings.Index(body, "ebay.com/itm/101")
+	if psa < 0 || bgs < 0 || psa > bgs {
+		t.Error("Last Sold does not list every grade sold, in the page's order")
+	}
+
+	body = search("/graded?q=" + url.QueryEscape("is:lastsold"))
+	if !shows(body, cards[0]) || !shows(body, cards[1]) || shows(body, cards[2]) {
+		t.Error("is:lastsold does not keep exactly the cards a slab of sold")
+	}
+	body = search("/graded?q=" + url.QueryEscape("not:lastsold"))
+	if !shows(body, cards[2]) || shows(body, cards[0]) || shows(body, cards[1]) {
+		t.Error("not:lastsold does not keep exactly the cards no slab of sold")
+	}
+
+	// Without the sales, neither the card nor the filter reads them.
+	withSigMode(t, true, true)
+	if shows(search("/graded?q="+cards[1]), cards[1]) {
+		t.Error("a reader without the sales finds a card no store lists")
+	}
+	body = search("/graded?q=" + url.QueryEscape("is:lastsold"))
+	if shows(body, cards[0]) || !strings.Contains(body, LastSoldLockedMessage) {
+		t.Error("is:lastsold judges cards for a reader without the sales, or says nothing")
+	}
+	withSigMode(t, true, false)
+	body = search("/search?q=" + url.QueryEscape("is:lastsold"))
+	if shows(body, cards[0]) || !strings.Contains(body, LastSoldGradedMessage) {
+		t.Error("is:lastsold runs off the Graded page, or says nothing")
 	}
 }
 
