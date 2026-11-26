@@ -96,6 +96,11 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 		log.Println("userstate: favorites shares unavailable:", err)
 	}
 
+	// Non-fatal too: losing these tables loses only invite links.
+	if _, err := db.Exec(createInvitesSQL); err != nil {
+		log.Println("userstate: invites unavailable:", err)
+	}
+
 	return &Client{db: db}, nil
 }
 

@@ -74,3 +74,40 @@ CREATE TABLE IF NOT EXISTS favorites_shares (
     revoked_at  TIMESTAMPTZ
 );
 CREATE UNIQUE INDEX IF NOT EXISTS favorites_shares_by_owner_game ON favorites_shares (email_hash, game) WHERE revoked_at IS NULL`
+
+// createInvitesSQL is the invite links an admin mints and each acceptance
+// of them, additive like the tables above (docs/adr/0011-invite-links.md).
+// A redemption's nonce is the accept form's, so a repeat of the same POST
+// is answered from its row instead of spending a second use.
+const createInvitesSQL = `
+CREATE TABLE IF NOT EXISTS invites (
+    code          TEXT PRIMARY KEY,
+    game          TEXT NOT NULL,
+    tier          TEXT NOT NULL,
+    overrides     JSONB NOT NULL DEFAULT '{}',
+    max_uses      INTEGER NOT NULL,
+    uses          INTEGER NOT NULL DEFAULT 0,
+    access_days   INTEGER NOT NULL,
+    open_until    TIMESTAMPTZ NOT NULL,
+    note          TEXT NOT NULL DEFAULT '',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_by    TEXT NOT NULL,
+    created_ip    TEXT NOT NULL,
+    created_ua    TEXT NOT NULL,
+    created_site  TEXT NOT NULL,
+    revoked_at    TIMESTAMPTZ,
+    revoked_by    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS invites_created ON invites (created_at DESC);
+CREATE TABLE IF NOT EXISTS invite_redemptions (
+    id            BIGSERIAL PRIMARY KEY,
+    code          TEXT NOT NULL REFERENCES invites (code) ON DELETE CASCADE,
+    nonce         TEXT NOT NULL,
+    redeemed_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at    TIMESTAMPTZ NOT NULL,
+    ip            TEXT NOT NULL,
+    ua            TEXT NOT NULL,
+    site          TEXT NOT NULL,
+    signed_in     BOOLEAN NOT NULL DEFAULT false
+);
+CREATE UNIQUE INDEX IF NOT EXISTS invite_redemptions_nonce ON invite_redemptions (code, nonce)`
