@@ -564,7 +564,12 @@ func (c *GradedCard) Velocity(day time.Time, name func(mtgban.Slab) string) (rat
 	if date.Year() != day.Year() {
 		when = date.Format("Jan 2, 2006")
 	}
-	last := "|last sale|$" + centsText(uint64(c.Last.Cents)) + " " + name(c.LastSlab) + " · " + when
+	price := "$" + centsText(uint64(c.Last.Cents))
+	if c.Last.BestOffer {
+		// The ask, not what the buyer paid, as the pane's "offer" says
+		price += " (offer)"
+	}
+	last := "|last sale|" + price + " " + name(c.LastSlab) + " · " + when
 	if c.Sales == 0 {
 		return "0/day", fmt.Sprintf("no sale in %d days\n%s", Window, last)
 	}

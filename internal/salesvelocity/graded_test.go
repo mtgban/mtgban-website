@@ -331,6 +331,12 @@ func TestGradedVelocity(t *testing.T) {
 	if rate != "0/day" || detail != "no sale in 30 days\n|last sale|$50.00 PSA 10  · Nov 26, 2025" {
 		t.Errorf("quiet card: rate %q, detail %q", rate, detail)
 	}
+	// An accepted offer's price is its ask, marked as the pane marks it.
+	offer := &GradedCard{Sales: 1, Days: 1, Last: GradedSale{At: uint32(gradedNow.Unix()), Cents: 999900, BestOffer: true}, LastSlab: psa10}
+	_, detail = offer.Velocity(gradedNow, name)
+	if !strings.HasSuffix(detail, "\n|last sale|$9999.00 (offer) PSA 10  · Nov 26") {
+		t.Errorf("best offer: detail %q", detail)
+	}
 	var none *GradedCard
 	rate, detail = none.Velocity(gradedNow, name)
 	if rate != "" || detail != "" {
