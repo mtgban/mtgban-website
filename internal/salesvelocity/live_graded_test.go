@@ -125,3 +125,19 @@ func TestGradedSalesLive(t *testing.T) {
 	sample("other digits", otherDigitsCount, otherDigits)
 	runtime.KeepAlive(snap)
 }
+
+// TestGradedSalesLiveSkipsAGameWithNone loads a game the newspaper has no
+// slab sales for: the existence check answers and the full read never runs,
+// leaving an empty snapshot. Read-only, and skipped like TestGradedSalesLive.
+func TestGradedSalesLiveSkipsAGameWithNone(t *testing.T) {
+	b, db := liveNewspaperFor(t, matcher.GamePokemon, cmp.Or(os.Getenv("POKEMON_PATH"), "../../pokemon.json"))
+	var s GradedStore
+	start := time.Now()
+	result, problem := s.Load(context.Background(), db, b, "Magic: The Gathering", time.Now())
+	took := time.Since(start)
+	snap := s.Snapshot()
+	if result != "" || problem != "" || snap == nil || len(snap.Cards) != 0 {
+		t.Fatalf("result %q, problem %q, snapshot %+v; want an empty one and nothing to report", result, problem, snap)
+	}
+	fmt.Printf("a game with no slab sales: answered in %s\n", took.Round(time.Millisecond))
+}

@@ -174,7 +174,8 @@ Boot sequence (`main()`):
      slabs' sales the newspaper pulls, filtered, for the Graded page's Last
      Sold and nothing else (`docs/adr/0012-graded-sales.md`), once the last
      load is 6 hours old or matched against another datastore; every
-     datastore load also runs it
+     datastore load also runs it. A game with no slab sales is found out by
+     one existence check (`GradedAnyQuery`) instead of the full read
    - `20 */12 * * *` — `s.offline.RequestRefresh()` (backstop; normal
      refreshes are event-driven)
    - `15 */6 * * *` — `refreshCheckpoints()` (reads no datastore, so it stays
