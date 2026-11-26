@@ -170,8 +170,10 @@ func (r *Rates) magic(co *matcher.CardObject) (Tier, bool) {
 	}
 
 	if co.IsPromo {
-		// Book promos and Unstable's are refused
-		if co.SetCode == "PHPR" || co.SetCode == "PUST" {
+		// Book promos and an Un-set's, filed in a promo set of its own,
+		// are refused
+		parent := r.b.Sets[set.ParentCode]
+		if co.SetCode == "PHPR" || (parent != nil && parent.Type == "funny") {
 			return Tier{}, false
 		}
 		return magicPromo, true

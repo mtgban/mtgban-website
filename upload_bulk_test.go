@@ -76,6 +76,7 @@ func TestBulkOffersMagic(t *testing.T) {
 		{"4bfcac0c-4b5f-5821-a126-8dfba5d2d384", ""},   // Mana Crypt, PHPR
 		{"03c64bd2-e1f9-5451-bc06-aee5f1db8612", ""},   // Hardy of Myra's Marvels, UNF
 		{"180727de-6673-5851-accd-bf73832db14a", ""},   // Earl of Squirrel, PUST
+		{"d9e63e68-ce49-5586-a812-9328111afd95", ""},   // Ass Whuppin', PUNH
 		{"0110702e-0151-574a-af73-7259033dcc4e", ""},   // Kozilek, Compleated, MB2 playtest
 		{"00460d79-3570-58b8-af87-7b89106eb48c", ""},   // Balance, PTC
 		{"00093ed9-5b6b-5a88-bd12-7c3e260abf1c", ""},   // Inkling, TBRC
