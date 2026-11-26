@@ -107,7 +107,7 @@ function optRow(id, cond, qty, price = '1.00', share = '0') {
     ]);
 }
 
-function load({ results, opt = [], optB = [], sentPack = 0, packHas = [] }) {
+function load({ results, opt = [], optB = [], sentPack = 0, packHas = [], packFull = false }) {
     listeners = {};
     const calls = { track: [], pack: [], reprocessed: 0, rendered: 0 };
     // The reload bar as upload.html draws it
@@ -139,6 +139,8 @@ function load({ results, opt = [], optB = [], sentPack = 0, packHas = [] }) {
             setPaid: (k, v) => calls.pack.push(['paid', k, v]),
             // The backpack refuses a grade it already holds
             addCond: (k, c) => { calls.pack.push(['add', k, c]); return !packHas.includes(c); },
+            // A full backpack refuses a new grade
+            split: (...args) => { calls.pack.push(['split', ...args]); return !packFull; },
         },
         renderBackpack: () => { calls.rendered++; },
         BAN_UPLOAD_PRINTINGS: { cards: {} },
@@ -380,6 +382,29 @@ test('a grade picked on one of a card\'s lines at two prices moves only its own 
     // And from the optimizer row, which edits its own line alone
     pick(btn(opt, 'cond'), 'MP');
     expect([bolt.dataset.cond, bolt2.dataset.cond]).toEqual(['MP', 'SP']);
+});
+
+test('a grade picked on one of a sent card\'s two lines in a grade splits its backpack entry', () => {
+    const bolt = resultRow('Bolt', 'a', 'NM', 1, { price: '10' });
+    const bolt2 = resultRow('Bolt', 'a', 'NM', 1, { price: '4' });
+    const { calls, pick } = load({ results: [bolt, bolt2], sentPack: 1 });
+
+    pick(btn(bolt2, 'cond'), 'SP');
+    expect([bolt.dataset.cond, bolt2.dataset.cond]).toEqual(['NM', 'SP']);
+    // Each grade keeps the copies and price of its own lines
+    expect(calls.pack).toEqual([['split', 'a', 1, 10, 'SP', 1, 4]]);
+    expect(calls.rendered).toBe(1);
+});
+
+test('a grade picked on one of a sent card\'s two lines moves the whole entry when the backpack is full', () => {
+    const bolt = resultRow('Bolt', 'a', 'NM', 1, { price: '10' });
+    const bolt2 = resultRow('Bolt', 'a', 'NM', 1, { price: '4' });
+    const { calls, pick } = load({ results: [bolt, bolt2], sentPack: 1, packFull: true });
+
+    pick(btn(bolt2, 'cond'), 'SP');
+    // No copy is lost: the entry keeps both, in the grade picked
+    expect(calls.pack).toEqual([['split', 'a', 1, 10, 'SP', 1, 4], ['cond', 'a', 'SP']]);
+    expect(calls.rendered).toBe(1);
 });
 
 test('a price set on a list sent from the backpack goes back to it', () => {

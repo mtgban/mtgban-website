@@ -456,6 +456,38 @@
         return true;
     }
 
+    // split leaves qty copies paid paid in the entry k names and puts qtyTo
+    // copies paid paidTo in the card's grade cond, as one undo step; a blank
+    // price takes it away. A new entry needs room; says whether it split.
+    function split(k, qty, paid, cond, qtyTo, paidTo) {
+        var list = read();
+        var i = find(list, k);
+        if (i < 0 || list[i].del) return false;
+        var to = key({ id: list[i].id, cond: cond, pack: list[i].pack });
+        if (to === k) return false;
+        var j = find(list, to);
+        if ((j < 0 || list[j].del) && full(list[i].pack)) return false;
+        remember(list, [k, to]);
+        if (j < 0 || list[j].del) {
+            var dup = JSON.parse(JSON.stringify(list[i]));
+            dup.cond = cond;
+            if (j >= 0) list.splice(j, 1);
+            list.splice(find(list, k) + 1, 0, dup);
+        }
+        var t = now();
+        fill(list[find(list, k)], qty, paid, t);
+        fill(list[find(list, to)], qtyTo, paidTo, t);
+        save(list);
+        return true;
+    }
+    // fill sets entry e to qty copies paid paid, removing it below one.
+    function fill(e, qty, paid, t) {
+        if (qty < 1) e.del = t;
+        else e.qty = Math.min(MAX_QTY, qty);
+        e.paid = paidOf(paid);
+        e.m = t;
+    }
+
     // take takes counts[key] copies of each entry out as one undo step, the
     // entry itself once none is left, and says how many copies went.
     function take(counts) {
@@ -2016,7 +2048,7 @@
         if (panel && panel.classList.contains("open")) close(); else open();
     }
 
-    window.Backpack = { sentPack: function () { return sentPack; }, read: read, add: add, setQty: setQty, remove: remove, setPaid: setPaid, setCond: setCond, addCond: addCond, moveTo: moveTo, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, tabs: tabs, addTab: addTab, renameTab: renameTab, deleteTab: deleteTab, open: open, close: close };
+    window.Backpack = { sentPack: function () { return sentPack; }, read: read, add: add, setQty: setQty, remove: remove, setPaid: setPaid, setCond: setCond, addCond: addCond, split: split, moveTo: moveTo, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, tabs: tabs, addTab: addTab, renameTab: renameTab, deleteTab: deleteTab, open: open, close: close };
 
     function init() {
         var nav = document.getElementById("nav-backpack");

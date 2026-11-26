@@ -1228,6 +1228,26 @@ describe('the condition dropdown', () => {
         expect(ids['backpack-toast'].textContent).toBe('Backpack is full (100 products)');
     });
 
+    test('a split leaves some copies and moves the rest to a grade, one undo step', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, paid: 7, t: 1, m: 1 }] });
+        expect(p.window.Backpack.split('uuid-1', 1, 10, 'SP', 1, 4)).toBe(true);
+        expect(live(p)).toEqual([['uuid-1', 'NM', 1], ['uuid-1', 'SP', 1]]);
+        expect(p.stored().filter((e) => !e.del).map((e) => e.paid)).toEqual([10, 4]);
+        p.window.Backpack.undo();
+        expect(live(p)).toEqual([['uuid-1', 'NM', 2]]);
+        expect(p.stored().filter((e) => !e.del).map((e) => e.paid)).toEqual([7]);
+    });
+
+    test('a split into a new grade of a full backpack toasts and writes nothing', () => {
+        const store = [];
+        for (let i = 0; i < 100; i++) store.push({ id: i === 0 ? 'uuid-1' : 'c' + i, name: 'c', qty: i === 0 ? 2 : 1, t: i, m: i });
+        const p = page({ store });
+        const before = p.m.mtgban_backpack;
+        expect(p.window.Backpack.split('uuid-1', 1, '', 'SP', 1, '')).toBe(false);
+        expect(p.m.mtgban_backpack).toBe(before);
+        expect(ids['backpack-toast'].textContent).toBe('Backpack is full (100 products)');
+    });
+
     test('NM to SP and back leaves one live NM entry, and undo walks it back', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
         p.window.Backpack.setCond('uuid-1', 'SP');
