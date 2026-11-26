@@ -208,6 +208,15 @@ for (const [file, ids, box, results] of [
         expect(page.log.executed).toEqual([{ q: 'box', sealed: true }]);
     });
 
+    test(file + ' keeps the graded mark in the URL, for the way back to /graded', async () => {
+        const page = await started(file, { ids, search: '?graded=1' });
+        page.log.mounted.onSubmit('box');
+        await page.settle();
+        expect(page.log.pushed).toEqual(['?q=box&graded=1']);
+        // and hands it to the renderer, for the result links
+        expect(page.log.rendered.at(-1).ctx.graded).toBe(true);
+    });
+
     test(file + ' searches sealed when it stands in for the sealed page', async () => {
         const page = await started(file, { ids, pathname: '/sealed', search: '?q=box' });
         expect(page.log.mounted.deps.sealed).toBe(true);

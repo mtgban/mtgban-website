@@ -155,6 +155,7 @@ test('a card with no offers says so once', () => {
 
 test('the name searches for it, staying in sealed for a product', () => {
     expect(R.buildHTML([result()], CTX)).toContain('href="?q=%22Boseiju%2C%20Who%20Endures%22"');
+    expect(R.buildHTML([result()], {...CTX, graded: true})).toContain('href="?q=%22Boseiju%2C%20Who%20Endures%22&amp;graded=1"');
     const box = result({card: {uuid: 'b', n: 'Box', num: '', r: '', set: 'NEO', f: false, e: false, s: true}});
     expect(R.buildHTML([box], CTX)).toContain('href="?sealed=1&amp;q=%22Box%22"');
 });

@@ -247,10 +247,12 @@
             badge = '<span class="result-badge foil">Foil</span>';
         }
 
-        // Sealed's mode rides on the shell's own links.
+        // Sealed's mode rides on the shell's own links, and the Graded page's
+        // mark its exits lead back by.
         var mode = card.s ? '?sealed=1&q=' : '?q=';
-        var setQuery = mode + encodeURIComponent('s:' + card.set);
-        var nameQuery = mode + encodeURIComponent('"' + card.n + '"');
+        var mark = ctx.graded ? '&graded=1' : '';
+        var setQuery = mode + encodeURIComponent('s:' + card.set) + mark;
+        var nameQuery = mode + encodeURIComponent('"' + card.n + '"') + mark;
 
         // Products link mirrors search.html's "Found in N products".
         var productsLink = '';

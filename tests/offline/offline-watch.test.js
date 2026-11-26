@@ -318,11 +318,11 @@ test('offline href on /search with q carries query', () => {
     expect(buildOfflineHref('/search', '?q=black+lotus')).toBe('/offline?q=black%20lotus');
 });
 
-test('offline href carries the sealed and graded queries', () => {
+test('offline href carries the sealed and graded queries and pages', () => {
     expect(buildOfflineHref('/sealed', '?q=foundations')).toBe('/offline?q=foundations&sealed=1');
     expect(buildOfflineHref('/sealed', '')).toBe('/offline?sealed=1');
-    expect(buildOfflineHref('/graded', '?q=charizard')).toBe('/offline?q=charizard');
-    expect(buildOfflineHref('/graded', '')).toBe('/offline');
+    expect(buildOfflineHref('/graded', '?q=charizard')).toBe('/offline?q=charizard&graded=1');
+    expect(buildOfflineHref('/graded', '')).toBe('/offline?graded=1');
 });
 
 test('offline href encodes special chars in q', () => {

@@ -118,11 +118,13 @@
             else if (exec) redraw().catch(showErrorNotice);
         }
 
-        // Compose a shell URL carrying the query and active mode.
+        // Compose a shell URL carrying the query and active mode, and the mark
+        // of the Graded page the exits lead back to.
         function buildUrl(q) {
             var parts = [];
             if (q) parts.push('q=' + encodeURIComponent(q));
             if (sealedMode) parts.push('sealed=1');
+            if (new URLSearchParams(location.search).get('graded') === '1') parts.push('graded=1');
             return parts.length ? '?' + parts.join('&') : location.pathname;
         }
 
@@ -177,7 +179,8 @@
                 hiddenSellers: hiddenList('SearchSellersList'),
                 hiddenVendors: hiddenList('SearchVendorsList'),
                 byStore: getCookie('SearchListingPriority') === 'stores',
-                buylistSecondary: getCookie('SearchBuylistSecondary') || ''
+                buylistSecondary: getCookie('SearchBuylistSecondary') || '',
+                graded: new URLSearchParams(location.search).get('graded') === '1'
             };
         }
 
