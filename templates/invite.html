@@ -1,0 +1,30 @@
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/settings-modal.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/invite.css?hash={{.Hash}}">
+{{end}}
+
+{{define "content"}}
+<div class="invite-page">
+    <h1>Invite</h1>
+    {{if .InviteNotice}}
+    <p>{{.InviteNotice}}</p>
+    {{else}}
+    <p>This invite gives you <strong>{{.InviteTier}}</strong> access for {{.InviteAccessDays}} {{if eq .InviteAccessDays 1}}day{{else}}days{{end}}.</p>
+    {{if .InviteFeatures}}
+    <p>It also opens:</p>
+    <ul class="invite-features">
+        {{range .InviteFeatures}}<li>{{.}}</li>{{end}}
+    </ul>
+    {{end}}
+    {{if .InviteSignedIn}}
+    <p class="invite-warning">You are signed in. Accepting signs you out of your account until the invite ends; your favorites and backpack stop syncing meanwhile, and nothing of yours is deleted. Log in again to get your account back.</p>
+    {{end}}
+    <form method="post" action="/invite/{{.InviteCode}}">
+        <input type="hidden" name="nonce" value="{{.InviteNonce}}">
+        <button type="submit" class="settings-btn primary" data-track="ui.invite" data-track-value="accept">Accept invite</button>
+    </form>
+    {{end}}
+</div>
+{{end}}

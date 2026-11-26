@@ -129,6 +129,7 @@ var notUse = map[string]bool{
 	"alerts.mail_event":   true, // the mail provider's bounce and complaint webhooks
 	"userstate.conflict":  true, // sync writes lost to a newer version
 	"favshare.view_gone":  true, // share links opened after they ended
+	"invite.closed":       true, // invite links opened or pressed after they closed
 	"ui.offline.sync":     true, // offline syncs, most run at a page load
 	"ui.offline.sw":       true, // the service worker's registration when offline mode is switched on
 	"ui.offline.failover": true, // the offline shell served for a page the network could not reach

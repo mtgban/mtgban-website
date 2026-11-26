@@ -110,6 +110,7 @@ var publicPagePaths = map[string]bool{
 
 // pageLabel is path as a label from a bounded set, or "other" for an unknown path.
 func pageLabel(path, page string) string {
+	path = prefixPageLink(path)
 	known := path == "/" || publicPagePaths[path]
 	for _, nav := range ExtraNavs {
 		if known {
@@ -121,6 +122,20 @@ func pageLabel(path, page string) string {
 		return "other"
 	}
 	return observability.NormalizePath(strings.Trim(path, "/"), page)
+}
+
+// prefixPageLink is the link of the sub-page answering a whole prefix that
+// path is under, so "/invite/<code>" is labelled by "/invite/" and the
+// label never carries the code; any other path is itself.
+func prefixPageLink(path string) string {
+	for _, nav := range ExtraNavs {
+		for _, sub := range nav.SubPages {
+			if strings.HasSuffix(sub.Link, "/") && strings.HasPrefix(path+"/", sub.Link) {
+				return sub.Link
+			}
+		}
+	}
+	return path
 }
 
 // pageLabels is every label pageLabel can return but "other", sorted; some are never stored yet.

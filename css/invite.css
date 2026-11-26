@@ -1,0 +1,21 @@
+.invite-page {
+    max-width: 36em;
+    margin: 0 auto;
+    padding: 1.25em 1em 3em;
+}
+.invite-page form {
+    margin: 1em 0;
+}
+/* main.css indents h1, p and lists; this page does not. */
+.invite-page h1,
+.invite-page p {
+    margin-left: 0;
+}
+.invite-features {
+    margin: 0 0 1em 1.25em;
+    padding: 0;
+}
+.invite-warning {
+    padding: 0.5em 0.75em;
+    border-left: 3px solid var(--awarning);
+}
