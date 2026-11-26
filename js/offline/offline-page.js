@@ -3,7 +3,7 @@
 (function (root) {
     'use strict';
 
-    // Mirrors MaxSearchResults (search.go:29); no pagination in v1.
+    // Mirrors MaxSearchResults; no pagination in v1.
     var PAGE_SIZE = 100;
     // What a keystroke prices and draws, a screen and some to spare. The pause
     // fills in the rest of the page.

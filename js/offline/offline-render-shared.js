@@ -4,9 +4,9 @@
     'use strict';
 
     var CONDITIONS = ['NM', 'SP', 'MP', 'HP', 'PO'];
-    // Mirror of Country2flag (utils.go:23).
+    // Mirror of Country2flag.
     var FLAGS = {EU: '\u{1F1EA}\u{1F1FA}', JP: '\u{1F1EF}\u{1F1F5}'};
-    // Static index pairing rules, mirroring the collapseIndex calls (search.go:613-614).
+    // Static index pairing rules, mirroring the collapseIndex calls (rebuildIndexRows).
     var INDEX_PAIRS = [
         {low: 'TCGLow', high: 'TCGMarket', label: 'TCG (Low / Market)'},
         {low: 'MKMLow', high: 'MKMTrend', label: 'CM (Low / Trend)'}
@@ -18,7 +18,7 @@
         return Number(v).toFixed(2);
     }
 
-    // keyruneClasses mirrors keyruneForCardSet's rarity/foil mapping (utils.go:110-152).
+    // keyruneClasses mirrors keyruneForCardSet's rarity/foil mapping.
     function keyruneClasses(card) {
         var rarity = card.r || '';
         if (rarity === 'special' || card.e) {
