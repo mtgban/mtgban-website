@@ -188,11 +188,17 @@ func PartitionEntries(entries []Entry, sealedIDs []string) (singles, sealed, not
 	return singles, sealed, notFound
 }
 
-// MergeIdenticalEntries collapses rows with the same card and condition into
-// one entry, accumulating quantities.
+// MergeIdenticalEntries collapses rows with the same card, condition and
+// price into one entry, accumulating quantities: copies loaded at two prices
+// stay two lines.
 func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 	var uploadedDataClean []Entry
-	duplicatedHashes := map[string]bool{}
+	type sku struct {
+		id, cond, from string
+		price          float64
+		market         bool
+	}
+	duplicatedHashes := map[sku]bool{}
 
 	for i := range uploadedData {
 		// Preserve empty results (for errors and whatnot)
@@ -204,16 +210,19 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 		// Use id + condition to mimic a "sku", and the product it came out of
 		// where there is one: two precons holding the same staple hold one
 		// each, and a view that reads a box at a time has to say so in both.
-		sku := uploadedData[i].CardID + string(uploadedData[i].OriginalCondition) + uploadedData[i].UnpackedFrom
+		// A price of its own keeps a line apart too.
+		key := sku{uploadedData[i].CardID, string(uploadedData[i].OriginalCondition), uploadedData[i].UnpackedFrom, uploadedData[i].OriginalPrice, uploadedData[i].PriceIsMarket}
 
-		if duplicatedHashes[sku] {
+		if duplicatedHashes[key] {
 			qty := uploadedData[i].QuantityOrOne()
 
 			// Iterate on the already added cards to update the quantity
 			for j := range uploadedDataClean {
 				if uploadedData[i].CardID == uploadedDataClean[j].CardID &&
 					uploadedData[i].OriginalCondition == uploadedDataClean[j].OriginalCondition &&
-					uploadedData[i].UnpackedFrom == uploadedDataClean[j].UnpackedFrom {
+					uploadedData[i].UnpackedFrom == uploadedDataClean[j].UnpackedFrom &&
+					uploadedData[i].OriginalPrice == uploadedDataClean[j].OriginalPrice &&
+					uploadedData[i].PriceIsMarket == uploadedDataClean[j].PriceIsMarket {
 					if uploadedDataClean[j].Quantity == 0 {
 						uploadedDataClean[j].Quantity++
 					}
@@ -225,7 +234,7 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 			continue
 		}
 
-		duplicatedHashes[sku] = true
+		duplicatedHashes[key] = true
 		uploadedDataClean = append(uploadedDataClean, uploadedData[i])
 	}
 

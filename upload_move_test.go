@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
@@ -286,5 +288,26 @@ func TestNotBoughtMoveTipsNoTie(t *testing.T) {
 		if got := sectionOf(rows, "tied"); strings.Join(got, ",") != tc.want {
 			t.Errorf("moves %v: tied at %q, want %s", tc.moves, got, tc.want)
 		}
+	}
+}
+
+// A card's lines at two prices share the copies cap: the later line adds
+// only what the earlier one left, and nothing past it.
+func TestOptimizerCapsACardsLinesTogether(t *testing.T) {
+	entries := []UploadEntry{
+		{CardID: "card", Quantity: 3, HasQuantity: true, OriginalPrice: 1},
+		{CardID: "card", Quantity: 3, HasQuantity: true, OriginalPrice: 2},
+		{CardID: "card", Quantity: 3, HasQuantity: true, OriginalPrice: 3},
+	}
+	rows := moveRows(t, entries, uploadSettings{maxQty: 4})
+	var got []string
+	for _, entry := range rows.optimizedResults["CK"] {
+		got = append(got, fmt.Sprintf("%v x%d", entry.LoadedPrice, entry.Quantity))
+	}
+	if !slices.Equal(got, []string{"1 x3", "2 x1"}) {
+		t.Errorf("CK lists %q, want the $1 line's 3 and the $2 line's 1", got)
+	}
+	if rows.optimizedQtys["CK"] != 4 {
+		t.Errorf("CK counts %d copies, want the cap's 4", rows.optimizedQtys["CK"])
 	}
 }

@@ -1166,6 +1166,7 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 
 	var priced []pricedRow
 	shares := uploadtie.Shares{}
+	capped := map[string]int{}
 	for i := range uploadedData {
 		// Skip unmatched cards
 		if uploadedData[i].MismatchError != nil {
@@ -1173,6 +1174,11 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 		}
 
 		row := newUploadRow(b, st, &uploadedData[i])
+		// A card's lines at different prices share its cap; opened copies
+		// are capped as the optimizer lists them
+		if row.counts && row.UnpackedFrom == "" {
+			row.qty = capShared(capped, row.priceKey, row.qty, st.maxQty)
+		}
 		rows.tallyMissing(row, prices, indexes)
 		rows.tallyIndexes(row, st, indexes)
 		if row.counts {
@@ -1200,6 +1206,10 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 			if len(bestStores) > 0 {
 				rows.tallyFor(row.CardID).ProductPrice = offers[bestStores[0]]
 			}
+			continue
+		}
+		// Its card's earlier lines took every copy the cap allows
+		if row.qty == 0 {
 			continue
 		}
 
@@ -1714,6 +1724,7 @@ func writeTagCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, hashTag s
 // CardConduit estimate and redirects to it.
 func redirectToCardConduit(w http.ResponseWriter, r *http.Request, b *matcher.Backend, uploadedData []UploadEntry, multiplier, maxQty int) error {
 	var items []cardconduit.Item
+	capped := map[string]int{}
 	for i := range uploadedData {
 		if uploadedData[i].CardID == "" {
 			continue
@@ -1739,6 +1750,10 @@ func redirectToCardConduit(w http.ResponseWriter, r *http.Request, b *matcher.Ba
 		}
 		qty := uploadedData[i].QuantityOrOne()
 		qty = adjustQty(qty, multiplier, maxQty)
+		qty = capShared(capped, uploadedData[i].CardID+string(uploadedData[i].OriginalCondition), qty, maxQty)
+		if qty == 0 {
+			continue
+		}
 
 		items = append(items, cardconduit.Item{
 			ScryfallID: scryfallID,
@@ -1779,6 +1794,7 @@ func writeTCGplayerCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, upl
 
 	var ids, qtys, conds []string
 	var loaded []float64
+	capped := map[string]int{}
 	for i := range uploadedData {
 		if uploadedData[i].CardID == "" {
 			continue
@@ -1786,6 +1802,11 @@ func writeTCGplayerCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, upl
 
 		qty := uploadedData[i].QuantityOrOne()
 		qty = adjustQty(qty, multiplier, maxQty)
+		// A card's lines share its cap, as they share its row
+		qty = capShared(capped, uploadedData[i].CardID+string(uploadedData[i].OriginalCondition), qty, maxQty)
+		if qty == 0 {
+			continue
+		}
 
 		ids = append(ids, uploadedData[i].CardID)
 		qtys = append(qtys, fmt.Sprintf("%d", qty))
@@ -3051,6 +3072,15 @@ func adjustQty(qty, multiplier, maxQty int) int {
 	if maxQty > 0 && qty > maxQty {
 		qty = maxQty
 	}
+	return qty
+}
+
+// capShared is how many of qty copies fit under maxQty after the copies
+// already taken under key, which it adds them to.
+func capShared(taken map[string]int, key string, qty, maxQty int) int {
+	had := taken[key]
+	qty = adjustQty(had+qty, 1, maxQty) - had
+	taken[key] = had + qty
 	return qty
 }
 
