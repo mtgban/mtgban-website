@@ -64,13 +64,13 @@
         <tbody>
         {{range .Rows}}
             <tr class="admin-invite-row{{if ne .State "open"}} admin-invite-closed{{end}}">
-                <td class="admin-mono">
+                <td class="admin-mono admin-invite-minted">
                     <time class="admin-localtime" datetime="{{.CreatedAt.UTC.Format "2006-01-02T15:04:05Z"}}">{{.CreatedAt.Format "2006-01-02 15:04"}}</time>
                     <br><span class="admin-dim">{{.CreatedBy}}</span>
                     <br><span class="admin-dim" title="{{.CreatedUA}}">{{.CreatedIP}} on {{.CreatedSite}} ({{.Game}})</span>
                 </td>
-                <td>{{.Note}}</td>
-                <td>{{.Tier}}, {{.AccessDays}} {{if eq .AccessDays 1}}day{{else}}days{{end}}{{range .Features}}<br><span class="admin-dim">+ {{.}}</span>{{end}}</td>
+                <td class="admin-invite-memo">{{.Note}}</td>
+                <td class="admin-invite-grants">{{.Tier}}, {{.AccessDays}} {{if eq .AccessDays 1}}day{{else}}days{{end}}{{range .Features}}<br><span class="admin-dim">+ {{.}}</span>{{end}}</td>
                 <td class="num admin-mono">
                     {{if .Redemptions}}
                     <details>
