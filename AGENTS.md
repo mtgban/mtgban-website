@@ -189,6 +189,7 @@ output, not a claim written here.
 | `search.go`, `searchfilter.go` | Search execution and the query-language parser/filters |
 | `search_cards.go`, `search_graded.go` | The offer at each edge of a card in the phone Cards view (`docs/adr/0010-mobile-card-view.md`); the Graded page (`/graded`), its slab groups and their order |
 | `favorites_share.go` | The shared favorites page (`/search/shared`), a list read by its share id; the owner's link lives in `userstate` under `/api/userstate/share` |
+| `invite.go`, `admin_invites.go` | Invite links: the page that accepts one (`/invite/<code>`, a GET that spends nothing and a POST that spends a use), and the admin's Invites tab that mints, lists and revokes them; rules in `internal/invites`, rows in `userstate` (`docs/adr/0011-invite-links.md`) |
 | `upload.go` | Bulk-upload parsing (CSV/XLS/XLSX/Sheets/Moxfield/TCG) + optimizer |
 | `arbit.go`, `sleep.go` | Arbitrage (arbit/global/reverse) and sleeper scoring |
 | `news.go` | Newspaper reports (SQL-backed), plus `gameMap`/`gameBadgeMap` — every deployable game has to be named there, or its newspaper stays empty and each refresh logs an error |
