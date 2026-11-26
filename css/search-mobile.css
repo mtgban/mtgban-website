@@ -1961,12 +1961,6 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 /* Landscape: side-by-side Sellers / Buyers with inline card image */
 @media (orientation: landscape) {
 
-    /* Landscape has room for the favorite + chart buttons inline, so drop their
-       collapsed copies from the actions menu. */
-    .m-actions-fav,
-    .m-actions-pack,
-    .m-actions-chart { display: none; }
-
     /* Navbar inline search: show search in navbar, hide standalone bar */
     .m-nav-search {
         display: flex;
