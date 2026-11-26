@@ -1,9 +1,9 @@
 # ADR-0011: Invite links with limited uses
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-11-25
 **Deciders:** Vittorio Giovara
-**Change:** (invite page branch)
+**Change:** PR #1615
 
 ## Context
 
@@ -248,8 +248,8 @@ A daily job, registered through `addJob`, deletes invites whose
 `open_until` (or `revoked_at`) is more than 90 days past, and their
 redemptions with them. Every deployment runs it; the delete is
 idempotent. The privacy page's usage-data paragraph says that accepting
-an invite records the address and browser with the time, kept for 90 days
-after the invite closes.
+an invite records the address and browser with the time, deleted about
+90 days after the invite expires or is revoked.
 
 ### 7. Old links keep working
 
@@ -295,7 +295,7 @@ margin to whatever the limiter allows.
 
 - Single-use and few-use links exist. Who made each one, when and from
   where, and when and from where it was accepted, is on the admin page
-  for 90 days after it closes.
+  for 90 days after it expires or is revoked.
 - An invite needs the userstate database. A deployment without one,
   local `-dev` runs without a scratch Postgres included, cannot mint; the
   tab says so.
@@ -328,4 +328,6 @@ margin to whatever the limiter allows.
   The request asked who, when and where for the admin who makes a link.
   The acceptance rows are what make a forwarded link visible; a time
   alone would still count uses.
+  Answered: yes, each acceptance row keeps the address and browser.
 - Is an admin tab the page wanted, or a page of its own?
+  Answered: an admin tab, Invites.
