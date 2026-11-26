@@ -1,9 +1,10 @@
 /*
 Package tcgcsvd ingests TCGplayer prices and product catalogs for the non-Magic
 games from tcgcsv.com into the shared price database. It is the ingestion half
-of the tcgcsv work, split out of the web server: the server imports it for its
-crons and admin button, and cmd/tcgcsvd runs the same jobs as a standalone
-process with no web server, datastore, or template stack attached.
+of the tcgcsv work, split out of the web server, which no longer runs it:
+cmd/tcgcsvd runs the jobs as a standalone process with no web server,
+datastore, or template stack attached, on the schedule in
+.github/workflows/tcgcsvd.yml.
 
 # The three jobs
 
@@ -25,14 +26,12 @@ Products (Service.SyncProducts) refreshes the tcg_products catalog — names,
 collector numbers, rarities, images — which changes slowly and runs weekly.
 
 The two scheduled jobs run under a shared Postgres advisory lock
-(Service.WithCrawlLock, which Service.StashPrices and Service.StashProducts
-apply for you), so several server instances — or a server and a standalone
-tcgcsvd — never crawl tcgcsv.com at once. Per tcgcsv.com's FAQ a full sync
-belongs at most once per 24h. The archive walk deliberately stays outside the
-lock: it is operator-driven and can run for hours, and holding the lock that
-long would starve the daily pull, which is the one that must not be missed. Its
-snapshot fallback does take the lock, being the same full crawl the daily job
-makes.
+(Service.WithCrawlLock, which cmd/tcgcsvd wraps around both), so two tcgcsvd
+runs never crawl tcgcsv.com at once. Per tcgcsv.com's FAQ a full sync
+belongs at most once per 24h. The archive walk deliberately stays outside the lock: it is operator-driven and can run for
+hours, and holding the lock that long would starve the daily pull, which is the
+one that must not be missed. Its snapshot fallback does take the lock, being
+the same full crawl the daily job makes.
 
 # Chosen categories
 
@@ -92,14 +91,14 @@ refresh of the current catalog every time:
 
 # Running it
 
-As a library, from a process that already has a *timeseries.Client:
+As a library, from a process that already has a *timeseries.Client
+(cmd/tcgcsvd is the only one; the website does not import this package):
 
-	svc, err := tcgcsvd.New(*cfg.TCGCSVConfig, db,
-	    tcgcsvd.WithNotifier(func(kind, message string) { ServerNotify(kind, message) }))
-	go svc.StashPrices(ctx)
+	svc, err := tcgcsvd.New(*cfg.TCGCSVConfig, db, tcgcsvd.WithNotifier(notify))
+	err = svc.WithCrawlLock(ctx, "daily", func() error { return svc.IngestLatest(ctx) })
 
-The context is the caller's own shutdown one, not a request's: the run outlives
-whatever started it, but a stop should reach it mid-crawl.
+The context is the caller's own shutdown one, not a request's: a stop should
+reach the run mid-crawl.
 
 As a standalone process, one job per invocation, exiting when it finishes:
 

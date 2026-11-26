@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/mtgban/mtgban-website/tcgcsv"
@@ -30,35 +29,22 @@ type Store interface {
 }
 
 // Service runs the tcgcsv ingestion jobs against one price database. Build it
-// with New and share a single instance per process: the single-flight guards
-// that keep two ingests from overlapping live on it.
+// with New; the crawl lock, not the Service, keeps two runs from overlapping.
 type Service struct {
 	client *tcgcsv.Client
 	store  Store
 	games  []tcgcsv.GameConfig
 	notify func(kind, message string)
-	report func(categoryID int, products []timeseries.TCGProduct)
-
-	pricesStashing   atomic.Bool
-	productsStashing atomic.Bool
 }
 
 // Option customizes a Service at construction.
 type Option func(*Service)
 
-// WithNotifier routes job-level successes and failures to an out-of-band
-// channel (the server passes ServerNotify, which posts to Discord). Everything
-// is logged either way; without a notifier the logs are the only record.
+// WithNotifier routes job notices to an out-of-band channel (cmd/tcgcsvd posts
+// them to Discord). Everything is logged either way; without a notifier the
+// logs are the only record.
 func WithNotifier(fn func(kind, message string)) Option {
 	return func(s *Service) { s.notify = fn }
-}
-
-// WithProductReport hands each synced game's catalog to fn after it is stored.
-// The server uses it to report how many products resolve to a loaded card
-// identity, which needs the matcher datastore the standalone binary doesn't
-// have — hence a hook rather than a dependency.
-func WithProductReport(fn func(categoryID int, products []timeseries.TCGProduct)) Option {
-	return func(s *Service) { s.report = fn }
 }
 
 // New builds a Service for the configured games. It errors when ingestion isn't
@@ -135,13 +121,11 @@ func (s *Service) notifyf(format string, args ...any) {
 	s.notify("tcgcsv", fmt.Sprintf(format, args...))
 }
 
-// crawlLockKey coordinates tcgcsv crawls across processes. The daily/weekly
-// crons are registered in every server instance, and the per-process atomics
-// above can't see other processes, so without this every instance would crawl
-// tcgcsv.com at once, N times the request volume against a service whose
-// etiquette is one full sync per 24h. Only the process that holds this Postgres
-// advisory lock crawls; the rest skip. A standalone tcgcsvd takes the same lock,
-// so it and the servers stay coordinated with no extra configuration.
+// crawlLockKey coordinates tcgcsv crawls across processes. Two cmd/tcgcsvd runs
+// can overlap (two workflow runs, or one and a run by hand), and without this
+// both would crawl tcgcsv.com at once, against a service whose etiquette is one
+// full sync per 24h. Only the run that holds this Postgres advisory lock
+// crawls; the other skips.
 const crawlLockKey = 0x7463675f_63726177 // "tcg_craw"
 
 // WithCrawlLock runs fn only if this process can take the shared crawl lock,
@@ -154,11 +138,11 @@ const crawlLockKey = 0x7463675f_63726177 // "tcg_craw"
 // A read-only database can't ingest, so it skips without taking the lock (else
 // it could win the lock and starve the writable process).
 //
-// Wrap the scheduled crawls in it — the daily ingest and the product sync do,
-// and a standalone process should too, so it stays coordinated with a server
-// whose crons are still armed. Backfill is the one exception: it is
-// operator-driven and runs for hours, and holding the lock across that would
-// starve the daily pull, which is the run that must not be missed.
+// Wrap the scheduled crawls in it: cmd/tcgcsvd runs the daily ingest and the
+// product sync under it, so two of its runs never crawl at once. Backfill is
+// the one exception: it is operator-driven and runs for hours, and holding
+// the lock across that would starve the daily pull, which is the run that
+// must not be missed.
 //
 // ctx covers taking the lock only; fn gets whatever context its caller closed
 // over, which is normally the same one.

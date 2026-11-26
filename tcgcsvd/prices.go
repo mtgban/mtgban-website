@@ -107,8 +107,7 @@ type BackfillOptions struct {
 
 // Backfill fills the long prices table over the requested range, from
 // tcgcsv's daily archives where they are served and from the current snapshot
-// where they are not. Invoked by the -tcgcsv-backfill server flag and by
-// cmd/tcgcsvd.
+// where they are not. Invoked by cmd/tcgcsvd -backfill.
 func (s *Service) Backfill(ctx context.Context, opts BackfillOptions) error {
 	games, err := s.SelectGames(opts.Categories)
 	if err != nil {
@@ -368,40 +367,6 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 		return fmt.Errorf("tcgcsv backfill: fetched %d archive(s) but extracted 0 rows; check the 7z tooling and configured categories", daysEmpty)
 	}
 	return nil
-}
-
-// IsStashingPrices reports whether a daily price ingest is currently running in
-// this process.
-func (s *Service) IsStashingPrices() bool { return s.pricesStashing.Load() }
-
-// StashPrices pulls tcgcsv's current snapshot for every configured game into
-// the long prices table. It is the cron/admin entry point: only one run
-// proceeds at a time per process, only the process holding the crawl lock
-// crawls, and it no-ops when the current snapshot is already stored.
-//
-// Pass a context that outlives a request but not the process — the caller's
-// shutdown context — so a stop ends the ingest where it is instead of leaving
-// it running into the exit.
-func (s *Service) StashPrices(ctx context.Context) {
-	if !s.pricesStashing.CompareAndSwap(false, true) {
-		log.Println("tcgcsv StashPrices: another ingest is already running, skipping")
-		return
-	}
-	defer s.pricesStashing.Store(false)
-
-	err := s.WithCrawlLock(ctx, "tcgcsv StashPrices", func() error {
-		return s.IngestLatest(ctx)
-	})
-	if errors.Is(err, context.Canceled) {
-		// The process is going down and the run stopped with it. That is the
-		// shutdown working, not something to wake anyone for.
-		log.Println("tcgcsv daily ingest: stopped by shutdown")
-		return
-	}
-	if err != nil {
-		log.Println("tcgcsv daily ingest:", err)
-		s.notifyf("daily ingest error: %s", err)
-	}
 }
 
 // IngestLatest fetches tcgcsv's current prices for every configured game and

@@ -365,24 +365,29 @@ archive read after another. Caching takes most of it away, because a
 response changes only when a snapshot runs:
 
 - The site sends `Cache-Control: public` with a `max-age` running to the
-  next archive write (00:00 or 12:00 on the host's clock, and 21:00 on
-  every game but Magic, where the tcgcsv ingest writes), and the same
-  `ETag` for an unchanged response. For the half hour after each of those
-  hours `max-age` is a minute: the standalone `cmd/tcgcsvd` and the other
-  instance of a blue-green deploy write without this process seeing it.
+  next archive write (00:00 or 12:00 on the host's clock, and on every
+  game but Magic also the hours of the daily runs in
+  `.github/workflows/tcgcsvd.yml`, where the tcgcsv ingest writes, read
+  in UTC like the workflow's crons whatever the host's clock), and
+  the same `ETag` for an unchanged response. For 30 minutes after the
+  snapshot hours and 90 after the workflow's `max-age` is a minute: the
+  workflow's `cmd/tcgcsvd`, which starts at a quarter past and can start
+  late, and the other instance of a blue-green deploy write without this
+  process seeing it.
 - A response depends on the path, its extension, `range`, `id`, `page`
   and the plan's lookback, and on nothing else about the account, since
   every history plan reads the same sources (see Plans). So the gateway,
   or a CDN in front of it, can cache on those and answer a second
   account's request for the same card without reaching the archive. The
   gateway caches nothing today; this would be its first cache.
-- Clients are told the data moves twice a day at most, so a client
-  re-fetching a card more often gains nothing.
+- Clients are told the data moves twice a day at most on Magic, and only
+  at those write hours on the other games, so a client re-fetching a card
+  more often gains nothing.
 - Built: `Cache-Control: public, max-age=` to the next archive write, an
   `ETag` over the body (the JSON less `meta.date`, the CSV whole), 304
   on an `If-None-Match` that names it, weak or strong, alone or in a
   list, or `*`. An empty response, and any response served while this
-  process's snapshot or tcgcsv ingest is writing, is `no-store` with no
+  process's snapshot is writing, is `no-store` with no
   `ETag`.
 
 ## Open questions

@@ -154,7 +154,7 @@ func TestBackfillRejectsBadDates(t *testing.T) {
 }
 
 // failingStore acquires the crawl lock and then fails the job's first step, so
-// the stash entry points run their error handling on an error we choose.
+// a job run under the lock fails with an error we choose.
 type failingStore struct {
 	stubStore
 	err error
@@ -166,43 +166,32 @@ func (s failingStore) TryAdvisoryLock(context.Context, int64) (bool, func(), err
 	return true, func() {}, nil
 }
 
-// A stop cancels the context the crons run under, so an ingest in flight ends
-// with context.Canceled. That is the shutdown working — every deploy that lands
-// on top of one would otherwise post a failure nobody needs to act on — while a
-// real failure still has to reach the channel.
-func TestStashDoesNotNotifyOnShutdown(t *testing.T) {
-	for _, tc := range []struct {
-		name       string
-		err        error
-		wantNotify bool
-	}{
-		{"cancelled by shutdown", context.Canceled, false},
-		{"wrapped cancellation", fmt.Errorf("upserting: %w", context.Canceled), false},
-		{"a real failure", errors.New("connection refused"), true},
+// A job run under the crawl lock hands its failure back, cancellation
+// included, so cmd/tcgcsvd exits non-zero and the workflow reports it.
+func TestCrawlLockReturnsTheJobError(t *testing.T) {
+	for _, want := range []error{
+		context.Canceled,
+		fmt.Errorf("upserting: %w", context.Canceled),
+		errors.New("connection refused"),
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			for _, stash := range []struct {
-				kind string
-				run  func(*Service, context.Context)
-			}{
-				{"prices", func(s *Service, ctx context.Context) { s.StashPrices(ctx) }},
-				{"products", func(s *Service, ctx context.Context) { s.StashProducts(ctx) }},
-			} {
-				var notified []string
-				svc, err := New(tcgcsv.Config{Games: []tcgcsv.GameConfig{{Name: "Disney Lorcana", CategoryID: 71}}},
-					failingStore{err: tc.err},
-					WithNotifier(func(kind, message string) { notified = append(notified, message) }))
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				stash.run(svc, context.Background())
-
-				if got := len(notified) > 0; got != tc.wantNotify {
-					t.Errorf("%s: notified=%v (%v), want %v", stash.kind, got, notified, tc.wantNotify)
-				}
+		for _, job := range []struct {
+			kind string
+			run  func(*Service, context.Context) error
+		}{
+			{"prices", (*Service).IngestLatest},
+			{"products", (*Service).SyncProducts},
+		} {
+			svc, err := New(tcgcsv.Config{Games: []tcgcsv.GameConfig{{Name: "Disney Lorcana", CategoryID: 71}}},
+				failingStore{err: want})
+			if err != nil {
+				t.Fatal(err)
 			}
-		})
+			ctx := context.Background()
+			got := svc.WithCrawlLock(ctx, job.kind, func() error { return job.run(svc, ctx) })
+			if !errors.Is(got, want) {
+				t.Errorf("%s: WithCrawlLock = %v, want %v", job.kind, got, want)
+			}
+		}
 	}
 }
 
@@ -218,30 +207,31 @@ func (s lockFailStore) TryAdvisoryLock(context.Context, int64) (bool, func(), er
 
 // A lock another process holds is a skip, and a lock we could not ask about is
 // a failure. Both leave the ingest un-run, but only one of them was a decision:
-// a database that stops answering silently stops the daily pull, which is the
-// case the channel is for. A stop still stays quiet, as everywhere else.
+// a database that stops answering silently stops the daily pull, so it must
+// come back as an error the workflow fails on.
 func TestCrawlLockErrorIsNotASilentSkip(t *testing.T) {
 	for _, tc := range []struct {
-		name       string
-		store      Store
-		wantNotify bool
+		name    string
+		store   Store
+		wantErr bool
 	}{
 		{"another process holds the lock", stubStore{}, false},
 		{"the database cannot answer", lockFailStore{err: errors.New("connection refused")}, true},
-		{"cancelled by shutdown", lockFailStore{err: context.Canceled}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var notified []string
-			svc, err := New(tcgcsv.Config{Games: []tcgcsv.GameConfig{{Name: "Disney Lorcana", CategoryID: 71}}},
-				tc.store, WithNotifier(func(kind, message string) { notified = append(notified, message) }))
+			svc, err := New(tcgcsv.Config{Games: []tcgcsv.GameConfig{{Name: "Disney Lorcana", CategoryID: 71}}}, tc.store)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			svc.StashPrices(context.Background())
+			ran := false
+			err = svc.WithCrawlLock(context.Background(), "daily", func() error { ran = true; return nil })
 
-			if got := len(notified) > 0; got != tc.wantNotify {
-				t.Errorf("notified=%v (%v), want %v", got, notified, tc.wantNotify)
+			if ran {
+				t.Error("the job ran without the lock")
+			}
+			if got := err != nil; got != tc.wantErr {
+				t.Errorf("err = %v, want an error: %v", err, tc.wantErr)
 			}
 		})
 	}

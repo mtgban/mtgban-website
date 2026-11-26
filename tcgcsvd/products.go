@@ -27,31 +27,6 @@ func productToRow(categoryID int, p tcgcsv.Product) timeseries.TCGProduct {
 	}
 }
 
-// StashProducts runs SyncProducts under the single-flight guard and the shared
-// crawl lock. It is the cron/CLI entry point, and takes the same kind of
-// context StashPrices does.
-func (s *Service) StashProducts(ctx context.Context) {
-	if !s.productsStashing.CompareAndSwap(false, true) {
-		log.Println("tcgcsv StashProducts: another product sync is already running, skipping")
-		return
-	}
-	defer s.productsStashing.Store(false)
-
-	err := s.WithCrawlLock(ctx, "tcgcsv StashProducts", func() error {
-		return s.SyncProducts(ctx)
-	})
-	if errors.Is(err, context.Canceled) {
-		// The process is going down and the run stopped with it. That is the
-		// shutdown working, not something to wake anyone for.
-		log.Println("tcgcsv product sync: stopped by shutdown")
-		return
-	}
-	if err != nil {
-		log.Println("tcgcsv product sync:", err)
-		s.notifyf("product sync error: %s", err)
-	}
-}
-
 // SyncProducts refreshes the tcg_products catalog for every configured game
 // from tcgcsv's live products endpoints. Product metadata (names, numbers,
 // rarities) is largely stable, so this runs on a slower cadence than prices.
@@ -118,8 +93,5 @@ func (s *Service) syncProductsForGame(ctx context.Context, categoryID int) (int,
 		return 0, fmt.Errorf("upsert: %w", err)
 	}
 	log.Printf("tcgcsv products: category %d, %d products (%d groups)", categoryID, n, len(groups))
-	if s.report != nil {
-		s.report(categoryID, rows)
-	}
 	return n, nil
 }

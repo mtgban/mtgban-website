@@ -156,7 +156,9 @@ of the server's config is ignored, so the deployed file works unchanged:
 - `infrastructure_path` — the infrastructure file the deployments share, read
   for `sql_config` when the config sets none of its own
 - `tcgcsv_config` — the chosen categories and the User-Agent
-- `discord.server_webhook_url` — optional, for job-level success and failure notices
+- `discord.server_webhook_url` (optional): the binary posts a daily run's
+  success with its row count and the backfill's notice there; failures are
+  posted by the workflow's report step, not the binary
 
 The ingest always writes the long `prices` table, and gates each category on
 the newest `price_dates` day under TCGplayer Mid, High or Direct Low (5 to 7),
@@ -171,7 +173,8 @@ The ingest runs from `.github/workflows/tcgcsvd.yml`, all times UTC:
 - `daily` at 21:15, 23:15 and 03:15. A late or skipped schedule is covered by
   the next one, and a run on a game already stored for the day is a no-op, so
   the spares cost nothing.
-- `products` on Mondays at 22:15.
+- `products` on Mondays at 18:15, well clear of the daily runs, so it never
+  finds a late daily holding the crawl lock and skips.
 
 To run a job or a backfill by hand, open the Actions tab, pick `tcgcsvd` and
 Run workflow: choose the job (`daily`, `products`, `backfill` or `games`),
@@ -182,9 +185,15 @@ The workflow reads the whole config from the `TCGCSVD_CONFIG` repository
 secret, a JSON file with three keys:
 
 - `sql_config`, where either `port` or `direct_port` must reach Postgres
-  directly, since the crawl lock needs one session
+  directly, since the crawl lock needs one session, and which should set
+  `"sslmode": "require"`: the default is `disable`, and the runner connects
+  over the internet
 - `tcgcsv_config`, the chosen categories and the User-Agent
 - `discord.server_webhook_url`, which also gets a notice when a run fails
+
+Store the secret minified on one line (`jq -c . config.json`). The runner
+masks each line of a multi-line secret on its own, so a pretty-printed JSON
+turns every lone brace in the log into `***`.
 
 After each `daily` run the workflow runs `tcgcsvd -games -stale-after 50h`,
 which fails the run when any configured game's newest stored day is missing or
@@ -213,17 +222,18 @@ WantedBy=timers.target
 
 ## As a library
 
+`cmd/tcgcsvd` is the package's only caller; the website does not import it.
+A caller with a `*timeseries.Client` of its own would run a job like this:
+
 ```go
 svc, err := tcgcsvd.New(*cfg.TCGCSVConfig, db,
-    tcgcsvd.WithNotifier(ServerNotify),
-    tcgcsvd.WithProductReport(logMatchReport))
+    tcgcsvd.WithNotifier(notify))
 if err != nil {
     return err
 }
-go svc.StashPrices()   // single-flight + crawl lock; StashProducts is the same
+// Under the crawl lock; SyncProducts goes the same way.
+err = svc.WithCrawlLock(ctx, "daily", func() error { return svc.IngestLatest(ctx) })
 ```
 
-`New` takes any `Store` — `*timeseries.Client` implements it — so the package
+`New` takes any `Store` (`*timeseries.Client` implements it), so the package
 carries no assumption about how the caller built its connection pool.
-`WithProductReport` exists because the server's match report needs the loaded
-matcher datastore, which a standalone process doesn't have.
