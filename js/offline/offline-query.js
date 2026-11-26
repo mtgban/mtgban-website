@@ -493,7 +493,7 @@
         return (card.fin || []).indexOf(finish) !== -1;
     }
 
-    // Mirrors MaxSearchTotalResults (search.go:36).
+    // Mirrors MaxSearchTotalResults.
     var MAX_TOTAL = 10000;
     // Store prices kept decoded, most recently used last. A page of 100 rows can
     // need over 500,000, and this many cost roughly 100 MB. Counted rather than
