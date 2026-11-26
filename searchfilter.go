@@ -1582,10 +1582,20 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 				filters = append(filters, FilterElem{Name: lockedLastSold, Negate: negate})
 				continue
 			}
+			values := strings.Split(strings.ToLower(code), ",")
+			// is:graded is the Graded page's search, of graded stores alone;
+			// no card property answers it.
+			if !negate && slices.Contains(values, "graded") {
+				gradedSearch(&config)
+				values = slices.DeleteFunc(values, func(value string) bool { return value == "graded" })
+				if len(values) == 0 {
+					continue
+				}
+			}
 			filters = append(filters, FilterElem{
 				Name:   "is",
 				Negate: negate,
-				Values: strings.Split(strings.ToLower(code), ","),
+				Values: values,
 			})
 		case "on":
 			filters = append(filters, FilterElem{

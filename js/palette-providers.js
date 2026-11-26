@@ -298,6 +298,7 @@
         { value: 'ampersand', label: 'Ampersand (&)', group: 'Generic' },
         { value: 'foil', label: 'Foil', group: 'Generic' },
         { value: 'nonfoil', label: 'Non-foil', group: 'Generic' },
+        { value: 'graded', label: 'Graded slabs', group: 'Generic' },
         { value: 'fullart', label: 'Full Art', sublabel: 'fa', group: 'Frame' },
         { value: 'extendedart', label: 'Extended Art', sublabel: 'ea', group: 'Frame' },
         { value: 'showcase', label: 'Showcase', sublabel: 'sc', group: 'Frame' },

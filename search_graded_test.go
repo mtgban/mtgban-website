@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
@@ -132,6 +133,107 @@ func TestGradedPage(t *testing.T) {
 		}
 		if agent != "" && !strings.Contains(body, `role="region" aria-label="Buyers"`) {
 			t.Errorf("search, %q: the Buyers panel is not named", agent)
+		}
+	}
+}
+
+// is:graded on the search page hands the search to the Graded page, query
+// and pinned bar intact, which keeps the graded stores alone; not:graded
+// leaves the search as it was.
+func TestSearchIsGraded(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Search") })
+	}
+	cards := somePlainCardUUIDs(t, 2)
+	stock := func(name string, graded bool, inv mtgban.InventoryRecord) mtgban.Seller {
+		return mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: name, Shorthand: name, GradedMode: graded})
+	}
+	withPrices(t, []mtgban.Seller{
+		stock("RAWSHOP", false, mtgban.InventoryRecord{
+			cards[0]: {{Conditions: "NM", Price: 10, URL: "u"}},
+			cards[1]: {{Conditions: "NM", Price: 10, URL: "u"}},
+		}),
+		stock("SLABSHOP", true, mtgban.InventoryRecord{
+			cards[0]: {{Conditions: "NM", Price: 40, URL: "u", Slab: &mtgban.Slab{Grader: "PSA", Score: 9}}},
+		}),
+	}, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{cards[0]: {{Conditions: "NM", BuyPrice: 5, URL: "u"}}},
+			mtgban.ScraperInfo{Name: "BUYSHOP", Shorthand: "BUYSHOP"}),
+	})
+
+	// A list of ids names its own cards and no filter narrows it, so the
+	// search is by the first card's name.
+	name := currentDatastore().backend.UUIDs[cards[0]].Name
+	row := func(store string) string { return `data-track-value="` + store + `"` }
+	serve := func(filter, scope string) string {
+		query := "q=" + url.QueryEscape(name+" "+filter) + "&scope=" + url.QueryEscape(scope)
+		rec := httptest.NewRecorder()
+		testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/search?"+query, nil))
+		if rec.Code != http.StatusFound {
+			return rec.Body.String()
+		}
+		if where := rec.Header().Get("Location"); where != "/graded?"+query {
+			t.Errorf("%q, pinned %q: sent to %q", filter, scope, where)
+			return ""
+		}
+		rec = httptest.NewRecorder()
+		testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/graded?"+query, nil))
+		return rec.Body.String()
+	}
+	slabsOnly := []string{row("SLABSHOP"), "Last Sold"}
+	for _, tc := range []struct {
+		filter, scope string
+		shown         []string
+		notShown      []string
+	}{
+		{"is:graded", "", slabsOnly, []string{row("RAWSHOP"), row("BUYSHOP")}},
+		{"", "is:graded", slabsOnly, []string{row("RAWSHOP"), row("BUYSHOP")}},
+		{"not:graded", "", []string{row("RAWSHOP"), row("SLABSHOP"), row("BUYSHOP")}, []string{"Last Sold"}},
+	} {
+		body := serve(tc.filter, tc.scope)
+		for _, want := range tc.shown {
+			if !strings.Contains(body, want) {
+				t.Errorf("%q, pinned %q: %q is missing", tc.filter, tc.scope, want)
+			}
+		}
+		for _, not := range tc.notShown {
+			if strings.Contains(body, not) {
+				t.Errorf("%q, pinned %q: %q is shown", tc.filter, tc.scope, not)
+			}
+		}
+	}
+}
+
+// is:graded is a search of graded stores, never a card property, so beside
+// another is: value it leaves that value's filter alone.
+func TestParseIsGraded(t *testing.T) {
+	b := colorBackend(matcher.GamePokemon, map[string][]string{"a": nil})
+	for _, tc := range []struct {
+		query  string
+		graded bool
+		is     []string
+	}{
+		{"pikachu is:graded", true, nil},
+		{"pikachu is:foil,graded", true, []string{"foil"}},
+		{"pikachu not:graded", false, []string{"graded"}},
+		{"pikachu is:foil", false, []string{"foil"}},
+	} {
+		config := parseSearchOptionsNG(b, currentPrices(), tc.query, nil, nil, nil)
+		var is []string
+		for _, filter := range config.CardFilters {
+			if filter.Name == "is" {
+				is = append(is, filter.Values...)
+			}
+		}
+		if config.GradedOnly != tc.graded || config.SkipBuylist != tc.graded || !slices.Equal(is, tc.is) || config.CleanQuery != "pikachu" {
+			t.Errorf("%q: graded %v, skip buylist %v, is %v, query %q; want graded %v, is %v, query pikachu",
+				tc.query, config.GradedOnly, config.SkipBuylist, is, config.CleanQuery, tc.graded, tc.is)
 		}
 	}
 }
