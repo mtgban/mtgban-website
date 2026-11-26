@@ -93,13 +93,18 @@ var DefaultNav = []NavElem{
 	},
 }
 
-// List of keys that may be present or not, and when present they are
-// guaranteed not to be user-editable)
-var OptionalFields = []string{
+// identityFields are the keys that name who a signature belongs to. A login
+// signs them from Patreon; nothing else may set them, an invite included.
+var identityFields = []string{
 	"UserName",
 	"UserEmail",
 	"UserEmailUnverified",
 	"UserTier",
+}
+
+// List of keys that may be present or not, and when present they are
+// guaranteed not to be user-editable)
+var OptionalFields = slices.Concat(identityFields, []string{
 	"SearchDisabled",
 	"SearchBuylistDisabled",
 	"SearchDownloadCSV",
@@ -128,7 +133,7 @@ var OptionalFields = []string{
 	"SearchBackpackTabs",
 	"AlertsMax",
 	"AlertChannels",
-}
+})
 
 // The key matches the query parameter of the permissions defined in sign()
 // These enable/disable the relevant pages
@@ -325,6 +330,10 @@ func init() {
 
 			CanPOST:        true,
 			AlwaysOnForDev: true,
+			// An invite link an admin minted; the code is the credential.
+			SubPages: []NavElem{
+				{Name: "Invite", Link: "/invite/", Handle: (*site).Invite, NoSigning: true, ShouldHide: func(*site) bool { return true }},
+			},
 		},
 	}
 }
@@ -342,6 +351,7 @@ type PageVars struct {
 	SleepVars
 	UploadVars
 	MetricsVars
+	InviteVars
 
 	Nav     []NavElem
 	UserNav *NavElem

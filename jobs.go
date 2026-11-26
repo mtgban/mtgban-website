@@ -30,6 +30,7 @@ const (
 	jobPopular         = "Popular searches"
 	jobUploadShares    = "Upload shares"
 	jobPatreonSessions = "Patreon sessions"
+	jobInvites         = "Invites"
 	jobFeatureCounter  = "Feature counter"
 	jobFeatureErrors   = "Feature errors"
 	jobMetricsFold     = "Metrics fold"
@@ -177,6 +178,8 @@ func (s *site) scheduleCrons() *cron.Cron {
 		addJob("10 5 * * *", jobUploadShares, pruneUploadShares)
 		// Reclaim the rows of sessions past their cap.
 		addJob("15 5 * * *", jobPatreonSessions, prunePatreonSessions)
+		// Invites go 90 days after they close; every site runs it.
+		addJob("20 5 * * *", jobInvites, pruneInvites)
 	}
 
 	// Metrics jobs touch tables every site shares; one flagged instance runs them.
