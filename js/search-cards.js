@@ -230,13 +230,13 @@
         // the card rests.
         if (el === cards()[current()]) land(el);
         var pane = paneAt(el);
+        // A tap's mark lasts one settle, even one back where it began.
+        var tap = tapped.has(el);
+        tapped.delete(el);
         if (pane === shown.get(el)) return;
         shown.set(el, pane);
         showSales(pane);
-        if (tapped.has(el)) {
-            tapped.delete(el);
-            return;
-        }
+        if (tap) return;
         if (pane !== 'picture' && window.BAN && BAN.track) BAN.track('ui.cards.pane', pane, 'swipe');
     }
 
