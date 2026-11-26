@@ -90,6 +90,24 @@ test('a keyboard page calls showHoverFor with trusted=true', () => {
     expect(showHoverCalls).toEqual([[h1, true]]);
 });
 
+// Any other key, a modifier above all, leaves the card under the pointer
+// on show rather than the header last stuck under the bar.
+test('a key other than PageUp/PageDown does not drive the sidebar', () => {
+    const h0 = makeHeader(0);
+    const h1 = makeHeader(500);
+    const { listeners, showHoverCalls } = load([h0, h1], {});
+
+    for (const key of ['Shift', 'Control', 'Alt', 'Meta', 'a']) {
+        listeners.document.keydown({
+            key,
+            target: { tagName: 'BODY' },
+            preventDefault: () => {},
+        });
+    }
+
+    expect(showHoverCalls).toEqual([]);
+});
+
 test('a scroll with the pointer over nothing calls showHoverFor(stuckHeader, true) when the stuck header changes', () => {
     const h0 = makeHeader(0);
     const h1 = makeHeader(500);
