@@ -1371,6 +1371,14 @@ describe('the price paid', () => {
         expect(paid(p)).toEqual([['uuid-1', 'NM', 2, 2], ['uuid-2', 'NM', 3, 5], ['uuid-3', 'HP', 1, 0.5]]);
     });
 
+    test('an Optimizer row with edited copies takes its own line\'s copies, not its card\'s', () => {
+        // $10 x3 and $4 x1, the $10 line cut to 1
+        const p = page({ results: [['uuid-1', 1, 'NM', false, '10'], ['uuid-1', 1, 'NM', false, '4']], sections: [[['uuid-1', 3, false, 'NM', '10'], ['uuid-1', 1, false, 'NM', '4']]] });
+        p.optSections[0].rows.forEach((tr) => tr.setAttribute('data-qty-edited', ''));
+        p.window.addRowsToBackpack(p.optSections[0].add);
+        expect(paid(p)).toEqual([['uuid-1', 'NM', 2, 7]]);
+    });
+
     test('an Optimizer section moved to another backpack carries it there', () => {
         const p = page({ store: [entry('uuid-1', { qty: 3, paid: 4 }), entry('uuid-1', { pack: 2, paid: 1 })], tabs: 2, sections: [[['uuid-1', 2, false, 'NM']]] });
         p.window.moveRowsToPack(p.optSections[0].move, 2);

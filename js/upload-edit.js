@@ -181,12 +181,6 @@
         if (priceBtn) priceBtn.classList.toggle('edited', price(tr) !== (parseFloat(tr.dataset.origPrice) || 0));
     }
 
-    function optRows(id, grade) {
-        return Array.prototype.filter.call(document.querySelectorAll('.opt-store tr[data-opt-id]'), function(tr) {
-            return tr.dataset.optId === id && (tr.dataset.optCond || '') === grade;
-        });
-    }
-
     // ownRows is the Optimizer rows pricing the Results row.
     function ownRows(tr) {
         return Array.prototype.filter.call(document.querySelectorAll('.opt-store tr[data-opt-id]'), function(opt) {
@@ -272,11 +266,12 @@
             mark(tr);
             if (conds.indexOf(tr.dataset.cond || '') < 0) conds.push(tr.dataset.cond || '');
         });
-        var grade = rows[0].dataset.grade || '';
+        // The Optimizer rows of the line, which a card's other price is not
+        var opts = ownRows(rows[0]);
         var listed = copies(Array.prototype.filter.call(document.querySelectorAll('.ures-table tr[data-hash]'), function(x) {
-            return x.dataset.hash === rows[0].dataset.hash && (x.dataset.grade || '') === grade && !x.classList.contains('ures-removed-row');
+            return !x.classList.contains('ures-removed-row') && opts.some(function(opt) { return pairs(opt, x); });
         }));
-        optRows(rows[0].dataset.hash, grade).forEach(function(opt) {
+        opts.forEach(function(opt) {
             // Until a reload the backpack pair counts the list's copies itself
             opt.dataset.qtyEdited = '';
             var ob = opt.querySelector('.ures-edit-btn[data-edit="qty"]');

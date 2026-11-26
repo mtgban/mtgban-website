@@ -316,6 +316,18 @@ test('the store sends wait for a reload, and the bar nudges', () => {
     expect(dispatch('click', pack.children[0]).defaultPrevented).toBe(false);
 });
 
+test('copies cut on one of a card\'s lines at two prices mark and count only its own optimizer row', () => {
+    const bolt = resultRow('Bolt', 'a', 'NM', 3, { price: '10' });
+    const bolt2 = resultRow('Bolt', 'a', 'NM', 1, { price: '4' });
+    const opt = optRow('a', 'NM', 3, '10.00', '10');
+    const opt2 = optRow('a', 'NM', 1, '4.00', '4');
+    const { pick } = load({ results: [bolt, bolt2], opt: [opt, opt2] });
+
+    pick(btn(bolt, 'qty'), '1');
+    expect([opt.hasAttribute('data-qty-edited'), opt2.hasAttribute('data-qty-edited')]).toEqual([true, false]);
+    expect(btn(opt, 'qty').title).toBe('1 in your list; reload to update');
+});
+
 test('a price set on an optimizer row prices its own list line, not the card\'s line at another price', () => {
     const ring = resultRow('Ring', 'b', 'SP', 1, { price: '1.5' });
     const ring2 = resultRow('Ring', 'b', 'SP', 2, { price: '2' });

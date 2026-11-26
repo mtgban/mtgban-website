@@ -868,7 +868,7 @@
         if (tr.getAttribute("data-opt-id") !== null) {
             var edited = tr.getAttribute("data-qty-edited") !== null;
             return {
-                id: attr("data-opt-id"), cond: attr("data-opt-cond"), qty: edited ? editedShare(tr, listedCopies(attr("data-opt-id"), attr("data-opt-cond"))) : parseInt(attr("data-load-qty"), 10) || 1,
+                id: attr("data-opt-id"), cond: attr("data-opt-cond"), qty: edited ? editedShare(tr, listedCopies(attr("data-opt-id"), attr("data-opt-cond"), tr.getAttribute("data-share-price"))) : parseInt(attr("data-load-qty"), 10) || 1,
                 name: attr("data-load-name"), edition: attr("data-opt-edition"), set: attr("data-load-set"), number: attr("data-load-number"),
                 finishTag: attr("data-opt-finish-tag"), finishClass: attr("data-opt-finish-class"), img: attr("data-opt-img"), cw: attr("data-opt-cw") === "true",
                 paid: paidOf(attr("data-share-price"))
@@ -882,27 +882,30 @@
         };
     }
 
-    // listedCopies is the list's copies of a card in a grade, its lines
+    // listedCopies is the list's copies of a card in a grade at a price,
+    // as a card's lines at two prices are two optimizer rows, its lines
     // struck on the page left out but not the ones struck as the card left
-    // the backpack, which come back with it.
-    function listedCopies(id, cond) {
+    // the backpack, which come back with it. A null price takes any.
+    function listedCopies(id, cond, price) {
         if (typeof window.exportRows !== "function") return 0;
         return Array.prototype.reduce.call(window.exportRows("all"), function (n, tr) {
             if (tr.getAttribute("data-hash") !== id || (tr.getAttribute("data-grade") || "") !== cond) return n;
+            if (price !== null && (tr.getAttribute("data-price") || "") !== price) return n;
             if (tr.classList.contains("ures-removed-row") && tr.getAttribute("data-pack-struck") === null) return n;
             return n + (parseInt(tr.getAttribute("data-qtys"), 10) || 1);
         }, 0);
     }
 
     // editedShare is an optimizer row's copies once the list's copies of
-    // its card and grade were edited: the ticked rows take the list in page
-    // order, each at most what its store had.
+    // its card, grade and price were edited: the ticked rows of that line
+    // take the list in page order, each at most what its store had.
     function editedShare(tr, listed) {
-        var id = tr.getAttribute("data-opt-id"), cond = tr.getAttribute("data-opt-cond");
+        var id = tr.getAttribute("data-opt-id"), cond = tr.getAttribute("data-opt-cond"), price = tr.getAttribute("data-share-price");
         var rows = document.querySelectorAll("tr[data-opt-id]");
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             if (r.getAttribute("data-opt-id") !== id || r.getAttribute("data-opt-cond") !== cond) continue;
+            if (r.getAttribute("data-share-price") !== price) continue;
             if (r !== tr && r.classList.contains("opt-removed")) continue;
             var n = Math.min(parseInt(r.getAttribute("data-load-qty"), 10) || 1, listed);
             if (r === tr) return n;
