@@ -77,6 +77,7 @@ paths:
           required: true
           schema: { type: string }
         - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/language"
         - $ref: "#/components/parameters/vendor"
         - $ref: "#/components/parameters/finish"
       responses:
@@ -89,6 +90,7 @@ paths:
       description: JSON only, and retail only
       parameters:
         - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/language"
         - $ref: "#/components/parameters/vendor"
         - $ref: "#/components/parameters/finish"
       responses:
@@ -109,6 +111,7 @@ paths:
           in: query
           schema: { type: string }
         - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/language"
       responses:
         "200": { $ref: "#/components/responses/Prices" }
         default: { $ref: "#/components/responses/Error" }
@@ -134,6 +137,7 @@ paths:
           in: query
           schema: { type: string }
         - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/language"
       responses:
         "200": { $ref: "#/components/responses/Prices" }
         default: { $ref: "#/components/responses/Error" }
@@ -155,6 +159,7 @@ paths:
           in: query
           schema: { type: string }
         - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/language"
       responses:
         "200": { $ref: "#/components/responses/Prices" }
         default: { $ref: "#/components/responses/Error" }
@@ -256,6 +261,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/idsOrSet"
         - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/language"
         - $ref: "#/components/parameters/range"
         - $ref: "#/components/parameters/page"
       responses:
@@ -272,6 +278,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/idsOrSet"
         - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/language"
         - $ref: "#/components/parameters/range"
         - $ref: "#/components/parameters/page"
       responses:
@@ -285,6 +292,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/set"
         - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/language"
         - $ref: "#/components/parameters/range"
         - $ref: "#/components/parameters/page"
       responses:
@@ -298,6 +306,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/set"
         - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/language"
         - $ref: "#/components/parameters/range"
         - $ref: "#/components/parameters/page"
       responses:
@@ -323,6 +332,16 @@ components:
       in: query
       description: Id system for card keys
       schema: { type: string, enum: [ban, tcg, scryfall, mtgjson, mkm, ck, name] }
+    language:
+      name: language
+      in: query
+      description: >-
+        A language code or name, as de or German, in any case; en or
+        English is the same as leaving it out, and an unknown one is an
+        error. Only meaningful with id=scryfall or id=mtgjson, where a
+        card's copy printed in another language shares the card's id: the
+        copy in this language answers it, and the card itself without one
+      schema: { type: string }
     vendor:
       name: vendor
       in: query

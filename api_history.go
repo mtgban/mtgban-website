@@ -324,7 +324,7 @@ func historyFinishes(b *matcher.Backend, id string) []*matcher.CardObject {
 // the id mode (scryfall for singles and mtgjson for sealed by default), and
 // leaves out what the mode has no id for, as v2 prices do, or the variant
 // cache does not know.
-func historyCardsOf(b *matcher.Backend, p *prices, idMode string, cos []*matcher.CardObject) ([]historyCard, []int64) {
+func historyCardsOf(b *matcher.Backend, p *prices, idMode, lang string, cos []*matcher.CardObject) ([]historyCard, []int64) {
 	var cards []historyCard
 	var banIDs []int64
 	for _, co := range cos {
@@ -339,7 +339,7 @@ func historyCardsOf(b *matcher.Backend, p *prices, idMode string, cos []*matcher
 				mode = "mtgjson"
 			}
 		}
-		id := getIDFromMode(b, p, mode, co)
+		id := getIDFromMode(b, p, mode, lang, co)
 		if id == "" {
 			continue
 		}
@@ -456,6 +456,11 @@ func (s *site) HistoryAPI(w http.ResponseWriter, r *http.Request) {
 		historyError(w, http.StatusBadRequest, fmt.Sprintf("unknown id %q, use one of %s", idMode, strings.Join(v2IDModes, ", ")))
 		return
 	}
+	lang, err := apiLanguage(r.FormValue("language"))
+	if err != nil {
+		historyError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	days := historyLookback(sig)
 	if rs := r.FormValue("range"); rs != "" {
 		n, err := strconv.Atoi(rs)
@@ -559,7 +564,7 @@ func (s *site) HistoryAPI(w http.ResponseWriter, r *http.Request) {
 		historyError(w, http.StatusServiceUnavailable, "price history is loading")
 		return
 	}
-	cards, banIDs := historyCardsOf(b, p, idMode, cos)
+	cards, banIDs := historyCardsOf(b, p, idMode, lang, cos)
 	if !acquireSlot(r.Context(), historySlots, historySlotWait) {
 		w.Header().Set("Retry-After", "5")
 		historyError(w, http.StatusServiceUnavailable, "price history is busy")

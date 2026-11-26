@@ -2590,7 +2590,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 		// way the sealed and index fetches below already do.
 		results = map[string]map[string]*BanPrice{}
 		if len(ids.cardIDs) > 0 {
-			results = getVendorPrices(b, p, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+			results = getVendorPrices(b, p, "", "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 		}
 
 		// Build the custom buylist if requested
@@ -2602,7 +2602,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 			if slices.ContainsFunc(rules, func(rule customBuylistRule) bool { return !rule.sealed && rule.seller != "" }) {
 				for _, cardID := range ids.cardIDs {
 					entries, rule := uploadCustomBuylistEntries(b, refs, cardID)
-					processEntry(b, p, results, entries, "", cardID, customStore, false, ids.shouldCheckForConditions, false, rule)
+					processEntry(b, p, results, entries, "", "", cardID, customStore, false, ids.shouldCheckForConditions, false, rule)
 				}
 				enabledStores = append(enabledStores, customStore)
 				customTips[customStore] = customBuylistTips(p, rules, false)
@@ -2612,7 +2612,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 			if hasSealed && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
 				for _, productID := range ids.sealedProductIDs {
 					entries, rule := uploadCustomBuylistEntries(b, refs, productID)
-					processEntry(b, p, results, entries, "", productID, customSealedStore, false, false, false, rule)
+					processEntry(b, p, results, entries, "", "", productID, customSealedStore, false, false, false, rule)
 				}
 				enabledSealedStores = append(enabledSealedStores, customSealedStore)
 				customTips[customSealedStore] = customBuylistTips(p, rules, true)
@@ -2621,7 +2621,7 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 
 		// Fetch sealed vendor prices and merge
 		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			mergePrices(results, getVendorPrices(b, p, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
+			mergePrices(results, getVendorPrices(b, p, "", "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
 		}
 
 		if st.priceSource != "" || st.tiebreak == uploadtie.Credit || st.tiebreak == uploadtie.MarketCredit {
@@ -2636,12 +2636,12 @@ func fetchUploadPrices(r *http.Request, b *matcher.Backend, p *prices, blMode bo
 		// upload has no singles (see the comment above).
 		results = map[string]map[string]*BanPrice{}
 		if len(ids.cardIDs) > 0 {
-			results = getSellerPrices(b, p, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+			results = getSellerPrices(b, p, "", "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 		}
 
 		// Fetch sealed seller prices and merge
 		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			mergePrices(results, getSellerPrices(b, p, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
+			mergePrices(results, getSellerPrices(b, p, "", "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
 		}
 	}
 
@@ -2748,7 +2748,7 @@ func writePricesCSV(w http.ResponseWriter, r *http.Request, b *matcher.Backend, 
 	}
 	indexResults := map[string]map[string]*BanPrice{}
 	if len(ids.cardIDs) > 0 && len(csvIndexKeys) > 0 {
-		indexResults = getSellerPrices(b, p, "", csvIndexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+		indexResults = getSellerPrices(b, p, "", "", csvIndexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 	}
 
 	// Copy these index prices in the final results
@@ -2789,7 +2789,7 @@ func fetchUploadIndexes(b *matcher.Backend, p *prices, blMode bool, st uploadSet
 		if !slices.Contains(indexKeys, st.altPriceSource) {
 			indexKeys = append(indexKeys, st.altPriceSource)
 		}
-		indexResults = getSellerPrices(b, p, "", indexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+		indexResults = getSellerPrices(b, p, "", "", indexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 	}
 
 	// An index that is also a selected store (TCGSealed) already gets its
@@ -2804,7 +2804,7 @@ func fetchUploadIndexes(b *matcher.Backend, p *prices, blMode bool, st uploadSet
 
 	// Fetch sealed index prices
 	if len(ids.sealedProductIDs) > 0 && len(sealedIndexKeys) > 0 {
-		mergePrices(indexResults, getSellerPrices(b, p, "", sealedIndexKeys, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
+		mergePrices(indexResults, getSellerPrices(b, p, "", "", sealedIndexKeys, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
 	}
 
 	return uploadIndexes{

@@ -94,9 +94,9 @@ func newGradedStore(info mtgban.ScraperInfo, record map[string][]mtgban.Inventor
 }
 
 // gradedSectionV2 is the retail section of a graded request.
-func gradedSectionV2(b *matcher.Backend, p *prices, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string) *v2Section {
+func gradedSectionV2(b *matcher.Backend, p *prices, mode, lang string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string) *v2Section {
 	sellers := p.sellers
-	section := newV2Section(b, p, mode, filterByEdition, filterByHash, filterByFinish, false, sellers)
+	section := newV2Section(b, p, mode, lang, filterByEdition, filterByHash, filterByFinish, false, sellers)
 	for _, seller := range sellers {
 		info := seller.Info()
 		if info.GradedMode && slices.Contains(enabledStores, info.Shorthand) {
@@ -107,9 +107,9 @@ func gradedSectionV2(b *matcher.Backend, p *prices, mode string, enabledStores [
 }
 
 // gradedSearchV2 is the retail section of a graded search.
-func gradedSearchV2(b *matcher.Backend, p *prices, mode string, cardIDs []string, config SearchConfig) *v2Section {
+func gradedSearchV2(b *matcher.Backend, p *prices, mode, lang string, cardIDs []string, config SearchConfig) *v2Section {
 	sellers := p.sellers
-	section := searchSectionV2(b, p, mode, cardIDs, false, sellers)
+	section := searchSectionV2(b, p, mode, lang, cardIDs, false, sellers)
 	for _, seller := range sellers {
 		info := seller.Info()
 		if !info.GradedMode || shouldSkipStoreNG(seller, config.StoreFilters) {

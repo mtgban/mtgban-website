@@ -141,8 +141,8 @@ func BenchmarkSetPricesAPIEdition(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		retail := getSellerPrices(backend(), currentPrices(), "", stores, benchSetCode, nil, "", true, true, false, "")
-		buylist := getVendorPrices(backend(), currentPrices(), "", stores, benchSetCode, nil, "", true, true, false, "")
+		retail := getSellerPrices(backend(), currentPrices(), "", "", stores, benchSetCode, nil, "", true, true, false, "")
+		buylist := getVendorPrices(backend(), currentPrices(), "", "", stores, benchSetCode, nil, "", true, true, false, "")
 		if len(retail) == 0 || len(buylist) == 0 {
 			b.Fatal("no results")
 		}
@@ -156,8 +156,8 @@ func BenchmarkSetPricesAPIByHash(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		retail := getSellerPrices(backend(), currentPrices(), "", stores, "", benchSetUUIDs, "", true, true, false, "")
-		buylist := getVendorPrices(backend(), currentPrices(), "", stores, "", benchSetUUIDs, "", true, true, false, "")
+		retail := getSellerPrices(backend(), currentPrices(), "", "", stores, "", benchSetUUIDs, "", true, true, false, "")
+		buylist := getVendorPrices(backend(), currentPrices(), "", "", stores, "", benchSetUUIDs, "", true, true, false, "")
 		if len(retail) == 0 || len(buylist) == 0 {
 			b.Fatal("no results")
 		}

@@ -111,9 +111,9 @@ func newSite() *site {
 			if err != nil {
 				return nil, err
 			}
-			retail := getSellerPrices(b, p, "", sellers, set.Code, nil, "", true, true, false, "")
-			buylist := getVendorPrices(b, p, "", vendors, set.Code, nil, "", true, true, false, "")
-			for id, m := range getSellerPrices(b, p, "", sellers, set.Code, nil, "", true, true, true, "") {
+			retail := getSellerPrices(b, p, "", "", sellers, set.Code, nil, "", true, true, false, "")
+			buylist := getVendorPrices(b, p, "", "", vendors, set.Code, nil, "", true, true, false, "")
+			for id, m := range getSellerPrices(b, p, "", "", sellers, set.Code, nil, "", true, true, true, "") {
 				if retail[id] == nil {
 					retail[id] = m
 					continue
@@ -122,7 +122,7 @@ func newSite() *site {
 					retail[id][store] = entry
 				}
 			}
-			for id, m := range getVendorPrices(b, p, "", vendors, set.Code, nil, "", true, true, true, "") {
+			for id, m := range getVendorPrices(b, p, "", "", vendors, set.Code, nil, "", true, true, true, "") {
 				if buylist[id] == nil {
 					buylist[id] = m
 					continue

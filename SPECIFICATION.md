@@ -953,7 +953,10 @@ consumers — carries regular/foil/etched/sealed prices plus optional
 per-condition (`Conditions`) and per-quantity (`Quantities`) breakdowns.
 Query params: `id` mode (`tcg`, `scryfall`, `mtgjson`, `name`, `mkm`, `ck`;
 unset or unrecognized falls back to the card's own internal uuid, not
-scryfall), `qty`, `conds`, `finish`, `vendor` filter (must be a subset of the
+scryfall), `language` (a code or a name: a copy of another set's card in
+another language shares its original's `mtgjson` and `scryfall` ids, and
+answers them in place of the original only when it names the copy's
+language), `qty`, `conds`, `finish`, `vendor` filter (must be a subset of the
 enabled stores), `tag=names` (full store names instead of shorthands), and
 `filter=singles|sealed` on the `/sets`/`/stores` endpoints. Access scoped by
 sig params `API` (an explicit store list, for both sides, or `ALL_ACCESS` —

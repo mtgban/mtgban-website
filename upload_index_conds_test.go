@@ -32,7 +32,7 @@ func TestIndexPriceIgnoresRowCondition(t *testing.T) {
 	for _, indexCond := range []mtgban.Condition{"NM", "INDEX"} {
 		out := map[string]map[string]*BanPrice{}
 		processEntry(backend(), currentPrices(), out, []mtgban.InventoryEntry{{Conditions: indexCond, Price: 4.20}},
-			"", cardID, "TCGLow", false, true /* conds */, false /* shouldBaseCond: an index */)
+			"", "", cardID, "TCGLow", false, true /* conds */, false /* shouldBaseCond: an index */)
 		price := out[cardID]["TCGLow"]
 
 		// Every grade gets the one price the index carries, including the
@@ -55,7 +55,7 @@ func TestRealStoreKeepsRowCondition(t *testing.T) {
 	processEntry(backend(), currentPrices(), out, []mtgban.InventoryEntry{
 		{Conditions: "NM", Price: 10.00, Quantity: 1},
 		{Conditions: "SP", Price: 7.00, Quantity: 1},
-	}, "", cardID, "TCGDirect", false, true /* conds */, true /* shouldBaseCond: a real store */)
+	}, "", "", cardID, "TCGDirect", false, true /* conds */, true /* shouldBaseCond: a real store */)
 	price := out[cardID]["TCGDirect"]
 
 	for _, tc := range []struct {
