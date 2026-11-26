@@ -116,11 +116,19 @@ func TestGradedPage(t *testing.T) {
 			}
 		}
 
+		// The phone's panel names its landscape column too.
+		if agent != "" && !strings.Contains(body, `role="region" aria-label="Last Sold"`) {
+			t.Errorf("graded, %q: the Last Sold panel is not named", agent)
+		}
+
 		body = serve("/search", agent)
 		for _, want := range []string{row("RAWSHOP"), row("SLABSHOP"), row("BUYSHOP"), "Condition: NM", card(0), card(1)} {
 			if !strings.Contains(body, want) {
 				t.Errorf("search, %q: %q is missing", agent, want)
 			}
+		}
+		if agent != "" && !strings.Contains(body, `role="region" aria-label="Buyers"`) {
+			t.Errorf("search, %q: the Buyers panel is not named", agent)
 		}
 	}
 }

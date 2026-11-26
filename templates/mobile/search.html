@@ -385,7 +385,7 @@
 
             {{/* Buyers panel */}}
             {{if $buyersList}}
-            <div class="m-tab-panel active" id="buyers-{{$cardId}}" role="region" aria-label="Buyers">
+            <div class="m-tab-panel active" id="buyers-{{$cardId}}" role="region" aria-label="{{if $.IsGraded}}Last Sold{{else}}Buyers{{end}}">
                 {{template "m-pane-head" dict "Title" (or (and $.IsGraded "Last Sold") "Buyers") "Prev" (or (and $salesFirst "sales") "picture") "Next" (or (and $hasSales (not $salesFirst) "sales") "")}}
                 {{template "result-buyers" dict "Page" $ "Card" $card "CardID" $cardId}}
             </div>

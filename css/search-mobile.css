@@ -2054,7 +2054,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     }
 
     .m-card:has(.m-tab-panel):not(:has(> [id^="sellers"] ~ [id^="buyers"])) > .m-tab-panel[id^="buyers"]::before {
-        content: "Buyers";
+        content: attr(aria-label);
     }
 
     /* 3-column grid: image | sellers | buyers, for a card with both */
@@ -2114,7 +2114,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     }
 
     .m-card:has(> [id^="sellers"] ~ [id^="buyers"]) > .m-tab-panel[id^="buyers"]::before {
-        content: "Buyers";
+        content: attr(aria-label);
     }
 
     /* Tighter vertical spacing in landscape */
