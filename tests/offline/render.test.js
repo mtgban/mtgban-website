@@ -201,6 +201,10 @@ test('a sealed result links to sealed searches, a single to plain ones', () => {
         '?sealed=1&q=s%3ANEO', '?sealed=1&q=%22NEO%20Box%22', '?sealed=1&q=s%3ANEO',
     ]);
     expect(links(R.buildHTML([result()], CTX))[0]).toBe('?q=s%3ANEO');
+    // From the Graded page, the mark the exits lead back by rides along
+    expect(links(R.buildHTML([result()], {...CTX, graded: true})).slice(0, 2)).toEqual([
+        '?q=s%3ANEO&graded=1', '?q=%22Boseiju%2C%20Who%20Endures%22&graded=1',
+    ]);
 });
 
 // css/search-rows.css hides Poor by these where NM and SP are listed too.

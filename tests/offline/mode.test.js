@@ -139,14 +139,15 @@ test('the navbar toggle leaves offline mode for the page the shell stands in for
         ['/sealed', '?q=box', '/sealed?q=box'],
         ['/graded', '?q=box', '/graded?q=box'],
         ['/offline', '?q=box&sealed=1', '/sealed?q=box'],
+        ['/offline', '?q=box&graded=1', '/graded?q=box'],
     ]) {
         expect(toggledHref(pathname, search, true)).toBe(href);
     }
 });
 
-test('the navbar toggle enters offline mode with the query and the sealed mode', () => {
+test('the navbar toggle enters offline mode with the query and the sealed or graded mode', () => {
     expect(toggledHref('/sealed', '?q=box', false)).toBe('/offline?q=box&sealed=1');
-    expect(toggledHref('/graded', '?q=box', false)).toBe('/offline?q=box');
+    expect(toggledHref('/graded', '?q=box', false)).toBe('/offline?q=box&graded=1');
 });
 
 // --- Storage line sync-status text ---

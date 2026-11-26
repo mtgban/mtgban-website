@@ -7,9 +7,10 @@
 
     function buildOfflineHref(pathname, search) {
         var sealed = pathname === '/sealed';
-        var hasQuery = pathname === '/search' || pathname === '/graded' || sealed;
+        var graded = pathname === '/graded';
+        var hasQuery = pathname === '/search' || graded || sealed;
         var q = hasQuery ? new URLSearchParams(search).get('q') : null;
-        var parts = [q ? 'q=' + encodeURIComponent(q) : '', sealed ? 'sealed=1' : ''].filter(Boolean);
+        var parts = [q ? 'q=' + encodeURIComponent(q) : '', sealed ? 'sealed=1' : '', graded ? 'graded=1' : ''].filter(Boolean);
         return '/offline' + (parts.length ? '?' + parts.join('&') : '');
     }
 

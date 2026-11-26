@@ -23,7 +23,7 @@
         var finish = '';
         if (card.e) finish = '<span class="m-badge etched">Etched</span>';
         else if (card.f) finish = '<span class="m-badge foil">Foil</span>';
-        var nameQuery = '?' + (card.s ? 'sealed=1&' : '') + 'q=' + encodeURIComponent('"' + card.n + '"');
+        var nameQuery = '?' + (card.s ? 'sealed=1&' : '') + 'q=' + encodeURIComponent('"' + card.n + '"') + (ctx.graded ? '&graded=1' : '');
         return '<div class="m-card-header"' +
             ' data-card-id="' + escapeHtml(res.uuid) + '"' +
             ' data-card-name="' + escapeHtml(card.n) + '"' +
