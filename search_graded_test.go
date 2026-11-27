@@ -136,6 +136,35 @@ func TestGradedPage(t *testing.T) {
 		if agent != "" && !strings.Contains(body, `role="region" aria-label="Buyers"`) {
 			t.Errorf("search, %q: the Buyers panel is not named", agent)
 		}
+
+		// The phone's drawer lists the Graded page's own sellers, the slabs' alone.
+		if agent != "" {
+			_, graded, _ := strings.Cut(body, `id="m-set-graded-sellers"`)
+			graded, _, _ = strings.Cut(graded, "m-settings-section")
+			if !strings.Contains(graded, `name="SLABSHOP"`) || strings.Contains(graded, `name="RAWSHOP"`) {
+				t.Errorf("search, %q: the Graded page's sellers are not SLABSHOP alone:\n%s", agent, graded)
+			}
+		}
+	}
+
+	// The Graded page hides the stores its own list names, and search those
+	// of its list: hiding a seller of slabs on one leaves it on the other.
+	for _, tc := range []struct {
+		path, cookie string
+		shown        bool
+	}{
+		{"/graded", "SearchSellersList=SLABSHOP,", true},
+		{"/graded", "SearchGradedSellersList=SLABSHOP,", false},
+		{"/search", "SearchGradedSellersList=SLABSHOP,", true},
+		{"/search", "SearchSellersList=SLABSHOP,", false},
+	} {
+		req := httptest.NewRequest(http.MethodGet, tc.path+"?q="+strings.Join(cards, ","), nil)
+		req.Header.Set("Cookie", tc.cookie)
+		rec := httptest.NewRecorder()
+		testSite.Search(rec, req)
+		if strings.Contains(rec.Body.String(), row("SLABSHOP")) != tc.shown {
+			t.Errorf("%s with %s: SLABSHOP shown %v, want %v", tc.path, tc.cookie, !tc.shown, tc.shown)
+		}
 	}
 }
 
@@ -417,11 +446,19 @@ func TestRandomGradedSearch(t *testing.T) {
 		}
 	}
 
-	// A store the reader hid in their store choices is skipped too.
+	// A store the reader hid from the Graded page is skipped too, and one
+	// hidden from search alone is not.
 	Config().Stores.SearchRetailBlockList = nil
+	req := httptest.NewRequest(http.MethodGet, "/randomgraded", nil)
+	req.Header.Set("Cookie", "SearchSellersList=SLABSHOP,HIDDENSLABS,")
+	rec := httptest.NewRecorder()
+	testSite.RandomGradedSearch(rec, req)
+	if rec.Code != http.StatusFound || !strings.HasPrefix(rec.Header().Get("Location"), "/graded?q=") {
+		t.Fatalf("with both hidden from search, redirect %d to %q", rec.Code, rec.Header().Get("Location"))
+	}
 	for range 30 {
 		req := httptest.NewRequest(http.MethodGet, "/randomgraded", nil)
-		req.Header.Set("Cookie", "SearchSellersList=SLABSHOP,")
+		req.Header.Set("Cookie", "SearchGradedSellersList=SLABSHOP,")
 		rec := httptest.NewRecorder()
 		testSite.RandomGradedSearch(rec, req)
 		want := "/graded?q=" + cards[2]

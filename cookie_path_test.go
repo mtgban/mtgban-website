@@ -17,6 +17,7 @@ func TestCookiePath(t *testing.T) {
 	}{
 		{"SearchSellersList", "/search", "/"},
 		{"SearchVendorsList", "/sealed", "/"},
+		{"SearchGradedSellersList", "/graded", "/"},
 		{"NewspaperList", "/newspaper?page=syp", "/newspaper"},
 		{"BanNewspaperPref", "/newspaper?page=syp", "/newspaper"},
 		{"SleepersEditionList", "/sleepers/bulk", "/sleepers"},

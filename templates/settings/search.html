@@ -31,6 +31,22 @@
     </div>
 </section>
 
+{{$gradedSellers := false}}
+{{range $key := .SellerKeys}}{{if eq (store_section $key $.SealedStores $.GradedStores) "graded"}}{{$gradedSellers = true}}{{end}}{{end}}
+{{if $gradedSellers}}
+<!-- Graded Page Stores - the sellers of slabs the Graded page lists -->
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">        <h3>Graded Page Stores</h3>
+
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">Display the selected stores on the Graded page.</p>
+        {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "Names" $.StoreNames "Sealed" .SealedStores "Graded" .GradedStores "GridId" "settings-graded-sellers" "CookieName" "SearchGradedSellersList" "Section" "graded")}}
+    </div>
+</section>
+{{end}}
+
 <!-- Store adjustments - a discount or a credit value per store -->
 <section class="settings-section expanded">
     <div class="settings-section-header" data-role="section-toggle">        <h3>Store adjustments</h3>

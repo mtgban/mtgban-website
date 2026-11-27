@@ -173,14 +173,15 @@
             };
             // In the background, so the first search doesn't wait on it.
             env.searchState().then(function () { return env.allNames(); }).catch(function () {});
+            var graded = new URLSearchParams(location.search).get('graded') === '1';
             ctx = {
                 sets: dicts.sets,
                 stores: dicts.stores,
-                hiddenSellers: hiddenList('SearchSellersList'),
+                hiddenSellers: hiddenList(graded ? 'SearchGradedSellersList' : 'SearchSellersList'),
                 hiddenVendors: hiddenList('SearchVendorsList'),
                 byStore: getCookie('SearchListingPriority') === 'stores',
                 buylistSecondary: getCookie('SearchBuylistSecondary') || '',
-                graded: new URLSearchParams(location.search).get('graded') === '1'
+                graded: graded
             };
         }
 

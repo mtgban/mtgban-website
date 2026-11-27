@@ -1652,6 +1652,15 @@ func getSearchBlocklists(r *http.Request, sig string) ([]string, []string, bool)
 	return retail, buylist, personalized
 }
 
+// gradedBlocklists is the Graded page's: the signature/config policy with
+// the reader's SearchGradedSellersList, a list of its own, so hiding a seller of
+// slabs from search leaves it on this page.
+func gradedBlocklists(r *http.Request, sig string) ([]string, []string) {
+	retail, buylist := getDefaultBlocklists(sig)
+	retail = appendNonEmptyCSV(retail, readCookie(r, "SearchGradedSellersList"))
+	return retail, buylist
+}
+
 func appendNonEmptyCSV(dst []string, value string) []string {
 	for _, item := range strings.Split(value, ",") {
 		if item != "" {

@@ -36,7 +36,7 @@
     };
     // The other settings a save can change, closed; each is only set or cleared.
     var OTHERS = [
-        'SearchSellersList', 'SearchVendorsList', 'SearchSellersPriority', 'SearchVendorsPriority', 'SearchStoreFactors',
+        'SearchSellersList', 'SearchVendorsList', 'SearchGradedSellersList', 'SearchSellersPriority', 'SearchVendorsPriority', 'SearchStoreFactors',
         'UploadAltPrice', 'UploadCustomBuyer', 'UploadCustomSealedBuyer', 'UploadCustomSinglesFallback', 'UploadCustomSealedFallback',
         'UploadPercSpread', 'UploadPercSpreadMax', 'UploadMinVal', 'UploadMaxVal', 'UploadMargin', 'UploadCustomPercMax',
         'UploadMultiplier', 'UploadMaxQty', 'UploadCustomMinPrice', 'UploadCustomRate', 'UploadCustomRules',
@@ -51,7 +51,7 @@
     var DRAWER = [
         'SearchListingPriority',
         'SearchSealedContents', 'SearchSellersPriority', 'SearchVendorsPriority', 'SearchMiscOpts',
-        'SearchSellersList', 'SearchVendorsList', 'SearchStoreFactors'
+        'SearchSellersList', 'SearchVendorsList', 'SearchGradedSellersList', 'SearchStoreFactors'
     ];
 
     function own(obj, key) { return Object.prototype.hasOwnProperty.call(obj, key); }

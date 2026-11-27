@@ -30,6 +30,7 @@ var settings = []Setting{
 	// Root, preference.
 	{Name: "SearchSellersList", Storage: "cookie", Path: "root", Kind: "list", Class: "preference", Area: "search"},
 	{Name: "SearchVendorsList", Storage: "cookie", Path: "root", Kind: "list", Class: "preference", Area: "search"},
+	{Name: "SearchGradedSellersList", Storage: "cookie", Path: "root", Kind: "list", Class: "preference", Area: "search"},
 	{Name: "SearchDefaultSort", Storage: "cookie", Path: "root", Kind: "enum", Enum: []string{"chrono", "hybrid", "alpha", "number", "retail", "buylist"}, Default: "chrono", Class: "preference", Area: "search", Fact: "search.sort_from", FactValue: "cookie"},
 	{Name: "SearchListingPriority", Storage: "cookie", Path: "root", Kind: "enum", Enum: []string{"stores", "prices", "credit", "market"}, Default: "prices", Class: "preference", Area: "search", Fact: "search.view", FactScope: "SearchListingPriority"},
 	{Name: "SearchSellersPriority", Storage: "cookie", Path: "root", Kind: "blob", Class: "preference", Area: "search"},
