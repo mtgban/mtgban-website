@@ -1,29 +1,28 @@
 {{/*
-    settings-stores-grouped-section - render one half (Singles or Sealed) of a
-    scraper-shorthand list as a settings-grid. Use `Section = "singles"` or
-    `Section = "sealed"`. Sealed is which shorthands trade sealed product,
-    from the page's data. Renders nothing if the selected section is empty.
+    settings-stores-grouped-section - render one section (Singles, Sealed or
+    Graded) of a scraper-shorthand list as a settings-grid. Use `Section =
+    "singles"`, `"sealed"` or `"graded"`. Sealed is which shorthands trade
+    sealed product and Graded which sell slabs, from the page's data.
+    Renders nothing if the selected section is empty.
 
     Expected dot context:
         {
             "Keys":       []string,  // shorthands to render
+            "Names":      map[string]string, // listed names by shorthand
             "Sealed":     map[string]bool, // the sealed ones among them
+            "Graded":     []string,  // the sellers of slabs
             "GridId":     string,    // id prefix; final id is "{GridId}-{Section}"
             "CookieName": string,    // data-skip-cookie="..." for the grid: the cookie of stores to skip
-            "Section":    string,    // "singles" | "sealed"
+            "Section":    string,    // "singles" | "sealed" | "graded"
         }
 */}}
 {{define "settings-stores-grouped-section"}}
 {{$keys := .Keys}}
-{{$wantSealed := eq .Section "sealed"}}
 {{/* Always emit the grid container (even if empty) so multi-column grid layouts
     don't shift cells when one column has no entries for this section. */}}
 <div class="settings-grid" id="{{.GridId}}-{{.Section}}" data-skip-cookie="{{.CookieName}}">
     {{range $key := $keys}}
-        {{if and $wantSealed (index $.Sealed $key)}}
-        <label><input type="checkbox" name="{{$key}}"> {{index $.Names $key}}</label>
-        {{end}}
-        {{if and (not $wantSealed) (not (index $.Sealed $key))}}
+        {{if eq (store_section $key $.Sealed $.Graded) $.Section}}
         <label><input type="checkbox" name="{{$key}}"> {{index $.Names $key}}</label>
         {{end}}
     {{end}}
@@ -33,25 +32,35 @@
 {{/*
     Backwards-compatible single-column rendering used by the arbitrage tabs, which have
     only one list (Vendors) so per-row alignment with another column does not
-    apply. Renders Singles then Sealed stacked in a single subgroup, from the
-    same dot context as the section, less Section.
+    apply. Renders Singles, Sealed then Graded stacked in a single subgroup,
+    from the same dot context as the section, less Section.
 */}}
 {{define "settings-stores-grouped"}}
 <div class="settings-subgroup">
     {{$keys := .Keys}}
     {{$hasSingles := false}}
-    {{range $k := $keys}}{{if not (index $.Sealed $k)}}{{$hasSingles = true}}{{end}}{{end}}
     {{$hasSealed := false}}
-    {{range $k := $keys}}{{if index $.Sealed $k}}{{$hasSealed = true}}{{end}}{{end}}
+    {{$hasGraded := false}}
+    {{range $k := $keys}}
+        {{$section := store_section $k $.Sealed $.Graded}}
+        {{if eq $section "singles"}}{{$hasSingles = true}}{{end}}
+        {{if eq $section "sealed"}}{{$hasSealed = true}}{{end}}
+        {{if eq $section "graded"}}{{$hasGraded = true}}{{end}}
+    {{end}}
 
     {{if $hasSingles}}
     <h5 class="settings-subgroup-label">Singles</h5>
-    {{template "settings-stores-grouped-section" (dict "Keys" $keys "Names" $.Names "Sealed" .Sealed "GridId" .GridId "CookieName" .CookieName "Section" "singles")}}
+    {{template "settings-stores-grouped-section" (dict "Keys" $keys "Names" $.Names "Sealed" .Sealed "Graded" .Graded "GridId" .GridId "CookieName" .CookieName "Section" "singles")}}
     {{end}}
 
     {{if $hasSealed}}
     <h5 class="settings-subgroup-label">Sealed</h5>
-    {{template "settings-stores-grouped-section" (dict "Keys" $keys "Names" $.Names "Sealed" .Sealed "GridId" .GridId "CookieName" .CookieName "Section" "sealed")}}
+    {{template "settings-stores-grouped-section" (dict "Keys" $keys "Names" $.Names "Sealed" .Sealed "Graded" .Graded "GridId" .GridId "CookieName" .CookieName "Section" "sealed")}}
+    {{end}}
+
+    {{if $hasGraded}}
+    <h5 class="settings-subgroup-label">Graded</h5>
+    {{template "settings-stores-grouped-section" (dict "Keys" $keys "Names" $.Names "Sealed" .Sealed "Graded" .Graded "GridId" .GridId "CookieName" .CookieName "Section" "graded")}}
     {{end}}
 </div>
 {{end}}

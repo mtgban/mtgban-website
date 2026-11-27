@@ -12,12 +12,21 @@
             <h4 class="settings-stores-col-label">Buylist</h4>
 
             <h5 class="settings-stores-row-label">Singles</h5>
-            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "Names" $.StoreNames "Sealed" .SealedStores "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "singles")}}
-            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "Names" $.StoreNames "Sealed" .SealedStores "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "singles")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "Names" $.StoreNames "Sealed" .SealedStores "Graded" .GradedStores "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "singles")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "Names" $.StoreNames "Sealed" .SealedStores "Graded" .GradedStores "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "singles")}}
 
             <h5 class="settings-stores-row-label">Sealed</h5>
-            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "Names" $.StoreNames "Sealed" .SealedStores "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "sealed")}}
-            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "Names" $.StoreNames "Sealed" .SealedStores "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "sealed")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "Names" $.StoreNames "Sealed" .SealedStores "Graded" .GradedStores "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "sealed")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "Names" $.StoreNames "Sealed" .SealedStores "Graded" .GradedStores "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "sealed")}}
+
+            {{$hasGraded := false}}
+            {{range $key := .SellerKeys}}{{if eq (store_section $key $.SealedStores $.GradedStores) "graded"}}{{$hasGraded = true}}{{end}}{{end}}
+            {{range $key := .VendorKeys}}{{if eq (store_section $key $.SealedStores $.GradedStores) "graded"}}{{$hasGraded = true}}{{end}}{{end}}
+            {{if $hasGraded}}
+            <h5 class="settings-stores-row-label">Graded</h5>
+            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "Names" $.StoreNames "Sealed" .SealedStores "Graded" .GradedStores "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "graded")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "Names" $.StoreNames "Sealed" .SealedStores "Graded" .GradedStores "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "graded")}}
+            {{end}}
         </div>
     </div>
 </section>

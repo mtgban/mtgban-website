@@ -211,8 +211,10 @@ type settingsModalVars struct {
 	// StoreFactorOptions is the search tab's store-factor editor data
 	StoreNames         map[string]string
 	StoreFactorOptions string
-	// Which of SellerKeys and VendorKeys trade sealed product
+	// Which of SellerKeys and VendorKeys trade sealed product, and which
+	// sell slabs
 	SealedStores  map[string]bool
+	GradedStores  []string
 	ListingLocked bool
 
 	// upload
@@ -284,6 +286,7 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 	}
 	v.SellerKeys, v.VendorKeys = searchSettingsKeys(p)
 	v.SealedStores = p.sealedStores()
+	v.GradedStores = gradedStores(p)
 	v.StoreNames = p.storeNames()
 	v.StoreFactorOptions = storeFactorOptions(p, v.SellerKeys, v.VendorKeys)
 
