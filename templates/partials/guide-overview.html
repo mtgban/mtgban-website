@@ -26,6 +26,8 @@
 <p>The main search page is the entry point for finding prices across every tracked store and vendor. It handles both single cards and sealed products, and accepts the full filter syntax documented in the Syntax tab.</p>
 <p><strong>Results layout:</strong> retail prices and buylist offers are split into separate tables. Each card has condition breakdowns (NM/SP/MP/HP/PO), and index prices from aggregators like TCGplayer Market, TCG Low, and Card Kingdom appear alongside individual vendor prices for reference.</p>
 <p><strong>Graded page:</strong> where a store sells graded cards (slabs), the Graded tab lists them by grade, such as PSA 10 or CGC 10 Pristine. Its <em>Last Sold</em> column shows what those grades sold for on eBay and Fanatics Collect, newest first. Their Sales Velocity is in the sidebar beside the card, or above the sales on a narrow screen. A price is what the marketplace reports: Fanatics auctions include its 20% buyer's premium, eBay leaves out shipping, and an eBay sale marked <em>offer</em> shows the asking price, since eBay does not publish the accepted offer.</p>
+<p><strong>Recent sales:</strong> on tiers with sales, the Buyers column has a <em>Buylist</em> / <em>Sales</em> switch, and the choice is remembered. <em>Sales</em> lists each condition's five newest TCGplayer orders, with the rest folded under <em>more</em> and the condition's average in its header; sealed products have theirs too. Where the results are wide enough, Sales is a third column beside Sellers and Buyers instead.</p>
+<p><strong>On a phone:</strong> results are Cards, one card at a time. Swipe up and down to move between cards, right for the card's sellers and left for its buyers, with its recent sales beside the buyers. The prices at the picture's edges open the same lists with a tap, and the search bar sits at the bottom of the screen.</p>
 <p><strong>Per-card actions:</strong></p>
 <ul>
     <li><strong>📊 chart icon</strong> - opens historical price data from major vendors</li>
@@ -118,6 +120,7 @@
 
 <template data-section="feature-arbitrage">
 <p>Arbitrage identifies cards where a meaningful gap exists between a vendor's retail price and another vendor's buylist offer - i.e. potential flip opportunities. The same filter bar as Global narrows the results, and the <code>&gt;arbit + Tab</code> palette menu opens the page in any sort order.</p>
+<p><strong>Median Sales:</strong> on tiers with sales, a last section compares each store's price with the median of the card's recent TCGplayer sales in the same condition: from 5 to 20 orders in the last 90 days, before fees and shipping. No store buys at that price; it is what copies have recently sold for.</p>
 <p>See also the <strong>Reverse</strong> page (buylists paying more than retail) and the <strong>Global</strong> page (cross-store comparison at the index level), which are part of the same toolkit.</p>
 </template>
 
@@ -150,7 +153,8 @@
 <p>A handful of features that are easy to miss:</p>
 <p><strong>Historical data:</strong> Click the 📊 chart icon on any card to view price history from major vendors.</p>
 <p><strong>Reprint finder:</strong> Click 📖 on a card to see every product containing any reprint of that card. Source products are also accessible via "Found in * products" links.</p>
-<p><strong>Backpack shortcut:</strong> On a search page, <kbd>Ctrl+B</kbd> / <kbd>Cmd+B</kbd> adds a copy of the card shown in the sidebar to your backpack, and <kbd>Alt+B</kbd> / <kbd>Option+B</kbd> takes one out.</p>
+<p><strong>Backpack:</strong> On a search page, <kbd>Ctrl+B</kbd> / <kbd>Cmd+B</kbd> adds a copy of the card shown in the sidebar to your backpack, and <kbd>Alt+B</kbd> / <kbd>Option+B</kbd> takes one out. Each card can carry the price you paid: click <em>Paid</em> under its grade and count to set it. Cards added from Upload take the price they were loaded at, and a backpack sent to Upload is compared against those prices.</p>
+<p><strong>Type to search:</strong> With no field selected, typing or pasting (<kbd>Ctrl+V</kbd> / <kbd>Cmd+V</kbd>) goes straight into the search box, replacing the old query.</p>
 <p><strong>Choosing stores:</strong> In Settings &rarr; Search &rarr; <em>Stores</em>, a tick means the store shows in your results; untick the ones to leave out. Stores added later show by default.</p>
 <p><strong>Flavor names:</strong> Searching a flavor name returns only those specific art versions (unless disabled in preferences). This does not work for complex multi-filter queries.</p>
 <p><strong>Feedback:</strong> Report issues in the #feedback channel on the BAN Discord with a URL or screenshot. Some errors originate from upstream providers.</p>
