@@ -481,9 +481,10 @@ body.mobile .backpack-row-where { display: inline; }
 body.mobile .backpack-row-finish { margin-left: 0.4em; }
 
 /* the price paid ends the controls' line, its field filling what is left,
-   beside a grade sized for its two letters; a narrower phone wraps it */
+   beside a grade sized for its two letters and Safari's arrow; a
+   narrower phone wraps it */
 body.mobile .backpack-row-ctl { display: flex; flex-wrap: wrap; row-gap: 0.4em; }
-body.mobile .backpack-cond { width: 3.5em; }
+body.mobile .backpack-cond { width: 4em; }
 body.mobile .backpack-row-ctl .backpack-row-paid { margin-left: auto; white-space: nowrap; }
 body.mobile .backpack-row-ctl .backpack-paid-edit { flex: 1; }
 body.mobile .backpack-row-ctl .backpack-paid-word { display: none; }
