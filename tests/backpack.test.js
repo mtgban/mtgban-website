@@ -2829,3 +2829,14 @@ describe('closing the panel', () => {
         expect(p.nav.attrs['aria-expanded']).toBe('false');
     });
 });
+
+test('where the rows reach the edge, a row grade list hangs back from it', () => {
+    // From the button's centre rightwards it runs 30px past a 744 iPad mini.
+    // The override follows the rule it overrides, which would win a tie;
+    // hung from the right, the list sizes to the button unless told not to.
+    const css = readFileSync(new URL('../css/search.css', import.meta.url), 'utf8');
+    const base = css.indexOf('.result-quick-icons .pack-wrap > .pack-grades {\n    display: none;');
+    const narrow = css.slice(base).match(/@media \(max-width: 768px\) \{\s*\.result-quick-icons \.pack-wrap > \.pack-grades \{ left: auto; right: 0; margin-left: 0; width: max-content; \}/);
+    expect(base).toBeGreaterThan(-1);
+    expect(narrow).not.toBeNull();
+});
