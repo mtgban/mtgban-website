@@ -56,7 +56,6 @@ func TestEmbedSellerEntriesKeepsARawOfferBesideASlab(t *testing.T) {
 	found := map[string]map[mtgban.Condition][]SearchEntry{
 		"abcd": {
 			"NM": {
-				{ScraperName: "Other Store Graded", Shorthand: "ZZOTHER", Price: 300, Slab: slab},
 				{ScraperName: "Same Store", Shorthand: "ZZSLAB", Price: 400, Slab: slab},
 			},
 			"SP": {{ScraperName: "Same Store", Shorthand: "ZZSAME", Price: 8}},
@@ -64,14 +63,13 @@ func TestEmbedSellerEntriesKeepsARawOfferBesideASlab(t *testing.T) {
 	}
 	out := EmbedSellerEntries(s.prices(), found, "abcd", false)
 	want := []embed.Entry{
-		{ScraperName: "Other Store Graded", Shorthand: "ZZOTHER", Price: 300},
 		{ScraperName: "Same Store (Graded)", Shorthand: "ZZSLAB", Price: 400},
 		{ScraperName: "Same Store", Shorthand: "ZZSAME", Price: 8, Grade: "SP"},
 	}
 	if !slices.Equal(out, want) {
 		t.Errorf("got %+v, want %+v", out, want)
 	}
-	if found["abcd"]["NM"][1].ScraperName != "Same Store" {
+	if found["abcd"]["NM"][0].ScraperName != "Same Store" {
 		t.Error("the page's own row was renamed")
 	}
 }

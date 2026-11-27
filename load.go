@@ -226,10 +226,9 @@ func (p *prices) listedName(shorthand string) string {
 	return gradedName(info, p.scraperName(shorthand))
 }
 
-// gradedName is a store's name, marked where it sells slabs under a name that
-// does not say so.
+// gradedName is a store's name, marked where it sells slabs.
 func gradedName(info mtgban.ScraperInfo, name string) string {
-	if info.GradedMode && !strings.HasSuffix(name, "Graded") {
+	if info.GradedMode {
 		return name + " (Graded)"
 	}
 	return name
