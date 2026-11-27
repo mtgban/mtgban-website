@@ -45,9 +45,10 @@ func (p *prices) hasGradedStores() bool {
 }
 
 // gradedSearch makes a search the Graded page's: of slabs alone, which no
-// store has a buylist for.
+// store has a buylist for. It replaces a not:graded asked before it.
 func gradedSearch(config *SearchConfig) {
 	config.GradedOnly = true
+	config.SkipGraded = false
 	config.SkipBuylist = true
 }
 

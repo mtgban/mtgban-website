@@ -89,6 +89,8 @@ type SearchConfig struct {
 
 	// Search the sellers of slabs alone, and list only the cards they offer
 	GradedOnly bool
+	// Leave out the sellers of slabs
+	SkipGraded bool
 	// GradedSales keeps a card GradedOnly would leave out where a slab of it
 	// sold; nil for a reader who may not see the slabs' sales
 	GradedSales *salesvelocity.GradedSnapshot
@@ -1583,10 +1585,16 @@ func parseSearchOptionsDepth(b *matcher.Backend, p *prices, numbers *numbersSnap
 				continue
 			}
 			values := strings.Split(strings.ToLower(code), ",")
-			// is:graded is the Graded page's search, of graded stores alone;
-			// no card property answers it.
-			if !negate && slices.Contains(values, "graded") {
-				gradedSearch(&config)
+			// is:graded is the Graded page's search, of graded stores alone,
+			// and not:graded leaves them out; the last one asked wins, and no
+			// card property answers either.
+			if slices.Contains(values, "graded") {
+				if negate {
+					config.SkipGraded = true
+					config.GradedOnly = false
+				} else {
+					gradedSearch(&config)
+				}
 				values = slices.DeleteFunc(values, func(value string) bool { return value == "graded" })
 				if len(values) == 0 {
 					continue

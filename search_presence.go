@@ -57,6 +57,9 @@ func newPostStores(b *matcher.Backend, p *prices, r *http.Request, cardIDs []str
 			if config.GradedOnly && !seller.Info().GradedMode {
 				continue
 			}
+			if config.SkipGraded && seller.Info().GradedMode {
+				continue
+			}
 			store := &postSeller{info: seller.Info(), inventory: seller.Inventory()}
 			s.sellers[strings.ToLower(store.info.Shorthand)] = store
 			// An index lists everything under INDEX, which is no offer

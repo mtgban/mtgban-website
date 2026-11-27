@@ -170,7 +170,7 @@ func TestGradedPage(t *testing.T) {
 
 // is:graded on the search page hands the search to the Graded page, query
 // and pinned bar intact, which keeps the graded stores alone; not:graded
-// leaves the search as it was.
+// stays on the search page without them.
 func TestSearchIsGraded(t *testing.T) {
 	skipWithoutDatastore(t)
 	withSigMode(t, true, false)
@@ -225,7 +225,10 @@ func TestSearchIsGraded(t *testing.T) {
 	}{
 		{"is:graded", "", slabsOnly, []string{row("RAWSHOP"), row("BUYSHOP")}},
 		{"", "is:graded", slabsOnly, []string{row("RAWSHOP"), row("BUYSHOP")}},
-		{"not:graded", "", []string{row("RAWSHOP"), row("SLABSHOP"), row("BUYSHOP")}, []string{"Last Sold"}},
+		{"not:graded", "", []string{row("RAWSHOP"), row("BUYSHOP")}, []string{row("SLABSHOP"), "Last Sold"}},
+		{"", "not:graded", []string{row("RAWSHOP"), row("BUYSHOP")}, []string{row("SLABSHOP"), "Last Sold"}},
+		{"is:graded", "not:graded", slabsOnly, []string{row("RAWSHOP"), row("BUYSHOP")}},
+		{"not:graded", "is:graded", []string{row("RAWSHOP"), row("BUYSHOP")}, []string{row("SLABSHOP"), "Last Sold"}},
 	} {
 		body := serve(tc.filter, tc.scope)
 		for _, want := range tc.shown {
@@ -239,6 +242,21 @@ func TestSearchIsGraded(t *testing.T) {
 			}
 		}
 	}
+
+	// On the Graded page a typed not:graded goes back to the search page,
+	// while a pinned one gives way to the page.
+	query := "q=" + url.QueryEscape(name+" not:graded")
+	rec := httptest.NewRecorder()
+	testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/graded?"+query, nil))
+	if where := rec.Header().Get("Location"); rec.Code != http.StatusFound || where != "/search?"+query {
+		t.Errorf("not:graded on the Graded page: %d to %q", rec.Code, where)
+	}
+	query = "q=" + url.QueryEscape(name) + "&scope=" + url.QueryEscape("not:graded")
+	rec = httptest.NewRecorder()
+	testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/graded?"+query, nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), row("SLABSHOP")) {
+		t.Errorf("pinned not:graded on the Graded page: %d, SLABSHOP missing", rec.Code)
+	}
 }
 
 // is:graded is a search of graded stores, never a card property, so beside
@@ -248,12 +266,14 @@ func TestParseIsGraded(t *testing.T) {
 	for _, tc := range []struct {
 		query  string
 		graded bool
+		skip   bool
 		is     []string
 	}{
-		{"pikachu is:graded", true, nil},
-		{"pikachu is:foil,graded", true, []string{"foil"}},
-		{"pikachu not:graded", false, []string{"graded"}},
-		{"pikachu is:foil", false, []string{"foil"}},
+		{"pikachu is:graded", true, false, nil},
+		{"pikachu is:foil,graded", true, false, []string{"foil"}},
+		{"pikachu not:graded", false, true, nil},
+		{"pikachu not:graded is:graded", true, false, nil},
+		{"pikachu is:foil", false, false, []string{"foil"}},
 	} {
 		config := parseSearchOptionsNG(b, currentPrices(), tc.query, nil, nil, nil)
 		var is []string
@@ -262,9 +282,9 @@ func TestParseIsGraded(t *testing.T) {
 				is = append(is, filter.Values...)
 			}
 		}
-		if config.GradedOnly != tc.graded || config.SkipBuylist != tc.graded || !slices.Equal(is, tc.is) || config.CleanQuery != "pikachu" {
-			t.Errorf("%q: graded %v, skip buylist %v, is %v, query %q; want graded %v, is %v, query pikachu",
-				tc.query, config.GradedOnly, config.SkipBuylist, is, config.CleanQuery, tc.graded, tc.is)
+		if config.GradedOnly != tc.graded || config.SkipBuylist != tc.graded || config.SkipGraded != tc.skip || !slices.Equal(is, tc.is) || config.CleanQuery != "pikachu" {
+			t.Errorf("%q: graded %v, skip buylist %v, skip graded %v, is %v, query %q; want graded %v, skip graded %v, is %v, query pikachu",
+				tc.query, config.GradedOnly, config.SkipBuylist, config.SkipGraded, is, config.CleanQuery, tc.graded, tc.skip, tc.is)
 		}
 	}
 }
