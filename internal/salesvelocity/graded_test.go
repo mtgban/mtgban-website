@@ -284,7 +284,7 @@ func TestGradeSalesGroup(t *testing.T) {
 		t.Errorf("shown %d, more %d; want %d, 2", len(group.Shown), len(group.More), RecentShown)
 	}
 	ebay, fanatics, offer := group.Shown[0], group.Shown[1], group.Shown[2]
-	if ebay.Source != "eBay" || ebay.Link != "https://www.ebay.com/itm/357409617632" || ebay.Price != "515.00" || ebay.Date != "2026-11-26" {
+	if ebay.Source != "eBay" || ebay.Link != "https://www.ebay.com/itm/357409617632?nordt=true" || ebay.Price != "515.00" || ebay.Date != "2026-11-26" {
 		t.Errorf("eBay line %+v", ebay)
 	}
 	if fanatics.Source != "Fanatics" || fanatics.Link != "https://sales-history.fanaticscollect.com/items/WEEKLY5559473" {
