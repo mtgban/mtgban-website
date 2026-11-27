@@ -327,7 +327,7 @@ func TestGradedPageLastSold(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		"<span>PSA 9</span><span class=\"sales-avg\">avg <b>$ 515.00</b>",
-		`href="https://www.ebay.com/itm/111"`,
+		`href="https://www.ebay.com/itm/111?nordt=true"`,
 		`data-track="ui.graded.sale" data-track-value="eBay"`,
 		`data-track="ui.graded.sale" data-track-value="Fanatics"`,
 		`<span class="sales-qty">offer</span>`,

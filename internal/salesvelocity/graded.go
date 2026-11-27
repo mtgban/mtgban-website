@@ -655,7 +655,9 @@ func gradedLine(sale GradedSale) Line {
 		Time:   at.Format("2006-01-02 15:04 UTC"),
 		Source: "eBay",
 		Price:  centsText(uint64(sale.Cents)),
-		Link:   "https://www.ebay.com/itm/" + sale.ListingID,
+		// nordt keeps eBay on the sold item rather than redirecting an
+		// ended listing to similar live ones.
+		Link: "https://www.ebay.com/itm/" + sale.ListingID + "?nordt=true",
 	}
 	if sale.Fanatics {
 		line.Source = "Fanatics"
