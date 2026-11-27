@@ -87,8 +87,8 @@ var (
 )
 
 // timeshifted are the sets whose cards carry the purple timeshifted symbol,
-// which every rare and mythic row refuses, foil or not. The datastore has no
-// flag for it; TSR's are only its retro-frame cards.
+// which the nonfoil rare and mythic rows refuse; a foil keeps its foil row.
+// The datastore has no flag for it; TSR's are only its retro-frame cards.
 var timeshifted = []string{"TSB", "H1R", "H2R", "TSR"}
 
 // organizedPlay are the Pokemon sets the notes keep off the shelf: "Exclude
@@ -186,7 +186,7 @@ func (r *Rates) magic(co *matcher.CardObject) (Tier, bool) {
 	}
 
 	timeshift := slices.Contains(timeshifted, co.SetCode) && (co.SetCode != "TSR" || co.FrameVersion == "1997")
-	if timeshift && (co.Rarity == "rare" || co.Rarity == "mythic") {
+	if timeshift && !co.Foil && !co.Etched && (co.Rarity == "rare" || co.Rarity == "mythic") {
 		return Tier{}, false
 	}
 
