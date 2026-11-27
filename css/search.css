@@ -2091,6 +2091,11 @@ body.modal-embed .cp-overlay {
     display: block;
 }
 
+/* where the rows reach the edge, the list hangs back from it */
+@media (max-width: 768px) {
+    .result-quick-icons .pack-wrap > .pack-grades { left: auto; right: 0; margin-left: 0; width: max-content; }
+}
+
 .result-quick-icons .pack-grade {
     display: grid;
     grid-template-columns: 22px 34px 22px;
