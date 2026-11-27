@@ -1984,12 +1984,14 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
         z-index: 110;
     }
 
-    /* Show filter button only when filter overlay exists on page */
+    /* Show filter button only when filter overlay exists on page; on the
+       sealed landing it opens the category jump, the hidden bar's button */
     .m-nav-filter-btn {
         display: none;
     }
 
-    body:has(#m-filter-overlay) .m-nav-filter-btn {
+    body:has(#m-filter-overlay) .m-nav-filter-btn,
+    body:has(#m-sealed-cat-overlay) .m-nav-filter-btn {
         display: flex;
     }
 
