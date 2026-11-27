@@ -939,7 +939,7 @@ window.__BAN_GUIDE = {
             icon: 'search',
             summary: 'Search prices across all stores for singles and sealed; historical charts, condition breakdowns, reprint finder.',
             snippets: [],
-            keywords: ['search', 'price', 'retail', 'buylist', 'chart', 'history', 'affiliate', 'store', 'sealed', 'product', 'condition', 'index', 'reprint', 'finder'],
+            keywords: ['search', 'price', 'retail', 'buylist', 'chart', 'history', 'affiliate', 'store', 'sealed', 'product', 'condition', 'index', 'reprint', 'finder', 'sales', 'recent sales', 'orders', 'phone', 'mobile', 'cards', 'swipe'],
             content: {
                 table: [],
                 examples: [
@@ -1126,7 +1126,7 @@ window.__BAN_GUIDE = {
             icon: 'trending-up',
             summary: 'Per-vendor retail-to-buylist gaps; flip opportunities filtered by condition, finish, and rarity.',
             snippets: [],
-            keywords: ['arbitrage', 'arb', 'gap', 'price difference', 'retail', 'buylist', 'profit', 'flip', 'condition', 'foil', 'rarity', 'filter', 'admin'],
+            keywords: ['arbitrage', 'arb', 'gap', 'price difference', 'retail', 'buylist', 'profit', 'flip', 'condition', 'foil', 'rarity', 'filter', 'admin', 'median', 'median sales', 'sales'],
             content: {
                 table: [],
                 examples: [
@@ -1197,9 +1197,9 @@ window.__BAN_GUIDE = {
             category: 'Tips & Tricks',
             title: 'Power Features',
             icon: 'zap',
-            summary: 'Historical charts, reprint finder, the backpack shortcut, choosing stores, flavor name search, and where to report issues.',
+            summary: 'Historical charts, reprint finder, the backpack and its prices paid, typing or pasting to search, choosing stores, flavor name search, and where to report issues.',
             snippets: [],
-            keywords: ['tips', 'tricks', 'power user', 'history', 'chart', 'historical', 'reprint', 'finder', 'flavor name', 'feedback', 'discord', '📊', '📖', 'icon', 'backpack', 'ctrl b', 'cmd b', 'shortcut', 'stores', 'settings', 'tick', 'hide store'],
+            keywords: ['tips', 'tricks', 'power user', 'history', 'chart', 'historical', 'reprint', 'finder', 'flavor name', 'feedback', 'discord', '📊', '📖', 'icon', 'backpack', 'ctrl b', 'cmd b', 'shortcut', 'stores', 'settings', 'tick', 'hide store', 'price paid', 'paid', 'paste', 'type to search'],
             content: {
                 table: [],
                 examples: [
