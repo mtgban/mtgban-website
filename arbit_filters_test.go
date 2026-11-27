@@ -336,7 +336,7 @@ func TestArbitRowFilter(t *testing.T) {
 }
 
 // TestArbitMinProfitAsShown holds the profit minimum to the value the table
-// prints: a trade scoring 0.18988 shows as 0.19, so a minimum of 0.19 keeps
+// prints: a trade scoring 0.18985 shows as 0.19, so a minimum of 0.19 keeps
 // it, run through the engine and the row filter as the page runs it.
 func TestArbitMinProfitAsShown(t *testing.T) {
 	b := &matcher.Backend{UUIDs: map[string]*matcher.CardObject{
@@ -346,7 +346,7 @@ func TestArbitMinProfitAsShown(t *testing.T) {
 		"card": {{Conditions: "NM", BuyPrice: 0.98, Quantity: 5}},
 	}, mtgban.ScraperInfo{Name: "vendor"})
 	seller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
-		"card": {{Conditions: "NM", Price: 0.8492, Quantity: 3}},
+		"card": {{Conditions: "NM", Price: 0.8124, Quantity: 1}},
 	}, mtgban.ScraperInfo{Name: "seller"})
 	for _, tt := range []struct {
 		query string
