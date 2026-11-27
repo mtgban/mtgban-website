@@ -76,4 +76,3 @@ mobile drawer does the same, with a second request to `/data/chart`.
   979MB. Nothing reads or writes `product_prices`, and the non-Magic ones are no
   longer written by the tcgcsv ingest; they are dropped in Phase A's last
   step.
-- The app is in NYC1 and the databases in SFO3: `deploy/REGION-MOVE.md`.
