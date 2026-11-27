@@ -11,21 +11,25 @@
     }
 
     // The banner's line: when prices were last refreshed, marked stale past
-    // STALE_MS.
-    function refreshText(iso, nowMs) {
+    // STALE_MS, or, with the subscription lapsed, why they stopped.
+    function refreshText(iso, nowMs, lapsed) {
         var t = parse(iso);
-        if (isNaN(t)) return 'Offline prices have not been refreshed on this device yet.';
-        var stale = nowMs - t > STALE_MS ? ' (stale)' : '';
-        return 'Offline prices last refreshed at ' + new Date(t).toLocaleString() + stale + '.';
+        if (isNaN(t)) {
+            if (lapsed) return 'Subscription lapsed: prices have not been refreshed on this device yet, syncing paused.';
+            return 'Offline prices have not been refreshed on this device yet.';
+        }
+        var when = new Date(t).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+        if (lapsed) return 'Subscription lapsed: prices from ' + when + ', syncing paused.';
+        return 'Offline prices from ' + when + (nowMs - t > STALE_MS ? ' (stale).' : '.');
     }
 
     // The banner's whole line. left is the sets a first sync has yet to
     // download, as far as this tab knows; missing is what the last sync left out.
-    function bannerText(iso, nowMs, left, missing) {
+    function bannerText(iso, nowMs, left, missing, lapsed) {
         if (isNaN(parse(iso)) && left > 0) {
             return 'Prices are still downloading (' + left + (left === 1 ? ' set' : ' sets') + ' left). Some cards might be missing.';
         }
-        var text = refreshText(iso, nowMs);
+        var text = refreshText(iso, nowMs, lapsed);
         if (missing > 0) {
             text += '\n' + (missing === 1 ? 'There is 1 set that needs' : 'There are ' + missing + ' sets that need') +
                 ' to resync, a few results will be unavailable.';

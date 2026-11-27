@@ -48,7 +48,6 @@
 /* Offline banner: data age, auth notice, back-online affordance */
 .offline-banner {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: 0.75em;
     padding: 0.55em var(--page-gutter, 3vw);
@@ -74,11 +73,13 @@
     border-radius: 50%;
     background: var(--orange, orange);
 }
-/* A warning takes a line of its own, and wraps beside the dot, not under it */
+/* One line between the dot and the exit, scrolled sideways where it is
+   longer; a warning takes a line of its own */
 #offline-banner-age {
     flex: 1 1 0;
-    min-width: 12em;
-    white-space: pre-line;
+    min-width: 0;
+    overflow-x: auto;
+    white-space: pre;
 }
 .offline-banner.offline-banner-stale {
     background: #7c2d12;
@@ -91,11 +92,10 @@
 .offline-banner-stale .offline-banner-dot {
     background: var(--red, red);
 }
-.offline-banner-auth {
-    font-weight: 600;
-}
 .offline-banner-back {
+    flex: none;
     margin-left: auto;
+    white-space: nowrap;
     padding: 0.3em 0.9em;
     border-radius: 1em;
     background: #22c55e;
@@ -153,8 +153,8 @@
     font-size: 0.8em;
 }
 
-.m-offline #offline-banner-age {
-    min-width: 8em;
+.m-offline .offline-banner-back {
+    padding: 0.2em 0.7em;
 }
 
 /* The phone's page is the search's Cards (search-cards-mobile.css), under the
