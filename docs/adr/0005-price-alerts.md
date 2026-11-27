@@ -94,9 +94,10 @@ each for all of them.
 - An alert on a card with widely spread prices does not fire on the
   outliers. A user who wants one store's price watches that store alone.
 - A parked alert shows Parked and comes back by itself once there is room;
-  only a paused, undeliverable or unresolvable alert offers Resume, and an
-  unresolvable one is parked again, silently, while its card is still
-  missing. The run that parks a
+  only a paused, undeliverable or unresolvable alert offers Resume. A run
+  whose datastore lacks an alert's card skips the alert and leaves it
+  active, so a short datastore costs a run, not the alert. The run that
+  parks a
   user's alerts sends them one notice saying which and why: no sign-in for
   a month, a tier without alerts or without their channel, or the
   allowance. It is a Discord DM when they have Discord, else a mail to

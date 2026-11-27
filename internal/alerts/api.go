@@ -580,7 +580,7 @@ func (a *API) patch(w http.ResponseWriter, r *http.Request, c Caller, id int64) 
 		// What the page offers: pause on an active alert, resume on a paused,
 		// undeliverable or unresolvable one. An alert over its allowance comes
 		// back by itself; resumed, the next run would park it again and DM
-		// about it each time. An unresolvable one is parked again silently.
+		// about it each time.
 		pausing := req.Status == StatusPaused && cur.Status == StatusActive
 		resuming := req.Status == StatusActive &&
 			(cur.Status == StatusPaused || cur.Status == StatusUndeliverable || cur.Status == StatusUnresolvable)

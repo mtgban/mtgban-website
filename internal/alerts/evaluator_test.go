@@ -465,8 +465,9 @@ func TestRunAlertEvaluationSkipsUnlinkedAndUnresolvable(t *testing.T) {
 	if len(dd.sent) != 0 || len(store.claims) != 0 {
 		t.Fatalf("sent to an unlinked user: %v claims=%v", dd.sent, store.claims)
 	}
-	if store.states[8].Status != StatusUnresolvable {
-		t.Fatalf("gone card state = %+v", store.states[8])
+	_, wrote := store.states[8]
+	if wrote || store.status[8] != StatusActive {
+		t.Fatalf("gone card parked: state=%+v status=%v", store.states[8], store.status[8])
 	}
 	st, ok := store.states[7]
 	if !ok || st.Status != StatusUndeliverable {
