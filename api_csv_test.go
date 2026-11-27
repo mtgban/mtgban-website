@@ -296,6 +296,32 @@ func TestTCGCSVSealedConditions(t *testing.T) {
 	}
 }
 
+// The Condition column names the printing as TCGplayer does, so a
+// non-Magic holofoil or edition row matches its sku.
+func TestTCGCSVConditionNamesThePrinting(t *testing.T) {
+	for _, c := range []struct {
+		finish               string
+		foil, etched, sealed bool
+		cond                 mtgban.Condition
+		want                 string
+	}{
+		{"nonfoil", false, false, false, mtgban.NM, "Near Mint"},
+		{"foil", true, false, false, mtgban.NM, "Near Mint Foil"},
+		{"etched", false, true, false, mtgban.SP, "Lightly Played Foil"},
+		{"reverseholofoil", true, false, false, mtgban.NM, "Near Mint Reverse Holofoil"},
+		{"1steditionholofoil", true, false, false, mtgban.NM, "Near Mint 1st Edition Holofoil"},
+		{"1stedition", false, false, false, mtgban.SP, "Lightly Played 1st Edition"},
+		{"coldfoil", true, false, false, mtgban.NM, "Near Mint Cold Foil"},
+		{"nonfoil", false, false, true, mtgban.NM, "Unopened"},
+	} {
+		co := &matcher.CardObject{}
+		co.Finish, co.Foil, co.Etched, co.Sealed = c.finish, c.foil, c.etched, c.sealed
+		if got := tcgCSVCondition(co, c.cond); got != c.want {
+			t.Errorf("%s %s (sealed %v) = %q, want %q", c.cond, c.finish, c.sealed, got, c.want)
+		}
+	}
+}
+
 // The TCGplayer export lists a row at the first price loaded for its card
 // and condition, in both price columns, and at the market price where none
 // finite and above zero was, leaving My Store Price blank.

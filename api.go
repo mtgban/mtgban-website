@@ -358,16 +358,6 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 			}
 		}
 
-		var condLong string
-		if co.Sealed {
-			condLong = "Unopened"
-		} else {
-			condLong = tcgConditionMap[cond]
-			if co.Foil || co.Etched {
-				condLong += " Foil"
-			}
-		}
-
 		tcgEntry := tcgProducts[findTCGproductID(b, p, id)]
 
 		record := make([]string, 0, len(tcgcsvHeader))
@@ -378,7 +368,7 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 		record = append(record, "")
 		record = append(record, tcgEntry.Number)
 		record = append(record, tcgEntry.Rarity)
-		record = append(record, condLong)
+		record = append(record, tcgCSVCondition(co, cond))
 		for _, price := range prices {
 			record = append(record, fmt.Sprintf("%0.2f", price))
 		}
@@ -405,6 +395,19 @@ func UUID2TCGCSV(b *matcher.Backend, p *prices, w *csv.Writer, ids, qtys, conds 
 	}
 	w.Flush()
 	return w.Error()
+}
+
+// tcgCSVCondition is the Condition column TCGplayer imports: the condition
+// and the printing, which the plain "Normal" leaves off.
+func tcgCSVCondition(co *matcher.CardObject, cond mtgban.Condition) string {
+	if co.Sealed {
+		return "Unopened"
+	}
+	printing := salesPrinting(co)
+	if printing == "" || printing == "Normal" {
+		return tcgConditionMap[cond]
+	}
+	return tcgConditionMap[cond] + " " + printing
 }
 
 // MKMHandler serves a card's sealed product decklist as a Cardmarket CSV.
