@@ -42,7 +42,6 @@ function makeHarness(meta = {}, location = { pathname: '/offline', search: '' })
     const els = {
         'offline-banner': makeEl(),
         'offline-banner-age': makeEl(),
-        'offline-banner-auth': makeEl(),
         'offline-banner-back': makeEl(),
         'offline-settings-link': makeEl(),
     };
@@ -131,6 +130,13 @@ test('a sync that left sets out says so and raises the warning colour', async ()
     const h = makeHarness({ lastSync: REFRESHED, missingSets: 3 });
     await h.flush();
     expect(h.els['offline-banner-age'].textContent).toContain('\nThere are 3 sets that need to resync, a few results will be unavailable.');
+    expect(h.els['offline-banner'].classList.names.has('offline-banner-stale')).toBe(true);
+});
+
+test('a lapsed subscription joins the refresh time on its one line', async () => {
+    const h = makeHarness({ lastSync: REFRESHED, authLapsed: true });
+    await h.flush();
+    expect(h.els['offline-banner-age'].textContent).toBe(OfflineAge.refreshText(REFRESHED, Date.now(), true));
     expect(h.els['offline-banner'].classList.names.has('offline-banner-stale')).toBe(true);
 });
 

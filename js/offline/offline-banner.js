@@ -12,7 +12,6 @@
     var root = document.getElementById('offline-banner');
     if (!root || !window.OfflineAge) return;
     var ageEl = document.getElementById('offline-banner-age');
-    var authEl = document.getElementById('offline-banner-auth');
     var backEl = document.getElementById('offline-banner-back');
     // The settings modal's body is fetched from /api/settings/modal, so it is
     // unreachable while the server is down; hide the link until it answers.
@@ -52,11 +51,12 @@
     var read = false;
     var lastSync = null;
     var missing = 0;
+    var lapsed = false;
 
     function paintAge() {
         var now = Date.now();
-        ageEl.textContent = OfflineAge.bannerText(lastSync, now, left, missing);
-        root.classList.toggle('offline-banner-stale', OfflineAge.isStale(lastSync, now) || missing > 0);
+        ageEl.textContent = OfflineAge.bannerText(lastSync, now, left, missing, lapsed);
+        root.classList.toggle('offline-banner-stale', OfflineAge.isStale(lastSync, now) || missing > 0 || lapsed);
     }
 
     function renderAge() {
@@ -80,17 +80,21 @@
         }
     }
 
+    function setLapsed(on) {
+        if (on === lapsed) return;
+        lapsed = on;
+        if (read) paintAge();
+    }
+
     function renderAuth() {
         if (window.OfflineMode && typeof OfflineMode.status === 'function') {
             var s = OfflineMode.status();
             if (s && s.authLapsed) {
-                authEl.hidden = false;
+                setLapsed(true);
                 return;
             }
         }
-        metaGet('authLapsed').then(function (lapsed) {
-            authEl.hidden = !lapsed;
-        });
+        metaGet('authLapsed').then(function (v) { setLapsed(!!v); });
     }
 
     function probe() {

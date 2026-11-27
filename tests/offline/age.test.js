@@ -12,15 +12,27 @@ const DAY = 24 * HOUR;
 
 function ago(ms) { return new Date(NOW - ms).toISOString(); }
 
+const SHORT = { dateStyle: 'short', timeStyle: 'short' };
+
 test('refreshText says when prices were last refreshed', () => {
-    const at = (ms) => new Date(NOW - ms).toLocaleString();
-    expect(OfflineAge.refreshText(ago(5 * MIN), NOW)).toBe('Offline prices last refreshed at ' + at(5 * MIN) + '.');
-    expect(OfflineAge.refreshText(ago(3 * DAY), NOW)).toBe('Offline prices last refreshed at ' + at(3 * DAY) + '.');
+    const at = (ms) => new Date(NOW - ms).toLocaleString(undefined, SHORT);
+    expect(OfflineAge.refreshText(ago(5 * MIN), NOW)).toBe('Offline prices from ' + at(5 * MIN) + '.');
+    expect(OfflineAge.refreshText(ago(3 * DAY), NOW)).toBe('Offline prices from ' + at(3 * DAY) + '.');
 });
 
 test('refreshText marks prices older than three days stale', () => {
-    const at = new Date(NOW - 4 * DAY).toLocaleString();
-    expect(OfflineAge.refreshText(ago(4 * DAY), NOW)).toBe('Offline prices last refreshed at ' + at + ' (stale).');
+    const at = new Date(NOW - 4 * DAY).toLocaleString(undefined, SHORT);
+    expect(OfflineAge.refreshText(ago(4 * DAY), NOW)).toBe('Offline prices from ' + at + ' (stale).');
+});
+
+test('refreshText says a lapsed subscription paused syncing, in place of stale', () => {
+    const at = new Date(NOW - 4 * DAY).toLocaleString(undefined, SHORT);
+    expect(OfflineAge.refreshText(ago(4 * DAY), NOW, true)).toBe('Subscription lapsed: prices from ' + at + ', syncing paused.');
+    expect(OfflineAge.bannerText(ago(4 * DAY), NOW, 0, 0, true)).toBe(OfflineAge.refreshText(ago(4 * DAY), NOW, true));
+});
+
+test('a lapsed subscription says so on a device never refreshed', () => {
+    expect(OfflineAge.refreshText(null, NOW, true)).toBe('Subscription lapsed: prices have not been refreshed on this device yet, syncing paused.');
 });
 
 test('refreshText reads missing or invalid lastSync as never refreshed', () => {
