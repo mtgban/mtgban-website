@@ -35,9 +35,9 @@ func onlyGraded(p *prices, stores []string, graded bool) []string {
 func compareSlabs(a, b banprice.Entry) int {
 	grader := func(e banprice.Entry) int {
 		if e.Grader == "" {
-			return len(slabGraders)
+			return len(mtgban.Graders)
 		}
-		return slices.Index(slabGraders, e.Grader)
+		return slices.Index(mtgban.Graders, e.Grader)
 	}
 	return cmp.Or(
 		cmp.Compare(grader(a), grader(b)),
