@@ -718,7 +718,11 @@ override; phone UA detection via `mileusna/useragent`).
   Sold. Charts,
   alerts, exports and the price, buylist and velocity sorts are all of raw
   copies, and left off; its random card (`/randomgraded`) is one a graded
-  store the reader sees lists, their `SearchSellersList` choices included.
+  store the reader sees there lists. The page hides the sellers of its own
+  list, `SearchGradedSellersList` (Settings → Search → Graded Page Stores, and the
+  phone drawer's Graded Page Sellers), in place of `SearchSellersList`, so a
+  seller of slabs hidden from search still shows here, and one hidden here
+  still shows in search.
 
 ### 5.2 Upload (`upload.go`)
 

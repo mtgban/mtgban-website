@@ -567,6 +567,15 @@ func TestSettingsModalSplitsGradedSellers(t *testing.T) {
 	if strings.Count(body, ">Graded</h5>") != 2 {
 		t.Errorf("want a Graded heading on each tab, have %d", strings.Count(body, ">Graded</h5>"))
 	}
+
+	// The Graded page's own list, a section of its own, has the slabs alone.
+	cells := gridCells(body, "settings-graded-sellers-graded")
+	if !strings.Contains(cells, `name="ZZSLAB"`) || strings.Contains(cells, `name="ZZRAW"`) {
+		t.Errorf("the Graded page's grid lists:\n%s\nwant ZZSLAB alone", cells)
+	}
+	if !strings.Contains(body, `id="settings-graded-sellers-graded" data-skip-cookie="SearchGradedSellersList"`) {
+		t.Error("the Graded page's grid does not keep SearchGradedSellersList")
+	}
 }
 
 // The upload tiebreak's custom order offers the sealed stores beside the

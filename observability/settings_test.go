@@ -92,10 +92,10 @@ func TestSettingsCounts(t *testing.T) {
 			byPath[s.Path]++
 		}
 	}
-	if byClass["preference"] != 95 || byClass["transient"] != 17 || byClass["admin"] != 1 {
-		t.Errorf("classes = %v, want 95 preference, 17 transient, 1 admin", byClass)
+	if byClass["preference"] != 96 || byClass["transient"] != 17 || byClass["admin"] != 1 {
+		t.Errorf("classes = %v, want 96 preference, 17 transient, 1 admin", byClass)
 	}
-	want := map[string]int{"root": 64, "upload": 23, "arbit": 1, "reverse": 1, "global": 1, "sleepers": 3, "newspaper": 2}
+	want := map[string]int{"root": 65, "upload": 23, "arbit": 1, "reverse": 1, "global": 1, "sleepers": 3, "newspaper": 2}
 	if !maps.Equal(byPath, want) {
 		t.Errorf("preference entries by path = %v, want %v", byPath, want)
 	}
@@ -160,11 +160,11 @@ func TestSettingEntries(t *testing.T) {
 	}
 }
 
-// The 57 settings the modal and the mobile drawer can change (the scopes
+// The 58 settings the modal and the mobile drawer can change (the scopes
 // of ui.settings.change) are preference entries under exactly these names.
 func TestSettingsCoverTheModal(t *testing.T) {
 	names := []string{
-		"SearchSellersList", "SearchVendorsList", "SearchDefaultSort", "SearchListingPriority",
+		"SearchSellersList", "SearchVendorsList", "SearchGradedSellersList", "SearchDefaultSort", "SearchListingPriority",
 		"SearchSellersPriority", "SearchVendorsPriority", "SearchBuylistSecondary", "SearchSealedContents",
 		"SearchStoreFactors",
 		"UploadCustomOpts.enabled",
@@ -182,8 +182,8 @@ func TestSettingsCoverTheModal(t *testing.T) {
 	for _, f := range []string{"lowval", "highval", "lowvalabs", "highvalabs", "minmargin", "unpack", "nocond", "noprice", "customperc", "noresults"} {
 		names = append(names, "UploadOptimizerOpts."+f)
 	}
-	if len(names) != 57 {
-		t.Fatalf("%d names, want 57", len(names))
+	if len(names) != 58 {
+		t.Fatalf("%d names, want 58", len(names))
 	}
 	for _, n := range names {
 		if !IsSetting(n) {
@@ -256,8 +256,8 @@ func TestSettingsJSONServesPreferencesOnly(t *testing.T) {
 	if err := json.Unmarshal(SettingsJSON(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Settings) != 95 {
-		t.Fatalf("served %d entries, want 95", len(got.Settings))
+	if len(got.Settings) != 96 {
+		t.Fatalf("served %d entries, want 96", len(got.Settings))
 	}
 	raw := string(SettingsJSON())
 	for _, leak := range []string{"uploadTab", "adminFixMode", "mtgban_metrics_snap", "mtgban_metrics_queue", "mtgban_search_layout", "upload.value_set", "\"class\"", "\"area\""} {

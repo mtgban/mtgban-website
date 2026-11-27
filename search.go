@@ -676,6 +676,8 @@ type SearchVars struct {
 	SetKeyrunes  map[string]string
 	NoSort       bool
 	HasAvailable bool
+	// The sellers of slabs among SellerKeys, which the Graded page lists
+	GradedSellerKeys []string
 
 	// A search ran for this request. Not the same as SearchQuery being set:
 	// a pinned filter searches on its own, and the page has results to draw
@@ -786,6 +788,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// starts with nothing pinned.
 	pageVars.IsSealed = r.URL.Path == "/sealed"
 	pageVars.IsGraded = r.URL.Path == "/graded"
+	if pageVars.IsGraded {
+		blocklistRetail, blocklistBuylist = gradedBlocklists(r, sig)
+	}
 	scope := strings.TrimSpace(r.FormValue("scope"))
 	pinnedConfig := scopeConfig(ds, p, scope, pageVars.IsSealed, false)
 	pinned := pinnedConfig.CardFilters
@@ -817,6 +822,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if pageVars.IsMobile {
 		pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys(p)
 		pageVars.SealedStores = p.sealedStores()
+		pageVars.GradedSellerKeys = onlyGraded(p, pageVars.SellerKeys, true)
 		pageVars.StoreNames = p.storeNames()
 		pageVars.StoreFactorOptions = storeFactorOptions(p, pageVars.SellerKeys, pageVars.VendorKeys)
 	}

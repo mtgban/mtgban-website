@@ -23,7 +23,7 @@
         // the unticked ones. Each list's grids carry data-skip-cookie="<cookie>".
         stores: [
             // search
-            'SearchSellersList', 'SearchVendorsList',
+            'SearchSellersList', 'SearchVendorsList', 'SearchGradedSellersList',
             // arbit, global, reverse
             'ArbitVendorsList', 'GlobalVendorsList', 'ReverseVendorsList',
             // sleep

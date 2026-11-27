@@ -191,6 +191,12 @@ for (const [file, ids, box, results] of [
         expect(page.log.rendered[0].ctx).toMatchObject({ hiddenSellers: ['CK', 'TCG'], hiddenVendors: ['SCG'], byStore: true });
     });
 
+    test(file + ' hides the Graded page\'s own stores in graded mode', async () => {
+        const cookies = { SearchSellersList: 'CK', SearchGradedSellersList: 'SLABS' };
+        const page = await started(file, { ids, search: '?q=x&graded=1', cookies });
+        expect(page.log.rendered[0].ctx).toMatchObject({ hiddenSellers: ['SLABS'], graded: true });
+    });
+
     test(file + ' puts a submitted query in the history and runs it', async () => {
         const page = await started(file, { ids, queries: { bolt: [row('a'), row('b')] } });
         page.log.mounted.onSubmit('bolt');
