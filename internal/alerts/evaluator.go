@@ -287,8 +287,8 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 		}
 		_, _, ok := deps.Resolve(a.CardID)
 		if !ok {
-			setState(ctx, deps, &sum, a, State{Status: StatusUnresolvable, AboveArmed: a.AboveArmed, BelowArmed: a.BelowArmed, LastError: "card no longer in the datastore"})
-			stopped[a.ID] = true
+			// Skipped, not parked: a short datastore must not stop the alert.
+			deps.logf("alerts: %d skipped, card %s not in the datastore", a.ID, a.CardID)
 			sum.skipped++
 			continue
 		}
