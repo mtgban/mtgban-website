@@ -153,6 +153,7 @@ func TestGradedSlab(t *testing.T) {
 		{"BGS", 10, "blackLabel", mtgban.Slab{Grader: "BGS", Score: 10, Label: "Black Label"}, true},
 		{"BGS", 9.5, "", mtgban.Slab{Grader: "BGS", Score: 9.5}, true},
 		{"tag", 8, "", mtgban.Slab{Grader: "TAG", Score: 8}, true},
+		{"AIGRADING", 9.5, "", mtgban.Slab{Grader: "AiGrading", Score: 9.5}, true},
 		// No group on the Graded page for these.
 		{"SGC", 10, "", mtgban.Slab{}, false},
 		{"ACE", 10, "", mtgban.Slab{}, false},

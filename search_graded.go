@@ -13,9 +13,6 @@ import (
 	"github.com/mtgban/mtgban-website/internal/salesvelocity"
 )
 
-// slabGraders is the order the Graded page lists the graders in.
-var slabGraders = []string{"PSA", "BGS", "CGC", "TAG"}
-
 // otherSlabs is the group of the slabs with no grader the page can list them
 // under: one it does not know, or no details at all.
 const otherSlabs = mtgban.Condition("Other slabs")
@@ -118,7 +115,7 @@ func gradedVelocity(m cardMetadata, snap *salesvelocity.GradedSnapshot, keys []s
 // first, its labels above the plain score and one with no score below them all.
 func slabOrder(x, y mtgban.Slab) int {
 	return cmp.Or(
-		cmp.Compare(slices.Index(slabGraders, x.Grader), slices.Index(slabGraders, y.Grader)),
+		cmp.Compare(slices.Index(mtgban.Graders, x.Grader), slices.Index(mtgban.Graders, y.Grader)),
 		cmp.Compare(y.Score, x.Score),
 		cmp.Compare(slabLabelRank(x.Label), slabLabelRank(y.Label)),
 		strings.Compare(x.Label, y.Label),

@@ -65,9 +65,6 @@ var gradedLabels = map[string]string{
 	"perfect":    "Perfect",
 }
 
-// gradedGraders are the graders the Graded page lists slabs under.
-var gradedGraders = []string{"PSA", "BGS", "CGC", "TAG"}
-
 // GradedSale is one sold slab.
 type GradedSale struct {
 	// Seconds since the epoch, UTC.
@@ -375,12 +372,14 @@ func namesNumber(title, digits string) bool {
 // gradedSlab is the slab a sale was of, as the stores list it, and whether
 // the Graded page lists that grader.
 func gradedSlab(company string, grade float64, label string) (mtgban.Slab, bool) {
-	company = strings.ToUpper(company)
 	tier, found := gradedLabels[label]
-	if !found || !slices.Contains(gradedGraders, company) {
+	grader := slices.IndexFunc(mtgban.Graders, func(name string) bool {
+		return strings.EqualFold(name, company)
+	})
+	if !found || grader < 0 {
 		return mtgban.Slab{}, false
 	}
-	return mtgban.Slab{Grader: company, Score: grade, Label: tier}, true
+	return mtgban.Slab{Grader: mtgban.Graders[grader], Score: grade, Label: tier}, true
 }
 
 // gradedStats counts what a load read and could not keep.

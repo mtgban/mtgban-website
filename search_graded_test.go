@@ -32,6 +32,8 @@ func TestGroupBySlab(t *testing.T) {
 				row("I", 80, mtgban.Slab{Grader: "BGS", Score: 10, Label: "Pristine"}),
 				row("J", 85, mtgban.Slab{Grader: "BGS", Score: 10, Label: "Black Label"}),
 				row("K", 60, mtgban.Slab{Grader: "BGS", Score: 10}),
+				row("L", 40, mtgban.Slab{Grader: "AiGrading", Score: 10}),
+				row("M", 45, mtgban.Slab{Grader: "GRAAD", Score: 9.5}),
 			},
 			"SP": {
 				row("G", 15, mtgban.Slab{Grader: "CGC", Label: "Less than 8"}),
@@ -43,7 +45,7 @@ func TestGroupBySlab(t *testing.T) {
 	for byPrice, wantCGC := range map[bool]string{true: "DA", false: "AD"} {
 		found := gather()
 		keys := groupBySlab(found, byPrice)
-		want := []mtgban.Condition{"PSA 10", "BGS 10 Black Label", "BGS 10 Pristine", "BGS 10", "BGS 9.5", "CGC 10 Pristine", "CGC 10", "CGC Less than 8", otherSlabs}
+		want := []mtgban.Condition{"PSA 10", "BGS 10 Black Label", "BGS 10 Pristine", "BGS 10", "BGS 9.5", "CGC 10 Pristine", "CGC 10", "CGC Less than 8", "GRAAD 9.5", "AiGrading 10", otherSlabs}
 		if !slices.Equal(keys, want) {
 			t.Errorf("byPrice %v: groups = %q, want %q", byPrice, keys, want)
 		}

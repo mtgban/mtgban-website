@@ -597,10 +597,10 @@ components:
             NM, SP, MP, HP or PO (Near Mint, Slightly Played, Moderately
             Played, Heavily Played or Poor), best first; absent for an index
             price and for sealed products. A slab's is its grade, such as
-            PSA 9 or CGC 10 Pristine, by grader (PSA, BGS, CGC, TAG) and
-            then best grade first, or Other slabs, last, without a grader
-            it can be filed under
-        grader: { type: string, description: "A slab's grader: PSA, BGS, CGC or TAG" }
+            PSA 9 or CGC 10 Pristine, by grader (PSA, BGS, CGC, TAG, GRAAD,
+            AiGrading) and then best grade first, or Other slabs, last,
+            without a grader it can be filed under
+        grader: { type: string, description: "A slab's grader: PSA, BGS, CGC, TAG, GRAAD or AiGrading" }
         score: { type: number, format: float, description: "A slab's score, 1 to 10 in half steps" }
         label:
           type: string
