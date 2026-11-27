@@ -39,7 +39,7 @@
             <div class="arb-store-group-label">Select Store</div>
             <div class="arb-store-grid">
                 {{range .ExtraNav}}
-                    {{if not (contains .Name "Sealed")}}
+                    {{if not (or (contains .Name "Sealed") (slice_has $.GradedStores .Short))}}
                         <a class="card arb-store-card" href="{{.Link}}" data-track="ui.arbit.store_select" data-track-value="landing_card">
                             <span class="store-name">{{.Name}}</span>
                             <span class="arb-store-arrow">&rarr;</span>
@@ -61,6 +61,28 @@
                 <div class="arb-store-grid">
                     {{range .ExtraNav}}
                         {{if contains .Name "Sealed"}}
+                            <a class="card arb-store-card" href="{{.Link}}" data-track="ui.arbit.store_select" data-track-value="landing_card">
+                                <span class="store-name">{{.Name}}</span>
+                                <span class="arb-store-arrow">&rarr;</span>
+                            </a>
+                        {{end}}
+                    {{end}}
+                </div>
+            </div>
+        {{end}}
+
+        {{$showGraded := false}}
+        {{range .ExtraNav}}
+            {{if slice_has $.GradedStores .Short}}
+                {{$showGraded = true}}
+            {{end}}
+        {{end}}
+        {{if $showGraded}}
+            <div class="arb-store-group">
+                <div class="arb-store-group-label">Graded Cards</div>
+                <div class="arb-store-grid">
+                    {{range .ExtraNav}}
+                        {{if slice_has $.GradedStores .Short}}
                             <a class="card arb-store-card" href="{{.Link}}" data-track="ui.arbit.store_select" data-track-value="landing_card">
                                 <span class="store-name">{{.Name}}</span>
                                 <span class="arb-store-arrow">&rarr;</span>
@@ -126,7 +148,7 @@
                 <span class="store-type">{{if .GlobalMode}}Index{{else if .ReverseMode}}Selling to{{else}}Buying from{{end}}</span>
                 <select class="arb-store-select" onchange="goToStore(this.value)" data-pick="store">
                     {{range .ExtraNav}}
-                        {{if not (contains .Name "Sealed")}}
+                        {{if not (or (contains .Name "Sealed") (slice_has $.GradedStores .Short))}}
                             {{if .Active}}
                                 <option value="" selected>{{.Name}}</option>
                             {{else}}
@@ -150,6 +172,22 @@
                             {{end}}
                         {{end}}
                     {{end}}
+                    {{$hasGraded := false}}
+                    {{range .ExtraNav}}
+                        {{if slice_has $.GradedStores .Short}}{{$hasGraded = true}}{{end}}
+                    {{end}}
+                    {{if $hasGraded}}
+                        <option disabled>──────────</option>
+                        {{range .ExtraNav}}
+                            {{if slice_has $.GradedStores .Short}}
+                                {{if .Active}}
+                                    <option value="" selected>{{.Name}}</option>
+                                {{else}}
+                                    <option value="{{.Link}}">{{.Name}}</option>
+                                {{end}}
+                            {{end}}
+                        {{end}}
+                    {{end}}
                 </select>
             </div>
             {{if .Arb}}
@@ -157,7 +195,12 @@
                 <span class="store-type">{{if .ReverseMode}}Buying from{{else}}Selling to{{end}}</span>
                 <select class="arb-store-select" onchange="if(this.value) location.hash = this.value" data-pick="jump">
                     <option value="" disabled selected>Jump to…</option>
+                    {{/* The graded sections come last, after a rule */}}
+                    {{$afterRaw := false}}
                     {{range .Arb}}
+                        {{$graded := slice_has $.GradedStores .Key}}
+                        {{if and $graded $afterRaw}}<option disabled>──────────</option>{{end}}
+                        {{$afterRaw = not $graded}}
                         <option value="{{.Name}}">{{.Name}} ({{len .Arbit}})</option>
                     {{end}}
                 </select>
