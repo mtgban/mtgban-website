@@ -542,6 +542,32 @@ func TestSettingsModalSplitsSealedVendors(t *testing.T) {
 	}
 }
 
+// The seller grids list the sellers of slabs under a Graded heading, apart
+// from the raw and sealed stores, whatever the raw ones are called.
+func TestSettingsModalSplitsGradedSellers(t *testing.T) {
+	signingEnabled(t, true)
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Slab Shop", Shorthand: "ZZSLAB", GradedMode: true}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Raw Shop", Shorthand: "ZZRAW"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Graded Goods", Shorthand: "ZZGOODS"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Box Shop", Shorthand: "ZZBOX", SealedMode: true}),
+	}, nil)
+	body := fetchSettingsModal(t, grantSig(t, "Search", "Reverse"))
+	for _, grid := range []string{"settings-search-sellers", "settings-reverse-vendors"} {
+		for section, in := range map[string][]string{"singles": {"ZZRAW", "ZZGOODS"}, "sealed": {"ZZBOX"}, "graded": {"ZZSLAB"}} {
+			cells := gridCells(body, grid+"-"+section)
+			for _, key := range []string{"ZZRAW", "ZZGOODS", "ZZBOX", "ZZSLAB"} {
+				if strings.Contains(cells, `name="`+key+`"`) != slices.Contains(in, key) {
+					t.Errorf("%s-%s lists:\n%s\nwant %v alone", grid, section, cells, in)
+				}
+			}
+		}
+	}
+	if strings.Count(body, ">Graded</h5>") != 2 {
+		t.Errorf("want a Graded heading on each tab, have %d", strings.Count(body, ">Graded</h5>"))
+	}
+}
+
 // The upload tiebreak's custom order offers the sealed stores beside the
 // singles ones, and the custom buylist to a reader who may define one.
 func TestSettingsModalTieOrderListsSealedStores(t *testing.T) {

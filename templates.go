@@ -68,6 +68,18 @@ func storeLabel(name string, sealed bool) string {
 	return name
 }
 
+// storeSection is the section of a store picker a store is listed in:
+// "sealed", "graded" or "singles".
+func storeSection(key string, sealed map[string]bool, graded []string) string {
+	switch {
+	case sealed[key]:
+		return "sealed"
+	case slices.Contains(graded, key):
+		return "graded"
+	}
+	return "singles"
+}
+
 func csvWithout(csv, drop string) string {
 	parts := strings.Split(csv, ",")
 	out := parts[:0]
@@ -373,6 +385,8 @@ var funcMap = template.FuncMap{
 	},
 	"storeLabel": storeLabel,
 	"slab_name":  slabName,
+	// The section of a store picker a store is listed in
+	"store_section": storeSection,
 	// The Graded page landing's sold slabs, newest first
 	"sold_slabs": soldSlabs,
 	"slice_has": func(s []string, p string) bool {
