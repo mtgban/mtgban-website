@@ -21,6 +21,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/mtgban/mtgban-website/internal/docparse"
+	"github.com/mtgban/mtgban-website/internal/infrastructure"
 	"github.com/mtgban/mtgban-website/internal/xlsread/xlstest"
 )
 
@@ -1032,5 +1033,58 @@ func TestLoadCollectionOversizePageErrors(t *testing.T) {
 	_, _, err := loadCollection(context.Background(), collectionParser(), collectionLink, uploadRowLimit)
 	if err == nil || !strings.Contains(err.Error(), "larger than") {
 		t.Fatalf("got %v, want a page past maxCollectionPage refused", err)
+	}
+}
+
+// TCGplayer's refusal is reported with its status, not parsed as a page.
+func TestLoadCollectionRefusedErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+	}))
+	defer srv.Close()
+	useCollectionServer(t, srv, 30*time.Second)
+
+	_, _, err := loadCollection(context.Background(), collectionParser(), collectionLink, uploadRowLimit)
+	if err == nil || !strings.Contains(err.Error(), "403") {
+		t.Fatalf("got %v, want the 403 reported", err)
+	}
+}
+
+// A collection that does not exist lands on TCGplayer's home page, which has
+// no collection table.
+func TestReadCollectionPageWithoutTableErrors(t *testing.T) {
+	page := strings.NewReader(`<html><head><title>TCGplayer</title></head><body></body></html>`)
+	_, _, err := readCollectionPage(collectionParser(), page, uploadRowLimit)
+	if err == nil || !strings.Contains(err.Error(), "no TCGplayer collection") {
+		t.Fatalf("got %v, want no collection found", err)
+	}
+}
+
+// With a TCGplayer uploader configured, the page is asked of it by id.
+func TestLoadCollectionGoesThroughTheProxy(t *testing.T) {
+	quietUploadLog(t)
+
+	header := []string{"Name", "Set", "Printing", "Condition", "Quantity", "Notes"}
+	rows := map[string][]string{"9999": {"Counterspell", "Ice Age", "Normal", "LP", "2", ""}}
+	page, err := io.ReadAll(collectionPage(header, rows, []string{"9999"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var asked string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = r.URL.Path
+		w.Write(page)
+	}))
+	defer srv.Close()
+	useCollectionServer(t, srv, 30*time.Second)
+	withInfrastructureConfig(t, "infrastructure.json")
+	infrastructurePtr.Store(&infrastructure.Config{Uploader: map[string]string{"tcgplayer": "https://proxifier.test/tcgcollection/"}})
+
+	entries, _, err := loadCollection(context.Background(), collectionParser(), collectionLink+"/extra", uploadRowLimit)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("got %d rows, %v, want 1 row", len(entries), err)
+	}
+	if asked != "/tcgcollection/1" {
+		t.Errorf("asked for %q, want the proxy's /tcgcollection/1", asked)
 	}
 }

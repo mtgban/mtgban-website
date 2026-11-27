@@ -383,7 +383,8 @@ save, and each has an admin tab that edits it (§5.9):
   `max_session_days`; `clear_on_negative`; `renew_timeout_seconds`),
   `patreon_webhook_secret` (the secret Patreon signs its webhook with;
   `/webhook/patreon` answers 404 while it is empty),
-  `uploader` (the Moxfield and Collectr endpoints), `handoff_origins`
+  `uploader` (the Moxfield, Collectr and TCGplayer collection endpoints;
+  with no `tcgplayer` one, a collection is fetched from TCGplayer itself), `handoff_origins`
   (the sites `/upload/handoff` takes a card list from, each `{"name",
   "seller"}`: the name its results are headed with, and the path segment
   its URLs name a seller after; a list in a link is known by its referrer
