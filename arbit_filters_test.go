@@ -343,7 +343,7 @@ func TestArbitMinProfitAsShown(t *testing.T) {
 		"card": {Card: matcher.Card{Name: "Plain Card", Rarity: "rare", SetCode: "AAA", Number: "10"}, Edition: "Alpha Set"},
 	}}
 	vendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{
-		"card": {{Conditions: "NM", BuyPrice: 0.98, Quantity: 5}},
+		"card": {{Conditions: "NM", BuyPrice: 1.003, Quantity: 5}},
 	}, mtgban.ScraperInfo{Name: "vendor"})
 	seller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
 		"card": {{Conditions: "NM", Price: 0.8492, Quantity: 3}},

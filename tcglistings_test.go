@@ -414,16 +414,17 @@ func sameInventory(a, b mtgban.InventoryRecord) bool {
 // profitability, whatever stock caps it, and drops one that was profitable
 // enough only on its stock.
 func TestRankDirectAsOneCopy(t *testing.T) {
+	weight := mtgban.QuantityWeight(16)
 	arbit := []mtgban.ArbitEntry{
-		{CardID: "stocked", Quantity: 16, Profitability: 6},
+		{CardID: "stocked", Quantity: 16, Profitability: 3 * weight},
 		{CardID: "single", Quantity: 1, Profitability: 3},
-		{CardID: "thin", Quantity: 16, Profitability: 4},
+		{CardID: "thin", Quantity: 16, Profitability: 2 * weight},
 	}
 	got := rankDirectAsOneCopy(arbit, 2.5)
 	if len(got) != 2 || got[0].CardID != "stocked" || got[1].CardID != "single" {
 		t.Fatalf("kept %+v, want stocked and single", got)
 	}
-	if got[0].Profitability != 3 || got[0].Quantity != 16 {
+	if math.Abs(got[0].Profitability-3) > 1e-9 || got[0].Quantity != 16 {
 		t.Errorf("stocked: profitability %v quantity %d, want 3 and the trade's 16", got[0].Profitability, got[0].Quantity)
 	}
 	if got[1].Profitability != 3 {
