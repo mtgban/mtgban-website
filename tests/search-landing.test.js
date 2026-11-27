@@ -22,3 +22,8 @@ test('the landscape nav opens the sealed category jump the hidden bar holds', ()
     expect(btn).toContain("getElementById('m-filter-overlay')||document.getElementById('m-sealed-cat-overlay')");
     expect(btn).toContain("getElementById('m-filter-sheet')||document.getElementById('m-sealed-cat-sheet')");
 });
+
+test('a landscape category jump stops under the nav, the bar being in it', () => {
+    const landscape = css.slice(css.indexOf('@media (orientation: landscape)'));
+    expect(landscape).toMatch(/\.m-sealed-section \{\s*scroll-margin-top: 56px;/);
+});

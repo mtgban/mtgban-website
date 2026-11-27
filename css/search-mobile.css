@@ -1999,6 +1999,11 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
         display: none !important;
     }
 
+    /* the bar is in the nav, so a jumped-to section clears the nav alone */
+    .m-sealed-section {
+        scroll-margin-top: 56px;
+    }
+
     /* Reclaim the space: page no longer needs extra top padding for search bar */
     .m-page:has(.m-search-bar-sticky) {
         padding-top: 0;
