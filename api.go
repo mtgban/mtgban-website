@@ -811,6 +811,9 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 			allKeys = allKeys[:MaxAPISearchResults]
 		}
 	}
+	if lang == "" {
+		lang = sharedLanguage(b, allKeys)
+	}
 
 	canRetail := canAccessMode(enabledModes, "retail")
 	canBuylist := canAccessMode(enabledModes, "buylist")

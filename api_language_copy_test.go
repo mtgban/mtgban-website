@@ -2,12 +2,21 @@ package main
 
 import (
 	"cmp"
+	"encoding/json"
+	"fmt"
 	"maps"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"slices"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/apisig"
+	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 // languageCopyOf returns a nonfoil printing of set carrying an identifier
@@ -167,5 +176,110 @@ func TestLanguageCopySetsListEveryCopy(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		t.Errorf("languageCopySet lacks %v", slices.Sorted(maps.Keys(missing)))
+	}
+}
+
+// TestSharedLanguage checks the language a request naming none reads its
+// cards in: theirs when they share one other than English.
+func TestSharedLanguage(t *testing.T) {
+	skipWithoutDatastore(t)
+	b := backend()
+	both := slices.Concat(b.GetUUIDsInSet("FBB"), b.GetUUIDsInSet("FBBFR"))
+	for _, tc := range []struct {
+		name  string
+		uuids []string
+		want  string
+	}{
+		{"FBBFR", b.GetUUIDsInSet("FBBFR"), "French"},
+		{"4BBPT", b.GetUUIDsInSet("4BBPT"), "Portuguese (Brazil)"},
+		{"FBB", b.GetUUIDsInSet("FBB"), ""},
+		{"FBB and FBBFR", both, ""},
+		{"FBBFR and 4BBES", slices.Concat(b.GetUUIDsInSet("FBBFR"), b.GetUUIDsInSet("4BBES")), ""},
+		{"none", nil, ""},
+	} {
+		if got := sharedLanguage(b, tc.uuids); got != tc.want {
+			t.Errorf("%s: %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestAPIReadsALanguageCopySetInItsLanguage checks that a request naming no
+// language finds a copy under the id it shares with its original where it
+// asks for that copy's set alone, on search, the price API and history,
+// and finds the original where it asks for both.
+func TestAPIReadsALanguageCopySetInItsLanguage(t *testing.T) {
+	skipWithoutDatastore(t)
+	co, original := languageCopyOf(t, "FBBFR", "scryfallId", matcher.IDSpaceScryfall)
+	id := original.Identifiers["scryfallId"]
+	inv := mtgban.InventoryRecord{}
+	inv.Add(original.UUID, &mtgban.InventoryEntry{Conditions: "NM", Price: 700, Quantity: 1, URL: "u"})
+	inv.Add(co.UUID, &mtgban.InventoryEntry{Conditions: "NM", Price: 300, Quantity: 1, URL: "u"})
+	withPrices(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Copies", Shorthand: "COPIES"}),
+	}, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Copies", Shorthand: "COPIES"}),
+	})
+	signingEnabled(t, false)
+	withAPIUserSecret(t, "plan@example.com", "plan-secret")
+	key := apisig.Mint([]byte("plan-secret"), signatureLink(), apisig.Claims{
+		API:     "ALL_ACCESS",
+		Fields:  url.Values{"APImode": {"all"}, "UserEmail": {"plan@example.com"}},
+		Expires: time.Now().Add(time.Hour).Unix(),
+	})
+	requests := 0
+	retail := func(handler http.HandlerFunc, target string) float64 {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, target+"&sig="+url.QueryEscape(key), nil)
+		// The API limiter is shared and keyed on the address.
+		requests++
+		req.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", 120+requests)
+		rec := httptest.NewRecorder()
+		enforceAPISigning(handler).ServeHTTP(rec, req)
+		var out PriceAPIOutputV2
+		err := json.Unmarshal(rec.Body.Bytes(), &out)
+		if err != nil {
+			t.Fatalf("%s: %v\n%s", target, err, rec.Body.String())
+		}
+		entries := out.Retail[id][v2Finish(co)]["COPIES"]
+		if len(out.Retail) != 1 || len(entries) != 1 {
+			t.Errorf("%s: %v, want %s alone", target, out.Retail, id)
+			return 0
+		}
+		return entries[0].Price
+	}
+	for _, tc := range []struct {
+		handler http.HandlerFunc
+		target  string
+		want    float64
+	}{
+		{testSite.SearchAPI, "/api/v2/search/retail/" + url.PathEscape(co.Name+" s:FBBFR") + ".json?id=scryfall", 300},
+		{testSite.SearchAPI, "/api/v2/search/retail/" + url.PathEscape(co.Name) + ".json?id=scryfall", 700},
+		{testSite.PriceAPIv2, "/api/v2/retail/FBBFR.json?id=scryfall", 300},
+		{testSite.PriceAPIv2, "/api/v2/retail/" + co.UUID + ".json?id=scryfall", 300},
+		{testSite.PriceAPIv2, "/api/v2/retail/" + original.UUID + ".json?id=scryfall", 700},
+	} {
+		if got := retail(tc.handler, tc.target); got != tc.want {
+			t.Errorf("%s: %v, want %v", tc.target, got, tc.want)
+		}
+	}
+
+	historyFixture(t, map[int64]map[string]timeseries.ProviderPrices{
+		1: {"2026-10-06": {1: 7}},
+		2: {"2026-10-06": {1: 3}},
+	}, nil)
+	historyBanID = func(card *matcher.CardObject) int64 {
+		return map[string]int64{original.UUID: 1, co.UUID: 2}[card.UUID]
+	}
+	days := 365
+	page := slices.Index(backend().GetUUIDsInSet("FBBFR"), co.UUID)/historyCardsAllowed(days) + 1
+	for _, target := range []string{
+		"/api/v2/history/" + co.UUID + ".json",
+		fmt.Sprintf("/api/v2/history/FBBFR.json?page=%d", page),
+	} {
+		_, out := historyGet(t, testSite, target, "history", strconv.Itoa(days), nil)
+		ck := out.Retail[id][v2Finish(co)]["CK"]
+		if out.Error != "" || ck == nil || !slices.Equal(ck.Prices, []float64{3}) {
+			t.Errorf("%s: %q %v, want %s at 3", target, out.Error, out.Retail, id)
+		}
 	}
 }

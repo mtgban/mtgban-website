@@ -444,6 +444,11 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 			json.NewEncoder(w).Encode(&out)
 			return
 		}
+		if lang == "" && filterByHash != nil {
+			lang = sharedLanguage(b, filterByHash)
+		} else if lang == "" {
+			lang = sharedLanguage(b, b.GetUUIDsInSet(filterByEdition))
+		}
 	}
 
 	// Only filtered output can have csv encoding, and only for retail or buylist requests
@@ -672,6 +677,25 @@ func apiLanguage(v string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("unknown language %q", v)
+}
+
+// sharedLanguage is the language every card of uuids is printed in, or ""
+// where one is English or two differ. A request naming no language reads
+// cards all in one other language in theirs, so that a copy answers under
+// the ids it shares with its original.
+func sharedLanguage(b *matcher.Backend, uuids []string) string {
+	var lang string
+	for _, uuid := range uuids {
+		co, err := b.GetUUID(uuid)
+		if err != nil {
+			continue
+		}
+		if co.Language == "" || co.Language == "English" || (lang != "" && co.Language != lang) {
+			return ""
+		}
+		lang = co.Language
+	}
+	return lang
 }
 
 // originalOf returns the card of another set that id names in space, which co
