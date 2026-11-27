@@ -61,12 +61,12 @@ func TestBulkOffersMagic(t *testing.T) {
 		// Not a Commander deck's: a CMM booster foil, a Secret Lair deck's
 		{"04ef11e8-3918-5332-9f7c-3dc29d972c5e_f", "Bulk Foil Mythic Rare"}, // Kozilek, CMM
 		{"00a1f936-ee43-55a3-aaa2-03adeb7d8f81_f", "Bulk Foil Mythic Rare"}, // Hexdrinker, SLD
-		// Timeshifted rares and mythics are refused in any finish; TSR's
-		// modern-frame cards are not timeshifted
-		{"16790491-a95d-5f99-8ae4-1f3bc0d78f4f", ""},          // Solitude, H2R
-		{"16790491-a95d-5f99-8ae4-1f3bc0d78f4f_f", ""},        // Solitude, H2R foil
-		{"485ea57b-16d8-54ba-a84a-c86e57cc70d7", ""},          // The First Sliver, H1R foil
-		{"00dc5683-b09e-5860-8ebb-ed9ad78bf9b0", "Bulk Rare"}, // Glittering Wish, TSR
+		// Timeshifted rares and mythics are refused in nonfoil, and a foil
+		// keeps its foil row; TSR's modern-frame cards are not timeshifted
+		{"16790491-a95d-5f99-8ae4-1f3bc0d78f4f", ""},                        // Solitude, H2R
+		{"16790491-a95d-5f99-8ae4-1f3bc0d78f4f_f", "Bulk Foil Mythic Rare"}, // Solitude, H2R foil
+		{"485ea57b-16d8-54ba-a84a-c86e57cc70d7", "Bulk Foil Mythic Rare"},   // The First Sliver, H1R foil
+		{"00dc5683-b09e-5860-8ebb-ed9ad78bf9b0", "Bulk Rare"},               // Glittering Wish, TSR
 		// A playtest card outside Mystery Booster 2 keeps its row
 		{"43a4c626-e28a-58a9-a724-de287a1bd7db", "Bulk Rare"}, // Counterspell, SLD
 		// Refused: memorabilia, book promo, Un-set, gold border, token,
