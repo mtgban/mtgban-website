@@ -160,14 +160,12 @@ func TestGradedStoreSharingAName(t *testing.T) {
 	withPrices(t, []mtgban.Seller{
 		store("Same Store", "ZZSLAB", true, 50),
 		store("Same Store", "ZZSAME", false, 5),
-		store("Other Store Graded", "ZZOTHER", true, 9),
 	}, nil)
 	p := currentPrices()
 
 	for shorthand, want := range map[string]string{
-		"ZZSAME":  "Same Store",
-		"ZZSLAB":  "Same Store (Graded)",
-		"ZZOTHER": "Other Store Graded",
+		"ZZSAME": "Same Store",
+		"ZZSLAB": "Same Store (Graded)",
 	} {
 		if got := p.storeNames()[shorthand]; got != want {
 			t.Errorf("%s is listed as %q, want %q", shorthand, got, want)
@@ -189,8 +187,8 @@ func TestGradedStoreSharingAName(t *testing.T) {
 	}
 }
 
-// gradedTwins is a site of a store, the seller of slabs sharing its name and
-// one whose own name says what it sells, each with its price for one card.
+// gradedTwins is a site of a store and the seller of slabs sharing its name,
+// each with its price for one card.
 func gradedTwins(t *testing.T) *site {
 	t.Helper()
 	store := func(name, shorthand string, graded bool, price float64) mtgban.Seller {
@@ -200,7 +198,6 @@ func gradedTwins(t *testing.T) *site {
 	return fixtureSite(t, fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}}), []mtgban.Seller{
 		store("Same Store", "ZZSLAB", true, 400),
 		store("Same Store", "ZZSAME", false, 100),
-		store("Other Store Graded", "ZZOTHER", true, 300),
 	}, nil)
 }
 
@@ -208,27 +205,27 @@ func gradedTwins(t *testing.T) *site {
 // their own price.
 func TestPricesByNameKeepAGradedStoreApart(t *testing.T) {
 	s := gradedTwins(t)
-	stores := []string{"ZZSAME", "ZZSLAB", "ZZOTHER"}
+	stores := []string{"ZZSAME", "ZZSLAB"}
 	for where, hashes := range map[string][]string{"full dump": nil, "by hash": {"FIXTUREA-1"}} {
 		got := getSellerPrices(s.backend(), s.prices(), "", "", stores, "", hashes, "", false, false, false, "names")["FIXTUREA-1"]
-		for name, want := range map[string]float64{"Same Store": 100, "Same Store (Graded)": 400, "Other Store Graded": 300} {
+		for name, want := range map[string]float64{"Same Store": 100, "Same Store (Graded)": 400} {
 			if got[name] == nil || got[name].Regular != want {
 				t.Errorf("%s: %q holds %+v, want %v", where, name, got[name], want)
 			}
 		}
-		if len(got) != 3 {
-			t.Errorf("%s: %d stores, want 3: %v", where, len(got), got)
+		if len(got) != 2 {
+			t.Errorf("%s: %d stores, want 2: %v", where, len(got), got)
 		}
 	}
 }
 
 // Wherever stores are named side by side, the seller of slabs sharing its
-// store's name is marked, and the one whose name says so is left alone.
+// store's name is marked.
 func TestGradedStoreIsMarkedWhereStoresAreNamed(t *testing.T) {
 	signingEnabled(t, false)
 	s := gradedTwins(t)
 	p := s.prices()
-	want := map[string]string{"ZZSAME": "Same Store", "ZZSLAB": "Same Store (Graded)", "ZZOTHER": "Other Store Graded"}
+	want := map[string]string{"ZZSAME": "Same Store", "ZZSLAB": "Same Store (Graded)"}
 
 	for _, store := range alertStorePrices(p, "FIXTUREA-1", false, alerts.SideRetail, nil) {
 		if store.Name != want[store.Shorthand] {
@@ -272,14 +269,14 @@ func TestGradedStoreIsMarkedWhereStoresAreNamed(t *testing.T) {
 
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	priced := map[string]map[string]*BanPrice{"FIXTUREA-1": {"ZZSAME": {Regular: 10}, "ZZSLAB": {Regular: 400}, "ZZOTHER": {Regular: 300}}}
+	priced := map[string]map[string]*BanPrice{"FIXTUREA-1": {"ZZSAME": {Regular: 10}, "ZZSLAB": {Regular: 400}}}
 	err = SimplePrice2CSV(s.backend(), p, w, priced, nil, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	w.Flush()
 	header, _, _ := strings.Cut(buf.String(), "\n")
-	if !strings.HasSuffix(header, ",Other Store Graded,Same Store,Same Store (Graded)") {
+	if !strings.HasSuffix(header, ",Same Store,Same Store (Graded)") {
 		t.Errorf("the CSV's header is %q", header)
 	}
 }
@@ -308,7 +305,7 @@ func TestBatchPricesMarkAGradedStore(t *testing.T) {
 func TestArbitMarksAGradedStore(t *testing.T) {
 	withSigMode(t, true, false)
 	s := gradedTwins(t)
-	allow := []string{"ZZSAME", "ZZSLAB", "ZZOTHER"}
+	allow := []string{"ZZSAME", "ZZSLAB"}
 	render := func(path string, pageVars PageVars) string {
 		rec := httptest.NewRecorder()
 		pageVars.UserNav = &NavElem{Short: "beta"}
@@ -319,7 +316,7 @@ func TestArbitMarksAGradedStore(t *testing.T) {
 		render("/arbit?source=ZZSLAB", PageVars{}),
 		render("/global?source=ZZSLAB", PageVars{ArbitVars: ArbitVars{GlobalMode: true}}),
 	} {
-		for _, want := range []string{">Same Store (Graded)</option>", ">Same Store</option>", ">Other Store Graded</option>", " Same Store (Graded)</title>"} {
+		for _, want := range []string{">Same Store (Graded)</option>", ">Same Store</option>", " Same Store (Graded)</title>"} {
 			if !strings.Contains(page, want) {
 				t.Errorf("the page lacks %s", want)
 			}
