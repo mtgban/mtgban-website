@@ -553,10 +553,16 @@ func (s *site) HistoryAPI(w http.ResponseWriter, r *http.Request) {
 			historyError(w, http.StatusBadRequest, fmt.Sprintf("these ids cover %d printings by finish; at most %d over %d days, ask for fewer cards or a shorter range", len(cos), allowed, days))
 			return
 		}
+		if lang == "" {
+			lang = sharedLanguage(b, slices.Collect(maps.Keys(seenUUID)))
+		}
 	} else {
 		uuids := b.GetUUIDsInSet(set.Code)
 		if sealed {
 			uuids = b.GetSealedUUIDsInSet(set.Code)
+		}
+		if lang == "" {
+			lang = sharedLanguage(b, uuids)
 		}
 		page = 1
 		if ps := r.FormValue("page"); ps != "" {
