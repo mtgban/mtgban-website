@@ -3653,11 +3653,21 @@ func loadCollection(ctx context.Context, parser *docparse.Parser, link string, m
 	if u.Scheme != "https" || u.Host != "store.tcgplayer.com" {
 		return nil, "", errors.New("unsupported URL")
 	}
-	if !strings.Contains(u.Path, "/collection/view/") {
+	_, collectionID, found := strings.Cut(u.Path, "/collection/view/")
+	collectionID, _, _ = strings.Cut(collectionID, "/")
+	if !found || !isURLID(collectionID) {
 		return nil, "", errors.New("unsupported URL")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
+	// TCGplayer refuses datacenter IPs, so where a proxy is configured the
+	// page is fetched through it
+	target := u.String()
+	proxyBase := Infrastructure().Uploader["tcgplayer"]
+	if proxyBase != "" {
+		target = strings.TrimSuffix(proxyBase, "/") + "/" + collectionID
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, http.NoBody)
 	if err != nil {
 		return nil, "", err
 	}
@@ -3666,6 +3676,10 @@ func loadCollection(ctx context.Context, parser *docparse.Parser, link string, m
 		return nil, "", err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("could not load the TCGplayer collection (%s)", resp.Status)
+	}
 
 	// Read whole before parsing, since a cut-off page would parse as fewer rows
 	page, err := io.ReadAll(io.LimitReader(resp.Body, maxCollectionPage+1))
@@ -3697,6 +3711,10 @@ func readCollectionPage(parser *docparse.Parser, body io.Reader, maxRows int) ([
 	doc.Find(`div[id="collectionContainer"] table thead`).Find("th").Each(func(i int, s *goquery.Selection) {
 		header = append(header, s.Text())
 	})
+	// A collection that does not exist redirects to TCGplayer's home page
+	if len(header) == 0 {
+		return nil, "", errors.New("no TCGplayer collection found at this link")
+	}
 
 	indexMap, err := parser.ParseHeader(header)
 	if err != nil {
