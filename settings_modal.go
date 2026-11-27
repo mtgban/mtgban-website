@@ -92,12 +92,12 @@ func sleepModalKeys(p *prices, blocklistRetail, blocklistBuylist []string) (sell
 }
 
 // uploadStoreLists is every store an upload may be priced against, by kind,
-// in display order.
+// in display order. An upload is raw cards, so no seller of slabs is one.
 // Sellers skip MetadataOnly entries; vendors do not.
 func uploadStoreLists(p *prices, sig string) (singlesSellers, sealedSellers, singlesVendors, sealedVendors []string) {
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 	singlesSellers = sortKeysByScraperName(p, p.filterSellers(func(info mtgban.ScraperInfo) bool {
-		return !info.MetadataOnly && !info.SealedMode &&
+		return !info.MetadataOnly && rawSingles(info) &&
 			!slices.Contains(blocklistRetail, info.Shorthand)
 	}))
 	sealedSellers = sortKeysByScraperName(p, p.filterSellers(func(info mtgban.ScraperInfo) bool {
@@ -106,7 +106,7 @@ func uploadStoreLists(p *prices, sig string) (singlesSellers, sealedSellers, sin
 			!Config().apiOnly(info.Shorthand)
 	}))
 	singlesVendors = sortKeysByScraperName(p, p.filterVendors(func(info mtgban.ScraperInfo) bool {
-		return !info.SealedMode &&
+		return rawSingles(info) &&
 			!slices.Contains(blocklistBuylist, info.Shorthand)
 	}))
 	sealedVendors = sortKeysByScraperName(p, p.filterVendors(func(info mtgban.ScraperInfo) bool {

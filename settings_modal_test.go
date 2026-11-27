@@ -104,7 +104,7 @@ func TestSettingsKeysLeaveOutAPIOnlyStores(t *testing.T) {
 }
 
 // The upload stores come by the name shown, any case and overrides included,
-// whatever order they loaded in.
+// whatever order they loaded in, and no seller of slabs is one.
 func TestUploadStoreListsAlphabetical(t *testing.T) {
 	info := func(name, shorthand string, sealed bool) mtgban.ScraperInfo {
 		return mtgban.ScraperInfo{Name: name, Shorthand: shorthand, SealedMode: sealed}
@@ -116,6 +116,7 @@ func TestUploadStoreListsAlphabetical(t *testing.T) {
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info("TCG Player", "TCGPlayer", false)),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info("MTGSeattle", "MSSealed", true)),
 		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info("Mana Pool", "MPSealed", true)),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Mana Pool", Shorthand: "MPGraded", GradedMode: true}),
 	}, []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, info("MTG Mint Card", "MMC", false)),
 		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, info("Manaleak", "ML", false)),
