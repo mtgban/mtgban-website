@@ -350,6 +350,32 @@ func TestTCGCSVWritesTheLoadedPrice(t *testing.T) {
 	}
 }
 
+// The optimizer's Remove from TCG CSV takes copies off at the price they
+// were loaded with, so the copies left keep it; one loaded at the market
+// price, which posts none, is written at today's.
+func TestTCGRemovalKeepsTheLoadedPrice(t *testing.T) {
+	b, p := decklistCSVFixture(t)
+	rec := httptest.NewRecorder()
+	err := writeTagCSV(rec, b, p, "TCG", []string{"FIXTUREA-1", "FIXTUREA-1"},
+		[]string{"-1", "-3"}, []string{"NM", "SP"}, []string{"5", ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := csv.NewReader(rec.Body).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 3 {
+		t.Fatalf("got %d records, want a header and 2 rows", len(records))
+	}
+	for i, want := range [][3]string{{"-1", "5.00", "5.00"}, {"-3", "", "1.30"}} {
+		row := records[i+1]
+		if row[13] != want[0] || row[14] != want[1] || row[15] != want[2] {
+			t.Errorf("%s: quantity %q, My Store Price %q, TCG Marketplace Price %q, want %q", row[7], row[13], row[14], row[15], want)
+		}
+	}
+}
+
 // Uploaded again, the TCGplayer export loads the price it wrote.
 func TestTCGCSVRoundTripsItsPrice(t *testing.T) {
 	b, p := decklistCSVFixture(t)

@@ -571,6 +571,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		hashes := r.Form[hashTag+"hashes"]
 		hashesQtys := r.Form[hashTag+"hashesQtys"]
 		hashesCond := r.Form[hashTag+"hashesCond"]
+		hashesPrice := r.Form[hashTag+"hashesPrice"]
 
 		if hashes != nil && hashTag == "SCGRetail" {
 			err := redirectToSCGMassEntry(w, r, b, p, hashes, hashesQtys, hashesCond)
@@ -585,7 +586,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if hashes != nil {
-			err := writeTagCSV(w, b, p, hashTag, hashes, hashesQtys, hashesCond)
+			err := writeTagCSV(w, b, p, hashTag, hashes, hashesQtys, hashesCond, hashesPrice)
 			if err != nil {
 				UserNotify("upload", err.Error())
 				pageVars.InfoMessage = "Unable to download CSV right now"
@@ -1705,7 +1706,7 @@ func redirectToSCGMassEntry(w http.ResponseWriter, r *http.Request, b *matcher.B
 // writeTagCSV answers with the CSV the store hashTag names (CK, SCG or TCG)
 // imports, listing the cards hashes names. When it fails it drops the
 // download headers, so the caller can answer with a page instead.
-func writeTagCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, hashTag string, hashes, hashesQtys, hashesCond []string) error {
+func writeTagCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, hashTag string, hashes, hashesQtys, hashesCond, hashesPrice []string) error {
 	setCSVDownloadHeaders(w, "ban_"+strings.ToLower(hashTag)+".csv")
 	csvWriter := csv.NewWriter(w)
 
@@ -1716,7 +1717,16 @@ func writeTagCSV(w http.ResponseWriter, b *matcher.Backend, p *prices, hashTag s
 	case "SCG":
 		err = UUID2SCGCSV(p, csvWriter, hashes, hashesQtys)
 	case "TCG":
-		err = UUID2TCGCSV(b, p, csvWriter, hashes, hashesQtys, hashesCond, nil)
+		// The price each row was loaded at, so a removal keeps the copies
+		// left at it rather than repricing them
+		var loaded []float64
+		if len(hashesPrice) == len(hashes) {
+			loaded = make([]float64, len(hashes))
+			for i, price := range hashesPrice {
+				loaded[i], _ = strconv.ParseFloat(price, 64)
+			}
+		}
+		err = UUID2TCGCSV(b, p, csvWriter, hashes, hashesQtys, hashesCond, loaded)
 	}
 	if err != nil {
 		dropDownloadHeaders(w)

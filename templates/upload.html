@@ -1178,6 +1178,7 @@
                                 <input type="hidden" name="TCGhashes" value="{{.CardID}}"/>
                                 <input type="hidden" name="TCGhashesQtys" value="-{{.Quantity}}"/>
                                 <input type="hidden" name="TCGhashesCond" value="{{.Condition}}"/>
+                                <input type="hidden" name="TCGhashesPrice" value="{{if not .LoadedIsMarket}}{{.LoadedPrice}}{{end}}"/>
                             {{end}}
                             <a class="opt-btn remove" href='javascript:void(0)' onclick='document.getElementById("TCG{{$scraperKey}}hashes").submit();' data-track="ui.optimizer.send" data-track-value="tcg_csv" data-track-scope="{{$scraperKey}}">Remove from TCG CSV</a>
                             <noscript>
