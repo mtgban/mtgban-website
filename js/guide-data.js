@@ -584,7 +584,7 @@ window.__BAN_GUIDE = {
                     { value: 'future', short: 'Future frame' },
                     { value: 'foil', short: 'Foil (includes etched)' },
                     { value: 'nonfoil', short: 'Non-foil' },
-                    { value: 'graded', short: 'Search on the Graded page: graded stores only' },
+                    { value: 'graded', short: 'Search on the Graded page: graded stores only; not:graded leaves them out' },
                     { value: 'altfoil', short: 'Any special foil treatment (see Promos & Variants)' },
                     { value: 'japanese / jpn / jp / ja', short: 'Japanese printing' },
                     { value: 'phyrexian / ph', short: 'Phyrexian printing' }

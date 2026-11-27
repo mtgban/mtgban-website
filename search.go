@@ -281,7 +281,7 @@ func scopeApplies(pinned SearchConfig) bool {
 func scopeNarrowsOffers(pinned SearchConfig) bool {
 	return len(pinned.StoreFilters) > 0 || len(pinned.PriceFilters) > 0 ||
 		len(pinned.EntryFilters) > 0 || len(pinned.PostFilters) > 0 ||
-		pinned.SkipRetail || pinned.SkipBuylist || pinned.GradedOnly
+		pinned.SkipRetail || pinned.SkipBuylist || pinned.GradedOnly || pinned.SkipGraded
 }
 
 // parseSearchPage parses what a reader typed into a search's bars. A sealed
@@ -311,6 +311,7 @@ func parseSearchPage(ds *datastore, p *prices, query string, sealed, bareIDs boo
 // Finish is the one axis known for certain: a finish the main bar names
 // replaces a pinned one, the way the last of "&*" is the one that
 // counts, and the bar is marked as overridden rather than read as applied.
+// A typed is:graded or not:graded likewise replaces a pinned one.
 func applySearchScope(config *SearchConfig, pinned SearchConfig) []FilterElem {
 	if !scopeApplies(pinned) {
 		return nil
@@ -326,8 +327,15 @@ func applySearchScope(config *SearchConfig, pinned SearchConfig) []FilterElem {
 	config.EntryFilters = append(config.EntryFilters, pinned.EntryFilters...)
 	config.PostFilters = append(config.PostFilters, pinned.PostFilters...)
 	config.SkipRetail = config.SkipRetail || pinned.SkipRetail
-	config.SkipBuylist = config.SkipBuylist || pinned.SkipBuylist
-	config.GradedOnly = config.GradedOnly || pinned.GradedOnly
+	// A pinned is:graded already skips the buylist, so its skip goes with it.
+	typedGraded := config.GradedOnly || config.SkipGraded
+	if !typedGraded || !pinned.GradedOnly {
+		config.SkipBuylist = config.SkipBuylist || pinned.SkipBuylist
+	}
+	if !typedGraded {
+		config.GradedOnly = pinned.GradedOnly
+		config.SkipGraded = pinned.SkipGraded
+	}
 
 	typedFinish := slices.ContainsFunc(config.CardFilters, asksFinish)
 	var overridden []FilterElem
@@ -899,6 +907,11 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.ShowUpsell = !miscSearchOpts.has("noUpsell")
 
 	config := parseSearchPage(ds, p, query, pageVars.IsSealed, false, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	// A typed not:graded asks for the search page without the graded stores.
+	if config.SkipGraded && pageVars.IsGraded {
+		http.Redirect(w, r, "/search?"+r.URL.RawQuery, http.StatusFound)
+		return
+	}
 	overridden := applySearchScope(&config, pinnedConfig)
 	// is:graded asks for the Graded page's search, which that page draws:
 	// its slabs' sales and velocity, and none of the raw copies' extras.
@@ -2406,6 +2419,9 @@ func searchSellers(p *prices, cardIDs []string, config SearchConfig) (foundSelle
 			continue
 		}
 		if config.GradedOnly && !seller.Info().GradedMode {
+			continue
+		}
+		if config.SkipGraded && seller.Info().GradedMode {
 			continue
 		}
 
