@@ -152,8 +152,8 @@ github.com/mroth/weightedrand/v2 v2.1.0 h1:o1ascnB1CIVzsqlfArQQjeMy1U0NcIbBO5rfd
 github.com/mroth/weightedrand/v2 v2.1.0/go.mod h1:f2faGsfOGOwc1p94wzHKKZyTpcJUW7OJ/9U4yfiNAOU=
 github.com/mtgban/go-cardmarket v0.5.0 h1:cpU4/PzkTlujNDLKHH1TFlLZq2gc8QMPlr8781JfhY4=
 github.com/mtgban/go-cardmarket v0.5.0/go.mod h1:RR9QJ8GSJ5Fj04sw2hw7FWGKHwqVEA3HdFbc6lDVDNE=
-github.com/mtgban/go-mtgban v0.16.1 h1:Jf8eia8N/LgKjgKOQ4Rxoy0GEe0pJRmxsiLRWdL6T9c=
-github.com/mtgban/go-mtgban v0.16.1/go.mod h1:osiIsCh3KPMyxALIv3mcC+rHutYetG2CV/EYd+uWE50=
+github.com/mtgban/go-mtgban v0.16.2 h1:MaJCOC7wZK0R2+Es62M5dv5s5JQbsnsP83WOMiT2o24=
+github.com/mtgban/go-mtgban v0.16.2/go.mod h1:osiIsCh3KPMyxALIv3mcC+rHutYetG2CV/EYd+uWE50=
 github.com/mtgban/go-tcgplayer v0.2.0 h1:n9/vE9yHDhJk0jI0xWddQaJxKlOOzUyfZJ4JJN+ubhc=
 github.com/mtgban/go-tcgplayer v0.2.0/go.mod h1:R27t98OFgcBtz4SnKqoOvYx31UNZi1tGWmH1Hmu/SYI=
 github.com/mtgban/simplecloud v0.1.3 h1:6ib5+mJPmkJqANfd+fx4Sk8/rDxD7aEQvJo+ivyqBfk=
