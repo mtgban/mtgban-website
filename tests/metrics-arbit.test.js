@@ -37,9 +37,9 @@ test.each([
     found.forEach((t) => expectTrack(t, 'ui.arbit.send', value, scope));
 });
 
-test('both landing card lists count landing_card', () => {
+test('all three landing card lists count landing_card', () => {
     const found = tagsWith(arbit, 'class="card arb-store-card"');
-    expect(found.length).toBe(2);
+    expect(found.length).toBe(3);
     found.forEach((t) => expectTrack(t, 'ui.arbit.store_select', 'landing_card', undefined));
 });
 

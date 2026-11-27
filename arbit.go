@@ -392,6 +392,9 @@ type ArbitVars struct {
 
 	// Whether the source trades sealed product
 	SealedSource bool
+
+	// The sellers of slabs, listed apart from the raw stores
+	GradedStores []string
 }
 
 func (s *site) Arbit(w http.ResponseWriter, r *http.Request) {
@@ -614,6 +617,21 @@ func suspectPriceFor(globalMode, reverseMode bool, sourceShort, scraperShort str
 	return nil
 }
 
+// gradedLast moves the sections of the graded stores after the raw ones,
+// each keeping its order.
+func gradedLast(arb []Arbitrage, graded []string) {
+	slices.SortStableFunc(arb, func(a, b Arbitrage) int {
+		gradedA, gradedB := slices.Contains(graded, a.Key), slices.Contains(graded, b.Key)
+		switch {
+		case gradedA == gradedB:
+			return 0
+		case gradedA:
+			return 1
+		}
+		return -1
+	})
+}
+
 // comparableSeller reports whether Global and Reverse compare against a
 // seller: a sealed index prices nothing anyone can buy, so it is left out.
 func comparableSeller(info mtgban.ScraperInfo) bool {
@@ -803,6 +821,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 	})
 
 	// Populate the menu bar with the pool selected above
+	pageVars.GradedStores = gradedStores(p)
 	for _, scraper := range menuScrapers {
 		var link string
 		if pageVars.GlobalMode {
@@ -1106,6 +1125,7 @@ func (s *site) scraperCompare(w http.ResponseWriter, r *http.Request, p *prices,
 		}
 	}
 	pageVars.Metadata.fillSales(salesVelocityStore.Snapshot())
+	gradedLast(pageVars.Arb, pageVars.GradedStores)
 
 	if len(pageVars.Arb) == 0 {
 		pageVars.InfoMessage = "No arbitrage available!"
