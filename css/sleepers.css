@@ -221,6 +221,46 @@
     transform: translateX(2px);
 }
 
+/* ── Saved comparisons, filled by sleepers-gap.js ── */
+.sleepers-comp-saved {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.sleepers-comp-saved[hidden] {
+    display: none;
+}
+
+.sleepers-comp-saved-row {
+    display: flex;
+    gap: 6px;
+}
+
+.sleepers-comp-saved-link {
+    flex: 1;
+    min-width: 0;
+}
+
+.sleepers-comp-saved-remove {
+    flex: none;
+    width: 42px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-dim);
+    font-size: var(--text-xl);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.sleepers-comp-saved-remove:hover {
+    border-color: var(--accent-border);
+    color: var(--normal);
+    background: var(--surface-3);
+}
+
 /* ── Custom comparison builder ── */
 .sleepers-comparator-right {
     display: flex;
@@ -295,6 +335,41 @@
     cursor: pointer;
     transition: filter 0.15s;
     width: 100%;
+}
+
+.sleepers-comp-actions {
+    margin-top: auto;
+    display: flex;
+    gap: 8px;
+}
+
+.sleepers-comp-actions .sleepers-comp-go {
+    margin-top: 0;
+    flex: 1;
+    width: auto;
+}
+
+.sleepers-comp-save {
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    border: 1px solid var(--border-moderate);
+    color: var(--normal);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.sleepers-comp-save:hover {
+    border-color: var(--ainfo);
+}
+
+.sleepers-comp-save:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    border-color: var(--border-moderate);
 }
 
 .sleepers-comp-go:hover {

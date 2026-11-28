@@ -116,15 +116,30 @@
                     <span class="preset-arrow">&rarr;</span>
                 </a>
             </div>
+            {{if .CanShowAll}}
+            {{/* Filled by sleepers-gap.js, the pairs being kept in the browser */}}
+            <div class="sleepers-comp-saved" data-gap-saved hidden></div>
+            <template data-gap-row>
+                <div class="sleepers-comp-saved-row">
+                    <a class="sleepers-comp-preset sleepers-comp-saved-link" data-gap-link data-track="ui.sleepers.gap" data-track-value="saved">
+                        <span class="ref-name" data-gap-ref></span>
+                        <span class="vs">vs</span>
+                        <span class="target-name" data-gap-target></span>
+                        <span class="preset-arrow">&rarr;</span>
+                    </a>
+                    <button type="button" class="sleepers-comp-saved-remove" data-gap-remove title="Remove" data-track="ui.sleepers.gap" data-track-value="remove">&times;</button>
+                </div>
+            </template>
+            {{end}}
         </div>
 
         {{if .CanShowAll}}
         <div class="sleepers-comparator-right">
             <div class="sleepers-comp-custom-title">Custom Comparison</div>
-            <form class="sleepers-comp-builder" action="sleepers" method="GET">
+            <form class="sleepers-comp-builder" action="sleepers" method="GET" data-gap-form>
                 <input type="hidden" name="page" value="gap">
                 <label for="ref">Reference Seller</label>
-                <select name="ref" id="ref" onchange="window.checkSleepersCompare && checkSleepersCompare()">
+                <select name="ref" id="ref">
                     <option value="" disabled selected>Pick a reference...</option>
                     {{range .SellerKeys}}
                         <option value="{{.}}">{{index $.StoreNames .}}</option>
@@ -132,13 +147,16 @@
                 </select>
                 <div class="sleepers-comp-vs-divider">VS</div>
                 <label for="target">Target Seller</label>
-                <select name="target" id="target" onchange="window.checkSleepersCompare && checkSleepersCompare()">
+                <select name="target" id="target">
                     <option value="" disabled selected>Pick where to buy...</option>
                     {{range .SellerKeys}}
                         <option value="{{.}}">{{index $.StoreNames .}}</option>
                     {{end}}
                 </select>
-                <button type="submit" class="sleepers-comp-go" id="sleepers-comp-go" disabled data-track="ui.sleepers.gap" data-track-value="compare">Compare</button>
+                <div class="sleepers-comp-actions">
+                    <button type="submit" class="sleepers-comp-go" id="sleepers-comp-go" data-gap-go disabled data-track="ui.sleepers.gap" data-track-value="compare">Compare</button>
+                    <button type="button" class="sleepers-comp-save" data-gap-save disabled data-track="ui.sleepers.gap" data-track-value="save">&#9734; Save</button>
+                </div>
             </form>
         </div>
         {{else if $.ShowUpsell}}
@@ -153,16 +171,7 @@
 </div>
 
 {{if .CanShowAll}}
-<script>
-function checkSleepersCompare() {
-    var r = document.getElementById('ref');
-    var t = document.getElementById('target');
-    var btn = document.getElementById('sleepers-comp-go');
-    if (r && t && btn) {
-        btn.disabled = !(r.value && t.value && r.value !== t.value);
-    }
-}
-</script>
+<script type="text/javascript" src="/js/sleepers-gap.js?hash={{.Hash}}" defer></script>
 {{end}}
 {{end}}
 

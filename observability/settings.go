@@ -80,6 +80,7 @@ var settings = []Setting{
 	{Name: "mtgban_upload_view", Storage: "local", Path: "root", Kind: "enum", Enum: []string{"rows", "cards"}, Default: "rows", Class: "preference", Area: "upload"},
 	{Name: "mtgban_arbit_presets", Storage: "local", Path: "root", Kind: "blob", Class: "preference", Area: "arbit"},
 	{Name: "mtgban_arbit_pins", Storage: "local", Path: "root", Kind: "blob", Class: "preference", Area: "arbit"},
+	{Name: "mtgban_sleepers_gap_pairs", Storage: "local", Path: "root", Kind: "blob", Class: "preference", Area: "sleepers"},
 	{Name: "mtgban_news_filters", Storage: "local", Path: "root", Kind: "blob", Class: "preference", Area: "news"},
 	{Name: "offline_mode", Storage: "local", Path: "root", Kind: "flag", Default: "off", Class: "preference", Area: "offline"},
 	{Name: "offline_img_editions", Storage: "local", Path: "root", Kind: "list", Class: "preference", Area: "offline"},
