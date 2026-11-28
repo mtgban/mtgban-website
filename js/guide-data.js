@@ -1048,7 +1048,7 @@ window.__BAN_GUIDE = {
             icon: 'moon',
             summary: 'Find cards the market hasn\'t caught up on - no-reprint plays, mismatches, and seller gaps.',
             snippets: [],
-            keywords: ['sleepers', 'reprint', 'mismatch', 'gap', 'hotlist', 'velocity', 'analysis', 'tier', 'rank', 'S', 'F', 'undervalued', 'opportunity', 'arbitrage', 'ocean gap', 'custom comparison', 'seller', 'reference', 'target', 'TCGLow', 'MKMLow', 'MKMTrend', 'Manapool'],
+            keywords: ['sleepers', 'reprint', 'mismatch', 'gap', 'hotlist', 'velocity', 'analysis', 'tier', 'rank', 'S', 'F', 'undervalued', 'opportunity', 'arbitrage', 'ocean gap', 'custom comparison', 'saved comparison', 'seller', 'reference', 'target', 'TCGLow', 'MKMLow', 'MKMTrend', 'Manapool'],
             content: {
                 table: [
                     { value: 'Long Time No Reprint',    short: 'No reprint in 2+ years (excludes bulk / RL / non-tournament)' },
@@ -1057,7 +1057,8 @@ window.__BAN_GUIDE = {
                     { value: 'Sales Velocity',          short: 'Copies sold a day on TCGplayer' },
                     { value: 'Ocean Gap',               short: 'Head-to-head seller comparison' },
                     { value: 'Ocean Gap presets',       short: 'TCG Low vs MKM Low / MKM Trend; MKM Trend vs Card Kingdom / Star City Games / Mana Pool' },
-                    { value: 'Custom comparison',       short: 'Pick any reference seller and target seller (tier-gated)' }
+                    { value: 'Custom comparison',       short: 'Pick any reference seller and target seller (tier-gated)' },
+                    { value: 'Saved comparisons',       short: 'Save a custom pair to keep it one click away under the presets' }
                 ],
                 examples: [
                     { query: '>sleepers + Tab + "Long Time No Reprint"', desc: 'Jump straight to the no-reprint list', palette: true },

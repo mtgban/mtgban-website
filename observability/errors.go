@@ -30,7 +30,7 @@ var scripts = []string{
 	"palette-loader.js", "palette-providers.js", "printings-panel.js", "recent-searches.js", "scope.js",
 	"screener.js", "sealed.js", "search-buyers.js", "search-cards.js", "search-chart.js", "search-modal.js", "search-quick-icons.js",
 	"search-result-nav.js", "search-sidebar.js", "search-track.js", "search-type-focus.js", "search-velocity.js", "section-fold.js",
-	"settings-changes.js", "settings-loader.js", "settings-shell.js", "settings.js", "store-factors.js",
+	"settings-changes.js", "settings-loader.js", "settings-shell.js", "settings.js", "sleepers-gap.js", "store-factors.js",
 	"store-picker.js", "tooltips.js", "upload-columns.js", "upload-edit.js", "upload-exports.js", "upload-form.js", "upload-handoff.js",
 	"upload-optimizer.js", "upload-options.js", "upload-presets.js", "upload-printings.js",
 	"upload-processing.js", "upload-share.js", "upload-sort.js", "upload-store-prompt.js", "upload-tabs.js", "upload-view.js",

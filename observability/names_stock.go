@@ -21,6 +21,7 @@ var stockPrefKeys = []string{
 	"offline_img_editions", "mtgban_popular_collapsed", "mtgban_store_factors",
 	"mtgban_upload_presets", "mtgban_arbit_filters", "mtgban_arbit_presets", "mtgban_arbit_pins",
 	"mtgban_backpack_tabs", "mtgban_backpack_sort", "mtgban_news_filters", "mtgban_upload_sort",
+	"mtgban_sleepers_gap_pairs",
 }
 
 // stockEdges are the bucket edges of each bucketed stock name.

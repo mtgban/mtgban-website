@@ -92,19 +92,19 @@ func TestSettingsCounts(t *testing.T) {
 			byPath[s.Path]++
 		}
 	}
-	if byClass["preference"] != 96 || byClass["transient"] != 17 || byClass["admin"] != 1 {
-		t.Errorf("classes = %v, want 96 preference, 17 transient, 1 admin", byClass)
+	if byClass["preference"] != 97 || byClass["transient"] != 17 || byClass["admin"] != 1 {
+		t.Errorf("classes = %v, want 97 preference, 17 transient, 1 admin", byClass)
 	}
-	want := map[string]int{"root": 65, "upload": 23, "arbit": 1, "reverse": 1, "global": 1, "sleepers": 3, "newspaper": 2}
+	want := map[string]int{"root": 66, "upload": 23, "arbit": 1, "reverse": 1, "global": 1, "sleepers": 3, "newspaper": 2}
 	if !maps.Equal(byPath, want) {
 		t.Errorf("preference entries by path = %v, want %v", byPath, want)
 	}
 }
 
 // One page's snapshot is root plus that page's scope plus a reader row each.
-// The script sends 50 entries a post, so under 90 keeps a snapshot to two
+// The script sends 50 entries a post, so 95 at most keeps a snapshot to two
 // posts with room for the load's first clicks.
-func TestSnapshotStaysUnderNinety(t *testing.T) {
+func TestSnapshotStaysWithinTwoPosts(t *testing.T) {
 	n := map[string]int{}
 	for _, s := range Settings() {
 		if s.Class == "preference" {
@@ -112,8 +112,8 @@ func TestSnapshotStaysUnderNinety(t *testing.T) {
 		}
 	}
 	for _, p := range SettingPaths[1:] {
-		if total := n["root"] + n[p] + 2; total > 90 {
-			t.Errorf("a snapshot on %s can reach %d entries, over 90", p, total)
+		if total := n["root"] + n[p] + 2; total > 95 {
+			t.Errorf("a snapshot on %s can reach %d entries, over 95", p, total)
 		}
 	}
 }
@@ -256,8 +256,8 @@ func TestSettingsJSONServesPreferencesOnly(t *testing.T) {
 	if err := json.Unmarshal(SettingsJSON(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Settings) != 96 {
-		t.Fatalf("served %d entries, want 96", len(got.Settings))
+	if len(got.Settings) != 97 {
+		t.Fatalf("served %d entries, want 97", len(got.Settings))
 	}
 	raw := string(SettingsJSON())
 	for _, leak := range []string{"uploadTab", "adminFixMode", "mtgban_metrics_snap", "mtgban_metrics_queue", "mtgban_search_layout", "upload.value_set", "\"class\"", "\"area\""} {

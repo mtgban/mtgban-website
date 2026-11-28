@@ -529,3 +529,86 @@ test('sync ready settles after the first read, or its failure', async () => {
     expect(await readySettles(true, ok)).toBe(true);
     expect(await readySettles(true, null)).toBe(true);
 });
+
+test('the saved gap pairs ride the synced preferences', () => {
+    const m = source.match(/var PREF_KEYS = \[([\s\S]*?)\];/);
+    expect(m[1]).toContain("'mtgban_sleepers_gap_pairs'");
+});
+
+// Runs reconcile on a device with unsynced gap pairs, and returns the list
+// it pushes over the server's.
+async function reconcileGapPairs(local, server) {
+    const m = { mtgban_userstate_dirty: '1', mtgban_sleepers_gap_pairs: JSON.stringify(local) };
+    const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
+    const state = { version: 3, favorites: [], recents: [], preferences: { mtgban_sleepers_gap_pairs: JSON.stringify(server) } };
+    const puts = [];
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PUT') puts.push(JSON.parse(opts.body));
+        return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(state) });
+    };
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
+        { addEventListener() {} }, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [], capBackpack: (list) => list });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    expect(puts.length).toBe(1);
+    return puts[0].preferences.mtgban_sleepers_gap_pairs;
+}
+
+// Stamps an hour back, so that tombstones are well inside their 30 days
+const T0 = Date.now() - 60 * 60 * 1000;
+const gapPair = (ref, target, at, game = 'magic') => ({ id: game + ':' + ref + '>' + target, game, ref, target, savedAt: T0 + at });
+const gapTomb = (ref, target, at, game = 'magic') => ({ id: game + ':' + ref + '>' + target, del: true, savedAt: T0 + at });
+
+test('the same pair saved on two devices is one entry, and the lists come out newest first', async () => {
+    const pushed = JSON.parse(await reconcileGapPairs(
+        [gapPair('TCGLow', 'CK', 5), gapPair('CK', 'SCG', 1)],
+        [gapPair('TCGLow', 'CK', 3), gapPair('MKMTrend', 'MP', 4)]));
+    expect(pushed).toEqual([gapPair('TCGLow', 'CK', 5), gapPair('MKMTrend', 'MP', 4), gapPair('CK', 'SCG', 1)]);
+});
+
+test('a removal beats an older save, and a save made after it beats the removal', async () => {
+    const pushed = JSON.parse(await reconcileGapPairs(
+        [gapTomb('TCGLow', 'CK', 5), gapPair('CK', 'SCG', 7)],
+        [gapPair('TCGLow', 'CK', 3), gapTomb('CK', 'SCG', 6)]));
+    expect(pushed).toEqual([gapPair('CK', 'SCG', 7), gapTomb('TCGLow', 'CK', 5)]);
+});
+
+test('two devices store the same string whichever list is local', async () => {
+    const a = [gapPair('TCGLow', 'CK', 5), gapTomb('A', 'B', 2), gapPair('CK', 'SCG', 1)];
+    const b = [gapPair('MKMTrend', 'MP', 4), gapTomb('C', 'D', 3), gapPair('SCG', 'CK', 1)];
+    expect(await reconcileGapPairs(a, b)).toBe(await reconcileGapPairs(b, a));
+});
+
+test('two devices\' pairs merge to the newest 10 per game, a delete standing for each dropped', async () => {
+    const local = Array.from({ length: 6 }, (_, i) => gapPair('L' + i, 'CK', 100 + i));
+    const server = Array.from({ length: 6 }, (_, i) => gapPair('S' + i, 'CK', i))
+        .concat(Array.from({ length: 10 }, (_, i) => gapPair('X' + i, 'CK', i, 'lorcana')));
+    const pushed = JSON.parse(await reconcileGapPairs(local, server));
+    const live = pushed.filter((p) => !p.del);
+    expect(live.filter((p) => p.game === 'magic').map((p) => p.ref)).toEqual(['L5', 'L4', 'L3', 'L2', 'L1', 'L0', 'S5', 'S4', 'S3', 'S2']);
+    expect(live.filter((p) => p.game === 'lorcana').length).toBe(10);
+    expect(pushed.filter((p) => p.del).map((p) => p.id)).toEqual(['magic:S0>CK', 'magic:S1>CK']);
+});
+
+test('a pair the cap dropped comes back when saved again past its delete', async () => {
+    const pushed = JSON.parse(await reconcileGapPairs(
+        [gapPair('S0', 'CK', 51)],
+        [gapTomb('S0', 'CK', 50)]));
+    expect(pushed).toEqual([gapPair('S0', 'CK', 51)]);
+});
+
+test('hydrate refreshes the saved gap pairs after writing the synced list', async () => {
+    const m = {};
+    const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const seen = [];
+    const window = { addEventListener() {}, SleepersGap: { refresh: () => seen.push(m.mtgban_sleepers_gap_pairs) } };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
+    const list = JSON.stringify([gapPair('TCGLow', 'CK', 1)]);
+    const res = { status: 200, ok: true, json: () => Promise.resolve({ version: 3, favorites: [], recents: [], preferences: { mtgban_sleepers_gap_pairs: list } }) };
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
+        window, document, storage, session, () => Promise.resolve(res), { mtime: (x) => x.m || x.t || 0 });
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(seen).toEqual([list]);
+});

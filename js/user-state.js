@@ -24,6 +24,7 @@
     var ARBIT_PRESETS_KEY = 'mtgban_arbit_presets';
     var ARBIT_PINS_KEY = 'mtgban_arbit_pins';
     var TABS_KEY = 'mtgban_backpack_tabs';
+    var GAP_KEY = 'mtgban_sleepers_gap_pairs';
     // Keys bundled into the preferences object.
     var PREF_KEYS = [
         'mtgban_fav_sort', 'mtgban_fav_sort_dir',
@@ -33,7 +34,7 @@
         'mtgban_popular_collapsed', 'mtgban_store_factors',
         'mtgban_upload_presets', 'mtgban_arbit_filters', 'mtgban_arbit_presets', 'mtgban_arbit_pins',
         'mtgban_backpack_tabs', 'mtgban_backpack_sort', 'mtgban_news_filters',
-        'mtgban_upload_sort'
+        'mtgban_upload_sort', 'mtgban_sleepers_gap_pairs'
     ];
 
     // The server renders whether the request carried the auth cookie; that is
@@ -268,6 +269,7 @@
         if (window.NewsFilters && typeof window.NewsFilters.refresh === 'function') window.NewsFilters.refresh();
         if (window.ArbitPresets && typeof window.ArbitPresets.refresh === 'function') window.ArbitPresets.refresh();
         if (window.StoreFactors && typeof window.StoreFactors.mirror === 'function') window.StoreFactors.mirror();
+        if (window.SleepersGap && typeof window.SleepersGap.refresh === 'function') window.SleepersGap.refresh();
         // Synced favorites arrive price-less; backfill (self-gating).
         if (typeof window.refreshFavorites === 'function') window.refreshFavorites();
     }
@@ -601,6 +603,7 @@
         if (NEWS_KEY in out) out[NEWS_KEY] = mergeSavedStates(localPrefs[NEWS_KEY], serverPrefs[NEWS_KEY]);
         if (ARBIT_PINS_KEY in out) out[ARBIT_PINS_KEY] = mergeSavedStates(localPrefs[ARBIT_PINS_KEY], serverPrefs[ARBIT_PINS_KEY]);
         if (TABS_KEY in out) out[TABS_KEY] = mergeBackpackTabs(localPrefs[TABS_KEY], serverPrefs[TABS_KEY]);
+        if (GAP_KEY in out) out[GAP_KEY] = mergeGapPairs(localPrefs[GAP_KEY], serverPrefs[GAP_KEY]);
         return out;
     }
 
@@ -751,6 +754,32 @@
             else if (!kept[p.id]) out.push({ id: p.id, del: true, savedAt: Math.max(now, p.savedAt || 0) + 1 });
         });
         return presetsOnClock(out);
+    }
+
+    // The saved Ocean Gap pairs merge as the presets do, then go newest
+    // first and keep the newest 10 of each game, as sleepers-gap.js saves
+    // them, leaving a delete for each pair the cap drops. Both lists are in
+    // a fixed order, so two devices that agree store the same string.
+    var GAP_PAIR_CAP = 10;
+    function mergeGapPairs(local, server) {
+        function newestFirst(a, b) {
+            if (later(a.savedAt, b.savedAt)) return -1;
+            if (later(b.savedAt, a.savedAt)) return 1;
+            return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+        }
+        var merged = mergePresetList(local, server);
+        var live = merged.filter(function(p) {
+            return !p.del && typeof p.game === 'string' && typeof p.ref === 'string' && typeof p.target === 'string';
+        }).sort(newestFirst);
+        var tombs = merged.filter(function(p) { return p.del; });
+        var now = serverNow(), count = {}, out = [];
+        live.forEach(function(p) {
+            count[p.game] = (count[p.game] || 0) + 1;
+            if (count[p.game] <= GAP_PAIR_CAP) out.push(p);
+            else tombs.push({ id: p.id, del: true, savedAt: Math.max(now, p.savedAt || 0) + 1 });
+        });
+        tombs.sort(function(a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
+        return presetsOnClock(out.concat(tombs));
     }
 
     function localFavorites() { try { return JSON.parse(readLocal(FAVORITES_KEY, '[]')); } catch (e) { return []; } }

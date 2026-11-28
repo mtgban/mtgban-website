@@ -86,38 +86,44 @@
                 <span>{{or (index $.StoreNames "MKMTrend") "MKMTrend"}}</span><span class="m-sleep-vs">vs</span><span>{{or (index $.StoreNames "MP") "MP"}}</span>
             </a>
         </div>
+        {{if .CanShowAll}}
+        {{/* Filled by sleepers-gap.js, the pairs being kept in the browser */}}
+        <div class="m-sleep-gap-saved" data-gap-saved hidden></div>
+        <template data-gap-row>
+            <div class="m-sleep-gap-saved-row">
+                <a class="m-sleep-gap-preset m-sleep-gap-saved-link" data-gap-link data-track="ui.sleepers.gap" data-track-value="saved">
+                    <span data-gap-ref></span><span class="m-sleep-vs">vs</span><span data-gap-target></span>
+                </a>
+                <button type="button" class="m-sleep-gap-saved-remove" data-gap-remove title="Remove" data-track="ui.sleepers.gap" data-track-value="remove">&times;</button>
+            </div>
+        </template>
+        {{end}}
 
         {{if .CanShowAll}}
         <div class="m-sleep-gap-custom">
             <span class="m-sleep-gap-custom-title">Custom Comparison</span>
-            <form class="m-sleep-gap-form" action="sleepers" method="GET">
+            <form class="m-sleep-gap-form" action="sleepers" method="GET" data-gap-form>
                 <input type="hidden" name="page" value="gap">
-                <select name="ref" id="ref" aria-label="Reference seller" onchange="window.checkSleepersCompare && checkSleepersCompare()">
+                <select name="ref" id="ref" aria-label="Reference seller">
                     <option value="" disabled selected>Reference seller...</option>
                     {{range .SellerKeys}}
                         <option value="{{.}}">{{index $.StoreNames .}}</option>
                     {{end}}
                 </select>
                 <span class="m-sleep-vs">VS</span>
-                <select name="target" id="target" aria-label="Target seller" onchange="window.checkSleepersCompare && checkSleepersCompare()">
+                <select name="target" id="target" aria-label="Target seller">
                     <option value="" disabled selected>Target seller...</option>
                     {{range .SellerKeys}}
                         <option value="{{.}}">{{index $.StoreNames .}}</option>
                     {{end}}
                 </select>
-                <button type="submit" class="m-sleep-gap-go" id="sleepers-comp-go" disabled data-track="ui.sleepers.gap" data-track-value="compare">Compare</button>
+                <div class="m-sleep-gap-actions">
+                    <button type="submit" class="m-sleep-gap-go" id="sleepers-comp-go" data-gap-go disabled data-track="ui.sleepers.gap" data-track-value="compare">Compare</button>
+                    <button type="button" class="m-sleep-gap-save" data-gap-save disabled data-track="ui.sleepers.gap" data-track-value="save">&#9734; Save</button>
+                </div>
             </form>
         </div>
-        <script>
-        function checkSleepersCompare() {
-            var r = document.getElementById('ref');
-            var t = document.getElementById('target');
-            var btn = document.getElementById('sleepers-comp-go');
-            if (r && t && btn) {
-                btn.disabled = !(r.value && t.value && r.value !== t.value);
-            }
-        }
-        </script>
+        <script type="text/javascript" src="/js/sleepers-gap.js?hash={{.Hash}}" defer></script>
         {{else if $.ShowUpsell}}
         <div class="m-sleep-gap-custom">
             <span class="m-sleep-gap-custom-title">Custom Comparison</span>
